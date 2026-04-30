@@ -1,0 +1,68 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net8.0-windows</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWPF>true</UseWPF>
+    <!-- Windows.Forms requis pour FolderBrowserDialog -->
+    <UseWindowsForms>true</UseWindowsForms>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <!-- Assure que l'application demande les droits admin (nécessaire pour scanner C:\Windows) -->
+    <!-- Voir app.manifest : requestedExecutionLevel level="requireAdministrator" -->
+    <AssemblyName>optiSCAN</AssemblyName>
+    <RootNamespace>optiSCAN</RootNamespace>
+    <Version>2.0.0</Version>
+    <Company>optiSCAN</Company>
+    <Product>optiSCAN — ClamAV Edition</Product>
+    <Copyright>Copyright 2026</Copyright>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Remove="ico.ico" />
+    <None Remove="icons8-historique-des-commandes-50.png" />
+    <None Remove="icons8-mises-à-jour-disponibles-50.png" />
+    <None Remove="icons8-nettoyer-50.png" />
+    <None Remove="icons8-www-50.png" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Resource Include="ico.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="icons8-historique-des-commandes-50.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="icons8-mises-à-jour-disponibles-50.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="icons8-nettoyer-50.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="icons8-www-50.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Resource>
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Binaires ClamAV (x64 + x86) -->
+    <Content Include="clamav\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- Binaires YARA -->
+    <Content Include="yara\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- Règles YARA (.yar) -->
+    <Content Include="rules\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <PackageReference Include="MaterialDesignThemes" Version="5.3.1" />
+  </ItemGroup>
+
+</Project>
