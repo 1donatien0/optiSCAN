@@ -1,0 +1,1135 @@
+<Window x:Class="optiSCAN.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+        mc:Ignorable="d"
+        Title="optiSCAN — Optimiseur &amp; Antivirus"
+        Height="650" Width="960"
+        ResizeMode="NoResize"
+        WindowStartupLocation="CenterScreen"
+        Icon="/ico.ico"
+        Background="#EEF2F7">
+
+    <Window.Resources>
+
+        <!-- Palette -->
+        <SolidColorBrush x:Key="SidebarBg"         Color="#1C2E4A"/>
+        <SolidColorBrush x:Key="SidebarActiveItem"  Color="#0F1F33"/>
+        <SolidColorBrush x:Key="SidebarIndicator"   Color="#2196F3"/>
+        <SolidColorBrush x:Key="SidebarText"        Color="#8EB0CC"/>
+        <SolidColorBrush x:Key="SidebarTextActive"  Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="ContentBg"          Color="#EEF2F7"/>
+        <SolidColorBrush x:Key="HeaderBg"           Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="CardBg"             Color="#FFFFFF"/>
+        <SolidColorBrush x:Key="PrimaryBlue"        Color="#1565C0"/>
+        <SolidColorBrush x:Key="AccentBlue"         Color="#2196F3"/>
+        <SolidColorBrush x:Key="SuccessGreen"       Color="#27AE60"/>
+        <SolidColorBrush x:Key="WarningOrange"      Color="#E67E22"/>
+        <SolidColorBrush x:Key="DangerRed"          Color="#C0392B"/>
+        <SolidColorBrush x:Key="TextDark"           Color="#1A2035"/>
+        <SolidColorBrush x:Key="TextMedium"         Color="#546478"/>
+        <SolidColorBrush x:Key="TextLight"          Color="#8A9DBB"/>
+        <SolidColorBrush x:Key="TextMuted"          Color="#4A6A88"/>
+        <SolidColorBrush x:Key="TextSecondary"      Color="#8EB0CC"/>
+        <SolidColorBrush x:Key="BorderColor"        Color="#1F3555"/>
+        <SolidColorBrush x:Key="CardBrush"          Color="#162236"/>
+
+        <!-- Ombres -->
+        <DropShadowEffect x:Key="CardShadow"
+                          Color="#000000" Opacity="0.07"
+                          BlurRadius="18" ShadowDepth="4" Direction="270"/>
+        <DropShadowEffect x:Key="CardShadowHover"
+                          Color="#1565C0" Opacity="0.12"
+                          BlurRadius="22" ShadowDepth="6" Direction="270"/>
+
+        <!-- Styles DataGrid -->
+        <Style x:Key="DgHeader" TargetType="DataGridColumnHeader">
+            <Setter Property="Background" Value="#1C2E4A"/>
+            <Setter Property="Foreground" Value="#8EB0CC"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="11"/>
+            <Setter Property="Padding" Value="10,8"/>
+            <Setter Property="BorderBrush" Value="#1F3555"/>
+            <Setter Property="BorderThickness" Value="0,0,0,1"/>
+        </Style>
+
+        <Style x:Key="DgRow" TargetType="DataGridRow">
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontSize" Value="12"/>
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#1A3050"/>
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <!-- Bouton sidebar -->
+        <Style x:Key="NavItem" TargetType="RadioButton">
+            <Setter Property="GroupName" Value="Navigation"/>
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource SidebarText}"/>
+            <Setter Property="Height" Value="52"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="OverridesDefaultStyle" Value="True"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="RadioButton">
+                        <Border x:Name="bg" Background="Transparent">
+                            <Grid>
+                                <Rectangle x:Name="bar" Width="3" HorizontalAlignment="Left" Fill="Transparent"/>
+                                <ContentPresenter Margin="28,0,16,0" VerticalAlignment="Center" HorizontalAlignment="Left"/>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsChecked" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="{StaticResource SidebarActiveItem}"/>
+                                <Setter TargetName="bar" Property="Fill" Value="{StaticResource SidebarIndicator}"/>
+                                <Setter Property="Foreground" Value="{StaticResource SidebarTextActive}"/>
+                            </Trigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="#15253A"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Carte d'action -->
+        <Style x:Key="ActionCard" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource CardBg}"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Effect" Value="{StaticResource CardShadow}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="card" Background="{TemplateBinding Background}" CornerRadius="14" Effect="{TemplateBinding Effect}">
+                            <ContentPresenter VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="card" Property="Background" Value="#F5F9FF"/>
+                                <Setter Property="Effect" Value="{StaticResource CardShadowHover}"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="card" Property="Background" Value="#EBF3FF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Bouton primaire -->
+        <Style x:Key="PrimaryButton" TargetType="Button">
+            <Setter Property="Background" Value="{StaticResource PrimaryBlue}"/>
+            <Setter Property="Foreground" Value="White"/>
+            <Setter Property="FontFamily" Value="Segoe UI"/>
+            <Setter Property="FontWeight" Value="SemiBold"/>
+            <Setter Property="FontSize" Value="13"/>
+            <Setter Property="Padding" Value="22,10"/>
+            <Setter Property="BorderThickness" Value="0"/>
+            <Setter Property="Cursor" Value="Hand"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bg" Background="{TemplateBinding Background}"
+                                CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="#1976D2"/>
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="#0D47A1"/>
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.5"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Bouton secondaire -->
+        <Style x:Key="SecondaryButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+            <Setter Property="Background" Value="Transparent"/>
+            <Setter Property="Foreground" Value="{StaticResource PrimaryBlue}"/>
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="bg" Background="Transparent"
+                                BorderBrush="{StaticResource PrimaryBlue}" BorderThickness="1.5"
+                                CornerRadius="8" Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="bg" Property="Background" Value="#EBF3FF"/>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Bouton danger -->
+        <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+            <Setter Property="Background" Value="#C0392B"/>
+        </Style>
+
+        <!-- Bouton warning -->
+        <Style x:Key="WarningButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+            <Setter Property="Background" Value="#E67E22"/>
+        </Style>
+
+        <!-- Bouton success -->
+        <Style x:Key="SuccessButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+            <Setter Property="Background" Value="#27AE60"/>
+        </Style>
+
+    </Window.Resources>
+
+    <!-- LAYOUT PRINCIPAL -->
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="230"/>
+            <ColumnDefinition Width="*"/>
+        </Grid.ColumnDefinitions>
+
+        <!-- SIDEBAR -->
+        <Grid Grid.Column="0" Background="{StaticResource SidebarBg}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="86"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="Auto"/>
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" Background="#162236" BorderBrush="#0F1F33" BorderThickness="0,0,0,1">
+                <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="22,0">
+                    <Border Background="{StaticResource AccentBlue}" CornerRadius="10" Width="38" Height="38" Margin="0,0,12,0">
+                        <md:PackIcon Kind="ShieldCheck" Width="22" Height="22" Foreground="White"
+                                     HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock Text="optiSCAN" Foreground="White" FontFamily="Segoe UI" FontWeight="Bold" FontSize="18"/>
+                        <TextBlock Text="Provided by Dona By" Foreground="{StaticResource SidebarText}" FontFamily="Segoe UI" FontSize="10"/>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <StackPanel Grid.Row="1" Margin="0,12,0,0">
+                <TextBlock Text="MENU" Foreground="#3A5068" FontFamily="Segoe UI" FontSize="9"
+                           FontWeight="Bold" Margin="28,4,0,8"/>
+
+                <RadioButton x:Name="navOverview" Style="{StaticResource NavItem}" IsChecked="True" Checked="NavOverview_Checked">
+                    <StackPanel Orientation="Horizontal">
+                        <md:PackIcon Kind="Monitor" Width="16" Height="16" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Vue d'ensemble" FontFamily="Segoe UI" FontSize="13" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </RadioButton>
+
+                <RadioButton x:Name="navClean" Style="{StaticResource NavItem}" Checked="NavClean_Checked">
+                    <StackPanel Orientation="Horizontal">
+                        <md:PackIcon Kind="Broom" Width="16" Height="16" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Nettoyer" FontFamily="Segoe UI" FontSize="13" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </RadioButton>
+
+                <RadioButton x:Name="navAntivirus" Style="{StaticResource NavItem}" Checked="NavAntivirus_Checked">
+                    <StackPanel Orientation="Horizontal">
+                        <md:PackIcon Kind="ShieldCheck" Width="16" Height="16" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                        <StackPanel>
+                            <TextBlock Text="Antivirus" FontFamily="Segoe UI" FontSize="13"/>
+                            <TextBlock x:Name="txtSidebarAntivirusStatus" Text="ClamAV" FontFamily="Segoe UI" FontSize="9"
+                                       Foreground="{StaticResource SidebarText}"/>
+                        </StackPanel>
+                    </StackPanel>
+                </RadioButton>
+
+                <RadioButton x:Name="navHistory" Style="{StaticResource NavItem}" Checked="NavHistory_Checked">
+                    <StackPanel Orientation="Horizontal">
+                        <md:PackIcon Kind="History" Width="16" Height="16" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Historique" FontFamily="Segoe UI" FontSize="13" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </RadioButton>
+
+                <RadioButton x:Name="navOptions" Style="{StaticResource NavItem}" Checked="NavOptions_Checked">
+                    <StackPanel Orientation="Horizontal">
+                        <md:PackIcon Kind="Cog" Width="16" Height="16" Margin="0,0,12,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Options" FontFamily="Segoe UI" FontSize="13" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </RadioButton>
+            </StackPanel>
+
+            <StackPanel Grid.Row="2" Margin="0,0,0,16">
+                <Separator Background="#1F3555" Margin="20,0,20,12"/>
+                <Button Style="{StaticResource SecondaryButton}" Margin="20,0" Padding="14,8"
+                        Foreground="{StaticResource SidebarText}" Click="Button_Web_Click">
+                    <StackPanel Orientation="Horizontal">
+                        <md:PackIcon Kind="Web" Width="14" Height="14" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="Site web" FontFamily="Segoe UI" FontSize="12"/>
+                    </StackPanel>
+                </Button>
+                <TextBlock Text="Version 1.0.0" HorizontalAlignment="Center" Foreground="BlanchedAlmond"
+                           FontFamily="Segoe UI" FontSize="10" Margin="0,10,0,0"/>
+            </StackPanel>
+        </Grid>
+
+        <!-- ZONE CONTENU -->
+        <Grid Grid.Column="1" Background="{StaticResource ContentBg}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="120"/>
+                <RowDefinition Height="*"/>
+                <RowDefinition Height="38"/>
+            </Grid.RowDefinitions>
+
+            <!-- HEADER -->
+            <Border x:Name="headerBorder" Grid.Row="0" Background="{StaticResource HeaderBg}" BorderBrush="#E2E8F0" BorderThickness="0,0,0,1">
+                <Grid Margin="32,0">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="Auto"/>
+                    </Grid.ColumnDefinitions>
+
+                    <StackPanel VerticalAlignment="Center">
+
+                        <StackPanel Orientation="Horizontal">
+                            <TextBlock Foreground="{StaticResource TextMedium}" FontFamily="Segoe UI" FontSize="12">
+                                <Run FontWeight="SemiBold" Text="Espace à nettoyer : "/>
+                                <Run x:Name="runEspace" Text="—"/>
+                            </TextBlock>
+                            <TextBlock Text="  •  " Foreground="{StaticResource TextLight}" FontSize="12"/>
+                            <TextBlock Foreground="{StaticResource TextMedium}" FontFamily="Segoe UI" FontSize="12">
+                                <Run FontWeight="SemiBold" Text="Dernière analyse : "/>
+                                <Run x:Name="runDate" Text="Jamais"/>
+                            </TextBlock>
+                            <TextBlock Text="  •  " Foreground="{StaticResource TextLight}" FontSize="12"/>
+                            <TextBlock Foreground="{StaticResource TextMedium}" FontFamily="Segoe UI" FontSize="12">
+                                <Run FontWeight="SemiBold" Text="Signatures : "/>
+                                <Run x:Name="runSignatures" Text="—"/>
+                            </TextBlock>
+                        </StackPanel>
+                    </StackPanel>
+
+                </Grid>
+            </Border>
+
+            <!-- PANEL 0 — VUE D'ENSEMBLE -->
+            <Grid x:Name="panelOverview" Grid.Row="1" Margin="28,24,28,0">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                    <RowDefinition Height="Auto"/>
+                </Grid.RowDefinitions>
+
+                <Border Grid.Row="0" Background="White" CornerRadius="12" Padding="16,12" Effect="{StaticResource CardShadow}">
+                    <StackPanel>
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                            <Border Width="28" Height="28" CornerRadius="14" Background="#E8F5E9" Margin="0,0,10,0">
+                                <md:PackIcon Kind="ShieldCheck" Width="16" Height="16" Foreground="{StaticResource SuccessGreen}"
+                                             VerticalAlignment="Center" HorizontalAlignment="Center"/>
+                            </Border>
+                            <TextBlock x:Name="overviewHealthTitle" Text="Votre ordinateur est protégé"
+                                       Foreground="{StaticResource TextDark}" FontFamily="Segoe UI"
+                                       FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center"/>
+                        </StackPanel>
+                        <TextBlock x:Name="overviewHealthSubtitle"
+                                   Text="Définitions à jour. Dernière analyse : jamais."
+                                   Foreground="{StaticResource TextMedium}" FontFamily="Segoe UI" FontSize="12"/>
+                    </StackPanel>
+                </Border>
+
+                <UniformGrid Grid.Row="1" Rows="1" Columns="4" HorizontalAlignment="Stretch" Margin="0,18,0,0">
+                    <Button Style="{StaticResource ActionCard}" Margin="0,0,12,0" Height="210" Click="Button_Nettoyer_Click">
+                        <StackPanel HorizontalAlignment="Center">
+                            <Border Background="#EBF3FF" CornerRadius="40" Width="68" Height="68" HorizontalAlignment="Center" Margin="0,0,0,14">
+                                <md:PackIcon Kind="Broom" Width="34" Height="34" Foreground="{StaticResource PrimaryBlue}"
+                                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="NETTOYER" FontFamily="Segoe UI" FontWeight="Bold" FontSize="14"
+                                       Foreground="{StaticResource TextDark}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                            <TextBlock x:Name="cardCleanSubtitle" Text="Fichiers temporaires"
+                                       FontFamily="Segoe UI" FontSize="11" Foreground="{StaticResource TextLight}" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource ActionCard}" Margin="6,0,6,0" Height="210" Click="Button_Antivirus_Click">
+                        <StackPanel HorizontalAlignment="Center">
+                            <Border x:Name="cardAntivirusDot" Background="#E8F5E9" CornerRadius="40" Width="68" Height="68"
+                                    HorizontalAlignment="Center" Margin="0,0,0,14">
+                                <md:PackIcon Kind="ShieldCheck" Width="34" Height="34" Foreground="{StaticResource SuccessGreen}"
+                                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="ANTIVIRUS" FontFamily="Segoe UI" FontWeight="Bold" FontSize="14"
+                                       Foreground="{StaticResource TextDark}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                            <TextBlock x:Name="cardAntivirusSubtitle" Text="ClamAV opérationnel"
+                                       FontFamily="Segoe UI" FontSize="11" Foreground="{StaticResource SuccessGreen}" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource ActionCard}" Margin="6,0,6,0" Height="210" Click="Button_Histo_Click">
+                        <StackPanel HorizontalAlignment="Center">
+                            <Border Background="#FFF8E1" CornerRadius="40" Width="68" Height="68" HorizontalAlignment="Center" Margin="0,0,0,14">
+                                <md:PackIcon Kind="History" Width="34" Height="34" Foreground="{StaticResource WarningOrange}"
+                                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="HISTORIQUE" FontFamily="Segoe UI" FontWeight="Bold" FontSize="14"
+                                       Foreground="{StaticResource TextDark}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                            <TextBlock x:Name="cardHistorySubtitle" Text="Voir les scans"
+                                       FontFamily="Segoe UI" FontSize="11" Foreground="{StaticResource TextLight}" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button Style="{StaticResource ActionCard}" Margin="12,0,0,0" Height="210" Click="Button_MAJ_Click">
+                        <StackPanel HorizontalAlignment="Center">
+                            <Border Background="#F3E5F5" CornerRadius="40" Width="68" Height="68" HorizontalAlignment="Center" Margin="0,0,0,14">
+                                <md:PackIcon Kind="Refresh" Width="34" Height="34" Foreground="#9C27B0"
+                                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="MISE À JOUR" FontFamily="Segoe UI" FontWeight="Bold" FontSize="14"
+                                       Foreground="{StaticResource TextDark}" HorizontalAlignment="Center" Margin="0,0,0,6"/>
+                            <TextBlock Text="Signatures ClamAV" FontFamily="Segoe UI" FontSize="11"
+                                       Foreground="{StaticResource TextLight}" HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </UniformGrid>
+
+                <Border Grid.Row="2" Margin="0,16,0,16" Background="White" CornerRadius="10"
+                        Padding="20,14" Effect="{StaticResource CardShadow}">
+                    <StackPanel Orientation="Horizontal">
+                        <Ellipse Width="8" Height="8" Fill="{StaticResource AccentBlue}" VerticalAlignment="Center" Margin="0,0,10,0"/>
+                        <TextBlock Foreground="{StaticResource TextMedium}" FontFamily="Segoe UI" FontSize="12" FontStyle="Italic">
+                            optiSCAN est un logiciel made in Vanier — gratuit et respectueux de votre vie privée.
+                        </TextBlock>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- PANEL 1 — NETTOYER -->
+            <Grid x:Name="panelClean" Grid.Row="1" Visibility="Collapsed" Margin="28,24,28,16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <TextBlock Text="Nettoyage du système" Grid.Row="0" FontFamily="Segoe UI" FontSize="18"
+                           FontWeight="SemiBold" Foreground="{StaticResource TextDark}" Margin="0,0,0,18"/>
+
+                <UniformGrid Grid.Row="1" Rows="1" Columns="3">
+                    <Border Background="White" CornerRadius="12" Margin="0,0,10,0" Padding="20" Effect="{StaticResource CardShadow}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                <md:PackIcon Kind="MicrosoftWindows" Width="14" Height="14" Margin="0,0,6,0"
+                                             VerticalAlignment="Center" Foreground="{StaticResource TextDark}"/>
+                                <TextBlock Text="Temp Windows" FontFamily="Segoe UI" FontWeight="SemiBold" FontSize="13"
+                                           Foreground="{StaticResource TextDark}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock x:Name="lblSysTotal" Text="Calcul en cours…" FontFamily="Segoe UI"
+                                       FontSize="22" FontWeight="Bold" Foreground="{StaticResource AccentBlue}"/>
+                            <TextBlock Text="Windows Temp + Temp utilisateur" FontFamily="Segoe UI" FontSize="10"
+                                       Foreground="{StaticResource TextLight}" Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="White" CornerRadius="12" Margin="5,0,5,0" Padding="20" Effect="{StaticResource CardShadow}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                <md:PackIcon Kind="AccountOutline" Width="14" Height="14" Margin="0,0,6,0"
+                                             VerticalAlignment="Center" Foreground="{StaticResource TextDark}"/>
+                                <TextBlock Text="Temp Utilisateur" FontFamily="Segoe UI" FontWeight="SemiBold" FontSize="13"
+                                           Foreground="{StaticResource TextDark}" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock x:Name="lblBrowserTotal" Text="Calcul en cours…" FontFamily="Segoe UI"
+                                       FontSize="22" FontWeight="Bold" Foreground="{StaticResource AccentBlue}"/>
+                            <TextBlock Text="Edge + Chrome + Firefox" FontFamily="Segoe UI" FontSize="10"
+                                       Foreground="{StaticResource TextLight}" Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{StaticResource PrimaryBlue}" CornerRadius="12" Margin="10,0,0,0"
+                            Padding="20" Effect="{StaticResource CardShadow}">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                <md:PackIcon Kind="ChartBarStacked" Width="14" Height="14" Margin="0,0,6,0"
+                                             VerticalAlignment="Center" Foreground="#AACCFF"/>
+                                <TextBlock Text="Total libérable" FontFamily="Segoe UI" FontWeight="SemiBold" FontSize="13"
+                                           Foreground="#AACCFF" VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock x:Name="lblTotalSize" Text="—" FontFamily="Segoe UI" FontSize="22"
+                                       FontWeight="Bold" Foreground="White"/>
+                            <TextBlock Text="Somme des deux cibles" FontFamily="Segoe UI" FontSize="10"
+                                       Foreground="#7AABFF" Margin="0,4,0,0"/>
+                        </StackPanel>
+                    </Border>
+                </UniformGrid>
+
+                <Grid Grid.Row="2" Margin="0,18,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,12">
+                        <Button Style="{StaticResource PrimaryButton}" Click="BtnCleanNow_Click" Margin="0,0,10,0">
+                            <StackPanel Orientation="Horizontal">
+                                <md:PackIcon Kind="Broom" Width="15" Height="15" Margin="0,0,7,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Nettoyer maintenant" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </Button>
+                        <ProgressBar x:Name="cleanProgress" Width="120" Height="6" Margin="10,0,0,0"
+                                     Visibility="Collapsed" IsIndeterminate="True"
+                                     Foreground="{StaticResource AccentBlue}" Background="#E0E8F0"
+                                     BorderBrush="Transparent" VerticalAlignment="Center"/>
+                    </StackPanel>
+
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="300"/>
+                            <ColumnDefinition Width="12"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0" Background="White" CornerRadius="10" Effect="{StaticResource CardShadow}" Padding="14">
+                            <StackPanel>
+                                <TextBlock Text="Sélection des éléments à nettoyer" FontFamily="Segoe UI" FontSize="13"
+                                           FontWeight="SemiBold" Foreground="{StaticResource TextDark}" Margin="0,0,0,12"/>
+
+                                <TextBlock Text="SYSTÈME" FontFamily="Segoe UI" FontSize="10" FontWeight="Bold"
+                                           Foreground="{StaticResource TextLight}" Margin="0,0,0,6"/>
+                                <CheckBox x:Name="chkCleanWinTemp" IsChecked="True" Margin="0,0,0,4">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="Temp Windows" Width="180"/>
+                                        <TextBlock x:Name="lblWinTempSize" Foreground="{StaticResource TextLight}" />
+                                    </StackPanel>
+                                </CheckBox>
+                                <CheckBox x:Name="chkCleanUserTemp" IsChecked="True" Margin="0,0,0,10">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="Temp utilisateur" Width="180"/>
+                                        <TextBlock x:Name="lblUserTempSize" Foreground="{StaticResource TextLight}" />
+                                    </StackPanel>
+                                </CheckBox>
+
+                                <TextBlock Text="NAVIGATEURS" FontFamily="Segoe UI" FontSize="10" FontWeight="Bold"
+                                           Foreground="{StaticResource TextLight}" Margin="0,0,0,6"/>
+                                <CheckBox x:Name="chkCleanEdge" IsChecked="True" Margin="0,0,0,4">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="Edge" Width="180"/>
+                                        <TextBlock x:Name="lblEdgeSize" Foreground="{StaticResource TextLight}" />
+                                    </StackPanel>
+                                </CheckBox>
+                                <CheckBox x:Name="chkCleanChrome" IsChecked="True" Margin="0,0,0,4">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="Chrome" Width="180"/>
+                                        <TextBlock x:Name="lblChromeSize" Foreground="{StaticResource TextLight}" />
+                                    </StackPanel>
+                                </CheckBox>
+                                <CheckBox x:Name="chkCleanFirefox" IsChecked="True" Margin="0,0,0,10">
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBlock Text="Firefox" Width="180"/>
+                                        <TextBlock x:Name="lblFirefoxSize" Foreground="{StaticResource TextLight}" />
+                                    </StackPanel>
+                                </CheckBox>
+
+                                <TextBlock Text="AUTRES" FontFamily="Segoe UI" FontSize="10" FontWeight="Bold"
+                                           Foreground="{StaticResource TextLight}" Margin="0,0,0,6"/>
+                                <CheckBox x:Name="chkCleanBin" IsChecked="True">
+                                    <TextBlock Text="Corbeille"/>
+                                </CheckBox>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="2" Background="White" CornerRadius="10" Effect="{StaticResource CardShadow}" Padding="16">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto">
+                                <TextBlock x:Name="cleanLog" TextWrapping="Wrap" FontFamily="Consolas" FontSize="11"
+                                           Foreground="{StaticResource TextMedium}"
+                                           Text="Cliquez sur Analyser pour évaluer l'espace, puis Nettoyer pour supprimer les fichiers temporaires."/>
+                            </ScrollViewer>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </Grid>
+
+            <!-- PANEL 2 — HISTORIQUE -->
+            <Grid x:Name="panelHistory" Grid.Row="1" Visibility="Collapsed" Margin="28,24,28,16">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto"/>
+                    <RowDefinition Height="*"/>
+                </Grid.RowDefinitions>
+
+                <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,16">
+                    <TextBlock Text="Historique" FontFamily="Segoe UI" FontSize="18"
+                               FontWeight="SemiBold" Foreground="{StaticResource TextDark}"
+                               VerticalAlignment="Center" Margin="0,0,16,0"/>
+                    <Button Style="{StaticResource SecondaryButton}" Click="Button_Antivirus_Click" Padding="14,7">
+                        <StackPanel Orientation="Horizontal">
+                            <md:PackIcon Kind="ShieldCheck" Width="15" Height="15" Margin="0,0,7,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Ouvrir l'antivirus" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+
+                <Border Grid.Row="1" Background="White" CornerRadius="12" Effect="{StaticResource CardShadow}" Padding="8">
+                    <TabControl>
+                        <TabItem Header="Scans antivirus">
+                            <DataGrid x:Name="historyGrid" AutoGenerateColumns="False" CanUserAddRows="False"
+                                      IsReadOnly="True" BorderThickness="0" Background="White" RowBackground="White"
+                                      AlternatingRowBackground="#F8FAFF" GridLinesVisibility="Horizontal"
+                                      HorizontalGridLinesBrush="#EEF2F7" HeadersVisibility="Column"
+                                      ColumnHeaderStyle="{StaticResource DgHeader}" RowStyle="{StaticResource DgRow}">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Date" Width="130" Binding="{Binding StartedAt, StringFormat='dd/MM/yyyy HH:mm'}"/>
+                                    <DataGridTextColumn Header="Type" Width="100" Binding="{Binding TypeDisplay}"/>
+                                    <DataGridTextColumn Header="Cible" Width="*" Binding="{Binding TargetPath}"/>
+                                    <DataGridTextColumn Header="Fichiers" Width="80" Binding="{Binding FilesScanned}"/>
+                                    <DataGridTextColumn Header="Durée" Width="70" Binding="{Binding DurationDisplay}"/>
+                                    <DataGridTextColumn Header="Résultat" Width="120" Binding="{Binding ThreatsBadge}"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </TabItem>
+                        <TabItem Header="Nettoyages système">
+                            <DataGrid x:Name="cleanHistoryGrid" AutoGenerateColumns="False" CanUserAddRows="False"
+                                      IsReadOnly="True" BorderThickness="0" Background="White" RowBackground="White"
+                                      AlternatingRowBackground="#F8FAFF" GridLinesVisibility="Horizontal"
+                                      HorizontalGridLinesBrush="#EEF2F7" HeadersVisibility="Column"
+                                      ColumnHeaderStyle="{StaticResource DgHeader}" RowStyle="{StaticResource DgRow}">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Date" Width="180" Binding="{Binding DateDisplay}"/>
+                                    <DataGridTextColumn Header="Éléments supprimés" Width="200" Binding="{Binding ItemsRemoved}"/>
+                                    <DataGridTextColumn Header="Espace libéré" Width="*" Binding="{Binding FreedDisplay}"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </TabItem>
+                    </TabControl>
+                </Border>
+            </Grid>
+
+            <!-- PANEL 3 — OPTIONS -->
+            <ScrollViewer x:Name="panelOptions" Grid.Row="1" Visibility="Collapsed"
+                          VerticalScrollBarVisibility="Auto" Margin="28,24,28,16">
+                <StackPanel>
+                    <TextBlock Text="Options" FontFamily="Segoe UI" FontSize="18" FontWeight="SemiBold"
+                               Foreground="{StaticResource TextDark}" Margin="0,0,0,20"/>
+
+                    <Border Background="White" CornerRadius="12" Margin="0,0,0,12" Padding="24" Effect="{StaticResource CardShadow}">
+                        <StackPanel>
+                            <TextBlock Text="GÉNÉRAL" FontFamily="Segoe UI" FontSize="10" FontWeight="Bold"
+                                       Foreground="{StaticResource TextLight}" Margin="0,0,0,14"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                                <CheckBox x:Name="chkStartup" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <StackPanel>
+                                    <TextBlock Text="Lancer optiSCAN au démarrage de Windows" FontFamily="Segoe UI"
+                                               FontSize="13" Foreground="{StaticResource TextDark}"/>
+                                    <TextBlock Text="Ajoute optiSCAN au démarrage automatique" FontFamily="Segoe UI"
+                                               FontSize="11" Foreground="{StaticResource TextLight}"/>
+                                </StackPanel>
+                            </StackPanel>
+                            <StackPanel Orientation="Horizontal">
+                                <CheckBox x:Name="chkNotifications" IsChecked="True" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <StackPanel>
+                                    <TextBlock Text="Notifications Windows" FontFamily="Segoe UI" FontSize="13"
+                                               Foreground="{StaticResource TextDark}"/>
+                                    <TextBlock Text="Alertes si menace détectée ou mise à jour disponible"
+                                               FontFamily="Segoe UI" FontSize="11" Foreground="{StaticResource TextLight}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="White" CornerRadius="12" Margin="0,0,0,12" Padding="24" Effect="{StaticResource CardShadow}">
+                        <StackPanel>
+                            <TextBlock Text="ANTIVIRUS" FontFamily="Segoe UI" FontSize="10" FontWeight="Bold"
+                                       Foreground="{StaticResource TextLight}" Margin="0,0,0,14"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,14">
+                                <CheckBox x:Name="chkAutoUpdate" IsChecked="True" VerticalAlignment="Center" Margin="0,0,12,0"/>
+                                <StackPanel>
+                                    <TextBlock Text="Mise à jour automatique des signatures (toutes les 4h)"
+                                               FontFamily="Segoe UI" FontSize="13" Foreground="{StaticResource TextDark}"/>
+                                    <TextBlock Text="freshclam.exe est lancé en arrière-plan périodiquement"
+                                               FontFamily="Segoe UI" FontSize="11" Foreground="{StaticResource TextLight}"/>
+                                </StackPanel>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="White" CornerRadius="12" Margin="0,0,0,12" Padding="24" Effect="{StaticResource CardShadow}">
+                        <StackPanel>
+                            <TextBlock Text="EXCLUSIONS" FontFamily="Segoe UI" FontSize="10" FontWeight="Bold"
+                                       Foreground="{StaticResource TextLight}" Margin="0,0,0,14"/>
+                            <TextBlock Text="Dossiers ignorés lors de l'analyse" FontFamily="Segoe UI"
+                                       FontSize="13" FontWeight="SemiBold" Foreground="{StaticResource TextDark}" Margin="0,0,0,4"/>
+                            <ListBox x:Name="lstExcludedFolders" Height="90" Margin="0,0,0,8"
+                                     FontFamily="Segoe UI" FontSize="12" BorderBrush="#E2E8F0"
+                                     BorderThickness="1" Background="#F8FAFC"/>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                                <Button x:Name="btnAddFolder" Content="+ Ajouter un dossier" Click="BtnAddExcludedFolder_Click"
+                                        Padding="12,6" Margin="0,0,8,0" FontFamily="Segoe UI" FontSize="12"
+                                        Background="{StaticResource AccentBlue}" Foreground="White" BorderThickness="0" Cursor="Hand"/>
+                                <Button x:Name="btnRemoveFolder" Content="Supprimer" Click="BtnRemoveExcludedFolder_Click"
+                                        Padding="12,6" FontFamily="Segoe UI" FontSize="12"
+                                        Background="#E74C3C" Foreground="White" BorderThickness="0" Cursor="Hand"/>
+                            </StackPanel>
+                            <TextBlock Text="Règles de détection ignorées" FontFamily="Segoe UI" FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{StaticResource TextDark}" Margin="0,0,0,4"/>
+                            <ListBox x:Name="lstExcludedRules" Height="80" Margin="0,0,0,8"
+                                     FontFamily="Segoe UI" FontSize="12" BorderBrush="#E2E8F0"
+                                     BorderThickness="1" Background="#F8FAFC"/>
+                            <StackPanel Orientation="Horizontal">
+                                <TextBox x:Name="txtNewRule" Width="200" Padding="8,6" Margin="0,0,8,0"
+                                         FontFamily="Segoe UI" FontSize="12" BorderBrush="#CBD5E0" BorderThickness="1"
+                                         VerticalContentAlignment="Center" ToolTip="Nom exact de la règle à ignorer"/>
+                                <Button x:Name="btnAddRule" Content="+ Ajouter" Click="BtnAddExcludedRule_Click"
+                                        Padding="12,6" Margin="0,0,8,0" FontFamily="Segoe UI" FontSize="12"
+                                        Background="{StaticResource AccentBlue}" Foreground="White" BorderThickness="0" Cursor="Hand"/>
+                                <Button x:Name="btnRemoveRule" Content="Supprimer" Click="BtnRemoveExcludedRule_Click"
+                                        Padding="12,6" FontFamily="Segoe UI" FontSize="12"
+                                        Background="#E74C3C" Foreground="White" BorderThickness="0" Cursor="Hand"/>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="White" CornerRadius="12" Padding="24" Effect="{StaticResource CardShadow}">
+                        <StackPanel>
+                            <TextBlock Text="À PROPOS" FontFamily="Segoe UI" FontSize="10" FontWeight="Bold"
+                                       Foreground="{StaticResource TextLight}" Margin="0,0,0,14"/>
+                            <TextBlock FontFamily="Segoe UI" FontSize="12" Foreground="{StaticResource TextMedium}" LineHeight="20">
+                                <Run FontWeight="SemiBold" Foreground="{StaticResource TextDark}">optiSCAN v1.0.0</Run>
+                                <LineBreak/>
+                                <Run>Optimiseur système et antivirus pour Windows, propulsé par ClamAV.</Run>
+                                <LineBreak/>
+                                <Run>optiSCAN est un logiciel made in Vanier — gratuit et respectueux de votre vie privée.</Run>
+                            </TextBlock>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+
+            <!-- PANEL 4 — ANTIVIRUS INTÉGRÉ -->
+            <Grid x:Name="panelAntivirus" Grid.Row="1" Visibility="Collapsed" Margin="10,8,10,8">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="210"/>
+                    <ColumnDefinition Width="*"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                    <Border Background="{StaticResource CardBrush}" CornerRadius="10" Padding="16" Margin="5"
+                            BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                        <StackPanel>
+                            <TextBlock Text="LANCER UN SCAN" Foreground="#8EB0CC"
+                                       FontFamily="Segoe UI" FontSize="10" FontWeight="Bold" Margin="0,0,0,12"/>
+
+                            <Border Background="#1A2F4A" CornerRadius="6" Padding="10,6" Margin="0,0,0,10">
+                                <StackPanel Orientation="Horizontal">
+                                    <md:PackIcon Kind="FileSearch" Width="14" Height="14" 
+                                                 Foreground="#50FA7B" Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                    <TextBlock x:Name="antivirusYaraStatus" Text="YARA : chargement..."
+                                               Foreground="#8EB0CC" FontFamily="Segoe UI" FontSize="10"
+                                               VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Border>
+
+                            <Button x:Name="btnQuickScan" Style="{StaticResource PrimaryButton}" Click="BtnQuickScan_Click"
+                                    HorizontalAlignment="Stretch" Margin="0,0,0,2">
+                                <StackPanel Orientation="Horizontal">
+                                    <md:PackIcon Kind="Flash" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Scan Rapide" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <TextBlock Text="Temp · Downloads · Bureau" Foreground="#8EB0CC"
+                                       FontFamily="Segoe UI" FontSize="10" Margin="2,0,0,10"/>
+
+                            <Button x:Name="btnFullScan" Style="{StaticResource PrimaryButton}" Click="BtnFullScan_Click"
+                                    HorizontalAlignment="Stretch" Margin="0,0,0,2">
+                                <StackPanel Orientation="Horizontal">
+                                    <md:PackIcon Kind="Magnify" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Scan Complet" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            <TextBlock Text="Tous les disques (lent)" Foreground="#8EB0CC"
+                                       FontFamily="Segoe UI" FontSize="10" Margin="2,0,0,10"/>
+
+                            <Button x:Name="btnBrowseFolder" Style="{StaticResource PrimaryButton}" Click="BrowseFolder_Click"
+                                    HorizontalAlignment="Stretch" Margin="0,0,0,4">
+                                <StackPanel Orientation="Horizontal">
+                                    <md:PackIcon Kind="FolderOpenOutline" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Scanner un dossier" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+
+                            <Button x:Name="btnBrowseFile" Style="{StaticResource PrimaryButton}" Click="BrowseFile_Click"
+                                    HorizontalAlignment="Stretch" Margin="0,0,0,4">
+                                <StackPanel Orientation="Horizontal">
+                                    <md:PackIcon Kind="FileDocumentOutline" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Scanner un fichier" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+
+                            <Separator Background="#1F3555" Margin="0,10"/>
+
+                            <Button x:Name="btnEicarTest" Style="{StaticResource WarningButton}" Click="BtnEicarTest_Click"
+                                    HorizontalAlignment="Stretch" Margin="0,0,0,6">
+                                <StackPanel Orientation="Horizontal">
+                                    <md:PackIcon Kind="TestTube" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Test EICAR" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+
+                            <Separator Background="#1F3555" Margin="0,10,0,10"/>
+
+                            <Button x:Name="btnStopScan" Style="{StaticResource DangerButton}" Click="BtnStopScan_Click"
+                                    IsEnabled="False" HorizontalAlignment="Stretch">
+                                <StackPanel Orientation="Horizontal">
+                                    <md:PackIcon Kind="StopCircleOutline" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Arrêter le scan" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <Border Background="{StaticResource CardBrush}" CornerRadius="10" Padding="16" Margin="5,4,5,5"
+                            BorderBrush="{StaticResource BorderColor}" BorderThickness="1">
+                        <StackPanel>
+                            <TextBlock Text="STATISTIQUES" Foreground="#8EB0CC"
+                                       FontFamily="Segoe UI" FontSize="10" FontWeight="Bold" Margin="0,0,0,12"/>
+
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="📁 Fichiers analysés" Foreground="#8EB0CC" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="antivirusFilesScanned" Grid.Column="1" Text="0" Foreground="#2196F3" FontWeight="Bold" FontSize="16" VerticalAlignment="Center"/>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="⚠️ Menaces trouvées" Foreground="#8EB0CC" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="antivirusThreatsFound" Grid.Column="1" Text="0" Foreground="#C0392B" FontWeight="Bold" FontSize="16" VerticalAlignment="Center"/>
+                            </Grid>
+
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="🔒 En quarantaine" Foreground="#8EB0CC" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="antivirusQuarantineCount" Grid.Column="1" Text="0" Foreground="#E67E22" FontWeight="Bold" FontSize="16" VerticalAlignment="Center"/>
+                            </Grid>
+
+                            <Grid Margin="0,10,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="🧬 Règles YARA" Foreground="#8EB0CC" FontSize="12" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="antivirusYaraCount" Grid.Column="1" Text="0" Foreground="#50FA7B" FontWeight="Bold" FontSize="16" VerticalAlignment="Center"/>
+                            </Grid>
+
+                            <Separator Background="#1F3555" Margin="0,10,0,10"/>
+
+                            <Grid Margin="0,5,0,0">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="🕐 Dernier scan" Foreground="#8EB0CC" FontSize="11" VerticalAlignment="Center"/>
+                                <TextBlock x:Name="antivirusLastScan" Grid.Column="1" Text="—" Foreground="White" FontSize="11" VerticalAlignment="Center"/>
+                            </Grid>
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+
+                <TabControl Grid.Column="1" Background="#162236" BorderBrush="#1F3555" BorderThickness="1">
+                    <TabItem>
+                        <TabItem.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <md:PackIcon Kind="Magnify" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Scan en cours" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </TabItem.Header>
+                        <Border Padding="12" Background="#162236">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+
+                                <TextBlock x:Name="antivirusStatusMessage" Grid.Row="0" Text="Prêt à scanner"
+                                           Foreground="White" FontFamily="Segoe UI" FontSize="13" 
+                                           TextWrapping="Wrap" Margin="0,0,0,10"/>
+
+                                <ProgressBar x:Name="antivirusProgressBar" Grid.Row="1" Height="8" 
+                                             Foreground="#2196F3" Background="#1F3555" 
+                                             BorderBrush="Transparent" Margin="0,0,0,10"
+                                             Visibility="Collapsed"/>
+
+                                <Border Grid.Row="2" Background="#1A2F4A" CornerRadius="8" Padding="12,8" Margin="0,0,0,10">
+                                    <StackPanel>
+                                        <Grid Margin="0,0,0,5">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="📊 Fichiers scannés :" Foreground="#8EB0CC" FontSize="11"/>
+                                            <TextBlock x:Name="antivirusRealtimeFiles" Grid.Column="1" Text="0" Foreground="White" FontWeight="Bold" FontSize="14"/>
+                                        </Grid>
+                                        <Grid>
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*"/>
+                                                <ColumnDefinition Width="Auto"/>
+                                            </Grid.ColumnDefinitions>
+                                            <TextBlock Text="⚠️ Menaces détectées :" Foreground="#8EB0CC" FontSize="11"/>
+                                            <TextBlock x:Name="antivirusRealtimeThreats" Grid.Column="1" Text="0" Foreground="#C0392B" FontWeight="Bold" FontSize="14"/>
+                                        </Grid>
+                                        <Border Background="#C0392B" CornerRadius="10" Padding="8,2" Margin="0,5,0,0"
+                                                x:Name="threatsBadge" Visibility="Collapsed">
+                                            <TextBlock x:Name="threatsBadgeText" FontFamily="Segoe UI"
+                                                       FontSize="11" FontWeight="Bold" Foreground="White"
+                                                       TextAlignment="Center"/>
+                                        </Border>
+                                    </StackPanel>
+                                </Border>
+
+                                <Border Grid.Row="3" CornerRadius="8" Padding="12,8" Margin="0,0,0,10" 
+                                        Background="#1A2F4A" BorderBrush="#2196F3" BorderThickness="0,0,0,2">
+                                    <TextBlock x:Name="antivirusSummary" Foreground="White" FontFamily="Segoe UI"
+                                               FontSize="13" FontWeight="SemiBold" TextWrapping="Wrap"/>
+                                </Border>
+
+                                <DataGrid x:Name="antivirusThreatsGrid" Grid.Row="4"
+                                          AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True"
+                                          Background="#0D1A2E" RowBackground="#0D1A2E" AlternatingRowBackground="#122035"
+                                          Foreground="White" GridLinesVisibility="Horizontal"
+                                          HorizontalGridLinesBrush="#1F3555" HeadersVisibility="Column"
+                                          BorderBrush="#1F3555" BorderThickness="0" SelectionMode="Single"
+                                          MaxHeight="200">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Fichier" Binding="{Binding FileName}" Width="150"/>
+                                        <DataGridTextColumn Header="Menace" Binding="{Binding VirusName}" Width="*"/>
+                                        <DataGridTextColumn Header="Source" Binding="{Binding DetectedBy}" Width="95"/>
+                                        <DataGridTextColumn Header="Heure" Binding="{Binding DetectedAt, StringFormat='HH:mm:ss'}" Width="70"/>
+                                        <DataGridTextColumn Header="Statut" Binding="{Binding Status}" Width="90"/>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+
+                                <StackPanel Grid.Row="5" Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,10,0,0">
+                                    <Button x:Name="btnQuarantineAll" Style="{StaticResource WarningButton}"
+                                            Click="BtnQuarantineAll_Click" Padding="14,7">
+                                        <StackPanel Orientation="Horizontal">
+                                            <md:PackIcon Kind="ShieldLock" Width="14" Height="14" Margin="0,0,7,0" VerticalAlignment="Center"/>
+                                            <TextBlock Text="Tout mettre en quarantaine" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </TabItem>
+
+                    <TabItem>
+                        <TabItem.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <md:PackIcon Kind="LockOutline" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Quarantaine" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </TabItem.Header>
+                        <Border Padding="12" Background="#162236">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="*"/>
+                                    <RowDefinition Height="Auto"/>
+                                </Grid.RowDefinitions>
+                                <DataGrid x:Name="quarantineGrid" Grid.Row="0"
+                                          AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True"
+                                          Background="#0D1A2E" RowBackground="#0D1A2E" AlternatingRowBackground="#122035"
+                                          Foreground="White" GridLinesVisibility="Horizontal"
+                                          HorizontalGridLinesBrush="#1F3555" BorderBrush="#1F3555" BorderThickness="0">
+                                    <DataGrid.Columns>
+                                        <DataGridTextColumn Header="Fichier" Binding="{Binding FileName}" Width="170"/>
+                                        <DataGridTextColumn Header="Virus" Binding="{Binding VirusName}" Width="*"/>
+                                        <DataGridTextColumn Header="Taille" Binding="{Binding SizeDisplay}" Width="75"/>
+                                        <DataGridTextColumn Header="Quarantaine" Binding="{Binding QuarantinedAt, StringFormat='dd/MM HH:mm'}" Width="110"/>
+                                        <DataGridTemplateColumn Header="Actions" Width="175">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Horizontal" Margin="2,1">
+                                                        <Button Margin="0,0,4,0" Tag="{Binding Id}" Click="BtnRestoreFromQuarantine_Click"
+                                                                Background="#1565C0" Foreground="White" FontSize="10" Padding="7,4" Cursor="Hand">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <md:PackIcon Kind="UndoVariant" Width="12" Height="12" Margin="0,0,4,0"/>
+                                                                <TextBlock Text="Restaurer"/>
+                                                            </StackPanel>
+                                                        </Button>
+                                                        <Button Tag="{Binding Id}" Click="BtnDeleteFromQuarantine_Click"
+                                                                Background="#C0392B" Foreground="White" FontSize="10" Padding="7,4" Cursor="Hand">
+                                                            <StackPanel Orientation="Horizontal">
+                                                                <md:PackIcon Kind="TrashCanOutline" Width="12" Height="12" Margin="0,0,4,0"/>
+                                                                <TextBlock Text="Supprimer"/>
+                                                            </StackPanel>
+                                                        </Button>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+                                <Button Grid.Row="1" x:Name="btnPurgeQuarantine" Style="{StaticResource DangerButton}"
+                                        Click="BtnPurgeQuarantine_Click" HorizontalAlignment="Right" Margin="0,10,0,0">
+                                    <StackPanel Orientation="Horizontal">
+                                        <md:PackIcon Kind="TrashCanOutline" Width="14" Height="14" Margin="0,0,7,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Vider toute la quarantaine" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                            </Grid>
+                        </Border>
+                    </TabItem>
+
+                    <TabItem>
+                        <TabItem.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <md:PackIcon Kind="History" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Historique" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </TabItem.Header>
+                        <Border Padding="12" Background="#162236">
+                            <DataGrid x:Name="antivirusHistoryGrid"
+                                      AutoGenerateColumns="False" CanUserAddRows="False" IsReadOnly="True"
+                                      Background="#0D1A2E" RowBackground="#0D1A2E" AlternatingRowBackground="#122035"
+                                      Foreground="White" GridLinesVisibility="Horizontal"
+                                      HorizontalGridLinesBrush="#1F3555" BorderBrush="#1F3555" BorderThickness="0">
+                                <DataGrid.Columns>
+                                    <DataGridTextColumn Header="Date" Binding="{Binding StartedAt, StringFormat='dd/MM/yyyy HH:mm'}" Width="130"/>
+                                    <DataGridTextColumn Header="Type" Binding="{Binding TypeDisplay}" Width="100"/>
+                                    <DataGridTextColumn Header="Cible" Binding="{Binding TargetPath}" Width="*"/>
+                                    <DataGridTextColumn Header="Fichiers" Binding="{Binding FilesScanned}" Width="75"/>
+                                    <DataGridTextColumn Header="Durée" Binding="{Binding DurationDisplay}" Width="65"/>
+                                    <DataGridTextColumn Header="Résultat" Binding="{Binding ThreatsBadge}" Width="120"/>
+                                </DataGrid.Columns>
+                            </DataGrid>
+                        </Border>
+                    </TabItem>
+
+                    <TabItem>
+                        <TabItem.Header>
+                            <StackPanel Orientation="Horizontal">
+                                <md:PackIcon Kind="DatabaseRefresh" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                <TextBlock Text="Signatures" VerticalAlignment="Center"/>
+                            </StackPanel>
+                        </TabItem.Header>
+                        <Border Padding="16" Background="#162236">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+
+                                <StackPanel Grid.Row="0">
+                                    <TextBlock Text="Base de signatures ClamAV" Foreground="White" FontFamily="Segoe UI"
+                                               FontSize="16" FontWeight="SemiBold" Margin="0,0,0,14"/>
+
+                                    <Grid Margin="0,0,0,14">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+
+                                        <Border Grid.Column="0" Background="#1A2F4A" CornerRadius="8" Padding="14,10" Margin="0,0,8,0"
+                                                BorderBrush="#1F3555" BorderThickness="1">
+                                            <StackPanel>
+                                                <TextBlock Text="VERSION ACTUELLE" Foreground="#8EB0CC" FontSize="10" FontWeight="Bold"/>
+                                                <TextBlock x:Name="signatureVersion" Foreground="#2196F3" FontSize="20" FontWeight="Bold" Margin="0,4,0,0"/>
+                                            </StackPanel>
+                                        </Border>
+
+                                        <Border Grid.Column="1" Background="#1A2F4A" CornerRadius="8" Padding="14,10" Margin="0,0,8,0"
+                                                BorderBrush="#1F3555" BorderThickness="1">
+                                            <StackPanel>
+                                                <TextBlock Text="DERNIÈRE MAJ" Foreground="#8EB0CC" FontSize="10" FontWeight="Bold"/>
+                                                <TextBlock x:Name="signatureLastUpdate" Foreground="White" FontSize="13" FontWeight="SemiBold" Margin="0,4,0,0" TextWrapping="Wrap"/>
+                                            </StackPanel>
+                                        </Border>
+                                    </Grid>
+
+                                    <Button x:Name="btnManualUpdateSignatures" Style="{StaticResource SuccessButton}"
+                                            Click="BtnManualUpdateSignatures_Click" HorizontalAlignment="Left" Margin="0,0,0,16">
+                                        <StackPanel Orientation="Horizontal">
+                                            <md:PackIcon Kind="Refresh" Width="16" Height="16" Margin="0,0,8,0"/>
+                                            <TextBlock Text="Mettre à jour maintenant" VerticalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Button>
+                                </StackPanel>
+
+                                <Border Grid.Row="1" Background="#060F1A" CornerRadius="8" BorderBrush="#1F3555" BorderThickness="1">
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto" Margin="2">
+                                        <TextBox x:Name="signatureLog" IsReadOnly="True" Background="Transparent"
+                                                 Foreground="#50FA7B" FontFamily="Consolas" FontSize="11" TextWrapping="Wrap"
+                                                 BorderThickness="0" Padding="12,8"/>
+                                    </ScrollViewer>
+                                </Border>
+                            </Grid>
+                        </Border>
+                    </TabItem>
+                </TabControl>
+            </Grid>
+
+            <!-- FOOTER -->
+            <Border Grid.Row="2" Background="#F0F4F8" BorderBrush="#E2E8F0" BorderThickness="0,1,0,0" Padding="20,0,20,0">
+                <Grid>
+                    <TextBlock x:Name="lblStatus" Text="Prêt." Foreground="#718096"
+                               FontFamily="Segoe UI" FontSize="11" VerticalAlignment="Center"/>
+                    <TextBlock Text="optiSCAN v1.0 — Provided by Dona By" HorizontalAlignment="Right"
+                               Foreground="#1565C0" FontFamily="Segoe UI" FontSize="10"
+                               VerticalAlignment="Center"/>
+                </Grid>
+            </Border>
+
+            <!-- OVERLAY MISE À JOUR -->
+            <Border x:Name="updateOverlay" Grid.RowSpan="3" Background="#AA000000" Visibility="Collapsed">
+                <Grid VerticalAlignment="Center" HorizontalAlignment="Center" Width="680" Height="460">
+                    <Border Background="White" CornerRadius="12" Padding="18" Effect="{StaticResource CardShadow}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBlock Text="Mise à jour des signatures" FontFamily="Segoe UI" FontSize="18"
+                                       FontWeight="SemiBold" Foreground="{StaticResource TextDark}" />
+                            <TextBlock x:Name="updateSummary" Grid.Row="1" Margin="0,8,0,10"
+                                       FontFamily="Segoe UI" FontSize="12" Foreground="{StaticResource TextMedium}" />
+
+                            <Border Grid.Row="2" Background="#0B1422" CornerRadius="8" Padding="8">
+                                <ScrollViewer x:Name="updateLogScroll" VerticalScrollBarVisibility="Auto">
+                                    <TextBox x:Name="updateLog" Background="Transparent" BorderThickness="0" IsReadOnly="True"
+                                             FontFamily="Consolas" FontSize="11" Foreground="#50FA7B"
+                                             TextWrapping="Wrap" VerticalScrollBarVisibility="Disabled"/>
+                                </ScrollViewer>
+                            </Border>
+
+                            <StackPanel Grid.Row="3" Orientation="Horizontal" Margin="0,12,0,0">
+                                <ProgressBar x:Name="updateProgressBar" Width="420" Height="8" IsIndeterminate="True"/>
+                                <Button x:Name="updateCloseBtn" Content="Fermer" Margin="12,0,0,0"
+                                        Style="{StaticResource SecondaryButton}" Click="UpdateOverlay_Close" IsEnabled="False"/>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Border>
+        </Grid>
+    </Grid>
+</Window>
