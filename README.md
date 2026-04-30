@@ -1,7 +1,7 @@
 # Guide Complet — optiSCAN v1.0
 
 > **Version de référence.** Ce guide décrit l'architecture, les modules et les procédures
-> de la version 1.0 du produit. Architecture mono-fenêtre — plus de ScanWindow séparée.
+> de la version 1.0 du produit. Architecture mono-fenêtre.
 
 ---
 
@@ -23,7 +23,7 @@
 ```
 optiSCAN/
 ├── optiSCAN/                          ← Solution Visual Studio
-│   ├── GUIDE_OPTISCAN.md              ← Ce fichier
+│   ├── README.md                      ← Ce fichier
 │   ├── installer/
 │   │   └── setup.iss                  ← Script Inno Setup
 │   └── optiSCAN/                      ← Projet C# WPF
@@ -60,9 +60,8 @@ optiSCAN/
 │           └── database/
 ```
 
-> **Note v1.0 :** `Views/ScanWindow.xaml` et `Views/ScanWindow.xaml.cs` ont été supprimés.
+> **Note v1.0 :** 
 > Toute la logique antivirus est intégrée dans `MainWindow` (panneau Antivirus, index 4).
-> `ViewModels/ScanViewModel.cs` peut également être supprimé — il n'est plus référencé.
 
 **Règle de séparation :**
 - `Models/` — aucune dépendance UI, testable en console
@@ -308,3 +307,9 @@ optiSCAN_Setup_v1.0.exe
 4. **Notifications toast** — Alertes Windows natives à la détection d'une menace
 5. **Score de risque** — Classification informationnel / mineur / critique
 6. **Rapport PDF** — Export d'un rapport de scan complet
+
+---
+
+## 👤 Crédits
+
+Développé par **@ 2026 Donatien Byakombe**
