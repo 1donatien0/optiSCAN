@@ -1,4 +1,3 @@
-using System.Diagnostics;
 using System.IO;
 using System.Text;
 
@@ -83,8 +82,8 @@ namespace optiSCAN.Services
             var lvl = level switch
             {
                 Level.Debug => "DEBUG",
-                Level.Info  => "INFO ",
-                Level.Warn  => "WARN ",
+                Level.Info => "INFO ",
+                Level.Warn => "WARN ",
                 Level.Error => "ERROR",
                 Level.Fatal => "FATAL",
                 _ => "?????",
@@ -92,7 +91,9 @@ namespace optiSCAN.Services
             var sb = new StringBuilder(256);
             sb.Append(DateTime.Now.ToString("yyyy-MM-dd HH:mm:ss.fff"));
             sb.Append(" | ").Append(lvl);
-            sb.Append(" | ").Append(component.PadRight(20).Substring(0, Math.Min(20, component.Length)));
+            // Pad puis tronquer à 20 colonnes (PadRight seul casse sur composants courts).
+            var comp = component.Length > 20 ? component[..20] : component;
+            sb.Append(" | ").Append(comp.PadRight(20));
             sb.Append(" | ").Append(message);
             if (ex != null)
             {

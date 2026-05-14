@@ -11,7 +11,7 @@ namespace optiSCAN.ViewModels
 {
     /// <summary>
     /// ViewModel principal de la fenêtre de scan optiSCAN.
-    /// Utilise ScanOrchestrator pour le pipeline ClamAV + YARA en parallèle.
+    /// Utilise ScanOrchestrator pour le moteur ClamAV + YARA en parallèle.
     /// </summary>
     public class ScanViewModel : INotifyPropertyChanged, IDisposable
     {
@@ -48,7 +48,7 @@ namespace optiSCAN.ViewModels
             set { _isUpdating = value; OnPropertyChanged(); }
         }
 
-        private string _statusMessage = "Prêt à scanner.";
+        private string _statusMessage = "Prêt à analyser.";
         public string StatusMessage
         {
             get => _statusMessage;
@@ -81,6 +81,22 @@ namespace optiSCAN.ViewModels
         {
             get => _isIndeterminate;
             set { _isIndeterminate = value; OnPropertyChanged(); }
+        }
+
+        private string _currentScanItem = "";
+        /// <summary>Fichier ou dossier en cours d’analyse (affichage type suite antivirus).</summary>
+        public string CurrentScanItem
+        {
+            get => _currentScanItem;
+            set { _currentScanItem = value; OnPropertyChanged(); }
+        }
+
+        private string _scanProgressDetail = "";
+        /// <summary>Résumé chiffré : pourcentage ou « N / total » fichiers.</summary>
+        public string ScanProgressDetail
+        {
+            get => _scanProgressDetail;
+            set { _scanProgressDetail = value; OnPropertyChanged(); }
         }
 
         private string _clamAvVersion = "Vérification…";
@@ -300,11 +316,12 @@ namespace optiSCAN.ViewModels
                 TryStep("Chargement quarantaine", LoadQuarantine);
 
                 if (!IsClamAvAvailable)
-                    StatusMessage = "⚠ ClamAV non détecté. Vérifiez 'clamav/x64/' dans le dossier de l'application.";
+                    StatusMessage = "Attention : ClamAV est introuvable. Vérifiez le dossier « clamav/x64/ » à côté de l’application.";
                 else
-                    StatusMessage = "Prêt — pipeline ClamAV + YARA actif.";
+                    StatusMessage = "Prêt — analyse ClamAV et YARA disponible.";
 
                 AppLogger.Info("ScanViewModel", "Initialisation terminée");
+                ServiceContainer.Default.RefreshScanHistoryViews?.Invoke();
             }
             catch (Exception ex)
             {
@@ -355,6 +372,8 @@ namespace optiSCAN.ViewModels
             ProgressValue = 0;
             FilesScanned = 0;
             ThreatsFound = 0;
+            CurrentScanItem = "Préparation des moteurs ClamAV et YARA…";
+            ScanProgressDetail = "Initialisation de l’analyse…";
 
             WpfApp.Current?.Dispatcher.Invoke(() => Threats.Clear());
 
@@ -366,11 +385,11 @@ namespace optiSCAN.ViewModels
 
             StatusMessage = type switch
             {
-                ScanType.QuickScan => "Scan rapide en cours (ClamAV + YARA)…",
-                ScanType.FullScan => "Scan complet en cours (ClamAV + YARA)…",
-                ScanType.Folder => $"Scan du dossier : {path}",
-                ScanType.File => $"Scan du fichier : {System.IO.Path.GetFileName(path ?? "")}",
-                _ => "Scan en cours…"
+                ScanType.QuickScan => "Analyse rapide en cours (ClamAV et YARA)…",
+                ScanType.FullScan => "Analyse complète en cours (ClamAV et YARA)…",
+                ScanType.Folder => $"Analyse du dossier : {path}",
+                ScanType.File => $"Analyse du fichier : {System.IO.Path.GetFileName(path ?? "")}",
+                _ => "Analyse en cours…"
             };
 
             _cts = new CancellationTokenSource();
@@ -390,6 +409,7 @@ namespace optiSCAN.ViewModels
                 LastResult = result;
                 _logger.SaveScanResult(result);
                 LoadHistory();
+                ServiceContainer.Default.RefreshScanHistoryViews?.Invoke();
 
                 WpfApp.Current?.Dispatcher.Invoke(() =>
                 {
@@ -403,7 +423,7 @@ namespace optiSCAN.ViewModels
             }
             catch (OperationCanceledException)
             {
-                StatusMessage = "Scan annulé par l'utilisateur.";
+                StatusMessage = "Analyse interrompue sur demande.";
             }
             catch (Exception ex)
             {
@@ -414,6 +434,8 @@ namespace optiSCAN.ViewModels
                 IsScanning = false;
                 IsIndeterminate = false;
                 ProgressValue = 0;
+                CurrentScanItem = string.Empty;
+                ScanProgressDetail = string.Empty;
                 _cts?.Dispose();
                 _cts = null;
             }
@@ -433,13 +455,37 @@ namespace optiSCAN.ViewModels
                 FilesScanned = p.FilesScanned;
                 ThreatsFound = p.ThreatsFound;
 
+                if (!string.IsNullOrWhiteSpace(p.CurrentFilePath))
+                    CurrentScanItem = p.CurrentFilePath;
+                else if (p.Phase == ScanPhase.ThreatFound && p.ThreatInfo != null
+                    && !string.IsNullOrWhiteSpace(p.ThreatInfo.FilePath))
+                    CurrentScanItem = p.ThreatInfo.FilePath;
+
+                if (p.TotalFiles > 0)
+                {
+                    if (p.FilesScanned <= 0)
+                        ScanProgressDetail = $"Environ {p.TotalFiles:N0} fichier(s) à parcourir — analyse en cours…";
+                    else
+                    {
+                        var pctVal = Math.Min(100.0, p.PercentComplete);
+                        ScanProgressDetail = $"{p.FilesScanned:N0} / {p.TotalFiles:N0} fichiers — {(int)pctVal} %";
+                    }
+                }
+                else
+                {
+                    var pctComplete = p.PercentComplete;
+                    ScanProgressDetail = pctComplete >= 0
+                        ? $"{(int)Math.Min(100, pctComplete)} %"
+                        : $"{p.FilesScanned:N0} fichier(s) parcourus — total inconnu";
+                }
+
                 // ProgressBar : déterminée si on connaît le total, indéterminée
                 // sinon (cas ClamAV en début de scan, avant le premier --summary).
-                var pct = p.PercentComplete;
-                if (pct >= 0)
+                var pctForBar = p.PercentComplete;
+                if (pctForBar >= 0)
                 {
                     IsIndeterminate = false;
-                    ProgressValue = pct;
+                    ProgressValue = pctForBar;
                 }
 
                 if (p.Phase == ScanPhase.ThreatFound && p.ThreatInfo != null)
@@ -494,14 +540,14 @@ namespace optiSCAN.ViewModels
             // ── 3. Résumé final ───────────────────────────────────────────────
             var summary = clamResult.Success
                 ? $"Signatures : {clamResult.Message}"
-                : $"Signatures : ⚠ {clamResult.Message}";
+                : $"Signatures : attention — {clamResult.Message}";
             summary += "\n" + (rulesResult.Success
                 ? $"Règles : {rulesResult.Message}"
-                : $"Règles : ⚠ {rulesResult.Message}");
+                : $"Règles : attention — {rulesResult.Message}");
 
             StatusMessage = clamResult.Success && rulesResult.Success
-                ? "✅ Mise à jour complète."
-                : "⚠ Mise à jour partielle — consultez le journal.";
+                ? "Mise à jour terminée avec succès."
+                : "Mise à jour partielle — consultez le journal.";
 
             AppendUpdateLog("");
             AppendUpdateLog(summary);
@@ -608,13 +654,6 @@ namespace optiSCAN.ViewModels
         {
             LoadHistory();
         }
-
-        public QuarantineManager GetQuarantineManager() => _quarantine;
-        public ScanLogManager GetLogManager() => _logger;
-        public ScanOrchestrator GetOrchestrator() => _orchestrator;
-        public FreshclamUpdater GetFreshclamUpdater() => _updater;
-        public YaraEngine GetYaraEngine() => _yara;
-        public ClamAvEngine GetClamAvEngine() => _clamAv;
 
         // ── INotifyPropertyChanged ────────────────────────────────────────────────
 

@@ -1,5 +1,3 @@
-using System.Windows;
-
 namespace optiSCAN.Views
 {
     public partial class OverviewControl : System.Windows.Controls.UserControl

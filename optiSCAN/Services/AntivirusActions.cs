@@ -1,6 +1,6 @@
+using optiSCAN.Models;
 using System.IO;
 using System.Runtime.Versioning;
-using optiSCAN.Models;
 
 namespace optiSCAN.Services
 {

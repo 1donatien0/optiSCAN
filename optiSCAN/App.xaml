@@ -16,9 +16,9 @@
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesign2.Defaults.xaml"/>
 
                 <!-- ═══════════════════════════════════════════════
-                     Thème chargé au démarrage
-                     ThemeManager.Initialize() le remplace si besoin.
-                     Par défaut : thème sombre.
+                     Thème Donaby au 1er frame : clair (cohérent avec UserPreferences).
+                     App.xaml.cs appelle ThemeManager.Initialize() après OnStartup
+                     pour appliquer la préférence persistée (clair ou sombre).
                 ═══════════════════════════════════════════════ -->
                 <ResourceDictionary Source="/Themes/Donaby.Light.xaml"/>
 

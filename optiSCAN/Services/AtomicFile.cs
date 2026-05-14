@@ -94,7 +94,10 @@ namespace optiSCAN.Services
             if (File.Exists(path))
             {
                 try { return parser(File.ReadAllText(path)); }
-                catch { /* corrompu → essayer le .bak */ }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn("AtomicFile", $"Parse principal échoué ({path}), tentative .bak", ex);
+                }
             }
 
             // Tentative 2 : sauvegarde
@@ -102,7 +105,10 @@ namespace optiSCAN.Services
             if (File.Exists(bak))
             {
                 try { return parser(File.ReadAllText(bak)); }
-                catch { /* .bak aussi corrompu → fallback */ }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn("AtomicFile", $"Parse .bak échoué ({bak})", ex);
+                }
             }
 
             return fallbackValue;

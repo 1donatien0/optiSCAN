@@ -75,8 +75,11 @@
                                     <Border x:Name="bg" Background="Transparent"
                                             BorderBrush="{DynamicResource PrimaryBlue}"
                                             BorderThickness="0,0,0,2">
-                                        <ContentPresenter Margin="{TemplateBinding Padding}"
-                                                          VerticalAlignment="Center"/>
+                                        <ContentPresenter ContentSource="Header"
+                                                          Margin="{TemplateBinding Padding}"
+                                                          VerticalAlignment="Center"
+                                                          HorizontalAlignment="Center"
+                                                          RecognizesAccessKey="True"/>
                                     </Border>
                                     <ControlTemplate.Triggers>
                                         <Trigger Property="IsSelected" Value="True">
@@ -120,16 +123,28 @@
                                                 Width="130"/>
                             <DataGridTextColumn Header="Cible"
                                                 Binding="{Binding TargetPath}"
-                                                Width="*"/>
+                                                Width="*">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource DgCellTextEllipsis}">
+                                        <Setter Property="ToolTip" Value="{Binding TargetPath}"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
                             <DataGridTextColumn Header="Fichiers"
                                                 Binding="{Binding FilesScanned, StringFormat={}{0:N0}}"
                                                 Width="90"/>
                             <DataGridTextColumn Header="Durée"
                                                 Binding="{Binding DurationDisplay}"
-                                                Width="80"/>
+                                                Width="100"/>
                             <DataGridTextColumn Header="Résultat"
                                                 Binding="{Binding ThreatsBadge}"
-                                                Width="110"/>
+                                                Width="*">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource DgCellTextEllipsis}">
+                                        <Setter Property="ToolTip" Value="{Binding ThreatsBadge}"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
                         </DataGrid.Columns>
                     </DataGrid>
                 </TabItem>

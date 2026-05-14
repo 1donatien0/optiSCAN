@@ -226,7 +226,7 @@
                                      FontFamily="Consolas" FontSize="11"
                                      TextWrapping="Wrap"
                                      AcceptsReturn="True"
-                                     Text="Cliquez sur Analyser pour évaluer l'espace libérable&#x0a;et détecter les problèmes de registre."/>
+                                     Text="Cliquez sur Analyser pour estimer l’espace récupérable&#x0a;(fichiers temporaires et caches des navigateurs cochés)."/>
                         </ScrollViewer>
                     </StackPanel>
                 </Border>

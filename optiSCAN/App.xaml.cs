@@ -1,6 +1,5 @@
 using optiSCAN.Models;
 using optiSCAN.Services;
-using System.Runtime.InteropServices;
 using System.Windows;
 using WinApplication = System.Windows.Application;
 
@@ -50,6 +49,9 @@ namespace optiSCAN
             }
 
             base.OnStartup(e);
+            // Applique le thème Donaby + MaterialDesign selon UserPreferences (sinon
+            // seul le dictionnaire fusionné dans App.xaml est actif — incohérence).
+            ThemeManager.Initialize();
         }
 
         // ── Headless ────────────────────────────────────────────────────────────

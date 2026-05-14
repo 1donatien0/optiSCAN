@@ -144,18 +144,19 @@ namespace optiSCAN.Services
         // ── Helpers privés ───────────────────────────────────────────────────────
 
         /// <summary>
-        /// Dérive une clé HMAC stable propre à l'utilisateur courant via DPAPI.
-        /// On chiffre une constante connue ; la sortie DPAPI est unique par user
-        /// et déterministe. Hashée en SHA-256 pour produire une clé 256 bits.
+        /// Dérive une clé HMAC stable propre à l'utilisateur Windows courant.
+        /// (Une ancienne version utilisait Protect puis SHA256 : chaque appel à
+        /// Protect produit un blob différent, donc la clé changeait entre Save
+        /// et Load et l'HMAC était toujours rejeté.)
         /// </summary>
         private static byte[] DeriveHmacKey()
         {
-            // Constante : on chiffre 32 octets d'un label connu pour obtenir
-            // un blob déterministe par utilisateur.
-            var seed = Encoding.UTF8.GetBytes(HmacInfo);
-            var protectedSeed = ProtectedData.Protect(seed, optionalEntropy: null, DataProtectionScope.CurrentUser);
-            // SHA-256 réduit la taille variable de DPAPI à 32 octets stables.
-            return SHA256.HashData(protectedSeed);
+            var identity =
+                HmacInfo + "|" +
+                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + "|" +
+                Environment.UserDomainName + "|" +
+                Environment.UserName;
+            return SHA256.HashData(Encoding.UTF8.GetBytes(identity));
         }
 
         private class Envelope

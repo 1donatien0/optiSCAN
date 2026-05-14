@@ -1,5 +1,8 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
+using System.Text;
+using System.Xml.Linq;
 
 namespace optiSCAN.Services
 {
@@ -12,6 +15,7 @@ namespace optiSCAN.Services
     {
         private const string TaskName = "optiSCAN_DailyScan";
         private readonly string _exePath;
+        private TimeSpan _scheduledTime = TimeSpan.FromHours(2);
 
         public ScheduledScanService()
         {
@@ -26,19 +30,34 @@ namespace optiSCAN.Services
         {
             try
             {
-                var t = time ?? TimeSpan.FromHours(2);
-                var startTime = $"{t.Hours:D2}:{t.Minutes:D2}";
+                _scheduledTime = time ?? TimeSpan.FromHours(2);
+                var startTime = $"{_scheduledTime.Hours:D2}:{_scheduledTime.Minutes:D2}";
 
-                // Supprimer la tâche existante si présente
                 DeleteTask();
 
-                // /RL HIGHEST = droits administrateur
-                // /F = forcer (écraser si elle existe déjà)
-                var args = $"/Create /TN \"{TaskName}\" " +
-                           $"/TR \"\\\"{_exePath}\\\" --fullscan --quiet\" " +
-                           $"/SC DAILY /ST {startTime} /RL HIGHEST /F";
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "schtasks.exe",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+                psi.ArgumentList.Add("/Create");
+                psi.ArgumentList.Add("/TN");
+                psi.ArgumentList.Add(TaskName);
+                psi.ArgumentList.Add("/TR");
+                // Ne pas entourer manuellement de guillemets : ArgumentList échappe correctement pour schtasks.
+                psi.ArgumentList.Add($"{_exePath} --fullscan --quiet");
+                psi.ArgumentList.Add("/SC");
+                psi.ArgumentList.Add("DAILY");
+                psi.ArgumentList.Add("/ST");
+                psi.ArgumentList.Add(startTime);
+                psi.ArgumentList.Add("/RL");
+                psi.ArgumentList.Add("HIGHEST");
+                psi.ArgumentList.Add("/F");
 
-                return RunSchtasks(args) == 0;
+                return RunSchtasksCapture(psi).ExitCode == 0;
             }
             catch (Exception ex)
             {
@@ -54,7 +73,19 @@ namespace optiSCAN.Services
         {
             try
             {
-                RunSchtasks($"/Delete /TN \"{TaskName}\" /F");
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "schtasks.exe",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+                psi.ArgumentList.Add("/Delete");
+                psi.ArgumentList.Add("/TN");
+                psi.ArgumentList.Add(TaskName);
+                psi.ArgumentList.Add("/F");
+                RunSchtasksCapture(psi);
                 return true;
             }
             catch { return false; }
@@ -67,20 +98,77 @@ namespace optiSCAN.Services
         {
             try
             {
-                return RunSchtasks($"/Query /TN \"{TaskName}\"") == 0;
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "schtasks.exe",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+                psi.ArgumentList.Add("/Query");
+                psi.ArgumentList.Add("/TN");
+                psi.ArgumentList.Add(TaskName);
+                return RunSchtasksCapture(psi).ExitCode == 0;
             }
             catch { return false; }
         }
 
         /// <summary>
-        /// Retourne l'heure approximative de la prochaine exécution (2h00 AM).
+        /// Prochaine exécution : lue depuis la tâche Windows (XML / LIST) si possible,
+        /// sinon dérivée de <see cref="_scheduledTime"/> (mémoire processus).
         /// </summary>
         public DateTime? GetNextRunTime()
         {
-            var next = DateTime.Today.AddHours(2);
-            if (next <= DateTime.Now)
-                next = next.AddDays(1);
-            return next;
+            try
+            {
+                if (!IsTaskExists())
+                    return FallbackFromScheduledMemory();
+
+                // 1) XML — indépendant de la locale pour l'heure du trigger
+                var xmlPsi = new ProcessStartInfo
+                {
+                    FileName = "schtasks.exe",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+                xmlPsi.ArgumentList.Add("/Query");
+                xmlPsi.ArgumentList.Add("/TN");
+                xmlPsi.ArgumentList.Add(TaskName);
+                xmlPsi.ArgumentList.Add("/XML");
+
+                var xmlRes = RunSchtasksCapture(xmlPsi);
+                if (xmlRes.ExitCode == 0 && TryParseNextRunFromTaskXml(xmlRes.CombinedOutput, out var fromXml))
+                    return fromXml;
+
+                // 2) LIST /V — « Next Run Time » / « Prochaine exécution » (locale Windows)
+                var listPsi = new ProcessStartInfo
+                {
+                    FileName = "schtasks.exe",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+                listPsi.ArgumentList.Add("/Query");
+                listPsi.ArgumentList.Add("/TN");
+                listPsi.ArgumentList.Add(TaskName);
+                listPsi.ArgumentList.Add("/FO");
+                listPsi.ArgumentList.Add("LIST");
+                listPsi.ArgumentList.Add("/V");
+
+                var listRes = RunSchtasksCapture(listPsi);
+                if (listRes.ExitCode == 0 && TryParseNextRunFromListOutput(listRes.CombinedOutput, out var fromList))
+                    return fromList;
+            }
+            catch
+            {
+                // repli
+            }
+
+            return FallbackFromScheduledMemory();
         }
 
         /// <summary>
@@ -90,28 +178,136 @@ namespace optiSCAN.Services
         {
             try
             {
-                return RunSchtasks($"/Run /TN \"{TaskName}\"") == 0;
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "schtasks.exe",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true
+                };
+                psi.ArgumentList.Add("/Run");
+                psi.ArgumentList.Add("/TN");
+                psi.ArgumentList.Add(TaskName);
+                return RunSchtasksCapture(psi).ExitCode == 0;
             }
             catch { return false; }
         }
 
-        // ── Helpers ──────────────────────────────────────────────────────────────
-
-        private static int RunSchtasks(string arguments)
+        private DateTime? FallbackFromScheduledMemory()
         {
-            var psi = new ProcessStartInfo("schtasks.exe", arguments)
-            {
-                UseShellExecute = false,
-                CreateNoWindow = true,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true
-            };
+            var next = DateTime.Today + _scheduledTime;
+            if (next <= DateTime.Now)
+                next = next.AddDays(1);
+            return next;
+        }
 
+        private static bool TryParseNextRunFromTaskXml(string xml, out DateTime next)
+        {
+            next = default;
+            try
+            {
+                var doc = XDocument.Parse(xml);
+                foreach (var el in doc.Descendants())
+                {
+                    if (!string.Equals(el.Name.LocalName, "StartBoundary", StringComparison.OrdinalIgnoreCase))
+                        continue;
+
+                    var text = el.Value.Trim();
+                    if (string.IsNullOrEmpty(text)) continue;
+
+                    if (!DateTime.TryParse(text, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var anchor)
+                        && !DateTime.TryParse(text, CultureInfo.CurrentCulture, DateTimeStyles.None, out anchor))
+                        continue;
+
+                    var timeOfDay = anchor.TimeOfDay;
+                    var candidate = DateTime.Today + timeOfDay;
+                    if (candidate <= DateTime.Now)
+                        candidate = candidate.AddDays(1);
+                    next = candidate;
+                    return true;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+
+            return false;
+        }
+
+        private static bool TryParseNextRunFromListOutput(string text, out DateTime next)
+        {
+            next = default;
+            foreach (var raw in text.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None))
+            {
+                var line = raw.Trim();
+                string? val = null;
+
+                if (line.StartsWith("Next Run Time:", StringComparison.OrdinalIgnoreCase))
+                    val = line["Next Run Time:".Length..].Trim();
+                else if (line.StartsWith("Prochaine exécution", StringComparison.OrdinalIgnoreCase))
+                {
+                    var idx = line.IndexOf(':');
+                    if (idx >= 0 && idx + 1 < line.Length)
+                        val = line[(idx + 1)..].Trim();
+                }
+                else if (line.StartsWith("Heure de début suivante", StringComparison.OrdinalIgnoreCase))
+                {
+                    var idx = line.IndexOf(':');
+                    if (idx >= 0 && idx + 1 < line.Length)
+                        val = line[(idx + 1)..].Trim();
+                }
+
+                if (string.IsNullOrEmpty(val) || val.Equals("N/A", StringComparison.OrdinalIgnoreCase))
+                    continue;
+
+                if (DateTime.TryParse(val, CultureInfo.CurrentCulture, DateTimeStyles.None, out next))
+                    return true;
+                if (DateTime.TryParse(val, CultureInfo.InvariantCulture, DateTimeStyles.None, out next))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private readonly record struct SchtasksResult(int ExitCode, string StdOut, string StdErr)
+        {
+            public string CombinedOutput
+            {
+                get
+                {
+                    var sb = new StringBuilder();
+                    if (!string.IsNullOrEmpty(StdOut)) sb.AppendLine(StdOut);
+                    if (!string.IsNullOrEmpty(StdErr)) sb.AppendLine(StdErr);
+                    return sb.ToString();
+                }
+            }
+        }
+
+        private static SchtasksResult RunSchtasksCapture(ProcessStartInfo psi)
+        {
             using var p = Process.Start(psi)
                 ?? throw new InvalidOperationException("Impossible de démarrer schtasks.exe");
 
-            p.WaitForExit(10_000);
-            return p.ExitCode;
+            // Lecture CONCURRENTE stdout + stderr : la lecture séquentielle
+            // (ReadToEnd puis ReadToEnd) peut bloquer indéfiniment si le process
+            // remplit le buffer interne stderr pendant qu'on attend la fin de
+            // stdout, et vice-versa (deadlock documenté par Microsoft).
+            var stdoutTask = p.StandardOutput.ReadToEndAsync();
+            var stderrTask = p.StandardError.ReadToEndAsync();
+
+            bool finished = Task.WhenAll(stdoutTask, stderrTask)
+                .Wait(TimeSpan.FromSeconds(15));
+            if (!finished)
+                try { p.Kill(entireProcessTree: true); } catch { }
+
+            p.WaitForExit(1_000);
+
+            return new SchtasksResult(
+                p.ExitCode,
+                stdoutTask.IsCompletedSuccessfully ? stdoutTask.Result : string.Empty,
+                stderrTask.IsCompletedSuccessfully ? stderrTask.Result : string.Empty);
         }
     }
 }

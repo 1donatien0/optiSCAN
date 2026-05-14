@@ -1,38 +1,46 @@
-﻿using System.Diagnostics;
-using System.IO;
+﻿using System.IO;
 
 namespace optiSCAN.Services
 {
     /// <summary>
-    /// Gère les mises à jour logicielles sans nécessiter de réinstallation manuelle.
+    /// Mises à jour du binaire optiSCAN (OTA / delta). Les signatures antivirus sont
+    /// gérées par <see cref="FreshclamUpdater"/> et les règles par <see cref="YaraForgeUpdater"/>.
     /// </summary>
+    /// <remarks>
+    /// Audit H1 : aucun canal de téléchargement applicatif n'est encore relié (pas d'URL
+    /// de mise à jour ni de vérification de version distante). Lorsque le produit en aura
+    /// besoin, brancher ici un manifest signé + téléchargement vérifié, ou désactiver
+    /// l'appel depuis <c>MainWindow</c> si l'OTA reste hors périmètre.
+    /// </remarks>
     public class UpdateService
     {
         private readonly string _localUpdatePath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "optiSCAN", "Updates");
 
-        public async Task CheckAndPrepareUpdatesAsync()
+        /// <summary>
+        /// Vérifie la présence du dossier de staging et journalise l'état.
+        /// Pas de téléchargement distant tant qu'aucun canal de distribution n'est branché.
+        /// </summary>
+        public Task CheckAndPrepareUpdatesAsync()
         {
             try
             {
-                Debug.WriteLine("Vérification des mises à jour en tâche de fond...");
+                if (!Directory.Exists(_localUpdatePath))
+                    Directory.CreateDirectory(_localUpdatePath);
 
-                // 1. Simulation d'appel serveur
-                await Task.Delay(2000);
-
-                // 2. Logique de téléchargement Delta (si nécessaire)
-                if (!Directory.Exists(_localUpdatePath)) Directory.CreateDirectory(_localUpdatePath);
-
-                // 3. Ici, on prépare le binaire qui sera remplacé au prochain redémarrage
-                // via un lanceur (bootstrapper).
+                AppLogger.Info("UpdateService",
+                    "Contrôle applicatif : aucune mise à jour OTA configurée (dossier staging prêt). " +
+                    "Utilisez les mises à jour signatures dans l'onglet Antivirus.");
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Erreur UpdateService : {ex.Message}");
+                AppLogger.Warn("UpdateService", "Préparation dossier mises à jour", ex);
             }
+
+            return Task.CompletedTask;
         }
 
-        public async Task CheckForUpdatesAsync() => await CheckAndPrepareUpdatesAsync();
+        public Task CheckForUpdatesAsync() => CheckAndPrepareUpdatesAsync();
     }
 }

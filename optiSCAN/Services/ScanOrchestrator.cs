@@ -77,40 +77,15 @@ namespace optiSCAN.Services
             return MergeResults(type, target, await clamTask, await yaraTask);
         }
 
-        private async Task<ScanResult> RunMultiTargetPipelineAsync(ScanType type, List<string> targets, IProgress<ScanProgress>? progress, CancellationToken ct)
-        {
-            var merged = new ScanResult
-            {
-                Type = type,
-                TargetPath = string.Join(", ", targets),
-                StartedAt = DateTime.Now,
-                Status = ScanStatus.Running
-            };
-
-            int targetIndex = 0;
-            foreach (var target in targets)
-            {
-                if (ct.IsCancellationRequested) break;
-                if (!Directory.Exists(target)) continue;
-
-                targetIndex++;
-                progress?.Report(new ScanProgress
-                {
-                    Message = $"Cible {targetIndex}/{targets.Count} : {target}",
-                    Phase = ScanPhase.Scanning
-                });
-
-                var sub = await RunPipelineAsync(type, target, true, progress, ct);
-                merged.FilesScanned += sub.FilesScanned;
-                merged.FilesSkipped += sub.FilesSkipped;
-                merged.TotalBytesScanned += sub.TotalBytesScanned;
-                merged.Threats.AddRange(sub.Threats);
-            }
-
-            merged.FinishedAt = DateTime.Now;
-            merged.Status = ct.IsCancellationRequested ? ScanStatus.Cancelled : ScanStatus.Completed;
-            return merged;
-        }
+        private Task<ScanResult> RunMultiTargetPipelineAsync(ScanType type, List<string> targets, IProgress<ScanProgress>? progress, CancellationToken ct) =>
+            MultiTargetScanAggregator.AggregateAsync(
+                type,
+                targets,
+                t => RunPipelineAsync(type, t, true, progress, ct),
+                ct,
+                progress,
+                skipIfDirectoryMissing: true,
+                reportTargetProgress: true);
 
         private async Task<ScanResult> RunYaraOnFileAsync(string filePath, IProgress<ScanProgress>? progress, CancellationToken ct)
         {
@@ -155,7 +130,8 @@ namespace optiSCAN.Services
                         Message = $"Match : {m.RuleName} [{Path.GetFileName(filePath)}]",
                         Phase = ScanPhase.ThreatFound,
                         ThreatInfo = threat,
-                        ThreatsFound = result.ThreatsFound
+                        ThreatsFound = result.ThreatsFound,
+                        CurrentFilePath = filePath,
                     });
                 }
 
@@ -215,6 +191,7 @@ namespace optiSCAN.Services
                     Message = $"YARA — scan récursif de {Path.GetFileName(folderPath)} ({total} fichiers)…",
                     Phase = ScanPhase.Starting,
                     TotalFiles = total,
+                    CurrentFilePath = folderPath,
                 });
 
                 // Single-process : un seul yara64.exe avec --recursive.
@@ -225,6 +202,7 @@ namespace optiSCAN.Services
                         Message = msg,
                         Phase = ScanPhase.Scanning,
                         TotalFiles = total,
+                        CurrentFilePath = folderPath,
                     }));
 
                 var allMatches = await _yara.ScanFolderAsync(folderPath, yaraProgress, ct);

@@ -1,3 +1,4 @@
+using optiSCAN.Services;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -141,8 +142,6 @@ namespace optiSCAN.Views
                 });
             });
 
-            // L'appel à MainWindow.PerformCleanup() a été retiré (audit A2) :
-            // c'était un signal de statut UI redondant avec AppendLog déjà émis.
             btnAnalyze.IsEnabled = true;
         }
 
@@ -168,9 +167,9 @@ namespace optiSCAN.Views
         // ── Chemins de cache navigateurs ─────────────────────────────────────
         private static string LocalApp => Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData);
 
-        private static string EdgeCachePath()   => Path.Combine(LocalApp, @"Microsoft\Edge\User Data\Default\Cache");
+        private static string EdgeCachePath() => Path.Combine(LocalApp, @"Microsoft\Edge\User Data\Default\Cache");
         private static string ChromeCachePath() => Path.Combine(LocalApp, @"Google\Chrome\User Data\Default\Cache");
-        private static string BraveCachePath()  => Path.Combine(LocalApp, @"BraveSoftware\Brave-Browser\User Data\Default\Cache");
+        private static string BraveCachePath() => Path.Combine(LocalApp, @"BraveSoftware\Brave-Browser\User Data\Default\Cache");
         private static string WindowsLogsPath() => Path.Combine(
             Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows", @"Logs");
         private static string FirefoxCachePath()
@@ -195,7 +194,11 @@ namespace optiSCAN.Views
                 }
                 return total;
             }
-            catch { return 0; }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("CleanControl", $"Mesure impossible « {path} » : {ex.Message}");
+                return 0;
+            }
         }
 
         private static long CleanDir(string path)
@@ -209,7 +212,10 @@ namespace optiSCAN.Views
                     try { long s = new FileInfo(f).Length; File.Delete(f); freed += s; } catch { }
                 }
             }
-            catch { }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("CleanControl", $"Nettoyage incomplet « {path} » : {ex.Message}");
+            }
             return freed;
         }
 

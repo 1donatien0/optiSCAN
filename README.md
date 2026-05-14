@@ -1,7 +1,9 @@
-# Guide Complet — optiSCAN v3.0
+# Guide Complet — optiSCAN v4.0
 
 > **Version de référence.** Ce guide décrit l'architecture, les modules et les procédures
-> de la version 3.0 du produit (ClamAV Edition). Architecture mono-fenêtre avec services avancés Phase 2 + Donaby Design System.
+> de la version **v4.0** du produit (build **4.0.0**, édition ClamAV). Architecture mono-fenêtre avec services avancés Phase 2 + Donaby Design System.
+>
+> **Nomenclature (comme v1.0 / v2.0 / v3.0)** — **v4.0** : nom de release (documentation, CLUF). **4.0.0** : identifiant d’assembly et d’installateur (`Directory.Build.props`, Inno Setup).
 >
 > **Design system : Donaby Design** — thème sombre/clair dynamique, tokens DynamicResource WPF.
 > Développé par **© 2026 Donatien Byakombe (Dona By)**.
@@ -24,63 +26,57 @@
 ### Structure des modules
 
 ```
-optiSCAN/
-├── optiSCAN/                          ← Solution Visual Studio
-│   ├── README.md                      ← Ce fichier
-│   ├── installer/
-│   │   └── setup.iss                  ← Script Inno Setup
-│   └── optiSCAN/                      ← Projet C# WPF
-│       ├── Models/
-│       │   ├── ThreatInfo.cs          ← Menace détectée
-│       │   ├── ScanProgress.cs        ← Progression temps réel (IProgress<T>)
-│       │   ├── ScanResult.cs          ← Résultat global d'un scan
-│       │   └── ScanSession.cs         ← Entrée d'historique (persistable JSON)
-│       │
-│       ├── Services/
-│       │   ├── ClamAvEngine.cs        ← Lance clamscan.exe, parse la sortie
-│       │   ├── ClamDaemon.cs          ← Client TCP clamd (port 3310)
-│       │   ├── FreshclamUpdater.cs    ← Mise à jour signatures via freshclam.exe
-│       │   ├── ThemeManager.cs        ← ★ Bascule thème Donaby Dark/Light (registre)
-│       │   ├── ExclusionSettings.cs   ← Dossiers et règles exclus (singleton JSON)
-│       │   ├── YaraEngine.cs          ← Moteur de détection comportementale
-│       │   ├── YaraForgeUpdater.cs    ← Mise à jour automatique règles de détection
-│       │   ├── ScanOrchestrator.cs    ← Pipeline ClamAV + détection en parallèle
-│       │   ├── QuarantineManager.cs   ← Déplace/restaure/supprime les fichiers infectés
-│       │   ├── ScanLogManager.cs      ← Historique JSON + journal texte
-│       │   ├── RealTimeProtection.cs  ← FileSystemWatcher sur dossiers critiques
-│       │   ├── ScheduledScanService.cs← Planificateur Windows (2h00 AM)
-│       │   ├── NotificationService.cs ← Toasts Windows natifs
-│       │   ├── RiskScoringService.cs  ← Score 0-100 par menace
-│       │   └── PdfReportGenerator.cs  ← Export rapport PDF (QuestPDF)
-│       │
-│       ├── Themes/
-│       │   ├── Donaby.Dark.xaml       ← ★ Thème sombre (tokens DynamicResource)
-│       │   └── Donaby.Light.xaml      ← ★ Thème clair (tokens DynamicResource)
-│       │
-│       ├── NativeMethods.cs           ← P/Invoke kernel32 (CPU, RAM)
-│       ├── App.xaml                   ← Charge Donaby.Dark.xaml par défaut
-│       ├── MainWindow.xaml            ← Fenêtre unique — 5 panneaux sidebar + tray
-│       ├── MainWindow.xaml.cs         ← Code-behind complet
-│       ├── optiSCAN.ico               ← Icône app (6 résolutions : 16→256px)
-│       ├── yara/                      ← Binaires du moteur de détection
-│       │   ├── yara64.exe
-│       │   ├── yara32.exe
-│       │   ├── yarac64.exe
-│       │   └── yarac32.exe
-│       ├── rules/                     ← Règles de détection (.yar)
-│       │   ├── malware_signatures.yar
-│       │   ├── suspicious_strings.yar
-│       │   └── _compiled.yarc         ← Cache compilé (regénéré automatiquement)
-│       └── clamav/                    ← Binaires et base ClamAV
-│           ├── x64/                   ← Binaires Windows x86-64 (pas ARM64 !)
-│           ├── x86/
-│           └── database/
+(racine du dépôt optiSCAN)
+├── README.md                          ← Ce fichier
+├── optiSCAN.sln                       ← Solution Visual Studio
+├── installer/
+│   └── setup.iss                      ← Script Inno Setup
+└── optiSCAN/                          ← Projet C# WPF
+    ├── Models/
+    │   ├── ThreatInfo.cs              ← Menace détectée
+    │   ├── ScanProgress.cs            ← Progression temps réel (IProgress<T>)
+    │   ├── ScanResult.cs              ← Résultat global d'un scan
+    │   └── ScanSession.cs             ← Entrée d'historique (persistable JSON)
+    │
+    ├── ViewModels/                    ← ScanViewModel, RelayCommand
+    ├── Views/                         ← Overview, Antivirus, Clean, History, Options
+    │
+    ├── Services/
+    │   ├── ClamAvEngine.cs            ← Lance clamscan.exe, parse la sortie
+    │   ├── ClamDaemon.cs              ← Client TCP clamd (prêt, non branché au pipeline scan)
+    │   ├── FreshclamUpdater.cs        ← Mise à jour signatures via freshclam.exe
+    │   ├── ThemeManager.cs            ← Bascule Donaby + MaterialDesign (UserPreferences)
+    │   ├── ExclusionSettings.cs       ← Dossiers et règles exclus (singleton JSON)
+    │   ├── YaraEngine.cs              ← Moteur de détection comportementale
+    │   ├── YaraForgeUpdater.cs        ← Mise à jour automatique règles de détection
+    │   ├── ScanOrchestrator.cs        ← Pipeline ClamAV + détection en parallèle
+    │   ├── QuarantineManager.cs       ← Déplace/restaure/supprime les fichiers infectés
+    │   ├── ScanLogManager.cs          ← Historique JSON + journal texte
+    │   ├── RealTimeProtection.cs      ← FileSystemWatcher sur dossiers critiques
+    │   ├── ScheduledScanService.cs    ← Tâche planifiée via schtasks.exe
+    │   ├── NotificationService.cs     ← Toasts Windows natifs
+    │   ├── RiskScoringService.cs      ← Score 0-100 par menace
+    │   └── PdfReportGenerator.cs      ← Export rapport PDF (QuestPDF)
+    │
+    ├── Themes/
+    │   ├── Donaby.Dark.xaml           ← Thème sombre (tokens DynamicResource)
+    │   └── Donaby.Light.xaml          ← Thème clair (tokens DynamicResource)
+    │
+    ├── App.xaml                       ← Fusionne Donaby.Light + ThemeManager au démarrage
+    ├── MainWindow.xaml                ← Fenêtre unique — 5 panneaux sidebar
+    ├── MainWindow.xaml.cs             ← Navigation, services, raccourcis
+    ├── optiSCAN.ico                   ← Icône app
+    ├── yara/                          ← Binaires du moteur de détection
+    ├── rules/                         ← Règles de détection (.yar) + cache _compiled.yarc
+    └── clamav/                        ← Binaires et base ClamAV (x64 / x86 / database)
 ```
 
 **Règle de séparation :**
-- `Models/` — aucune dépendance UI, testable en console
-- `Services/` — aucune dépendance UI, injectables
-- `MainWindow.xaml.cs` — orchestre tous les services, met à jour l'UI directement
+- `Models/` — aucune dépendance UI
+- `Services/` — aucune dépendance WPF ; injectables / résolus via `ServiceContainer`
+- `ViewModels/` — logique de présentation (`ScanViewModel`, commandes)
+- `Views/` — XAML + code-behind léger ; navigation via `INavigationService`
+- `MainWindow.xaml.cs` — composition : navigation, handlers globaux, pont avec le `ServiceContainer`
 
 ---
 
@@ -96,15 +92,15 @@ Fichiers de thème :
 |---|---|
 | `Themes/Donaby.Dark.xaml` | Palette sombre (fond `#1A1917`, accents violets) |
 | `Themes/Donaby.Light.xaml` | Palette claire (fond `#F8F5F0`, accents violets) |
-| `Services/ThemeManager.cs` | Service statique de bascule, persistance registre |
+| `Services/ThemeManager.cs` | Service statique de bascule, persistance `UserPreferences` (DPAPI) |
 
 ### 2.2 ThemeManager
 
-`ThemeManager` est un service `static` appelé au démarrage depuis `App.xaml.cs` :
+`ThemeManager` est un service `static` appelé au démarrage depuis `App.xaml.cs` (après `OnStartup`) :
 
 ```csharp
-// App.xaml.cs
-ThemeManager.Initialize(); // charge le thème sauvegardé (sombre par défaut)
+// App.xaml.cs — branche interface graphique
+ThemeManager.Initialize(); // applique DarkTheme depuis UserPreferences (clair par défaut)
 
 // Bascule depuis le bouton de l'UI
 ThemeManager.Toggle();
@@ -113,10 +109,7 @@ ThemeManager.Toggle();
 ThemeManager.ThemeChanged += (_, isDark) => { /* ... */ };
 ```
 
-La préférence est persistée dans le registre Windows :
-```
-HKEY_CURRENT_USER\Software\optiSCAN\optiSCAN_IsDarkTheme  (1 = sombre, 0 = clair)
-```
+La préférence est persistée avec les autres options dans `%AppData%\optiSCAN\preferences.dat` (chiffrement DPAPI + HMAC, voir `UserPreferences.cs`). La propriété `DarkTheme` vaut `true` pour le thème sombre Donaby.
 
 ### 2.3 Tokens de couleur disponibles
 
@@ -145,15 +138,11 @@ https://www.clamav.net/downloads#otherversions
 ### 3.2 Placer les binaires dans le projet
 
 ```
-optiSCAN/optiSCAN/clamav/x64/
+<racine du dépôt>/optiSCAN/clamav/x64/
     ├── clamscan.exe
-    ├── clamd.exe              ← mode démon TCP
+    ├── clamd.exe              ← mode démon TCP (binaire présent ; pipeline UI = clamscan)
     ├── freshclam.exe
-    ├── libclamav.dll
-    ├── libclammspack.dll      ← obligatoire
-    ├── libclamunrar.dll
-    ├── freshclam.conf         ← généré automatiquement par FreshclamUpdater
-    └── database/              ← rempli par freshclam
+    ...
 ```
 
 ### 3.3 Première mise à jour des signatures
@@ -186,49 +175,27 @@ après la date textuelle (le premier champ est une date lisible, pas un entier).
 
 ---
 
-## 4. Architecture mono-fenêtre (v3.0)
+## 4. Architecture mono-fenêtre (v4.0)
 
 ### 4.1 Les 5 panneaux de MainWindow
 
-| Index | Panneau | Contenu |
-|---|---|---|
-| 0 | Vue d'ensemble | Dashboard dynamique (graphique, recommandations, jauges système) |
-| 1 | Nettoyer | Analyse + suppression des fichiers temporaires |
-| 2 | Historique | Liste des scans passés |
-| 3 | Options | Général, ClamAV, Exclusions, À propos |
-| 4 | Antivirus | Scan, Quarantaine, Historique, Signatures |
+Les vues sont empilées dans un seul `Grid` (`MainWindow.xaml`) : une seule est `Visible`, les autres `Collapsed`. La navigation passe par `NavigationService.NavigateTo("…")` (clés insensibles à la casse), enregistrées dans `MainWindow.RegisterPanels()`.
 
-Navigation via `ShowPanel(index)` — visibilité XAML gérée par `Visibility="Collapsed"`.
+| Clé `NavigateTo` | Panneau | Contrôle | Rôle principal |
+|---|---|---|---|
+| `Overview` | Vue d'ensemble | `OverviewControl` | Cartes d'action, graphique illustratif, recommandations, état ClamAV/YARA et versions |
+| `Clean` | Nettoyer | `CleanControl` | Analyse / suppression des fichiers temporaires et caches (ex. Brave, journaux Windows) |
+| `Antivirus` | Antivirus | `AntivirusView` | Scans, onglets Scan / Quarantaine / Historique / Signatures (`ScanViewModel`) |
+| `History` | Historique | `HistoryControl` | Liste des sessions enregistrées |
+| `Options` | Options | `OptionsControl` | Démarrage Windows, notifications, MAJ auto signatures+règles, cases antivirus (RTP / quarantaine auto — UI présente, branchement incomplet), exclusions |
 
-### 4.2 Icône système (System Tray)
+Raccourcis clavier : `Ctrl+1` … `Ctrl+5` (`KeyboardShortcuts`) mappés sur cet ordre : Overview, Clean, Antivirus, History, Options.
 
-L'application se minimise dans la barre des tâches système via `Hardcodet.Wpf.TaskbarNotification` :
+### 4.2 Fenêtre principale et icône
 
-```xml
-<!-- MainWindow.xaml -->
-<tb:TaskbarIcon x:Name="TrayIcon"
-                IconSource="/optiSCAN.ico"
-                ToolTipText="optiSCAN — Protection active"
-                TrayMouseDoubleClick="TrayIcon_TrayMouseDoubleClick">
-    <tb:TaskbarIcon.ContextMenu>
-        <ContextMenu>
-            <MenuItem Header="Afficher optiSCAN"         Click="TrayMenuShow_Click"/>
-            <Separator/>
-            <MenuItem Header="Lancer un scan"            Click="TrayMenuScan_Click"/>
-            <MenuItem x:Name="TrayMenuProtect"
-                      Header="Protection temps réel : Active"
-                      Click="TrayMenuProtect_Click"/>
-            <MenuItem Header="Mettre à jour signatures"  Click="TrayMenuUpdate_Click"/>
-            <Separator/>
-            <MenuItem Header="Quitter"                   Click="TrayMenuQuit_Click"/>
-        </ContextMenu>
-    </tb:TaskbarIcon.ContextMenu>
-</tb:TaskbarIcon>
-```
+L'interface v4.0 repose sur la fenêtre principale (`MainWindow`) et la barre latérale de navigation ; il n'y a pas d'icône dédiée dans la zone de notification système dans cette branche. L'icône `optiSCAN.ico` sert à la fenêtre, à la barre des tâches et à l'installateur.
 
-L'icône `optiSCAN.ico` est utilisée à la fois pour la fenêtre principale et pour la zone de notification. Elle contient 6 résolutions (16 × 16 à 256 × 256 px).
-
-### 4.3 Panneau Antivirus (index 4)
+### 4.3 Panneau Antivirus (`NavigateTo("Antivirus")`)
 
 Panneau divisé en deux colonnes :
 - **Colonne gauche (210px)** : boutons de scan + statistiques en temps réel
@@ -246,7 +213,7 @@ Chaque ligne du tableau des menaces (`antivirusThreatsGrid`) propose deux action
 
 | Bouton | Handler | Comportement |
 |---|---|---|
-| **Quarantaine** | `BtnQuarantineThreat_Click` | Chiffre le fichier (XOR `0x5A`) et le déplace dans `%LOCALAPPDATA%\optiSCAN\Quarantine\` — réversible |
+| **Quarantaine** | `BtnQuarantineThreat_Click` | Chiffre le fichier (**AES-256-GCM** via `QuarantineManager`) et le déplace sous `%LOCALAPPDATA%\optiSCAN\Quarantine\` — réversible (restauration) |
 | **Supprimer** | `BtnDeleteThreat_Click` | Demande confirmation, supprime définitivement le fichier — irréversible |
 
 En bas du tableau, le bouton **Tout mettre en quarantaine** (`BtnQuarantineAll_Click`) traite toutes les menaces listées en une seule opération.
@@ -255,27 +222,21 @@ En bas du tableau, le bouton **Tout mettre en quarantaine** (`BtnQuarantineAll_C
 
 ### 4.5 Pipeline de détection en parallèle
 
+Les scans interactifs passent par `ScanViewModel.StartScanAsync` → `ScanOrchestrator` : pour chaque cible, **ClamAV** (`clamscan.exe` via `ClamAvEngine`) et **YARA** (`YaraEngine`) tournent en parallèle (`Task.WhenAll`), puis fusion des résultats. **`RiskScoringService`** est utilisé pour les **toasts** et le **rapport PDF**, pas comme étape interne obligatoire de fusion dans l’orchestrateur. Le fichier `ClamDaemon.cs` fournit un client **clamd** TCP (port 3310) prêt à l’emploi, mais **n’est pas encore branché** sur ce pipeline (les scans utilisent `clamscan`).
+
 ```
-StartAntivirusScanAsync(type, path?)
-    │
-    ├─→ ScanOrchestrator  ←→ filtre ExclusionSettings.Current
-    │        ├─→ ClamAvEngine.ScanFolderAsync()    ┐
-    │        │   ou ClamDaemon.ScanFileAsync()      ├── Task.WhenAll
-    │        └─→ YaraEngine (RunYaraOnFolder)       ┘
-    │                ↓ filtrage des règles exclues
-    │                ↓ RiskScoringService.Assess() pour chaque menace
-    └─→ MergeResults() → UI mise à jour (Progress<ScanProgress>)
+ScanViewModel → ScanOrchestrator (+ ExclusionSettings.Current)
+    │   ├─→ ClamAvEngine (clamscan.exe)  ─┐
+    │   └─→ YaraEngine                   ├── Task.WhenAll → fusion menaces
+    │         (règles filtrées)            ┘
+    └─→ Progress<ScanProgress> → UI (AntivirusView / bindings)
 ```
 
 ### 4.6 Mise à jour des signatures
 
-`BtnManualUpdateSignatures_Click` lance séquentiellement :
-1. `FreshclamUpdater.UpdateAsync()` — signatures ClamAV
-2. `YaraForgeUpdater.UpdateAsync()` — règles de détection comportementale
+**Manuel** — `BtnManualUpdateSignatures_Click` enchaîne `FreshclamUpdater.UpdateAsync()` puis `YaraForgeUpdater.UpdateAsync()` (journal dans l’onglet Signatures).
 
-Auto-update silencieux en arrière-plan :
-- Signatures ClamAV : toutes les **4h**
-- Règles de détection : toutes les **24h**
+**Automatique** — À l’instanciation de `ServiceContainer.Default`, les minuteries sont armées : **ClamAV toutes les 4 h**, **paquet YARA-Forge toutes les 24 h**. La case **Mise à jour automatique des signatures** dans **Options** coupe ou réactive **les deux** services (`DisableAutoUpdate` / `EnableAutoUpdate`).
 
 ### 4.7 Système d'exclusions
 
@@ -291,13 +252,12 @@ Configurable depuis **Options → EXCLUSIONS**.
 
 ### 4.8 QuarantineManager — sécurité des fichiers infectés
 
-Les fichiers en quarantaine sont **chiffrés par XOR** (`0x5A`) :
-- Empêche Windows Defender de les détecter comme actifs
-- Réversible (restauration = re-XOR)
+Les fichiers en quarantaine sont chiffrés en **AES-256-GCM** (format binaire `OPTQ` v2, nonce + tag d’authentification). L’ancien format **XOR 0x5A** (v1) reste pris en charge en **lecture seule** pour migration.
 
-Stockage : `%LOCALAPPDATA%\optiSCAN\Quarantine\`
-- Fichiers : `{guid}.quar`
-- Index : `manifest.json`
+- Clé maîtresse 256 bits, stockée chiffrée **DPAPI CurrentUser** (fichier `.key` à côté du manifeste).
+- Manifeste `manifest.json` signé **HMAC-SHA256** (intégrité).
+
+Stockage : `%LOCALAPPDATA%\optiSCAN\Quarantine\` — fichiers `{guid}.quar` + `manifest.json`.
 
 ### 4.9 ScanLogManager — persistance
 
@@ -308,53 +268,19 @@ Stockage : `%LOCALAPPDATA%\optiSCAN\Quarantine\`
 
 ## 5. Services avancés
 
-### 5.1 ClamDaemon — mode démon TCP
+> **Transparence code / README** — Les sections ci-dessous décrivent des **modules présents dans le dépôt**. Lorsque l’intégration UI ou le pipeline de scan n’est pas encore branché, c’est indiqué explicitement.
 
-`ClamDaemon.cs` remplace les appels `clamscan.exe` par une connexion TCP directe à `clamd` (port 3310). Le daemon reste en mémoire et ne recharge les signatures qu'une seule fois au démarrage, ce qui élimine la latence de 5–15 s par fichier en mode clamscan.
+### 5.1 ClamDaemon — mode démon TCP (code prêt, non branché au pipeline)
 
-```
-optiSCAN → TCP 127.0.0.1:3310 → clamd.exe
-                                      └── clamd.conf (auto-généré si absent)
-                                            ├── DatabaseDirectory
-                                            ├── MaxThreads = 10
-                                            └── ScanPE / OLE2 / HTML / PDF / Archive
-```
+`ClamDaemon.cs` implémente démarrage de `clamd.exe`, génération de `clamd.conf`, connexion **TCP 127.0.0.1:3310** et commandes `SCAN` / statistiques, avec garde-fous (vérification du PID à l’écoute). **Les scans utilisateur passent aujourd’hui uniquement par `clamscan.exe`** (`ClamAvEngine`) ; l’activation « Utiliser clamd » dans l’UI n’est pas câblée.
 
-Activation : **Options → Utiliser clamd (mode démon)**
+### 5.2 RealTimeProtection — surveillance temps réel (implémenté, non branché)
 
-### 5.2 RealTimeProtection — surveillance temps réel
+`RealTimeProtection.cs` décrit la surveillance `FileSystemWatcher` (dossiers utilisateur / `ProgramData` / `Temp`, extensions dangereuses), délai de stabilisation, déduplication et **SemaphoreSlim(3)**. La classe n’est **pas encore instanciée** depuis `ServiceContainer` ou `MainWindow` ; la case **Protection temps réel** dans Options n’appelle pas ce service (branchement à compléter).
 
-`RealTimeProtection.cs` surveille en permanence les dossiers critiques via `FileSystemWatcher` :
+### 5.3 ScheduledScanService — tâche planifiée Windows (API prête)
 
-| Dossier surveillé | Raison |
-|---|---|
-| `C:\Users` | Profils utilisateurs (téléchargements, bureau) |
-| `C:\ProgramData` | Installateurs et données d'applications |
-| `C:\Windows\Temp` | Dépôt fréquent de droppers |
-| Desktop / Downloads | Zones d'atterrissage principales |
-
-Extensions surveillées : `.exe`, `.dll`, `.scr`, `.bat`, `.cmd`, `.ps1`, `.vbs`, `.js`, `.jar`, `.msi`, `.docm`, `.xlsm`, `.pptm`
-
-Mécanismes de robustesse :
-- **SemaphoreSlim(3)** — 3 scans simultanés maximum
-- **Délai de stabilisation 500 ms** — attend la fin d'écriture du fichier
-- **Cache de déduplication 30 s** — évite de rescanner le même fichier
-
-En cas de détection : mise en quarantaine automatique + toast de notification.
-
-Activation : **Options → Protection en temps réel** ou bouton **Optimiser maintenant** du dashboard.
-
-### 5.3 ScheduledScanService — tâche planifiée Windows
-
-`ScheduledScanService.cs` crée via `Microsoft.Win32.TaskScheduler` une tâche Windows planifiée :
-
-| Paramètre | Valeur |
-|---|---|
-| Nom | `optiSCAN_DailyScan` |
-| Heure | 2 h 00 AM quotidien |
-| Commande | `optiSCAN.exe --fullscan --quiet` |
-| Niveau | `TaskRunLevel.Highest` (administrateur) |
-| `WakeToRun` | `true` |
+`ScheduledScanService.cs` enveloppe **`schtasks.exe`** (`/Create`, `/Delete`, `/Query`, `/Run`) pour la tâche **`optiSCAN_DailyScan`** (`optiSCAN.exe --fullscan --quiet`, `/RL HIGHEST`, quotidien à 02:00 par défaut). **Aucun écran Options ne crée encore la tâche** ; en revanche `App.xaml.cs` gère bien `--fullscan` / `--quickscan` / `--quiet` en **mode headless** pour l’automatisation ou une tâche créée manuellement.
 
 ### 5.4 NotificationService — toasts Windows natifs
 
@@ -421,61 +347,37 @@ Sortie : `%LOCALAPPDATA%\optiSCAN\Reports\optiSCAN_Report_YYYYMMDD_HHmmss.pdf`
 
 ## 6. Dashboard Vue d'ensemble
 
-Le panneau **Vue d'ensemble** (index 0) affiche en temps réel trois modules côte à côte :
+Le panneau **Vue d'ensemble** (`OverviewControl`, entrée de menu **Vue d'ensemble**) comprend notamment :
 
-**Module 1 — Statistiques de Protection** : graphique linéaire (Canvas WPF natif) sur 30 jours — scans par jour (bleu) et menaces détectées (vert).
-
-**Module 2 — Recommandations d'Action** : cases à cocher reflétant l'état réel des services (RTP, clamd, scan planifié…). Bouton **Optimiser maintenant** pour tout activer en un clic.
-
-**Module 3 — État Système** : trois jauges (`DashBar`) rafraîchies toutes les 4 secondes.
-
-| Jauge | Source | Couleur dynamique |
-|---|---|---|
-| CPU | `GetSystemTimes` (delta 250 ms, kernel32.dll) | Vert < 60 %, Orange < 80 %, Rouge ≥ 80 % |
-| RAM | `GlobalMemoryStatusEx` (kernel32.dll) | Idem |
-| Disque C: | `DriveInfo("C")` | Idem |
+- **Bannière** : message de protection et état des définitions.
+- **Quatre cartes d'action** : raccourcis vers Nettoyer, Antivirus, Historique et la mise à jour des signatures.
+- **Trois colonnes** sous les cartes :
+  - **Statistiques de Protection** : graphique décoratif (polylignes statiques sur `Canvas`) avec légende « Menaces / Scans » — illustration visuelle, pas un historique dynamique branché sur les données réelles.
+  - **Recommandations d'Action** : encarts d'état (ex. système à jour, nettoyage conseillé).
+  - **Cartes d'information** : état ClamAV / YARA, dernière analyse, versions des signatures ClamAV et du pack YARA (alimentées par `MainWindow` / `ScanViewModel`).
 
 ---
 
-## 7. Workflow utilisateur optiSCAN v3.0
+## 7. Workflow utilisateur optiSCAN v4.0
 
 ```
-DÉMARRAGE
+DÉMARRAGE (UI)
     │
-    ├─→ Vérification ClamAV installé
-    ├─→ Vérification base de signatures
-    ├─→ Initialisation ThemeManager (Donaby Dark/Light)
-    ├─→ Initialisation services (RTP, clamd, notifications, PDF)
-    ├─→ Auto-update signatures       (toutes les 4 h,  silencieux)
-    └─→ Auto-update règles détection (toutes les 24 h, silencieux)
-             │
-             └─→ Fenêtre principale unique + icône system tray
-                     │
-                     ├─→ [VUE D'ENSEMBLE]
-                     │       ├─→ Graphique protection 30 j
-                     │       ├─→ Recommandations d'action
-                     │       ├─→ Jauges CPU / RAM / Disque
-                     │       └─→ [Optimiser maintenant] → active RTP + scan planifié
-                     │
-                     ├─→ [NETTOYER]    → analyse Temp + suppression avec confirmation
-                     │
-                     ├─→ [ANTIVIRUS]
-                     │       ├─→ [⚡ Scan Rapide]     → Temp, Downloads, Bureau
-                     │       ├─→ [🔍 Scan Complet]    → Tous les disques (lent)
-                     │       ├─→ [📁 Scanner dossier] → FolderBrowserDialog
-                     │       ├─→ [📄 Scanner fichier] → OpenFileDialog
-                     │       ├─→ Par menace : [Quarantaine] ou [Supprimer]
-                     │       ├─→ [🛡️ Tout mettre en quarantaine]
-                     │       └─→ [📄 Exporter PDF]    → Rapport complet
-                     │
-                     ├─→ [HISTORIQUE] → tous les scans
-                     └─→ [OPTIONS]
-                             ├─→ Thème Donaby Dark / Light (toggle)
-                             ├─→ Exclusions dossiers/règles
-                             ├─→ Protection en temps réel (toggle)
-                             ├─→ Mode clamd démon (toggle)
-                             ├─→ Scan planifié : créer / supprimer
-                             └─→ Notifications toast (toggle)
+    ├─→ Mutex single-instance (2e instance → IPC « afficher » la fenêtre existante)
+    ├─→ `App.OnStartup` → `ThemeManager.Initialize()` (préférence `UserPreferences`)
+    ├─→ `MainWindow` + `ServiceContainer.Default` (services partagés : ClamAV, YARA, orchestrateur, MAJ, quarantaine, logs, notifications, `AntivirusActions`)
+    ├─→ Minuteries MAJ : freshclam **4 h**, règles YARA **24 h** (désactivables via Options)
+    ├─→ `ScanViewModel.InitializeAsync` : versions, base, YARA, historique, quarantaine
+    └─→ Fenêtre principale — pas d’icône zone de notification dédiée
+            │
+            ├─→ [VUE D'ENSEMBLE] — cartes d’action, graphique illustratif, recommandations, état antivirus / signatures
+            ├─→ [NETTOYER] — analyse et suppression des temporaires (avec confirmation)
+            ├─→ [ANTIVIRUS] — scans rapide/complet/dossier/fichier, quarantaine, PDF, signatures
+            ├─→ [HISTORIQUE] — sessions enregistrées
+            └─→ [OPTIONS] — démarrage auto, notifications, MAJ auto, exclusions ; cases RTP / quarantaine auto (UI, câblage partiel)
+
+DÉMARRAGE (ligne de commande)
+    `--fullscan` / `--quickscan` [+ `--quiet` ] → `App.RunHeadlessAsync` : orchestrateur, journal, quarantaine auto si `ExclusionSettings.Current.AutoQuarantineEnabled`, notification fin si menaces et non quiet.
 ```
 
 ---
@@ -493,15 +395,14 @@ DÉMARRAGE
 
 | Technique | Impact |
 |---|---|
-| Mode clamd (TCP daemon) | ✅ Pas de rechargement signatures (~10× plus rapide) |
-| Pipeline parallèle (Task.WhenAll) | ✅ ClamAV + YARA simultanés |
-| Règles pré-compilées (_compiled.yarc) | ✅ Scan comportemental ~10× plus rapide |
-| SemaphoreSlim(3) RTP | ✅ Pas de tempête d'I/O à la création de fichiers |
-| Scan rapide limité aux dossiers critiques | ✅ ~30 s vs 1 h+ scan complet |
+| Mode clamd (TCP daemon) | ✅ Gain théorique majeur — **module présent, non utilisé par le pipeline actuel** |
+| Pipeline parallèle (Task.WhenAll) | ✅ ClamAV + YARA simultanés sur chaque cible |
+| Règles pré-compilées (_compiled.yarc) | ✅ Scan comportemental accéléré |
+| SemaphoreSlim(3) RTP | ✅ Prévu dans `RealTimeProtection` (non branché) |
+| Scan rapide limité aux dossiers critiques | ✅ `ScanTargets.QuickScanTargets()` |
 | ExclusionSettings.Current (singleton lazy) | ✅ Pas de rechargement JSON par fichier |
-| GetSystemTimes delta 250 ms | ✅ CPU sans PerformanceCounter NuGet |
-| Timer 4 s pour le dashboard | ✅ Faible impact CPU en arrière-plan |
-| ThemeManager.IsDark (static, registre) | ✅ Bascule de thème sans redémarrage |
+| ServiceContainer (singleton services) | ✅ Une instance ClamAV/YARA/orchestrateur pour toute l’app |
+| ThemeManager + UserPreferences | ✅ Bascule de thème sans redémarrage |
 
 ### 8.3 Faux positifs
 
@@ -518,25 +419,24 @@ Add-MpPreference -ExclusionPath "C:\Program Files\optiSCAN\clamav\database"
 
 ---
 
-## 9. Packaging final (v3.0)
+## 9. Packaging final (v4.0)
 
 ```powershell
-# 1. Compilation Release x64
-cd optiSCAN/optiSCAN
-dotnet publish -c Release -r win-x64 --self-contained false -o ..\..\build\app
+# 1. À la racine du dépôt (dossier contenant optiSCAN.sln)
+dotnet publish .\optiSCAN\optiSCAN.csproj -c Release -r win-x64 --self-contained false -o .\build\app
 
-# 2. Télécharger base ClamAV initiale
+# 2. Première base ClamAV (exemple)
 .\build\app\clamav\x64\freshclam.exe --datadir=".\build\app\clamav\x64\database"
 
-# 3. Compiler l'installateur Inno Setup
-"C:\Program Files (x86)\Inno Setup 6\ISCC.exe" .\installer\setup.iss
-# → installer\output\optiSCAN_Setup_v3.0.exe
+# 3. Inno Setup
+& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" .\installer\setup.iss
+# → installer\output\optiSCAN_Setup_v4.0.0.exe (voir #define AppVersion dans setup.iss)
 ```
 
 **Contenu de l'installateur (~260 Mo avec signatures initiales) :**
 
 ```
-optiSCAN_Setup_v3.0.exe
+optiSCAN_Setup_v4.0.0.exe
     ├── optiSCAN.exe
     ├── optiSCAN.ico
     ├── *.dll (runtime .NET 8)
@@ -554,9 +454,8 @@ optiSCAN_Setup_v3.0.exe
 | ClamAV | Dernière stable | GPLv2 | Inclure la licence dans l'installateur |
 | .NET 8 WPF | 8.x | MIT | Inclus dans le runtime Windows |
 | MaterialDesignThemes | 5.3.1 | MIT | Bibliothèque UI (PackIcon, styles) |
-| Hardcodet.Wpf.TaskbarNotification | — | MIT | Icône system tray |
 | QuestPDF | 2024.12.2 | Community | Rapport PDF — licence gratuite projets open-source |
-| Microsoft.Win32.TaskScheduler | 2.2.0.3 | MIT | Planificateur Windows |
+| Planificateur de tâches (`schtasks.exe`) | — | — | Natif Windows — voir `ScheduledScanService` |
 | Microsoft.Toolkit.Uwp.Notifications | 7.1.3 | MIT | Toasts Windows natifs |
 | Inno Setup | 6.x | Freeware | Gratuit pour projets commerciaux |
 | Base de signatures ClamAV | — | ClamAV License | Mise à jour depuis database.clamav.net |
@@ -566,30 +465,38 @@ optiSCAN_Setup_v3.0.exe
 
 ## 11. Historique des versions
 
+### v4.0 — Version majeure (alignement produit)
+
+- **Versioning unifié** — même convention que les releases précédentes : nom **v4.0** + build **4.0.0** (`Directory.Build.props`, Inno `AppVersion` / `AppRelease`, CLUF **LICENSE.txt**, manifeste, rapports PDF/HTML, User-Agent réseau)
+- **Interface d’analyse** — bannière « analyse en cours », progression, fichier courant (ClamAV / YARA / agrégateur multi-cibles)
+- **Vue d’ensemble** — retrait du graphique décoratif trompeur ; textes et recommandations alignés sur l’état réel
+- **Dernière analyse** — rafraîchissement depuis l’historique après scan et au chargement
+- **Français** — ton et libellés (crédits Dona By, statuts, options) harmonisés
+
 ### v3.0 — Donaby Design System + Stabilisation
 
-- ★ **Donaby Design System complet** — refonte UI vers le thème clair Donaby Light par défaut
-- ★ **OverviewControl** — 4 cartes d'action cliquables (Border + `MouseLeftButtonUp`, sans ControlTemplate) ; cercles d'icônes neutres (`SurfaceBg`) ; carte "État Antivirus" enrichie (ClamAV + YARA en temps réel)
-- ★ **AntivirusView** — zone drag & drop redessinée (Rectangle dashed border, `TrayArrowDown`, 62px) ; menu "Cibles récentes" (dead code) supprimé
-- ★ **CleanControl** — support complet `chkBrave` (cache Brave Browser) et `chkLogs` (journaux Windows) dans analyse et nettoyage
-- ★ **FreshclamUpdater** — `EnsureConfExists()` : résolution automatique du conf manquant (`x64\` → parent → `x86` → génération) ; `ResolveDbDir()` : résolution intelligente du dossier de base de données selon la hiérarchie clamav
+- **Donaby Design System complet** — refonte UI vers le thème clair Donaby Light par défaut
+- **OverviewControl** — 4 cartes d'action cliquables (Border + `MouseLeftButtonUp`, sans ControlTemplate) ; cercles d'icônes neutres (`SurfaceBg`) ; carte "État Antivirus" enrichie (ClamAV + YARA en temps réel)
+- **AntivirusView** — zone drag & drop redessinée (Rectangle dashed border, `TrayArrowDown`, 62px) ; menu "Cibles récentes" (dead code) supprimé
+- **CleanControl** — support complet `chkBrave` (cache Brave Browser) et `chkLogs` (journaux Windows) dans analyse et nettoyage
+- **FreshclamUpdater** — `EnsureConfExists()` : résolution automatique du conf manquant (`x64\` → parent → `x86` → génération) ; `ResolveDbDir()` : résolution intelligente du dossier de base de données selon la hiérarchie clamav
 - ✅ Correction CS0104 `CheckBox`/`Button` ambiguous — aliases `WpfCheckBox`/`WpfButton` dans `OptionsControl.xaml.cs`
-- ✅ Correction XDG0066 designer — `StaticResource` → `DynamicResource` pour `DgHeader`/`DgRow` dans `HistoryControl.xaml`
+- ✅ **README aligné code** — navigation `NavigationService`, quarantaine AES-GCM, pipeline clamscan+YARA, état d’intégration clamd/RTP/planificateur, workflow et packaging
+- ✅ **MAJ auto** — `ServiceContainer` arme freshclam (4 h) + YARA-Forge (24 h) ; Options coupe/réactive les deux
 
 ### v2.0 — Phase 2 : Services Avancés + Donaby Design
 
-- ★ **Donaby Design** — thème sombre/clair dynamique (`ThemeManager`, tokens `DynamicResource`)
-- ★ Icône **system tray** (`Hardcodet.Wpf.TaskbarNotification`) — menu contextuel complet
-- ★ **Nettoyer par menace** — boutons Quarantaine + Supprimer par ligne dans le tableau des menaces
-- ★ Correction affichage **version signatures ClamAV** (regex `ClamAV-VDB:[^:]+:(\d+):`)
-- ★ Mode démon **clamd** (TCP 3310) — scan sans rechargement signatures
-- ★ **Protection en temps réel** (FileSystemWatcher, 3 workers simultanés)
-- ★ **Tâche planifiée Windows** (2 h 00 AM, `TaskRunLevel.Highest`)
-- ★ **Notifications toast** Windows natives (boutons Quarantaine/Ignorer)
-- ★ **Score de risque** par menace (CRITIQUE / MAJEUR / MINEUR / INFORMATIONNEL)
-- ★ **Rapport PDF** exportable (QuestPDF, Community license)
-- ★ **Dashboard Vue d'ensemble** redessiné : graphique 30 j, recommandations, jauges CPU/RAM/Disque
-- Bouton **Optimiser maintenant** : configuration en un clic
+- **Donaby Design** — thème sombre/clair dynamique (`ThemeManager`, tokens `DynamicResource`)
+- Icône **system tray** (expérimental dans les versions précédentes ; l’UI actuelle reste fenêtre principale uniquement)
+- **Nettoyer par menace** — boutons Quarantaine + Supprimer par ligne dans le tableau des menaces
+- Correction affichage **version signatures ClamAV** (regex `ClamAV-VDB:[^:]+:(\d+):`)
+- Mode démon **clamd** (TCP 3310) — scan sans rechargement signatures
+- **Protection en temps réel** (FileSystemWatcher, 3 workers simultanés)
+- **Tâche planifiée Windows** — API `schtasks` (`ScheduledScanService`), création UI à venir ; headless `--fullscan` opérationnel
+- **Notifications toast** Windows natives (`Microsoft.Toolkit.Uwp.Notifications`)
+- **Score de risque** (`RiskScoringService`) — CRITIQUE / MAJEUR / MINEUR / INFORMATIONNEL
+- **Rapport PDF** (`PdfReportGenerator`, QuestPDF Community)
+- **Vue d'ensemble** — cartes d'action, graphique illustratif, recommandations, état antivirus (sans jauges CPU matérielles dans l'UI actuelle)
 
 ### v1.0 — Phase 1 : Fondations
 
@@ -605,5 +512,5 @@ optiSCAN_Setup_v3.0.exe
 
 ## 👤 Crédits
 
-Développé par **© 2026 Donatien Byakombe (Dona By)**
+Développé par **© 2026 Donatien Byakombe**
 Design system : **Donaby Design**

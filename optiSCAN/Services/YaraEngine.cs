@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Text.RegularExpressions;
 
 namespace optiSCAN.Services
 {
@@ -50,19 +51,29 @@ namespace optiSCAN.Services
             return Directory.GetFiles(_rulesDirectory, "*.yar").Length > 0;
         }
 
+        // L2 fix : regex multiline plutôt que StartsWith("rule ") ligne par ligne.
+        // StartsWith manquait les règles précédées d'indentation, de commentaires,
+        // ou définies sans espace supplémentaire ; la regex matche "rule <ident>"
+        // n'importe où en début de ligne (y compris avec tabulation).
+        private static readonly Regex RuleStartRegex = new(
+            @"^\s*rule\s+[A-Za-z_]\w*",
+            RegexOptions.Multiline | RegexOptions.Compiled);
+
         private int CountRules()
         {
             try
             {
-                // Compte le nombre de règles dans tous les .yar
                 int count = 0;
-                foreach (var f in Directory.GetFiles(_rulesDirectory, "*.yar"))
-                    foreach (var line in File.ReadAllLines(f))
-                        if (line.TrimStart().StartsWith("rule "))
-                            count++;
-                return count > 0 ? count : Directory.GetFiles(_rulesDirectory, "*.yar").Length;
+                var files = Directory.GetFiles(_rulesDirectory, "*.yar");
+                foreach (var f in files)
+                    count += RuleStartRegex.Matches(File.ReadAllText(f)).Count;
+                return count > 0 ? count : files.Length;
             }
-            catch { return 0; }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("YaraEngine", $"CountRules : {ex.Message}");
+                return 0;
+            }
         }
 
         // ── Compilation des règles ────────────────────────────────────────────────

@@ -46,6 +46,9 @@
         /// <summary>Information sur la dernière menace trouvée (si Phase == ThreatFound).</summary>
         public ThreatInfo? ThreatInfo { get; set; }
 
+        /// <summary>Dernier fichier ou dossier en cours d’analyse (affichage type suite antivirus).</summary>
+        public string? CurrentFilePath { get; set; }
+
         /// <summary>Nombre de fichiers scannés par YARA.</summary>
         public int YaraFilesScanned { get; set; }
 
@@ -81,6 +84,8 @@
             YaraMatchesFound = other.YaraMatchesFound;
             ClamFilesScanned = other.ClamFilesScanned;
             ClamThreatsFound = other.ClamThreatsFound;
+            TotalFiles = other.TotalFiles;
+            CurrentFilePath = other.CurrentFilePath;
         }
 
         /// <summary>
@@ -107,6 +112,8 @@
             YaraMatchesFound = other.YaraMatchesFound;
             ClamFilesScanned = other.ClamFilesScanned;
             ClamThreatsFound = other.ClamThreatsFound;
+            TotalFiles = other.TotalFiles;
+            CurrentFilePath = other.CurrentFilePath;
         }
 
         /// <summary>
@@ -123,6 +130,8 @@
             YaraMatchesFound = 0;
             ClamFilesScanned = 0;
             ClamThreatsFound = 0;
+            TotalFiles = 0;
+            CurrentFilePath = null;
         }
 
         /// <summary>
@@ -147,7 +156,8 @@
                 Message = $"Menace détectée : {threat.VirusName}",
                 Phase = ScanPhase.ThreatFound,
                 ThreatInfo = threat,
-                ThreatsFound = 1
+                ThreatsFound = 1,
+                CurrentFilePath = threat.FilePath,
             };
         }
 

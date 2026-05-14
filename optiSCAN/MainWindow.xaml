@@ -42,7 +42,7 @@
                             <TextBlock Text="optiSCAN"
                                        FontSize="16" FontWeight="Bold"
                                        Foreground="{DynamicResource TextDark}"/>
-                            <TextBlock Text="Provided by Dona By"
+                            <TextBlock Text="Fourni par Dona By"
                                        FontSize="10"
                                        Foreground="{DynamicResource TextMuted}"/>
                         </StackPanel>
@@ -61,7 +61,8 @@
 
                 <!-- Boutons bas (Dock=Bottom en premier pour être en bas) -->
                 <StackPanel DockPanel.Dock="Bottom" Margin="12,0,12,14">
-                    <TextBlock Text="Version 3.0.0"
+                    <TextBlock x:Name="txtSidebarVersion"
+                               Text="…"
                                FontSize="10" Foreground="{DynamicResource TextMuted}"
                                HorizontalAlignment="Center" Margin="0,8,0,0"/>
                 </StackPanel>
@@ -158,9 +159,11 @@
                 <!-- Navigation RadioButtons -->
                 <StackPanel DockPanel.Dock="Top">
 
-                    <!-- Vue d'ensemble -->
-                    <RadioButton Style="{StaticResource NavItem}"
-                                 Tag="Overview" IsChecked="True"
+                    <!-- Vue d'ensemble — IsChecked défini en code après RegisterPanels()
+                         (sinon Checked se déclenche pendant InitializeComponent avant l'enregistrement des panneaux). -->
+                    <RadioButton x:Name="navOverview"
+                                 Style="{StaticResource NavItem}"
+                                 Tag="Overview"
                                  Checked="NavItem_Checked">
                         <StackPanel Orientation="Horizontal">
                             <md:PackIcon Kind="Monitor" Width="18" Height="18"
@@ -261,14 +264,14 @@
                                      Foreground="{DynamicResource SuccessGreen}"
                                      VerticalAlignment="Center" Margin="0,0,6,0"/>
                         <TextBlock x:Name="lblStatus"
-                                   Text="Prêt. Protection active."
+                                   Text="Prêt — protection active."
                                    Foreground="{DynamicResource TextMedium}"
                                    FontSize="12" VerticalAlignment="Center"/>
                     </StackPanel>
 
                     <!-- Centre : mention légale -->
                     <TextBlock Grid.Column="1"
-                               Text="optiSCAN est un logiciel gratuit made in Vanier"
+                               Text="optiSCAN est un logiciel gratuit — Vanier, Canada."
                                Foreground="{DynamicResource TextMuted}"
                                FontSize="11" VerticalAlignment="Center"
                                Margin="0,0,24,0"
@@ -279,10 +282,9 @@
                         <md:PackIcon Kind="Wrench" Width="12" Height="12"
                                      Foreground="{DynamicResource TextMuted}"
                                      VerticalAlignment="Center" Margin="0,0,4,0"/>
-                        <TextBlock FontSize="11" Foreground="{DynamicResource TextMuted}">
-                            <Run FontWeight="SemiBold">optiSCAN v3.0</Run>
-                            <Run>— Provided by Dona By</Run>
-                        </TextBlock>
+                        <TextBlock x:Name="txtFooterVersion"
+                                   FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                   Text="optiSCAN — Fourni par Dona By"/>
                     </StackPanel>
                 </Grid>
             </Border>

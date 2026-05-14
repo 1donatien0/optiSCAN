@@ -1,8 +1,11 @@
 using optiSCAN.Models;
 using optiSCAN.Services;
 using optiSCAN.ViewModels;
+using System.Collections.Concurrent;
+using System.Text;
 using System.Windows;
 using System.Windows.Media;
+using System.Windows.Threading;
 using Color = System.Windows.Media.Color;
 using DataFormats = System.Windows.DataFormats;
 using DragDropEffects = System.Windows.DragDropEffects;
@@ -16,6 +19,13 @@ namespace optiSCAN.Views
     public partial class AntivirusView : System.Windows.Controls.UserControl
     {
         private ScanViewModel? _vmScanTabSubscription;
+
+        // Journal MAJ signatures : file d'attente + timer pour ne pas poster une
+        // opération dispatcher par ligne (freshclam peut en cracher des centaines
+        // et geler toute l'UI avec ScrollToEnd à chaque fois).
+        private readonly ConcurrentQueue<string> _signatureLogQueue = new();
+        private DispatcherTimer? _signatureLogFlushTimer;
+        private int _signatureLogArmPosted;
 
         public AntivirusView()
         {
@@ -45,6 +55,11 @@ namespace optiSCAN.Views
                 _vmScanTabSubscription.DisplayScanProgressRequested -= OnVmDisplayScanProgressRequested;
                 _vmScanTabSubscription = null;
             }
+
+            _signatureLogFlushTimer?.Stop();
+            _signatureLogFlushTimer = null;
+            while (_signatureLogQueue.TryDequeue(out _)) { }
+            Interlocked.Exchange(ref _signatureLogArmPosted, 0);
         }
 
         private void OnVmDisplayScanProgressRequested(object? sender, EventArgs e)
@@ -85,6 +100,18 @@ namespace optiSCAN.Views
             });
         }
 
+        /// <summary>Affiche la date du dernier enregistrement d’analyse (vue latérale).</summary>
+        public void UpdateLastScanDisplay(DateTime? lastScan)
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                if (antivirusLastScan == null) return;
+                antivirusLastScan.Text = lastScan.HasValue
+                    ? lastScan.Value.ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.CurrentCulture)
+                    : "—";
+            });
+        }
+
         /// <summary>Peuple le DataGrid de quarantaine et met à jour le compteur.</summary>
         public void UpdateQuarantineList(IEnumerable<QuarantineEntry> entries)
         {
@@ -111,14 +138,49 @@ namespace optiSCAN.Views
         /// <summary>Ajoute une ligne dans le journal de mise à jour des signatures.</summary>
         public void AppendSignatureLog(string message)
         {
-            Dispatcher.InvokeAsync(() =>
+            _signatureLogQueue.Enqueue(message);
+            if (Interlocked.CompareExchange(ref _signatureLogArmPosted, 1, 0) != 0)
+                return;
+
+            // Ne pas utiliser this.Dispatcher depuis un thread pool (freshclam OutputDataReceived) :
+            // l'accès au Dispatcher du DO peut lever InvalidOperationException.
+            var disp = System.Windows.Application.Current?.Dispatcher;
+            if (disp == null) return;
+            disp.BeginInvoke(new Action(ArmSignatureLogFlush), DispatcherPriority.Background);
+        }
+
+        private void ArmSignatureLogFlush()
+        {
+            Interlocked.Exchange(ref _signatureLogArmPosted, 0);
+
+            _signatureLogFlushTimer ??= new DispatcherTimer(
+                TimeSpan.FromMilliseconds(110),
+                DispatcherPriority.Background,
+                OnSignatureLogFlushTick,
+                Dispatcher);
+
+            _signatureLogFlushTimer.Stop();
+            _signatureLogFlushTimer.Start();
+        }
+
+        private void OnSignatureLogFlushTick(object? sender, EventArgs e)
+        {
+            _signatureLogFlushTimer?.Stop();
+            if (signatureLog == null)
+                return;
+
+            var sb = new StringBuilder(8192);
+            for (var i = 0; i < 500 && _signatureLogQueue.TryDequeue(out var line); i++)
+                sb.AppendLine(line);
+
+            if (sb.Length > 0)
             {
-                if (signatureLog != null)
-                {
-                    signatureLog.AppendText(message + Environment.NewLine);
-                    signatureLog.ScrollToEnd();
-                }
-            });
+                signatureLog.AppendText(sb.ToString());
+                signatureLog.ScrollToEnd();
+            }
+
+            if (!_signatureLogQueue.IsEmpty)
+                _signatureLogFlushTimer?.Start();
         }
 
         /// <summary>Affiche ou masque la barre de progression et les boutons pendant une MAJ.</summary>

@@ -68,6 +68,12 @@ namespace optiSCAN.Services
         /// </summary>
         public Action? FocusAntivirusSignaturesTab { get; set; }
 
+        /// <summary>
+        /// Renseigné par <see cref="MainWindow"/> : synchronise grilles d’historique
+        /// et libellé « dernière analyse » (vue d’ensemble + panneau Antivirus).
+        /// </summary>
+        public Action? RefreshScanHistoryViews { get; set; }
+
         private ServiceContainer()
         {
             // Ordre de construction : du plus indépendant au plus dépendant.
@@ -83,6 +89,10 @@ namespace optiSCAN.Services
             ScanEngine = new ClamAvScanEngineAdapter(ClamAv);
             Actions = new AntivirusActions(this);
 
+            // MAJ silencieuses alignées sur le guide produit (Options peut les couper).
+            FreshclamUpdater.EnableAutoUpdate(TimeSpan.FromHours(4));
+            RulesUpdater.EnableAutoUpdate(TimeSpan.FromHours(24));
+
             AppLogger.Info("ServiceContainer", "Services initialisés");
         }
 
@@ -93,6 +103,7 @@ namespace optiSCAN.Services
         public void Shutdown()
         {
             FocusAntivirusSignaturesTab = null;
+            RefreshScanHistoryViews = null;
             try { FreshclamUpdater.DisableAutoUpdate(); } catch { }
             try { RulesUpdater.DisableAutoUpdate(); } catch { }
             (ClamAv as IDisposable)?.Dispose();

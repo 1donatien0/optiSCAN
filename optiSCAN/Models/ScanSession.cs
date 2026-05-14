@@ -19,12 +19,14 @@ namespace optiSCAN.Models
         [JsonIgnore]
         public string DurationDisplay =>
             FinishedAt.HasValue
-                ? $"{(FinishedAt.Value - StartedAt).TotalSeconds:F0}s"
+                ? ScanDisplayFormatter.FormatDuration(FinishedAt.Value - StartedAt)
                 : "—";
 
         [JsonIgnore]
         public string ThreatsBadge =>
-            ThreatsFound == 0 ? "✅ Propre" : $"⚠️ {ThreatsFound} menace(s)";
+            ThreatsFound == 0
+                ? "Aucune menace"
+                : $"Attention : {ThreatsFound} menace{(ThreatsFound > 1 ? "s" : "")}";
 
         /// <summary>Convertit un ScanResult complet en entrée d'historique légère.</summary>
         public static ScanSession FromResult(ScanResult result) => new ScanSession

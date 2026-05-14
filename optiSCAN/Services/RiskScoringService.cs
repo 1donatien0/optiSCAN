@@ -145,15 +145,32 @@ namespace optiSCAN.Services
 
         // ── Analyse interne ──────────────────────────────────────────────────────
 
+        /// <summary>
+        /// Normalise un nom de menace ou un mot-clé pour la comparaison :
+        /// remplace '_' et '.' par un espace afin que "trojan.ransom" matche
+        /// "win_trojan_ransom_xyz" et réciproquement.
+        /// </summary>
+        private static string NormalizeForMatch(string s)
+            => s.Replace('_', ' ').Replace('.', ' ');
+
         private static (RiskLevel, string) AnalyzeVirusName(string virusName)
         {
             if (string.IsNullOrEmpty(virusName))
                 return (RiskLevel.Informational, "Nom de menace inconnu");
 
+            var normalizedName = NormalizeForMatch(virusName);
+
             foreach (var kvp in KeywordRiskMap)
             {
+                // Correspondance directe (ex. ClamAV : "Trojan.GenericKD")
                 if (virusName.Contains(kvp.Key, StringComparison.OrdinalIgnoreCase))
                     return (kvp.Value, $"Mot-clé '{kvp.Key}' détecté dans le nom");
+
+                // Correspondance normalisée (ex. YARA : "win_trojan_ransom_xyz"
+                // → "win trojan ransom xyz" contient "trojan ransom")
+                var normalizedKey = NormalizeForMatch(kvp.Key);
+                if (normalizedName.Contains(normalizedKey, StringComparison.OrdinalIgnoreCase))
+                    return (kvp.Value, $"Mot-clé '{kvp.Key}' détecté dans le nom (normalisé)");
             }
 
             return (RiskLevel.Minor, "Menace générique");

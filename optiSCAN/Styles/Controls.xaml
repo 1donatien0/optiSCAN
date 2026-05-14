@@ -32,6 +32,13 @@
         </Style.Triggers>
     </Style>
 
+    <!-- Cellule DataGrid : texte sur une ligne + infobulle (chemin long, etc.) -->
+    <Style x:Key="DgCellTextEllipsis" TargetType="TextBlock">
+        <Setter Property="TextTrimming" Value="CharacterEllipsis"/>
+        <Setter Property="TextWrapping" Value="NoWrap"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
     <!-- Style MenuButton -->
     <Style x:Key="MenuButton" TargetType="Button">
         <Setter Property="Height" Value="40"/>

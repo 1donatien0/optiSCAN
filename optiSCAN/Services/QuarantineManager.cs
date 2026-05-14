@@ -35,6 +35,9 @@ namespace optiSCAN.Services
         private const int TagSize = 16;
         private const int HeaderSize = 4 + 1 + NonceSize + TagSize; // 33 octets
 
+        /// <summary>Limite de taille fichier en quarantaine (plainte) pour éviter un pic RAM + OOM.</summary>
+        private const long MaxQuarantinePlaintextBytes = 256L * 1024 * 1024;
+
         // ── Chemins ──────────────────────────────────────────────────────────────
         private readonly string _quarantineDir;
         private readonly string _manifestPath;
@@ -115,6 +118,17 @@ namespace optiSCAN.Services
             {
                 var id = Guid.NewGuid().ToString("N");
                 var qPath = Path.Combine(_quarantineDir, id + ".quar");
+
+                long len;
+                try { len = new FileInfo(threat.FilePath).Length; }
+                catch { return false; }
+
+                if (len > MaxQuarantinePlaintextBytes)
+                {
+                    AppLogger.Warn("QuarantineManager",
+                        $"Fichier trop volumineux pour la quarantaine ({len} octets > {MaxQuarantinePlaintextBytes}) : {threat.FilePath}");
+                    return false;
+                }
 
                 // 1. Lecture du fichier original.
                 byte[] plaintext = File.ReadAllBytes(threat.FilePath);

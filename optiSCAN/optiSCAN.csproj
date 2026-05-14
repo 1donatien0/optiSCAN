@@ -9,17 +9,34 @@
     <!-- Windows.Forms requis pour FolderBrowserDialog -->
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <!-- Assure que l'application demande les droits admin (nécessaire pour scanner C:\Windows) -->
-    <!-- Voir app.manifest : requestedExecutionLevel level="requireAdministrator" -->
+    <!-- Exécution utilisateur standard (asInvoker) : l’élévation UAC n’est demandée que si une fonctionnalité le requiert. -->
     <AssemblyName>optiSCAN</AssemblyName>
     <RootNamespace>optiSCAN</RootNamespace>
-    <Version>3.0.0</Version>
     <Company>optiSCAN</Company>
     <Product>optiSCAN — ClamAV Edition</Product>
     <Copyright>Copyright 2026 Dona By</Copyright>
     <!-- Icône embarquée dans le .exe (taskbar, explorateur, setup) -->
     <ApplicationIcon>optiSCAN.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- Avant chaque publish : supprimer les dossiers RID / publish (voir cible
+         CleanStalePublishOutput). Désactiver : dotnet publish -p:CleanPublishArtifactsBeforePublish=false -->
+    <CleanPublishArtifactsBeforePublish Condition="'$(CleanPublishArtifactsBeforePublish)' == ''">true</CleanPublishArtifactsBeforePublish>
+  </PropertyGroup>
+
+  <!-- Inno Setup lit bin\...\publish\ ou publish\win-x64\ : sans ce nettoyage,
+       des fichiers d'une build précédente peuvent rester si le dossier n'est
+       pas vidé et se retrouver dans l'installateur. -->
+  <Target Name="CleanStalePublishOutput" BeforeTargets="BeforePublish" Condition="'$(CleanPublishArtifactsBeforePublish)' == 'true'">
+    <PropertyGroup>
+      <_PublishParent>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)</_PublishParent>
+    </PropertyGroup>
+    <Message Importance="high" Text="optiSCAN : suppression des anciennes sorties publish ($(_PublishParent)\win-x64, publish, win-x86)..." />
+    <RemoveDir Directories="$(_PublishParent)\win-x64" ContinueOnError="true" />
+    <RemoveDir Directories="$(_PublishParent)\win-x86" ContinueOnError="true" />
+    <RemoveDir Directories="$(_PublishParent)\publish" ContinueOnError="true" />
+  </Target>
 
   <ItemGroup>
     <None Remove="ico.ico" />
@@ -110,7 +127,6 @@
     <PackageReference Include="QuestPDF" Version="2024.12.2" />
 
     <PackageReference Include="Microsoft.Toolkit.Uwp.Notifications" Version="7.1.3" />
-    <PackageReference Include="Hardcodet.NotifyIcon.Wpf" Version="1.0.5" NoWarn="NU1701" />
   </ItemGroup>
 
 

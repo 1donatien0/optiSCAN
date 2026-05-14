@@ -41,7 +41,7 @@ namespace optiSCAN.Services
         static YaraForgeUpdater()
         {
             _http = new HttpClient();
-            _http.DefaultRequestHeaders.UserAgent.ParseAdd("optiSCAN/1.0");
+            _http.DefaultRequestHeaders.UserAgent.ParseAdd(ProductVersionInfo.HttpUserAgent);
             _http.Timeout = TimeSpan.FromMinutes(10);
         }
 
@@ -242,44 +242,21 @@ namespace optiSCAN.Services
                     return result;
                 }
 
-                // ── 4. Extraction ─────────────────────────────────────────────
+                // ── 4. Extraction (I/O synchrone, centaines de fichiers) ─────
+                // Hors thread UI : UpdateAsync peut reprendre le dispatcher (ConfigureAwait(true))
+                // depuis MainWindow — extraire ici bloquait l'interface plusieurs secondes.
                 Report(progress, "Installation des règles de détection…");
 
                 if (!Directory.Exists(_rulesDirectory))
                     Directory.CreateDirectory(_rulesDirectory);
 
-                int installed = 0;
+                var rulesDir = _rulesDirectory;
+                var compiledPath = _compiledRulesPath;
+                int installed = await Task.Run(
+                    () => InstallYarPackageFromZipBytes(zipBytes, rulesDir, compiledPath, token),
+                    token).ConfigureAwait(false);
 
-                using var ms = new MemoryStream(zipBytes);
-                using var archive = new ZipArchive(ms, ZipArchiveMode.Read);
-
-                foreach (var entry in archive.Entries)
-                {
-                    if (entry.Name.EndsWith(".yar", StringComparison.OrdinalIgnoreCase)
-                        && entry.Name.Length > 0)
-                    {
-                        var dest = Path.Combine(_rulesDirectory, entry.Name);
-                        try
-                        {
-                            entry.ExtractToFile(dest, overwrite: true);
-                            installed++;
-                        }
-                        catch
-                        {
-                            // Fichier verrouillé → ignorer
-                        }
-                    }
-                }
-
-                // ── 5. Invalidation du cache compilé ──────────────────────────
-                try
-                {
-                    if (File.Exists(_compiledRulesPath))
-                        File.Delete(_compiledRulesPath);
-                }
-                catch { /* Non bloquant */ }
-
-                // ── 6. Résultat ───────────────────────────────────────────────
+                // ── 5. Résultat ───────────────────────────────────────────────
                 LastVersion = tagName;
                 LastUpdateTime = DateTime.Now;
                 SavePersistedMeta();
@@ -319,12 +296,62 @@ namespace optiSCAN.Services
             return result;
         }
 
+        /// <summary>
+        /// Extraction synchrone du ZIP — doit tourner sur un thread pool (<see cref="Task.Run"/>)
+        /// pour ne pas bloquer le dispatcher WPF.
+        /// </summary>
+        private static int InstallYarPackageFromZipBytes(
+            byte[] zipBytes,
+            string rulesDirectory,
+            string compiledRulesPath,
+            CancellationToken ct)
+        {
+            int installed = 0;
+            var n = 0;
+            using var ms = new MemoryStream(zipBytes, writable: false);
+            using var archive = new ZipArchive(ms, ZipArchiveMode.Read);
+
+            foreach (var entry in archive.Entries)
+            {
+                if ((n++ & 0x3F) == 0)
+                    ct.ThrowIfCancellationRequested();
+
+                if (!entry.Name.EndsWith(".yar", StringComparison.OrdinalIgnoreCase)
+                    || entry.Name.Length == 0)
+                    continue;
+
+                var dest = Path.Combine(rulesDirectory, entry.Name);
+                try
+                {
+                    entry.ExtractToFile(dest, overwrite: true);
+                    installed++;
+                }
+                catch
+                {
+                    // Fichier verrouillé ou accès refusé → ignorer
+                }
+            }
+
+            try
+            {
+                if (File.Exists(compiledRulesPath))
+                    File.Delete(compiledRulesPath);
+            }
+            catch { /* Non bloquant */ }
+
+            return installed;
+        }
+
         // ── Helpers ───────────────────────────────────────────────────────────────
 
         private void Report(IProgress<string>? progress, string message)
         {
-            progress?.Report(message);
-            UpdateOutput?.Invoke(this, message);
+            // Si un IProgress est branché (ex. MAJ manuelle depuis MainWindow), ne pas
+            // doubler avec UpdateOutput — sinon deux flux AppendSignatureLog saturent le dispatcher.
+            if (progress != null)
+                progress.Report(message);
+            else
+                UpdateOutput?.Invoke(this, message);
         }
     }
 

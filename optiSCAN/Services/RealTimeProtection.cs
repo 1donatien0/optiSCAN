@@ -21,10 +21,9 @@ namespace optiSCAN.Services
         private bool _isEnabled;
         private bool _disposed;
 
-        // Dossiers surveillés par défaut
+        // Dossiers système à surveiller (pas C:\Users en entier — trop d'événements avec sous-dossiers).
         private static readonly string[] DefaultWatchFolders = new[]
         {
-            @"C:\Users",
             @"C:\ProgramData",
             @"C:\Windows\Temp",
             @"C:\Windows\Downloaded Program Files"
@@ -149,20 +148,21 @@ namespace optiSCAN.Services
                 var ext = Path.GetExtension(e.FullPath);
                 if (!WatchedExtensions.Contains(ext)) return;
 
-                // Éviter les scans trop fréquents du même fichier
-                if (_recentlyScanned.TryGetValue(e.FullPath, out var lastScan) &&
-                    (DateTime.Now - lastScan) < TimeSpan.FromSeconds(30))
-                    return;
+                // Dédup immédiate (avant le délai de stabilisation) pour éviter deux
+                // événements concurrents sur le même fichier avant l'écriture du cache.
+                var utcNow = DateTime.UtcNow;
+                if (!_recentlyScanned.TryAdd(e.FullPath, utcNow))
+                {
+                    if (_recentlyScanned.TryGetValue(e.FullPath, out var t) &&
+                        (utcNow - t) < TimeSpan.FromSeconds(30))
+                        return;
+                    _recentlyScanned[e.FullPath] = utcNow;
+                }
 
-                // Attendre que le fichier soit stabilisé
                 await Task.Delay(StabilizationDelay);
 
-                // Vérifier que le fichier existe toujours
                 if (!File.Exists(e.FullPath)) return;
 
-                _recentlyScanned[e.FullPath] = DateTime.Now;
-
-                // Nettoyer les entrées anciennes
                 CleanupRecentCache();
 
                 await _scanSemaphore.WaitAsync();
@@ -174,6 +174,8 @@ namespace optiSCAN.Services
                 {
                     _scanSemaphore.Release();
                 }
+
+                _recentlyScanned[e.FullPath] = DateTime.UtcNow;
             }
             catch (Exception ex)
             {
@@ -191,8 +193,19 @@ namespace optiSCAN.Services
                 var ext = Path.GetExtension(e.FullPath);
                 if (!WatchedExtensions.Contains(ext)) return;
 
+                var utcNow = DateTime.UtcNow;
+                if (!_recentlyScanned.TryAdd(e.FullPath, utcNow))
+                {
+                    if (_recentlyScanned.TryGetValue(e.FullPath, out var t) &&
+                        (utcNow - t) < TimeSpan.FromSeconds(30))
+                        return;
+                    _recentlyScanned[e.FullPath] = utcNow;
+                }
+
                 await Task.Delay(StabilizationDelay);
                 if (!File.Exists(e.FullPath)) return;
+
+                CleanupRecentCache();
 
                 await _scanSemaphore.WaitAsync();
                 try
@@ -203,6 +216,8 @@ namespace optiSCAN.Services
                 {
                     _scanSemaphore.Release();
                 }
+
+                _recentlyScanned[e.FullPath] = DateTime.UtcNow;
             }
             catch (Exception ex)
             {
@@ -258,7 +273,7 @@ namespace optiSCAN.Services
 
         private void CleanupRecentCache()
         {
-            var threshold = DateTime.Now.AddMinutes(-5);
+            var threshold = DateTime.UtcNow.AddMinutes(-5);
             foreach (var kvp in _recentlyScanned)
             {
                 if (kvp.Value < threshold)

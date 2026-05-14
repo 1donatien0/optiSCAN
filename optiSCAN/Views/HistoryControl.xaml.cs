@@ -16,18 +16,7 @@ namespace optiSCAN.Views
             Dispatcher.InvokeAsync(() =>
             {
                 if (dgScanHistory != null)
-                {
                     dgScanHistory.ItemsSource = sessions;
-
-                    // D�bogage : affiche les propri�t�s disponibles
-                    if (sessions != null && sessions.Any())
-                    {
-                        var first = sessions.First();
-                        var properties = first.GetType().GetProperties();
-                        var propNames = string.Join(", ", properties.Select(p => p.Name));
-                        System.Diagnostics.Debug.WriteLine($"Propri�t�s disponibles: {propNames}");
-                    }
-                }
             });
         }
 

@@ -2,8 +2,8 @@ using optiSCAN.Services;
 using System.Collections.ObjectModel;
 using System.Windows;
 using WinForms = System.Windows.Forms;
+using WpfButton = System.Windows.Controls.Button;
 using WpfCheckBox = System.Windows.Controls.CheckBox;
-using WpfButton   = System.Windows.Controls.Button;
 
 namespace optiSCAN.Views
 {
@@ -36,8 +36,8 @@ namespace optiSCAN.Views
         {
             if (sender is WpfCheckBox cb)
             {
-                bool isOn  = cb.IsChecked == true;
-                var prefs  = UserPreferences.Current;
+                bool isOn = cb.IsChecked == true;
+                var prefs = UserPreferences.Current;
 
                 switch (cb.Tag as string)
                 {
@@ -55,8 +55,17 @@ namespace optiSCAN.Views
                         // remonter vers MainWindow par cast. Ainsi cette vue compile
                         // et fonctionne même indépendamment du host (tests, design-time).
                         var updater = ServiceContainer.Default.FreshclamUpdater;
-                        if (isOn) updater.EnableAutoUpdate(System.TimeSpan.FromHours(4));
-                        else updater.DisableAutoUpdate();
+                        var rules = ServiceContainer.Default.RulesUpdater;
+                        if (isOn)
+                        {
+                            updater.EnableAutoUpdate(TimeSpan.FromHours(4));
+                            rules.EnableAutoUpdate(TimeSpan.FromHours(24));
+                        }
+                        else
+                        {
+                            updater.DisableAutoUpdate();
+                            rules.DisableAutoUpdate();
+                        }
                         break;
 
                     // RealtimeProtection, AutoQuarantine → futurs services
@@ -69,7 +78,7 @@ namespace optiSCAN.Views
         // ── Démarrage Windows (Registre) ─────────────────────────────────────
         private static void SetAutoStart(bool enable)
         {
-            const string regKey  = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
+            const string regKey = @"SOFTWARE\Microsoft\Windows\CurrentVersion\Run";
             const string appName = "optiSCAN";
             try
             {

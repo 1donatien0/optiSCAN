@@ -145,7 +145,7 @@ namespace optiSCAN.Services
   <div class=""logo"">🛡</div>
   <div>
     <h1>Rapport optiSCAN</h1>
-    <div class=""meta"">Généré le {now:dddd dd MMMM yyyy à HH:mm} · optiSCAN v2.0</div>
+    <div class=""meta"">Généré le {now:dddd dd MMMM yyyy à HH:mm} · optiSCAN {ProductVersionInfo.ReleaseLabel} ({ProductVersionInfo.SemVer})</div>
   </div>
 </header>
 
@@ -266,7 +266,7 @@ namespace optiSCAN.Services
             }
 
             sb.AppendLine($@"<footer>
-  Rapport généré automatiquement par optiSCAN v2.0 — {now:yyyy} ·
+  Rapport généré automatiquement par optiSCAN {ProductVersionInfo.ReleaseLabel} ({ProductVersionInfo.SemVer}) — {now:yyyy} ·
   Les informations de ce rapport sont confidentielles.
 </footer>
 </body>

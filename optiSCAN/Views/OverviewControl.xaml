@@ -93,7 +93,7 @@
                         <TextBlock Text="ANTIVIRUS" FontSize="13" FontWeight="Bold"
                                    Foreground="{DynamicResource TextDark}"
                                    HorizontalAlignment="Center"/>
-                        <TextBlock Text="Lancer un scan" FontSize="11"
+                        <TextBlock Text="Lancer une analyse" FontSize="11"
                                    Foreground="{DynamicResource TextMuted}"
                                    HorizontalAlignment="Center" Margin="0,3,0,0"/>
                     </StackPanel>
@@ -118,7 +118,7 @@
                         <TextBlock Text="HISTORIQUE" FontSize="13" FontWeight="Bold"
                                    Foreground="{DynamicResource TextDark}"
                                    HorizontalAlignment="Center"/>
-                        <TextBlock Text="Voir les scans" FontSize="11"
+                        <TextBlock Text="Voir l’historique" FontSize="11"
                                    Foreground="{DynamicResource TextMuted}"
                                    HorizontalAlignment="Center" Margin="0,3,0,0"/>
                     </StackPanel>
@@ -167,66 +167,23 @@
                         CornerRadius="12" Padding="18,16"
                         Effect="{DynamicResource CardShadow}">
                     <StackPanel>
-                        <TextBlock Text="Statistiques de Protection"
+                        <TextBlock Text="Statistiques de protection"
                                    FontSize="13" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextDark}"/>
-                        <TextBlock Text="Les 30 derniers jours"
+                        <TextBlock Text="Tendance sur 30 jours (bientôt disponible)"
                                    FontSize="11" Foreground="{DynamicResource TextMuted}"
-                                   Margin="0,2,0,12"/>
+                                   Margin="0,2,0,10"/>
 
-                        <!-- Graphique ligne (Canvas statique) -->
-                        <Canvas Height="145" ClipToBounds="True">
-
-                            <!-- Grilles horizontales -->
-                            <Line X1="0" Y1="14"  X2="340" Y2="14"
-                                  Stroke="{DynamicResource BorderSubtle}" StrokeThickness="1"
-                                  StrokeDashArray="3,4"/>
-                            <Line X1="0" Y1="46"  X2="340" Y2="46"
-                                  Stroke="{DynamicResource BorderSubtle}" StrokeThickness="1"
-                                  StrokeDashArray="3,4"/>
-                            <Line X1="0" Y1="77"  X2="340" Y2="77"
-                                  Stroke="{DynamicResource BorderSubtle}" StrokeThickness="1"
-                                  StrokeDashArray="3,4"/>
-                            <Line X1="0" Y1="109" X2="340" Y2="109"
-                                  Stroke="{DynamicResource BorderSubtle}" StrokeThickness="1"
-                                  StrokeDashArray="3,4"/>
-
-                            <!-- Labels Y (droite) -->
-                            <TextBlock Canvas.Right="0" Canvas.Top="6"   Text="40"
-                                       FontSize="9" Foreground="{DynamicResource TextMuted}"/>
-                            <TextBlock Canvas.Right="0" Canvas.Top="38"  Text="30"
-                                       FontSize="9" Foreground="{DynamicResource TextMuted}"/>
-                            <TextBlock Canvas.Right="0" Canvas.Top="69"  Text="20"
-                                       FontSize="9" Foreground="{DynamicResource TextMuted}"/>
-                            <TextBlock Canvas.Right="0" Canvas.Top="101" Text="10"
-                                       FontSize="9" Foreground="{DynamicResource TextMuted}"/>
-
-                            <!-- Courbe Scans (vert) -->
-                            <Polyline
-                                Points="0,128 38,115 76,109 113,97 151,90 189,78 227,65 264,53 302,37 340,16"
-                                Stroke="#1D9E75" StrokeThickness="2.5"
-                                StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                                Fill="Transparent"/>
-
-                            <!-- Courbe Menaces (ambre) -->
-                            <Polyline
-                                Points="0,134 38,128 76,121 113,112 151,106 189,100 227,90 264,84 302,78 340,72"
-                                Stroke="#EF9F27" StrokeThickness="2.5"
-                                StrokeLineJoin="Round" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
-                                Fill="Transparent"/>
-                        </Canvas>
-
-                        <!-- Légende -->
-                        <StackPanel Orientation="Horizontal" Margin="0,10,0,0">
-                            <Ellipse Width="10" Height="10" Fill="#EF9F27" VerticalAlignment="Center"/>
-                            <TextBlock Text=" Menaces" FontSize="11"
+                        <Border MinHeight="128" CornerRadius="8"
+                                Background="{DynamicResource SurfaceBg}"
+                                Padding="14,12">
+                            <TextBlock TextWrapping="Wrap"
+                                       FontSize="12"
                                        Foreground="{DynamicResource TextMuted}"
-                                       VerticalAlignment="Center" Margin="0,0,16,0"/>
-                            <Ellipse Width="10" Height="10" Fill="#1D9E75" VerticalAlignment="Center"/>
-                            <TextBlock Text=" Scans" FontSize="11"
-                                       Foreground="{DynamicResource TextMuted}"
-                                       VerticalAlignment="Center"/>
-                        </StackPanel>
+                                       VerticalAlignment="Center"
+                                       LineHeight="18"
+                                       Text="Les graphiques seront dérivés de votre historique d’analyses. Pour l’instant, consultez l’onglet Historique pour chaque session (fichiers parcourus, durée, menaces)."/>
+                        </Border>
                     </StackPanel>
                 </Border>
 
@@ -236,7 +193,7 @@
                         CornerRadius="12" Padding="18,16"
                         Effect="{DynamicResource CardShadow}">
                     <StackPanel>
-                        <TextBlock Text="Recommandations d'Action"
+                        <TextBlock Text="Recommandations"
                                    FontSize="13" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextDark}" Margin="0,0,0,12"/>
 
@@ -258,7 +215,7 @@
                                 <md:PackIcon Kind="Broom" Width="16" Height="16"
                                              Foreground="{DynamicResource AlertGoldLight}"
                                              VerticalAlignment="Center"/>
-                                <TextBlock Text=" Nettoyage conseillé"
+                                <TextBlock Text=" Nettoyage recommandé"
                                            FontSize="12" Foreground="{DynamicResource AlertGold}"
                                            VerticalAlignment="Center"/>
                             </StackPanel>
@@ -267,10 +224,10 @@
                         <Border Background="{DynamicResource SurfaceBg}"
                                 CornerRadius="8" Padding="12,10">
                             <StackPanel Orientation="Horizontal">
-                                <md:PackIcon Kind="ShieldCheck" Width="16" Height="16"
+                                <md:PackIcon Kind="History" Width="16" Height="16"
                                              Foreground="{DynamicResource SuccessGreen}"
                                              VerticalAlignment="Center"/>
-                                <TextBlock Text=" Aucune menace détectée"
+                                <TextBlock Text=" Détail des analyses dans Historique"
                                            FontSize="12" Foreground="{DynamicResource TextMedium}"
                                            VerticalAlignment="Center"/>
                             </StackPanel>

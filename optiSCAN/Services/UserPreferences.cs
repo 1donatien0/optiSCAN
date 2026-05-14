@@ -1,7 +1,6 @@
 using optiSCAN.Models;
 using System.IO;
 using System.Runtime.Versioning;
-using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace optiSCAN.Services
@@ -61,7 +60,8 @@ namespace optiSCAN.Services
         public DateTime? LastFullScanDate { get; set; }
 
         /// <summary>Thème sombre activé (true) ou clair (false).</summary>
-        public bool DarkTheme { get; set; } = true;
+        /// <remarks>Par défaut clair, aligné sur Donaby.Light.xaml au premier lancement.</remarks>
+        public bool DarkTheme { get; set; } = false;
 
         /// <summary>Suivre le thème Windows automatiquement.</summary>
         public bool SyncWindowsTheme { get; set; } = false;

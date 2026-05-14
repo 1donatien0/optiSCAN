@@ -20,12 +20,9 @@ namespace optiSCAN.Services
         private static readonly Regex InfectedRegex =
             new Regex(@"^(.+):\s+(.+)\s+FOUND\s*$", RegexOptions.Compiled);
 
-        // Lignes de scan : "C:\path\file.exe: OK" ou "C:\path\file.exe: ... FOUND"
-        // Strict : on exige au minimum un suffixe " OK" ou " FOUND" en fin de ligne.
-        // Sans cela, l'ancien comptage (line.Contains(":")) capturait toutes les
-        // lignes contenant un chemin Windows et faussait massivement le résultat.
-        private static readonly Regex ScannedLineRegex =
-            new Regex(@":\s+(OK|FOUND|Empty file|Excluded|Symbolic link)\s*$",
+        // Lignes de scan : "C:\path\file.exe: OK" ou "...: ... FOUND"
+        private static readonly Regex ScannedFileLineRegex =
+            new(@"^(?<path>.+):\s+(?<verdict>OK|FOUND|Empty file|Excluded|Symbolic link)\s*$",
                 RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
         // Regex statistiques finales : "Scanned files: 123"
@@ -166,7 +163,8 @@ namespace optiSCAN.Services
             progress?.Report(new ScanProgress
             {
                 Message = $"ClamAV — démarrage : {Path.GetFileName(targetPath)}",
-                Phase = ScanPhase.Starting
+                Phase = ScanPhase.Starting,
+                CurrentFilePath = targetPath,
             });
 
             try
@@ -229,34 +227,17 @@ namespace optiSCAN.Services
             return result;
         }
 
-        private async Task<ScanResult> RunMultiTargetScanAsync(
+        private Task<ScanResult> RunMultiTargetScanAsync(
             ScanType type, List<string> targets,
-            IProgress<ScanProgress>? progress, CancellationToken ct)
-        {
-            var merged = new ScanResult
-            {
-                Type = type,
-                TargetPath = string.Join(", ", targets),
-                StartedAt = DateTime.Now,
-                Status = ScanStatus.Running
-            };
-
-            foreach (var target in targets)
-            {
-                if (ct.IsCancellationRequested) break;
-                var sub = await RunScanAsync(type, target, recursive: true, progress, ct);
-                merged.FilesScanned += sub.FilesScanned;
-                merged.FilesSkipped += sub.FilesSkipped;
-                merged.TotalBytesScanned += sub.TotalBytesScanned;
-                merged.Threats.AddRange(sub.Threats);
-            }
-
-            merged.FinishedAt = DateTime.Now;
-            merged.Status = ct.IsCancellationRequested
-                ? ScanStatus.Cancelled
-                : ScanStatus.Completed;
-            return merged;
-        }
+            IProgress<ScanProgress>? progress, CancellationToken ct) =>
+            MultiTargetScanAggregator.AggregateAsync(
+                type,
+                targets,
+                t => RunScanAsync(type, t, recursive: true, progress, ct),
+                ct,
+                progress,
+                skipIfDirectoryMissing: false,
+                reportTargetProgress: true);
 
         // ── Parsing ──────────────────────────────────────────────────────────────
 
@@ -289,7 +270,8 @@ namespace optiSCAN.Services
                     Phase = ScanPhase.ThreatFound,
                     ThreatInfo = threat,
                     FilesScanned = result.FilesScanned,
-                    ThreatsFound = result.ThreatsFound
+                    ThreatsFound = result.ThreatsFound,
+                    CurrentFilePath = filePath,
                 });
                 return;
             }
@@ -304,7 +286,7 @@ namespace optiSCAN.Services
                     Message = $"ClamAV : {result.FilesScanned} fichiers analysés.",
                     Phase = ScanPhase.Scanning,
                     FilesScanned = result.FilesScanned,
-                    ThreatsFound = result.ThreatsFound
+                    ThreatsFound = result.ThreatsFound,
                 });
                 return;
             }
@@ -313,17 +295,22 @@ namespace optiSCAN.Services
             // sont comptabilisées. L'ancienne heuristique (line.Contains(":"))
             // captait aussi les lignes de stats, warnings et lettres de lecteur,
             // donnant un compteur systématiquement faux.
-            if (ScannedLineRegex.IsMatch(line))
+            if (ScannedFileLineRegex.IsMatch(line))
             {
+                var m = ScannedFileLineRegex.Match(line);
+                var scannedPath = m.Success ? m.Groups["path"].Value.Trim() : string.Empty;
+
                 result.FilesScanned++;
-                if (result.FilesScanned % 50 == 0)
+                const int pathUpdateEvery = 12;
+                if (result.FilesScanned % pathUpdateEvery == 0 || result.FilesScanned % 50 == 0)
                 {
                     progress?.Report(new ScanProgress
                     {
                         Message = $"ClamAV : {result.FilesScanned} fichiers analysés…",
                         Phase = ScanPhase.Scanning,
                         FilesScanned = result.FilesScanned,
-                        ThreatsFound = result.ThreatsFound
+                        ThreatsFound = result.ThreatsFound,
+                        CurrentFilePath = string.IsNullOrEmpty(scannedPath) ? null : scannedPath,
                     });
                 }
             }

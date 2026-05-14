@@ -185,7 +185,7 @@ namespace optiSCAN.Services
                         .DefaultTextStyle(s => s.FontSize(8).FontColor(Colors.Grey.Medium))
                         .Text(x =>
                         {
-                            x.Span($"optiSCAN v2.0 — Rapport généré le {DateTime.Now:dd/MM/yyyy HH:mm:ss} — Page ");
+                            x.Span($"optiSCAN {ProductVersionInfo.ReleaseLabel} ({ProductVersionInfo.SemVer}) — Rapport généré le {DateTime.Now:dd/MM/yyyy HH:mm:ss} — Page ");
                             x.CurrentPageNumber();
                             x.Span(" / ");
                             x.TotalPages();

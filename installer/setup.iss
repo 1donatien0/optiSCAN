@@ -1,16 +1,20 @@
 ; =============================================================================
-; optiSCAN v3.0 — Script Inno Setup
+; optiSCAN — Installateur Windows (Inno Setup)
 ; =============================================================================
+; AppRelease = nom vM.m (comme README v3.0 / v4.0) · AppVersion = semver / Directory.Build.props
 
 #define AppName        "optiSCAN"
-#define AppVersion     "3.0.0"
+#define AppVersion     "4.0.0"
 #define AppPublisher   "Dona By"
-#define AppURL         "https://sourceforge.net/u/donaby"
+#define AppURL         "https://sourceforge.net/projects/optiscan/"
 #define AppExeName     "optiSCAN.exe"
 #define AppId          "{{F3A2C1D0-5B6E-4F7A-8C9D-0E1F2A3B4C5D}"
+#define AppRelease     "v4.0"
 #define AppIconFile    "..\optiSCAN\optiSCAN.ico"
 
-; ── ISPP : emplacement de publish (VS peut sortir dans publish\ ou publish\win-x64\) ──
+; ── ISPP : emplacement de publish (VS peut sortir dans publish\ ou publish\win-x64\)
+; Le .csproj supprime win-x64 / win-x86 / publish avant chaque « dotnet publish »
+; pour éviter d'embarquer des restes d'une build précédente dans ce setup.
 #if FileExists(AddBackslash(SourcePath) + "..\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\optiSCAN.exe")
   #define AppPublishSource "..\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\*"
 #elif FileExists(AddBackslash(SourcePath) + "..\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\optiSCAN.exe")
@@ -23,12 +27,13 @@
 AppId={#AppId}
 AppName={#AppName}
 AppVersion={#AppVersion}
-AppVerName={#AppName} {#AppVersion}
+AppVerName={#AppName} {#AppRelease} ({#AppVersion})
 AppPublisher={#AppPublisher}
 AppPublisherURL={#AppURL}
 AppSupportURL={#AppURL}
 AppUpdatesURL={#AppURL}
 AppCopyright=Copyright 2026 Dona By
+AppComments=optiSCAN {#AppRelease} ({#AppVersion}) — Antivirus (ClamAV + YARA) et optimisation système
 SetupIconFile={#AppIconFile}
 UninstallDisplayIcon={app}\{#AppExeName}
 #if FileExists("..\LICENSE.txt")
@@ -109,7 +114,7 @@ Filename: "{app}\{#AppExeName}"; Description: "Lancer {#AppName} maintenant"; Fl
 ; =============================================================================
 ; Supprime les fichiers de configuration legacy susceptibles de contenir des
 ; chemins de la machine de dev ou la directive CVDCertsDirectory cassée
-; (héritée des versions ≤ 3.0). Le code optiSCAN regénère un freshclam.conf
+; (héritée des versions antérieures). Le code optiSCAN regénère un freshclam.conf
 ; propre dans %LocalAppData% au premier lancement de la mise à jour.
 [InstallDelete]
 ; --- freshclam.conf legacy dans le dossier d'install ---
@@ -238,7 +243,7 @@ end;
 // =============================================================================
 // CLEAN INSTALL — détecte une installation précédente et propose un reset
 // =============================================================================
-// Si l'utilisateur fait une mise à jour par-dessus une version 3.0 buguée
+// Si l'utilisateur fait une mise à jour par-dessus une version antérieure buguée
 // (avec un freshclam.conf cassé en LocalAppData), on propose de wiper le
 // dossier de conf pour repartir sur des bases saines. La quarantaine et
 // l'historique sont conservés.
