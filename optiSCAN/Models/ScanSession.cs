@@ -1,4 +1,3 @@
-using System;
 using System.Text.Json.Serialization;
 
 namespace optiSCAN.Models
@@ -30,11 +29,11 @@ namespace optiSCAN.Models
         /// <summary>Convertit un ScanResult complet en entrée d'historique légère.</summary>
         public static ScanSession FromResult(ScanResult result) => new ScanSession
         {
-            SessionId   = result.SessionId,
-            StartedAt   = result.StartedAt,
-            FinishedAt  = result.FinishedAt,
+            SessionId = result.SessionId,
+            StartedAt = result.StartedAt,
+            FinishedAt = result.FinishedAt,
             TypeDisplay = result.TypeDisplay,
-            TargetPath  = result.TargetPath,
+            TargetPath = result.TargetPath,
             FilesScanned = result.FilesScanned,
             ThreatsFound = result.ThreatsFound,
             StatusDisplay = result.Status.ToString()

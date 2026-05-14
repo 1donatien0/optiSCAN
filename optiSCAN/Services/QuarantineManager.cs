@@ -1,90 +1,184 @@
-using System;
-using System.Collections.Generic;
-using System.IO;
-using System.Text.Json;
 using optiSCAN.Models;
+using System.IO;
+using System.Runtime.Versioning;
+using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
 
 namespace optiSCAN.Services
 {
     /// <summary>
-    /// Gère la mise en quarantaine, la restauration et la suppression des fichiers infectés.
-    /// Les fichiers en quarantaine sont chiffrés (XOR simple) pour empêcher leur exécution accidentelle.
-    /// Un manifeste JSON conserve la trace des fichiers déplacés.
+    /// Quarantaine sécurisée :
+    ///   - Chiffrement par fichier en AES-256-GCM (authentifié, intègre)
+    ///   - Clé maîtresse 256 bits stockée chiffrée par DPAPI (CurrentUser)
+    ///   - Chaque fichier reçoit un nonce 96 bits aléatoire unique
+    ///   - Le manifest est signé en HMAC-SHA256 — un manifest manipulé est rejeté
+    ///
+    /// Format des fichiers .quar (binaire) :
+    ///   Magic:    4 octets   "OPTQ"
+    ///   Version:  1 octet    0x02       (0x01 = legacy XOR, géré en lecture)
+    ///   Nonce:    12 octets
+    ///   Tag:      16 octets  (GCM auth tag)
+    ///   Cipher:   N octets   (taille = taille du fichier original)
+    ///
+    /// Format manifest.json :
+    ///   { "Version": 2, "Hmac": "...base64...", "Entries": [...] }
     /// </summary>
+    [SupportedOSPlatform("windows")]
     public class QuarantineManager
     {
+        // ── Constantes format ────────────────────────────────────────────────────
+        private const byte FormatVersion = 0x02;
+        private const byte LegacyXorKey = 0x5A; // ancien format (lecture seule, migration)
+        private static readonly byte[] Magic = Encoding.ASCII.GetBytes("OPTQ");
+        private const int NonceSize = 12;
+        private const int TagSize = 16;
+        private const int HeaderSize = 4 + 1 + NonceSize + TagSize; // 33 octets
+
+        // ── Chemins ──────────────────────────────────────────────────────────────
         private readonly string _quarantineDir;
         private readonly string _manifestPath;
-        private List<QuarantineEntry> _manifest;
+        private readonly string _keyPath;       // clé maîtresse chiffrée DPAPI
 
-        // Clé XOR simple — suffit pour rendre le fichier non-exécutable accidentellement
-        private const byte XorKey = 0x5A;
+        // ── État ─────────────────────────────────────────────────────────────────
+        private readonly byte[] _masterKey;     // 32 octets (déchiffrés en RAM)
+        private QuarantineDocument _doc;
+        private readonly object _lock = new();
+
+        // ── Construction ─────────────────────────────────────────────────────────
 
         public QuarantineManager(string? quarantineDir = null)
         {
-            _quarantineDir = quarantineDir
-                ?? Path.Combine(
-                    Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                    "optiSCAN", "Quarantine");
+            _quarantineDir = quarantineDir ?? Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "optiSCAN", "Quarantine");
 
             _manifestPath = Path.Combine(_quarantineDir, "manifest.json");
+            _keyPath = Path.Combine(_quarantineDir, ".key");
 
             EnsureDirectoryExists(_quarantineDir);
-            _manifest = LoadManifest();
+            _masterKey = LoadOrCreateMasterKey();
+            _doc = LoadManifest();
         }
 
-        // ── Quarantaine ─────────────────────────────────────────────────────────
+        // ── Clé maîtresse (DPAPI) ────────────────────────────────────────────────
 
         /// <summary>
-        /// Déplace le fichier infecté en quarantaine et met à jour la ThreatInfo.
+        /// Charge la clé maîtresse chiffrée par DPAPI, ou en génère une nouvelle.
+        /// DPAPI CurrentUser : seul l'utilisateur courant peut déchiffrer la clé,
+        /// même un autre admin de la machine ne pourra pas l'utiliser.
         /// </summary>
+        private byte[] LoadOrCreateMasterKey()
+        {
+            try
+            {
+                if (File.Exists(_keyPath))
+                {
+                    var encrypted = File.ReadAllBytes(_keyPath);
+                    return ProtectedData.Unprotect(encrypted, optionalEntropy: null, DataProtectionScope.CurrentUser);
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("QuarantineManager", "Lecture clé maîtresse", ex);
+                // Clé corrompue → on la régénère. Les anciens fichiers .quar v2
+                // seront illisibles (acceptable : l'utilisateur perd l'accès à
+                // sa quarantaine si DPAPI échoue, mais aucune fuite de données).
+            }
+
+            // Génération d'une clé 256 bits aléatoire et stockage chiffré DPAPI.
+            var key = RandomNumberGenerator.GetBytes(32);
+            try
+            {
+                var encrypted = ProtectedData.Protect(key, optionalEntropy: null, DataProtectionScope.CurrentUser);
+                AtomicFile.WriteAllBytes(_keyPath, encrypted);
+
+                // Sur Windows, on tente de marquer le fichier comme caché + system
+                // pour éviter la curiosité utilisateur (best effort).
+                try { File.SetAttributes(_keyPath, FileAttributes.Hidden | FileAttributes.System); }
+                catch { /* best effort */ }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("QuarantineManager", "Persistance clé maîtresse échouée", ex);
+            }
+            return key;
+        }
+
+        // ── Quarantaine ──────────────────────────────────────────────────────────
+
         public bool Quarantine(ThreatInfo threat)
         {
-            if (!File.Exists(threat.FilePath))
-                return false;
+            if (!File.Exists(threat.FilePath)) return false;
 
             try
             {
-                var id          = Guid.NewGuid().ToString("N");
-                var qPath       = Path.Combine(_quarantineDir, id + ".quar");
+                var id = Guid.NewGuid().ToString("N");
+                var qPath = Path.Combine(_quarantineDir, id + ".quar");
 
-                // Lecture + chiffrement XOR + écriture dans le dossier quarantaine
-                var bytes = File.ReadAllBytes(threat.FilePath);
-                for (int i = 0; i < bytes.Length; i++) bytes[i] ^= XorKey;
-                File.WriteAllBytes(qPath, bytes);
+                // 1. Lecture du fichier original.
+                byte[] plaintext = File.ReadAllBytes(threat.FilePath);
 
-                // Suppression de l'original
+                // 2. Hash SHA-256 du plaintext (pour détecter une corruption à la
+                //    restauration et tracer l'identité du fichier).
+                var sha256 = SHA256.HashData(plaintext);
+
+                // 3. Chiffrement AES-GCM avec nonce aléatoire unique.
+                var nonce = RandomNumberGenerator.GetBytes(NonceSize);
+                var ciphertext = new byte[plaintext.Length];
+                var tag = new byte[TagSize];
+
+                using (var aes = new AesGcm(_masterKey, TagSize))
+                {
+                    aes.Encrypt(nonce, plaintext, ciphertext, tag);
+                }
+
+                // 4. Écriture du fichier quarantaine au format binaire versionné.
+                using (var fs = new FileStream(qPath, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                {
+                    fs.Write(Magic, 0, Magic.Length);
+                    fs.WriteByte(FormatVersion);
+                    fs.Write(nonce, 0, nonce.Length);
+                    fs.Write(tag, 0, tag.Length);
+                    fs.Write(ciphertext, 0, ciphertext.Length);
+                    fs.Flush(flushToDisk: true);
+                }
+
+                // 5. Suppression du fichier original (après écriture confirmée).
+                //    Si la suppression échoue, on a une copie quarantaine valide
+                //    et le fichier reste sur disque — l'opérateur peut réessayer.
                 File.Delete(threat.FilePath);
 
-                // Mise à jour de la ThreatInfo
-                threat.Status        = ThreatStatus.Quarantined;
+                threat.Status = ThreatStatus.Quarantined;
                 threat.QuarantinePath = qPath;
 
-                // Ajout au manifeste
-                _manifest.Add(new QuarantineEntry
+                lock (_lock)
                 {
-                    Id              = id,
-                    OriginalPath    = threat.FilePath,
-                    QuarantinePath  = qPath,
-                    VirusName       = threat.VirusName,
-                    QuarantinedAt   = DateTime.Now,
-                    OriginalSize    = threat.FileSize
-                });
+                    _doc.Entries.Add(new QuarantineEntry
+                    {
+                        Id = id,
+                        OriginalPath = threat.FilePath,
+                        QuarantinePath = qPath,
+                        VirusName = threat.VirusName,
+                        QuarantinedAt = DateTime.Now,
+                        OriginalSize = threat.FileSize,
+                        Sha256 = Convert.ToHexString(sha256),
+                    });
+                    SaveManifest();
+                }
 
-                SaveManifest();
+                // 6. Wipe du plaintext en RAM (réduit la fenêtre d'exposition mémoire).
+                CryptographicOperations.ZeroMemory(plaintext);
+
                 return true;
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[Quarantaine] Erreur : {ex.Message}");
+                AppLogger.Error("QuarantineManager", $"Quarantine échec ({threat.FilePath})", ex);
                 return false;
             }
         }
 
-        /// <summary>
-        /// Met en quarantaine toutes les menaces d'un ScanResult.
-        /// Retourne le nombre de fichiers traités avec succès.
-        /// </summary>
         public int QuarantineAll(IEnumerable<ThreatInfo> threats)
         {
             int count = 0;
@@ -93,44 +187,174 @@ namespace optiSCAN.Services
             return count;
         }
 
-        // ── Restauration ───────────────────────────────────────────────────────
+        // ── Restauration ─────────────────────────────────────────────────────────
 
-        /// <summary>
-        /// Restaure un fichier de la quarantaine à son emplacement d'origine.
-        /// ATTENTION : restaure un fichier potentiellement infecté.
-        /// </summary>
         public bool Restore(string quarantineId)
         {
-            var entry = _manifest.Find(e => e.Id == quarantineId);
-            if (entry == null || !File.Exists(entry.QuarantinePath))
-                return false;
+            QuarantineEntry? entry;
+            lock (_lock) { entry = _doc.Entries.Find(e => e.Id == quarantineId); }
+            if (entry == null) return false;
+            return RestoreToPath(entry, entry.OriginalPath);
+        }
+
+        public bool RestoreTo(string quarantineId, string destinationFolder)
+        {
+            QuarantineEntry? entry;
+            lock (_lock) { entry = _doc.Entries.Find(e => e.Id == quarantineId); }
+            if (entry == null) return false;
 
             try
             {
-                var dir = Path.GetDirectoryName(entry.OriginalPath);
-                if (dir != null && !Directory.Exists(dir))
-                    Directory.CreateDirectory(dir);
+                if (!Directory.Exists(destinationFolder))
+                    Directory.CreateDirectory(destinationFolder);
 
-                var bytes = File.ReadAllBytes(entry.QuarantinePath);
-                for (int i = 0; i < bytes.Length; i++) bytes[i] ^= XorKey; // déchiffrement
-                File.WriteAllBytes(entry.OriginalPath, bytes);
-
-                File.Delete(entry.QuarantinePath);
-                _manifest.Remove(entry);
-                SaveManifest();
-                return true;
+                var destPath = Path.Combine(destinationFolder, entry.FileName);
+                if (File.Exists(destPath))
+                {
+                    destPath = Path.Combine(destinationFolder,
+                        Path.GetFileNameWithoutExtension(entry.FileName) + "_restored" +
+                        Path.GetExtension(entry.FileName));
+                }
+                return RestoreToPath(entry, destPath);
             }
-            catch { return false; }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[QuarantineManager] RestoreTo: {ex.Message}");
+                return false;
+            }
         }
 
-        // ── Suppression définitive ──────────────────────────────────────────────
+        private bool RestoreToPath(QuarantineEntry entry, string destination)
+        {
+            if (!File.Exists(entry.QuarantinePath)) return false;
+
+            // Sécurité : on refuse les chemins de restauration aberrants.
+            // Une entrée manipulée pourrait demander une écriture vers System32.
+            // Le manifest est signé HMAC, donc cela ne devrait jamais arriver,
+            // mais défense en profondeur.
+            try
+            {
+                var fullDest = Path.GetFullPath(destination);
+                if (IsSensitivePath(fullDest))
+                {
+                    System.Diagnostics.Debug.WriteLine($"[QuarantineManager] Restauration refusée vers chemin sensible: {fullDest}");
+                    return false;
+                }
+            }
+            catch { return false; }
+
+            try
+            {
+                byte[] plaintext = DecryptQuarantineFile(entry.QuarantinePath);
+
+                // Vérification d'intégrité via SHA-256 stocké dans le manifest.
+                if (!string.IsNullOrEmpty(entry.Sha256))
+                {
+                    var actual = Convert.ToHexString(SHA256.HashData(plaintext));
+                    if (!string.Equals(actual, entry.Sha256, StringComparison.OrdinalIgnoreCase))
+                    {
+                        System.Diagnostics.Debug.WriteLine($"[QuarantineManager] SHA-256 mismatch pour {entry.Id}");
+                        CryptographicOperations.ZeroMemory(plaintext);
+                        return false;
+                    }
+                }
+
+                var dir = Path.GetDirectoryName(destination);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+
+                File.WriteAllBytes(destination, plaintext);
+                CryptographicOperations.ZeroMemory(plaintext);
+
+                File.Delete(entry.QuarantinePath);
+                lock (_lock)
+                {
+                    _doc.Entries.Remove(entry);
+                    SaveManifest();
+                }
+                return true;
+            }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[QuarantineManager] RestoreToPath ({entry.Id}): {ex.Message}");
+                return false;
+            }
+        }
 
         /// <summary>
-        /// Supprime définitivement un fichier en quarantaine.
+        /// Refuse la restauration vers les emplacements système critiques.
+        /// Liste blanche conservatrice : un attaquant ayant manipulé le manifest
+        /// (hors HMAC) ne peut pas écrire dans System32 via Restore.
         /// </summary>
+        private static bool IsSensitivePath(string fullPath)
+        {
+            string[] forbidden =
+            {
+                Environment.GetFolderPath(Environment.SpecialFolder.System),       // System32
+                Environment.GetFolderPath(Environment.SpecialFolder.SystemX86),    // SysWOW64
+                Environment.GetFolderPath(Environment.SpecialFolder.Windows),      // C:\Windows
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
+                Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+            };
+
+            foreach (var f in forbidden)
+            {
+                if (string.IsNullOrEmpty(f)) continue;
+                if (fullPath.StartsWith(f, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Déchiffre un fichier .quar. Gère le format v2 (AES-GCM) ET le format
+        /// legacy v1 (XOR 0x5A) pour permettre la migration des quarantaines
+        /// créées par les versions antérieures sans perte.
+        /// </summary>
+        private byte[] DecryptQuarantineFile(string path)
+        {
+            byte[] raw = File.ReadAllBytes(path);
+
+            // Détection du format : si magic "OPTQ" présent → v2, sinon → legacy XOR.
+            bool isV2 = raw.Length >= HeaderSize
+                && raw[0] == Magic[0] && raw[1] == Magic[1]
+                && raw[2] == Magic[2] && raw[3] == Magic[3];
+
+            if (!isV2)
+            {
+                // Format legacy : XOR octet-par-octet avec 0x5A.
+                var legacy = new byte[raw.Length];
+                for (int i = 0; i < raw.Length; i++) legacy[i] = (byte)(raw[i] ^ LegacyXorKey);
+                return legacy;
+            }
+
+            byte version = raw[4];
+            if (version != FormatVersion)
+                throw new InvalidDataException($"Version quarantaine inconnue : {version}");
+
+            var nonce = new byte[NonceSize];
+            var tag = new byte[TagSize];
+            Array.Copy(raw, 5, nonce, 0, NonceSize);
+            Array.Copy(raw, 5 + NonceSize, tag, 0, TagSize);
+
+            int cipherLen = raw.Length - HeaderSize;
+            var ciphertext = new byte[cipherLen];
+            Array.Copy(raw, HeaderSize, ciphertext, 0, cipherLen);
+
+            var plaintext = new byte[cipherLen];
+            using (var aes = new AesGcm(_masterKey, TagSize))
+            {
+                aes.Decrypt(nonce, ciphertext, tag, plaintext);
+            }
+            return plaintext;
+        }
+
+        // ── Suppression / Purge ──────────────────────────────────────────────────
+
         public bool DeletePermanently(string quarantineId)
         {
-            var entry = _manifest.Find(e => e.Id == quarantineId);
+            QuarantineEntry? entry;
+            lock (_lock) { entry = _doc.Entries.Find(e => e.Id == quarantineId); }
             if (entry == null) return false;
 
             try
@@ -138,67 +362,142 @@ namespace optiSCAN.Services
                 if (File.Exists(entry.QuarantinePath))
                     File.Delete(entry.QuarantinePath);
 
-                _manifest.Remove(entry);
-                SaveManifest();
+                lock (_lock)
+                {
+                    _doc.Entries.Remove(entry);
+                    SaveManifest();
+                }
                 return true;
             }
-            catch { return false; }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[QuarantineManager] DeletePermanently ({quarantineId}): {ex.Message}");
+                return false;
+            }
         }
 
-        /// <summary>
-        /// Vide complètement la quarantaine (suppression définitive de tout).
-        /// </summary>
         public int PurgeAll()
         {
             int count = 0;
-            foreach (var entry in _manifest.ToArray())
-            {
+            QuarantineEntry[] snapshot;
+            lock (_lock) { snapshot = _doc.Entries.ToArray(); }
+            foreach (var entry in snapshot)
                 if (DeletePermanently(entry.Id)) count++;
-            }
             return count;
         }
 
-        // ── Lecture ─────────────────────────────────────────────────────────────
+        public IReadOnlyList<QuarantineEntry> GetEntries()
+        {
+            lock (_lock) { return _doc.Entries.AsReadOnly(); }
+        }
+
+        public int Count
+        {
+            get { lock (_lock) { return _doc.Entries.Count; } }
+        }
+
+        public long TotalSize
+        {
+            get { lock (_lock) { return _doc.Entries.Sum(e => e.OriginalSize > 0 ? e.OriginalSize : 0); } }
+        }
+
+        // ── Manifest avec HMAC-SHA256 ────────────────────────────────────────────
 
         /// <summary>
-        /// Retourne la liste des entrées de quarantaine.
+        /// Charge le manifest en vérifiant la signature HMAC.
+        /// Si la signature ne correspond pas, on log et on retourne un manifest vide
+        /// — refus de charger un manifest manipulé.
         /// </summary>
-        public IReadOnlyList<QuarantineEntry> GetEntries() =>
-            _manifest.AsReadOnly();
-
-        public int Count => _manifest.Count;
-
-        public long TotalSize => _manifest.Sum(e => e.OriginalSize > 0 ? e.OriginalSize : 0);
-
-        // ── Manifeste JSON ──────────────────────────────────────────────────────
-
-        private List<QuarantineEntry> LoadManifest()
+        private QuarantineDocument LoadManifest()
         {
-            if (!File.Exists(_manifestPath)) return new List<QuarantineEntry>();
-            try
-            {
-                var json = File.ReadAllText(_manifestPath);
-                return JsonSerializer.Deserialize<List<QuarantineEntry>>(json)
-                    ?? new List<QuarantineEntry>();
-            }
-            catch { return new List<QuarantineEntry>(); }
+            return AtomicFile.ReadWithBackup(
+                _manifestPath,
+                json =>
+                {
+                    var doc = JsonSerializer.Deserialize<QuarantineDocument>(json) ?? new QuarantineDocument();
+
+                    // Vérification HMAC : on recalcule sur la liste d'entries
+                    // sérialisée canoniquement, et compare avec le HMAC stocké.
+                    if (!string.IsNullOrEmpty(doc.Hmac))
+                    {
+                        var expected = ComputeHmac(doc.Entries);
+                        if (!CryptographicOperations.FixedTimeEquals(
+                                Convert.FromBase64String(doc.Hmac),
+                                expected))
+                        {
+                            AppLogger.Fatal("QuarantineManager", "HMAC manifest invalide — refus de chargement");
+                            throw new InvalidDataException("Manifest HMAC invalide");
+                        }
+                    }
+                    return doc;
+                },
+                fallbackValue: new QuarantineDocument());
         }
 
         private void SaveManifest()
         {
-            var json = JsonSerializer.Serialize(_manifest,
-                new JsonSerializerOptions { WriteIndented = true });
-            File.WriteAllText(_manifestPath, json);
+            try
+            {
+                _doc.Version = 2;
+                _doc.Hmac = Convert.ToBase64String(ComputeHmac(_doc.Entries));
+
+                var json = JsonSerializer.Serialize(_doc, new JsonSerializerOptions
+                {
+                    WriteIndented = true,
+                });
+                AtomicFile.WriteAllText(_manifestPath, json);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("QuarantineManager", "SaveManifest", ex);
+            }
+        }
+
+        /// <summary>
+        /// Calcule le HMAC-SHA256 sur la sérialisation canonique des entries.
+        /// La clé HMAC est dérivée de la clé maîtresse via HKDF (label différent
+        /// pour ne pas réutiliser la même clé entre AES-GCM et HMAC).
+        /// </summary>
+        private byte[] ComputeHmac(List<QuarantineEntry> entries)
+        {
+            // Dérivation : HMAC-key = HKDF(_masterKey, "optiSCAN-manifest-hmac")
+            var hmacKey = HKDF.DeriveKey(
+                hashAlgorithmName: HashAlgorithmName.SHA256,
+                ikm: _masterKey,
+                outputLength: 32,
+                salt: null,
+                info: Encoding.ASCII.GetBytes("optiSCAN-manifest-hmac"));
+
+            // Sérialisation canonique : on prend les entries sans le champ Hmac
+            // pour éviter la circularité, dans un ordre stable.
+            var canonical = JsonSerializer.Serialize(
+                entries.OrderBy(e => e.Id, StringComparer.Ordinal).ToList());
+
+            using var hmac = new HMACSHA256(hmacKey);
+            var sig = hmac.ComputeHash(Encoding.UTF8.GetBytes(canonical));
+
+            CryptographicOperations.ZeroMemory(hmacKey);
+            return sig;
         }
 
         private static void EnsureDirectoryExists(string dir)
         {
-            if (!Directory.Exists(dir))
-                Directory.CreateDirectory(dir);
+            if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
         }
     }
 
-    // ── Entrée de quarantaine ────────────────────────────────────────────────────
+    // ── Document persisté ────────────────────────────────────────────────────────
+
+    /// <summary>Container persisté du manifest (versionné + signé).</summary>
+    public class QuarantineDocument
+    {
+        public int Version { get; set; } = 2;
+
+        /// <summary>Signature HMAC-SHA256 base64 du contenu Entries.</summary>
+        public string Hmac { get; set; } = string.Empty;
+
+        public List<QuarantineEntry> Entries { get; set; } = new();
+    }
 
     public class QuarantineEntry
     {
@@ -208,6 +507,9 @@ namespace optiSCAN.Services
         public string VirusName { get; set; } = string.Empty;
         public DateTime QuarantinedAt { get; set; }
         public long OriginalSize { get; set; }
+
+        /// <summary>Hash SHA-256 hex du fichier original (vérifié à la restauration).</summary>
+        public string Sha256 { get; set; } = string.Empty;
 
         public string FileName => Path.GetFileName(OriginalPath);
         public string SizeDisplay => OriginalSize >= 0

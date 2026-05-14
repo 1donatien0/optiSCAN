@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-
 namespace optiSCAN.Models
 {
     /// <summary>
@@ -36,22 +32,44 @@ namespace optiSCAN.Models
         public string SummaryDisplay =>
             Status switch
             {
-                ScanStatus.Running    => $"Scan en cours… ({FilesScanned} fichiers analysés)",
-                ScanStatus.Completed  => ThreatsFound == 0
+                ScanStatus.Running => $"Scan en cours… ({FilesScanned} fichiers analysés)",
+                ScanStatus.Completed => ThreatsFound == 0
                     ? $"✅ Aucune menace — {FilesScanned} fichiers analysés en {Duration.TotalSeconds:F1}s"
                     : $"⚠️ {ThreatsFound} menace(s) détectée(s) sur {FilesScanned} fichiers",
-                ScanStatus.Cancelled  => $"⛔ Scan annulé ({FilesScanned} fichiers parcourus)",
-                ScanStatus.Error      => $"❌ Erreur : {ErrorMessage}",
-                _                     => "Inconnu"
+                ScanStatus.Cancelled => $"⛔ Scan annulé ({FilesScanned} fichiers parcourus)",
+                ScanStatus.Error => $"❌ Erreur : {ErrorMessage}",
+                _ => "Inconnu"
             };
 
         public string TypeDisplay => Type switch
         {
-            ScanType.File      => "Fichier",
-            ScanType.Folder    => "Dossier",
-            ScanType.FullScan  => "Scan complet",
+            ScanType.File => "Fichier",
+            ScanType.Folder => "Dossier",
+            ScanType.FullScan => "Scan complet",
             ScanType.QuickScan => "Scan rapide",
-            _                  => "Scan"
+            _ => "Scan"
+        };
+
+        public string DurationDisplay
+        {
+            get
+            {
+                var d = Duration;
+                if (d.TotalSeconds < 1) return "< 1s";
+                if (d.TotalMinutes < 1) return $"{d.Seconds}s";
+                if (d.TotalHours < 1) return $"{d.Minutes}m {d.Seconds:D2}s";
+                return $"{(int)d.TotalHours}h {d.Minutes:D2}m";
+            }
+        }
+
+        public string ThreatsBadge => Status switch
+        {
+            ScanStatus.Running => "En cours…",
+            ScanStatus.Cancelled => "Annulé",
+            ScanStatus.Error => "Erreur",
+            _ => ThreatsFound == 0
+                                        ? "✅ Propre"
+                                        : $"⚠️ {ThreatsFound} menace{(ThreatsFound > 1 ? "s" : "")}"
         };
     }
 

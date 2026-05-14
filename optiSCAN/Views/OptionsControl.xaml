@@ -1,0 +1,227 @@
+<UserControl x:Class="optiSCAN.Views.OptionsControl"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
+
+    <ScrollViewer Background="{DynamicResource ContentBg}" VerticalScrollBarVisibility="Auto">
+        <StackPanel Margin="24,20,24,24">
+
+            <TextBlock Text="Options"
+                       FontSize="20" FontWeight="Bold"
+                       Foreground="{DynamicResource TextDark}"
+                       Margin="0,0,0,20"/>
+
+            <!-- ── GÉNÉRAL ────────────────────────────────────────────────── -->
+            <Border Background="{DynamicResource CardBg}"
+                    CornerRadius="12" Padding="24,20"
+                    Effect="{DynamicResource CardShadow}"
+                    Margin="0,0,0,14">
+                <StackPanel>
+
+                    <TextBlock Text="GÉNÉRAL"
+                               FontSize="11" FontWeight="Bold"
+                               Foreground="{DynamicResource AlertGoldLight}"
+                               Margin="0,0,0,16"/>
+
+                    <!-- Démarrage Windows -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                        <CheckBox x:Name="chkAutoStart"
+                                  VerticalAlignment="Top"
+                                  Margin="0,2,16,0"
+                                  Checked="CheckOption_Changed"
+                                  Unchecked="CheckOption_Changed"
+                                  Tag="AutoStart"/>
+                        <StackPanel>
+                            <TextBlock Text="Lancer optiSCAN au démarrage de Windows"
+                                       FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextDark}"/>
+                            <TextBlock Text="Ajoute optiSCAN au démarrage automatique"
+                                       FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                       Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Notifications -->
+                    <StackPanel Orientation="Horizontal">
+                        <CheckBox x:Name="chkNotifications"
+                                  IsChecked="True"
+                                  VerticalAlignment="Top"
+                                  Margin="0,2,16,0"
+                                  Checked="CheckOption_Changed"
+                                  Unchecked="CheckOption_Changed"
+                                  Tag="Notifications"/>
+                        <StackPanel>
+                            <TextBlock Text="Notifications Windows"
+                                       FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextDark}"/>
+                            <TextBlock Text="Alertes si menace détectée ou mise à jour disponible"
+                                       FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                       Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                </StackPanel>
+            </Border>
+
+            <!-- ── ANTIVIRUS ─────────────────────────────────────────────── -->
+            <Border Background="{DynamicResource CardBg}"
+                    CornerRadius="12" Padding="24,20"
+                    Effect="{DynamicResource CardShadow}"
+                    Margin="0,0,0,14">
+                <StackPanel>
+
+                    <TextBlock Text="ANTIVIRUS"
+                               FontSize="11" FontWeight="Bold"
+                               Foreground="{DynamicResource AlertGoldLight}"
+                               Margin="0,0,0,16"/>
+
+                    <!-- Protection temps réel -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                        <CheckBox x:Name="chkRealtimeProtection"
+                                  IsChecked="True"
+                                  VerticalAlignment="Top"
+                                  Margin="0,2,16,0"
+                                  Checked="CheckOption_Changed"
+                                  Unchecked="CheckOption_Changed"
+                                  Tag="RealtimeProtection"/>
+                        <StackPanel>
+                            <TextBlock Text="Protection temps réel"
+                                       FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextDark}"/>
+                            <TextBlock Text="Surveille téléchargements, bureau et dossiers système en continu"
+                                       FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                       Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Quarantaine automatique -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                        <CheckBox x:Name="chkAutoQuarantine"
+                                  IsChecked="True"
+                                  VerticalAlignment="Top"
+                                  Margin="0,2,16,0"
+                                  Checked="CheckOption_Changed"
+                                  Unchecked="CheckOption_Changed"
+                                  Tag="AutoQuarantine"/>
+                        <StackPanel>
+                            <TextBlock Text="Quarantaine automatique"
+                                       FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextDark}"/>
+                            <TextBlock Text="Les menaces détectées sont immédiatement isolées"
+                                       FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                       Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Mise à jour auto -->
+                    <StackPanel Orientation="Horizontal">
+                        <CheckBox x:Name="chkAutoUpdate"
+                                  IsChecked="True"
+                                  VerticalAlignment="Top"
+                                  Margin="0,2,16,0"
+                                  Checked="CheckOption_Changed"
+                                  Unchecked="CheckOption_Changed"
+                                  Tag="AutoUpdate"/>
+                        <StackPanel>
+                            <TextBlock Text="Mise à jour automatique des signatures (toutes les 4h)"
+                                       FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextDark}"/>
+                            <TextBlock Text="freshclam.exe est lancé en arrière-plan périodiquement"
+                                       FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                       Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                </StackPanel>
+            </Border>
+
+            <!-- ── EXCLUSIONS ────────────────────────────────────────────── -->
+            <Border Background="{DynamicResource CardBg}"
+                    CornerRadius="12" Padding="24,20"
+                    Effect="{DynamicResource CardShadow}">
+                <StackPanel>
+
+                    <TextBlock Text="EXCLUSIONS"
+                               FontSize="11" FontWeight="Bold"
+                               Foreground="{DynamicResource AlertGoldLight}"
+                               Margin="0,0,0,16"/>
+
+                    <TextBlock Text="Dossiers ignorés lors de l'analyse"
+                               FontSize="13" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextDark}"
+                               Margin="0,0,0,10"/>
+
+                    <!-- Zone d'ajout -->
+                    <Grid Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="Auto"/>
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0"
+                                BorderBrush="{DynamicResource BorderColor}"
+                                BorderThickness="1" CornerRadius="6">
+                            <TextBox x:Name="txtNewExclusion"
+                                     Background="Transparent"
+                                     BorderThickness="0"
+                                     Foreground="{DynamicResource TextMedium}"
+                                     FontSize="12" Padding="10,8"
+                                     md:HintAssist.Hint="C:\Chemin\vers\dossier..."
+                                     md:HintAssist.Foreground="{DynamicResource TextMuted}"
+                                     VerticalAlignment="Center"/>
+                        </Border>
+                        <Button Grid.Column="2"
+                                Content="Parcourir..."
+                                Click="BtnAddExclusion_Click"
+                                Style="{StaticResource SecondaryButton}"
+                                Height="34" Padding="14,6"/>
+                    </Grid>
+
+                    <!-- Liste des exclusions -->
+                    <ItemsControl x:Name="lstExclusions" Margin="0,4,0,0">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate>
+                                <Border Background="{DynamicResource SurfaceBg}"
+                                        CornerRadius="6" Margin="0,3"
+                                        Padding="12,8">
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto"/>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="Auto"/>
+                                        </Grid.ColumnDefinitions>
+                                        <md:PackIcon Grid.Column="0"
+                                                     Kind="FolderOutline" Width="16" Height="16"
+                                                     Foreground="{DynamicResource TextMuted}"
+                                                     VerticalAlignment="Center" Margin="0,0,8,0"/>
+                                        <TextBlock Grid.Column="1"
+                                                   Text="{Binding}"
+                                                   FontSize="12"
+                                                   Foreground="{DynamicResource TextMedium}"
+                                                   VerticalAlignment="Center"
+                                                   TextTrimming="CharacterEllipsis"/>
+                                        <Button Grid.Column="2"
+                                                Tag="{Binding}"
+                                                Click="BtnRemoveExclusion_Click"
+                                                Background="Transparent"
+                                                BorderThickness="0"
+                                                Foreground="{DynamicResource DangerRed}"
+                                                Cursor="Hand" FontSize="14"
+                                                Padding="6,0"
+                                                Content="✕"/>
+                                    </Grid>
+                                </Border>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+
+                    <TextBlock Text="Les chemins exclus ne sont analysés ni par ClamAV ni par YARA."
+                               FontSize="11" Foreground="{DynamicResource TextMuted}"
+                               Margin="0,10,0,0" FontStyle="Italic"/>
+
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -1,10 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace optiSCAN.Services
 {
@@ -19,23 +15,23 @@ namespace optiSCAN.Services
         private readonly string _rulesDirectory;
         private readonly string _compiledRulesPath;
 
-        public bool IsAvailable  { get; private set; }
-        public int  RulesCount   { get; private set; }
-        public bool HasCompiled  => File.Exists(_compiledRulesPath);
+        public bool IsAvailable { get; private set; }
+        public int RulesCount { get; private set; }
+        public bool HasCompiled => File.Exists(_compiledRulesPath);
 
         // ── Constructeur ─────────────────────────────────────────────────────────
 
         public YaraEngine(string? yaraDir = null, string? rulesDir = null)
         {
             var baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            var arch    = Environment.Is64BitProcess ? "64" : "32";
+            var arch = Environment.Is64BitProcess ? "64" : "32";
 
             var resolvedYaraDir = yaraDir ?? Path.Combine(baseDir, "yara");
 
-            _yaraExe   = Path.Combine(resolvedYaraDir, $"yara{arch}.exe");
-            _yaracExe  = Path.Combine(resolvedYaraDir, $"yarac{arch}.exe");
+            _yaraExe = Path.Combine(resolvedYaraDir, $"yara{arch}.exe");
+            _yaracExe = Path.Combine(resolvedYaraDir, $"yarac{arch}.exe");
 
-            _rulesDirectory    = rulesDir ?? Path.Combine(baseDir, "rules");
+            _rulesDirectory = rulesDir ?? Path.Combine(baseDir, "rules");
             _compiledRulesPath = Path.Combine(_rulesDirectory, "_compiled.yarc");
 
             IsAvailable = CheckAvailability();
@@ -83,24 +79,22 @@ namespace optiSCAN.Services
             var ruleFiles = Directory.GetFiles(_rulesDirectory, "*.yar");
             if (ruleFiles.Length == 0) return false;
 
-            // yarac usage : yarac [options] source_file1 [source_file2 ...] output_file
-            var sb = new StringBuilder();
-            foreach (var f in ruleFiles)
-                sb.Append($"\"{f}\" ");
-            sb.Append($"\"{_compiledRulesPath}\"");
-
-            var process = new Process
+            // Audit S4 : ArgumentList plutôt que concatenation de string —
+            // chaque fichier de règle est passé comme argument distinct, le
+            // quoting est géré par .NET (CommandLineToArgvW round-trip safe)
+            // même si un chemin contient des espaces ou des guillemets.
+            var psi = new ProcessStartInfo
             {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName               = _yaracExe,
-                    Arguments              = sb.ToString(),
-                    UseShellExecute        = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError  = true,
-                    CreateNoWindow         = true
-                }
+                FileName = _yaracExe,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
             };
+            foreach (var f in ruleFiles) psi.ArgumentList.Add(f);
+            psi.ArgumentList.Add(_compiledRulesPath);
+
+            using var process = new Process { StartInfo = psi };
 
             try
             {
@@ -108,16 +102,17 @@ namespace optiSCAN.Services
                 // Lire stderr pour les erreurs de compilation
                 var errTask = process.StandardError.ReadToEndAsync();
                 await process.WaitForExitAsync(ct);
+                try { process.WaitForExit(); } catch { }
                 var err = await errTask;
 
                 if (!string.IsNullOrWhiteSpace(err))
-                    Debug.WriteLine($"[yarac] {err}");
+                    AppLogger.Warn("yarac", err);
 
                 return process.ExitCode == 0 && File.Exists(_compiledRulesPath);
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[yarac] Exception : {ex.Message}");
+                AppLogger.Error("yarac", "Compilation échouée", ex);
                 return false;
             }
         }
@@ -141,8 +136,9 @@ namespace optiSCAN.Services
             if (HasCompiled)
             {
                 // Scan avec règles compilées : yara64.exe --compiled-rules rules.yarc file
+                // ArgumentList → quoting sûr, pas de concat string.
                 var results = await RunYaraScanAsync(
-                    $"--compiled-rules \"{_compiledRulesPath}\" \"{filePath}\"",
+                    new[] { "--compiled-rules", _compiledRulesPath, filePath },
                     filePath, ct);
                 matches.AddRange(results);
             }
@@ -153,8 +149,7 @@ namespace optiSCAN.Services
                 {
                     if (ct.IsCancellationRequested) break;
                     var results = await RunYaraScanAsync(
-                        $"\"{ruleFile}\" \"{filePath}\"",
-                        filePath, ct);
+                        new[] { ruleFile, filePath }, filePath, ct);
                     matches.AddRange(results);
                 }
             }
@@ -166,25 +161,140 @@ namespace optiSCAN.Services
         public async Task<bool> IsMaliciousAsync(string filePath, CancellationToken ct = default)
             => (await ScanFileAsync(filePath, ct)).Count > 0;
 
-        // ── Helpers ──────────────────────────────────────────────────────────────
+        /// <summary>
+        /// Scanne un dossier entier en UN SEUL processus yara avec --recursive.
+        ///
+        /// L'ancienne approche (un process par fichier dans ScanOrchestrator)
+        /// dominait le temps de scan pour les gros dossiers : pour 10 000 fichiers,
+        /// 10 000 spawns de yara64.exe, soit ~10 minutes uniquement de spawn
+        /// overhead. Cette méthode passe le dossier directement à yara qui
+        /// l'itère lui-même, divisant le temps global par un facteur 10 à 50.
+        ///
+        /// La sortie de yara conserve le format "RuleName Path" pour chaque match,
+        /// avec un chemin absolu permettant de reconstruire le ThreatInfo correctement.
+        /// </summary>
+        public async Task<List<YaraMatch>> ScanFolderAsync(
+            string folderPath,
+            IProgress<string>? progress = null,
+            CancellationToken ct = default)
+        {
+            var matches = new List<YaraMatch>();
+            if (!IsAvailable || !Directory.Exists(folderPath)) return matches;
 
-        private async Task<List<YaraMatch>> RunYaraScanAsync(
-            string args, string filePath, CancellationToken ct)
+            // Compilation au besoin (idem ScanFileAsync).
+            if (!HasCompiled)
+                await CompileRulesAsync(ct);
+
+            // Construction de la commande : --recursive + dossier en argument.
+            // -N (no-warnings) supprime les avertissements verbeux.
+            // ArgumentList systématique (audit S4) → quoting sûr.
+            string[] args;
+            if (HasCompiled)
+            {
+                args = new[] { "-N", "--compiled-rules", "--recursive", _compiledRulesPath, folderPath };
+            }
+            else
+            {
+                // Sans règles compilées : scan séquentiel par règle, encore N fois
+                // moins de spawn qu'un process par fichier.
+                foreach (var ruleFile in Directory.GetFiles(_rulesDirectory, "*.yar"))
+                {
+                    if (ct.IsCancellationRequested) break;
+                    progress?.Report($"YARA : règle {Path.GetFileNameWithoutExtension(ruleFile)}");
+                    var sub = await RunYaraScanAsync(
+                        new[] { "-N", "--recursive", ruleFile, folderPath },
+                        folderPath, ct);
+                    matches.AddRange(sub);
+                }
+                return matches;
+            }
+
+            progress?.Report($"YARA : scan récursif de {Path.GetFileName(folderPath)}…");
+            return await RunYaraScanRecursiveAsync(args, ct);
+        }
+
+        /// <summary>
+        /// Variante de RunYaraScanAsync pour les scans récursifs : la sortie yara
+        /// est au format "RuleName /chemin/absolu/fichier" — chaque ligne est un
+        /// match indépendant, avec un fichier potentiellement différent.
+        /// </summary>
+        private async Task<List<YaraMatch>> RunYaraScanRecursiveAsync(IEnumerable<string> args, CancellationToken ct)
         {
             var matches = new List<YaraMatch>();
 
-            var process = new Process
+            var psi = new ProcessStartInfo
             {
-                StartInfo = new ProcessStartInfo
-                {
-                    FileName               = _yaraExe,
-                    Arguments              = args,
-                    UseShellExecute        = false,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError  = true,
-                    CreateNoWindow         = true
-                }
+                FileName = _yaraExe,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8,
             };
+            foreach (var a in args) psi.ArgumentList.Add(a);
+
+            using var process = new Process { StartInfo = psi };
+
+            try
+            {
+                process.Start();
+
+                var outputSb = new StringBuilder();
+                process.OutputDataReceived += (_, e) =>
+                {
+                    if (e.Data != null) outputSb.AppendLine(e.Data);
+                };
+                process.BeginOutputReadLine();
+                process.BeginErrorReadLine();
+
+                await process.WaitForExitAsync(ct);
+                try { process.WaitForExit(); } catch { }
+
+                foreach (var line in outputSb.ToString()
+                    .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+                {
+                    if (line.StartsWith("0x")) continue;
+
+                    // Format yara : "RuleName <espace> /chemin/absolu/fichier"
+                    // Le chemin peut contenir des espaces — on prend le premier
+                    // espace après la règle puis tout le reste.
+                    var spaceIdx = line.IndexOf(' ');
+                    if (spaceIdx <= 0) continue;
+
+                    var ruleName = line[..spaceIdx].Trim();
+                    var matchedPath = line[(spaceIdx + 1)..].Trim();
+
+                    if (!string.IsNullOrEmpty(ruleName) && !string.IsNullOrEmpty(matchedPath))
+                        matches.Add(new YaraMatch { RuleName = ruleName, FilePath = matchedPath });
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("YARA", "Scan récursif", ex);
+            }
+
+            return matches;
+        }
+
+        // ── Helpers ──────────────────────────────────────────────────────────────
+
+        private async Task<List<YaraMatch>> RunYaraScanAsync(
+            IEnumerable<string> args, string filePath, CancellationToken ct)
+        {
+            var matches = new List<YaraMatch>();
+
+            // Audit S4 + R4 : ArgumentList + using var (dispose garanti).
+            var psi = new ProcessStartInfo
+            {
+                FileName = _yaraExe,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true
+            };
+            foreach (var a in args) psi.ArgumentList.Add(a);
+
+            using var process = new Process { StartInfo = psi };
 
             try
             {
@@ -199,6 +309,10 @@ namespace optiSCAN.Services
                 process.BeginErrorReadLine(); // Absorber stderr
 
                 await process.WaitForExitAsync(ct);
+
+                // Drain final synchrone : garantit la réception des dernières
+                // lignes capturées avant que outputSb soit lu (cf. doc MS).
+                try { process.WaitForExit(); } catch { }
 
                 // Format sortie YARA : "RuleName FilePath"
                 foreach (var line in outputSb.ToString()
@@ -218,7 +332,7 @@ namespace optiSCAN.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[YARA] Erreur : {ex.Message}");
+                AppLogger.Error("YARA", "Scan", ex);
             }
 
             return matches;

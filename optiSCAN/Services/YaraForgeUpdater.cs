@@ -1,10 +1,8 @@
-using System;
+using System.Globalization;
 using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
 using System.Text.Json.Nodes;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace optiSCAN.Services
 {
@@ -25,13 +23,16 @@ namespace optiSCAN.Services
     {
         // ── Constantes ────────────────────────────────────────────────────────────
 
-        private const string ApiUrl      = "https://api.github.com/repos/YARAHQ/yara-forge/releases/latest";
+        private const string ApiUrl = "https://api.github.com/repos/YARAHQ/yara-forge/releases/latest";
         private const string PackageName = "yara-forge-rules-core.zip";
 
         private readonly string _rulesDirectory;
         private readonly string _compiledRulesPath;
+        private readonly string _rulesMetaPath;
 
         private System.Threading.Timer? _autoTimer;
+        private CancellationTokenSource? _currentCts;
+        private readonly object _ctsLock = new();
 
         private static readonly HttpClient _http;
 
@@ -52,8 +53,8 @@ namespace optiSCAN.Services
         /// <summary>Déclenché à la fin de la mise à jour (succès ou échec).</summary>
         public event EventHandler<RulesUpdateResult>? UpdateCompleted;
 
-        public bool     IsUpdating   { get; private set; }
-        public string?  LastVersion  { get; private set; }
+        public bool IsUpdating { get; private set; }
+        public string? LastVersion { get; private set; }
         public DateTime? LastUpdateTime { get; private set; }
 
         // ── Constructeur ─────────────────────────────────────────────────────────
@@ -61,8 +62,53 @@ namespace optiSCAN.Services
         public YaraForgeUpdater(string? rulesDir = null)
         {
             var baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            _rulesDirectory    = rulesDir ?? Path.Combine(baseDir, "rules");
+            _rulesDirectory = rulesDir ?? Path.Combine(baseDir, "rules");
             _compiledRulesPath = Path.Combine(_rulesDirectory, "_compiled.yarc");
+            _rulesMetaPath = Path.Combine(_rulesDirectory, ".optiscan-yara-meta.txt");
+            LoadPersistedMeta();
+        }
+
+        /// <summary>Version du paquet YARA-Forge affichable (persistée sur disque).</summary>
+        public string GetRulesPackVersionDisplay()
+            => string.IsNullOrWhiteSpace(LastVersion) ? "—" : LastVersion!.Trim();
+
+        /// <summary>Date de dernière mise à jour réussie des règles (persistée).</summary>
+        public string GetRulesLastUpdateDisplay()
+            => LastUpdateTime.HasValue
+                ? LastUpdateTime.Value.ToString("dd/MM/yyyy HH:mm", CultureInfo.CurrentCulture)
+                : "—";
+
+        private void LoadPersistedMeta()
+        {
+            try
+            {
+                if (!File.Exists(_rulesMetaPath)) return;
+                var lines = File.ReadAllLines(_rulesMetaPath);
+                if (lines.Length >= 1 && !string.IsNullOrWhiteSpace(lines[0]))
+                    LastVersion = lines[0].Trim();
+                if (lines.Length >= 2
+                    && DateTime.TryParse(lines[1], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var utc))
+                    LastUpdateTime = utc.ToLocalTime();
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("YaraForgeUpdater", "LoadPersistedMeta", ex);
+            }
+        }
+
+        private void SavePersistedMeta()
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(LastVersion)) return;
+                Directory.CreateDirectory(_rulesDirectory);
+                var line2 = LastUpdateTime?.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture) ?? "";
+                File.WriteAllText(_rulesMetaPath, LastVersion + "\n" + line2);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("YaraForgeUpdater", "SavePersistedMeta", ex);
+            }
         }
 
         // ── Mise à jour automatique ───────────────────────────────────────────────
@@ -88,6 +134,19 @@ namespace optiSCAN.Services
             _autoTimer = null;
         }
 
+        /// <summary>
+        /// Annule la mise à jour des règles en cours (interrompt téléchargement
+        /// HTTP / extraction). Sans effet si aucune mise à jour n'est active.
+        /// </summary>
+        public void CancelUpdate()
+        {
+            lock (_ctsLock)
+            {
+                try { _currentCts?.Cancel(); }
+                catch (ObjectDisposedException) { /* déjà disposé */ }
+            }
+        }
+
         // ── Mise à jour manuelle ──────────────────────────────────────────────────
 
         /// <summary>
@@ -107,6 +166,12 @@ namespace optiSCAN.Services
             IsUpdating = true;
             var result = new RulesUpdateResult { StartedAt = DateTime.Now };
 
+            // CTS lié au token externe : permet à CancelUpdate() d'interrompre
+            // les opérations HTTP/I/O ci-dessous.
+            var internalCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            lock (_ctsLock) { _currentCts = internalCts; }
+            var token = internalCts.Token;
+
             try
             {
                 // ── 1. Récupération de la dernière version ─────────────────────
@@ -115,7 +180,7 @@ namespace optiSCAN.Services
                 string releaseJson;
                 try
                 {
-                    releaseJson = await _http.GetStringAsync(ApiUrl, ct);
+                    releaseJson = await _http.GetStringAsync(ApiUrl, token);
                 }
                 catch (Exception ex)
                 {
@@ -124,17 +189,17 @@ namespace optiSCAN.Services
                     return result;
                 }
 
-                var release  = JsonNode.Parse(releaseJson);
-                var tagName  = release?["tag_name"]?.GetValue<string>() ?? "inconnue";
+                var release = JsonNode.Parse(releaseJson);
+                var tagName = release?["tag_name"]?.GetValue<string>() ?? "inconnue";
 
                 Report(progress, $"Version disponible : {tagName}");
 
                 // Déjà à jour ?
                 if (LastVersion != null && LastVersion == tagName)
                 {
-                    result.Success       = true;
+                    result.Success = true;
                     result.AlreadyUpToDate = true;
-                    result.Message       = "Les règles de détection sont déjà à jour.";
+                    result.Message = "Les règles de détection sont déjà à jour.";
                     return result;
                 }
 
@@ -168,7 +233,7 @@ namespace optiSCAN.Services
                 byte[] zipBytes;
                 try
                 {
-                    zipBytes = await _http.GetByteArrayAsync(downloadUrl, ct);
+                    zipBytes = await _http.GetByteArrayAsync(downloadUrl, token);
                 }
                 catch (Exception ex)
                 {
@@ -215,13 +280,14 @@ namespace optiSCAN.Services
                 catch { /* Non bloquant */ }
 
                 // ── 6. Résultat ───────────────────────────────────────────────
-                LastVersion    = tagName;
+                LastVersion = tagName;
                 LastUpdateTime = DateTime.Now;
+                SavePersistedMeta();
 
-                result.Success        = true;
-                result.Version        = tagName;
+                result.Success = true;
+                result.Version = tagName;
                 result.FilesInstalled = installed;
-                result.Message        = installed > 0
+                result.Message = installed > 0
                     ? $"Règles de détection mises à jour — {installed} règle(s) installée(s) (version {tagName})."
                     : "Mise à jour effectuée (aucun nouveau fichier de règles).";
 
@@ -239,7 +305,13 @@ namespace optiSCAN.Services
             }
             finally
             {
-                IsUpdating       = false;
+                lock (_ctsLock)
+                {
+                    if (ReferenceEquals(_currentCts, internalCts))
+                        _currentCts = null;
+                }
+                internalCts.Dispose();
+                IsUpdating = false;
                 result.FinishedAt = DateTime.Now;
                 UpdateCompleted?.Invoke(this, result);
             }
@@ -260,13 +332,13 @@ namespace optiSCAN.Services
 
     public class RulesUpdateResult
     {
-        public bool     Success        { get; set; }
-        public string   Message        { get; set; } = string.Empty;
-        public string?  Version        { get; set; }
-        public int      FilesInstalled { get; set; }
-        public bool     AlreadyUpToDate{ get; set; }
-        public DateTime StartedAt      { get; set; }
-        public DateTime? FinishedAt    { get; set; }
+        public bool Success { get; set; }
+        public string Message { get; set; } = string.Empty;
+        public string? Version { get; set; }
+        public int FilesInstalled { get; set; }
+        public bool AlreadyUpToDate { get; set; }
+        public DateTime StartedAt { get; set; }
+        public DateTime? FinishedAt { get; set; }
 
         public TimeSpan Duration =>
             FinishedAt.HasValue ? FinishedAt.Value - StartedAt : TimeSpan.Zero;

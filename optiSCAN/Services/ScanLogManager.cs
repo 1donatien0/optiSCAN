@@ -1,9 +1,7 @@
-using System;
-using System.Collections.Generic;
+using optiSCAN.Models;
 using System.IO;
 using System.Text;
 using System.Text.Json;
-using optiSCAN.Models;
 
 namespace optiSCAN.Services
 {
@@ -132,14 +130,10 @@ namespace optiSCAN.Services
 
         private List<ScanSession> LoadHistory()
         {
-            if (!File.Exists(_historyPath)) return new List<ScanSession>();
-            try
-            {
-                var json = File.ReadAllText(_historyPath);
-                return JsonSerializer.Deserialize<List<ScanSession>>(json)
-                    ?? new List<ScanSession>();
-            }
-            catch { return new List<ScanSession>(); }
+            return AtomicFile.ReadWithBackup(
+                _historyPath,
+                json => JsonSerializer.Deserialize<List<ScanSession>>(json) ?? new List<ScanSession>(),
+                fallbackValue: new List<ScanSession>());
         }
 
         private void PersistHistory()
@@ -148,9 +142,12 @@ namespace optiSCAN.Services
             {
                 var json = JsonSerializer.Serialize(_history,
                     new JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(_historyPath, json);
+                AtomicFile.WriteAllText(_historyPath, json);
             }
-            catch { /* Ne pas crasher si le disque est plein */ }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"[ScanLogManager] PersistHistory: {ex.Message}");
+            }
         }
 
         private static void EnsureDirectory(string dir)

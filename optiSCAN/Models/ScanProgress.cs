@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace optiSCAN.Models
+﻿namespace optiSCAN.Models
 {
     /// <summary>
     /// Phases possibles du scan.
@@ -25,6 +23,19 @@ namespace optiSCAN.Models
 
         /// <summary>Nombre total de fichiers scannés.</summary>
         public int FilesScanned { get; set; }
+
+        /// <summary>
+        /// Nombre total de fichiers à scanner (connu seulement après énumération).
+        /// 0 = inconnu (la progressbar restera indéterminée).
+        /// </summary>
+        public int TotalFiles { get; set; }
+
+        /// <summary>
+        /// Pourcentage d'avancement [0, 100]. -1 si TotalFiles est inconnu.
+        /// </summary>
+        public double PercentComplete => TotalFiles > 0
+            ? Math.Min(100.0, FilesScanned * 100.0 / TotalFiles)
+            : -1.0;
 
         /// <summary>Nombre total de menaces trouvées.</summary>
         public int ThreatsFound { get; set; }
