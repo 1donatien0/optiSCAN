@@ -2,25 +2,45 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows</TargetFramework>
+    <TargetFramework>net8.0-windows10.0.17763.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
     <!-- Windows.Forms requis pour FolderBrowserDialog -->
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationManifest>app.manifest</ApplicationManifest>
-    <!-- Assure que l'application demande les droits admin (nécessaire pour scanner C:\Windows) -->
-    <!-- Voir app.manifest : requestedExecutionLevel level="requireAdministrator" -->
+    <!-- Exécution utilisateur standard (asInvoker) : l’élévation UAC n’est demandée que si une fonctionnalité le requiert. -->
     <AssemblyName>optiSCAN</AssemblyName>
     <RootNamespace>optiSCAN</RootNamespace>
-    <Version>2.0.0</Version>
     <Company>optiSCAN</Company>
     <Product>optiSCAN — ClamAV Edition</Product>
-    <Copyright>Copyright 2026</Copyright>
+    <Copyright>Copyright 2026 Dona By</Copyright>
+    <!-- Icône embarquée dans le .exe (taskbar, explorateur, setup) -->
+    <ApplicationIcon>optiSCAN.ico</ApplicationIcon>
   </PropertyGroup>
+
+  <PropertyGroup>
+    <!-- Avant chaque publish : supprimer les dossiers RID / publish (voir cible
+         CleanStalePublishOutput). Désactiver : dotnet publish -p:CleanPublishArtifactsBeforePublish=false -->
+    <CleanPublishArtifactsBeforePublish Condition="'$(CleanPublishArtifactsBeforePublish)' == ''">true</CleanPublishArtifactsBeforePublish>
+  </PropertyGroup>
+
+  <!-- Inno Setup lit bin\...\publish\ ou publish\win-x64\ : sans ce nettoyage,
+       des fichiers d'une build précédente peuvent rester si le dossier n'est
+       pas vidé et se retrouver dans l'installateur. -->
+  <Target Name="CleanStalePublishOutput" BeforeTargets="BeforePublish" Condition="'$(CleanPublishArtifactsBeforePublish)' == 'true'">
+    <PropertyGroup>
+      <_PublishParent>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)</_PublishParent>
+    </PropertyGroup>
+    <Message Importance="high" Text="optiSCAN : suppression des anciennes sorties publish ($(_PublishParent)\win-x64, publish, win-x86)..." />
+    <RemoveDir Directories="$(_PublishParent)\win-x64" ContinueOnError="true" />
+    <RemoveDir Directories="$(_PublishParent)\win-x86" ContinueOnError="true" />
+    <RemoveDir Directories="$(_PublishParent)\publish" ContinueOnError="true" />
+  </Target>
 
   <ItemGroup>
     <None Remove="ico.ico" />
+    <None Remove="optiSCAN.png" />
     <None Remove="icons8-historique-des-commandes-50.png" />
     <None Remove="icons8-mises-à-jour-disponibles-50.png" />
     <None Remove="icons8-nettoyer-50.png" />
@@ -29,6 +49,12 @@
 
   <ItemGroup>
     <Resource Include="ico.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="optiSCAN.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Resource>
+    <Resource Include="optiSCAN.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Resource>
     <Resource Include="icons8-historique-des-commandes-50.png">
@@ -46,10 +72,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Binaires ClamAV (x64 + x86) -->
-    <Content Include="clamav\**\*">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <!-- Binaires YARA -->
     <Content Include="yara\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -58,11 +80,66 @@
     <Content Include="rules\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
+    <!-- Base de signatures ClamAV partagée -->
+    <Content Include="clamav\database\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- CA Cisco-Talos pour la vérification des signatures CVD (ClamAV ≥ 1.5) — copié à côté de freshclam ou en LocalAppData -->
+    <Content Include="clamav\certs\clamav.crt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!--
+    Exclusion des fichiers .conf de la copie :
+    FreshclamUpdater et ClamDaemon génèrent leur propre conf à l'exécution
+    dans %LocalAppData%\optiSCAN\clamav\. Un freshclam.conf copié depuis le
+    repo contiendrait des chemins de la machine de dev (DatabaseDirectory =
+    D:\Projets\...) qui seraient invalides sur l'installation utilisateur,
+    et provoquerait des erreurs freshclam à l'init.
+  -->
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' Or '$(PlatformTarget)' == 'x64'">
+    <Content Include="clamav\x64\**\*" Exclude="clamav\x64\**\*.conf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'win-x86' Or '$(PlatformTarget)' == 'x86'">
+    <Content Include="clamav\x86\**\*" Exclude="clamav\x86\**\*.conf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Fallback IDE: si aucune architecture n'est précisée, on copie les deux. -->
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == '' And '$(PlatformTarget)' == ''">
+    <Content Include="clamav\x64\**\*" Exclude="clamav\x64\**\*.conf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="clamav\x86\**\*" Exclude="clamav\x86\**\*.conf">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 
   <ItemGroup>
     <PackageReference Include="MaterialDesignThemes" Version="5.3.1" />
+    <!-- Phase 2 : services avancés -->
+    <PackageReference Include="QuestPDF" Version="2024.12.2" />
+
+    <PackageReference Include="Microsoft.Toolkit.Uwp.Notifications" Version="7.1.3" />
+  </ItemGroup>
+
+
+  <ItemGroup>
+    <Compile Update="Views\OptionsControl.xaml.cs">
+      <Generator>MSBuild:Compile</Generator>
+    </Compile>
+    <Compile Update="Views\HistoryControl.xaml.cs">
+      <Generator>MSBuild:Compile</Generator>
+    </Compile>
+    <Compile Update="Views\CleanControl.xaml.cs">
+      <Generator>MSBuild:Compile</Generator>
+    </Compile>
   </ItemGroup>
 
 </Project>

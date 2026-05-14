@@ -1,6 +1,5 @@
-using System;
-using System.Collections.Generic;
 using System.IO;
+using System.Runtime.Versioning;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -8,93 +7,112 @@ namespace optiSCAN.Services
 {
     /// <summary>
     /// Paramètres d'exclusion persistants (dossiers + règles de détection ignorés).
-    /// Chargé une seule fois via <see cref="Current"/> (singleton lazy).
-    /// Persisté dans %LOCALAPPDATA%\optiSCAN\exclusions.json.
+    /// Stockés chiffrés DPAPI + intégrité HMAC dans %LOCALAPPDATA%\optiSCAN\exclusions.dat.
+    ///
+    /// Exclusion implicite : tout chemin sous le répertoire d'installation du processus
+    /// (<see cref="AppInstallPaths"/>) est traité comme exclu (scans + RTP), sans entrée
+    /// dans ExcludedFolders — évite les auto-détections YARA/ClamAV sur rules/, yara/, etc.
+    ///
+    /// Pourquoi protégé : un attaquant local pourrait sinon ajouter des dossiers
+    /// à ExcludedFolders (en éditant le JSON en clair) pour cacher du malware
+    /// aux scans suivants. Avec DPAPI+HMAC, toute modification est détectée.
     /// </summary>
+    [SupportedOSPlatform("windows")]
     public class ExclusionSettings
     {
-        // ── Singleton ─────────────────────────────────────────────────────────────
+        // ── Singleton thread-safe ────────────────────────────────────────────────
+        // Lazy<T> avec ExecutionAndPublication garantit qu'une seule instance est
+        // chargée même si Current est appelé concurremment depuis l'UI, le scan
+        // temps réel et un scan planifié.
+        private static Lazy<ExclusionSettings> _current = new(Load, LazyThreadSafetyMode.ExecutionAndPublication);
+        public static ExclusionSettings Current => _current.Value;
+        public static void Reload() =>
+            _current = new Lazy<ExclusionSettings>(Load, LazyThreadSafetyMode.ExecutionAndPublication);
 
-        private static ExclusionSettings? _current;
+        // Sérialise les accès concurrents à Save() pour éviter qu'un Save de l'UI
+        // n'écrase un Save de la protection temps réel (et vice-versa).
+        private static readonly object _saveLock = new();
 
-        /// <summary>Instance partagée de l'application, chargée à la première utilisation.</summary>
-        public static ExclusionSettings Current => _current ??= Load();
-
-        /// <summary>Réinitialise le singleton (utile après sauvegarde pour forcer le rechargement).</summary>
-        public static void Reload() => _current = Load();
-
-        // ── Chemin de persistance ─────────────────────────────────────────────────
-
+        // ── Chemins de persistance ────────────────────────────────────────────────
+        // Nouveau : exclusions.dat (DPAPI + HMAC). Legacy : exclusions.json (clair),
+        // migré au premier chargement.
         private static readonly string SettingsPath = Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "optiSCAN", "exclusions.dat");
+
+        private static readonly string LegacyPath = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
             "optiSCAN", "exclusions.json");
 
         // ── Données ───────────────────────────────────────────────────────────────
-
-        /// <summary>Dossiers ignorés lors de l'analyse (et leurs sous-dossiers).</summary>
+        public bool RealTimeEnabled { get; set; } = true;
+        public bool AutoQuarantineEnabled { get; set; } = false;
         public List<string> ExcludedFolders { get; set; } = new();
-
-        /// <summary>
-        /// Noms de règles de détection ignorés.
-        /// "SuspiciousDownloads" est exclu par défaut — trop de faux positifs.
-        /// </summary>
-        public List<string> ExcludedRuleNames { get; set; } = new()
-        {
-            "SuspiciousDownloads"
-        };
+        public List<string> ExcludedFilePaths { get; set; } = new();
+        public List<string> ExcludedRuleNames { get; set; } = new() { "SuspiciousDownloads" };
 
         // ── Chargement / Sauvegarde ───────────────────────────────────────────────
-
         private static readonly JsonSerializerOptions _jsonOptions = new()
         {
-            WriteIndented       = true,
+            WriteIndented = true,
             DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull
         };
 
-        /// <summary>Charge les paramètres depuis le fichier JSON, ou retourne les valeurs par défaut.</summary>
         public static ExclusionSettings Load()
         {
-            try
-            {
-                if (File.Exists(SettingsPath))
-                {
-                    var json = File.ReadAllText(SettingsPath);
-                    return JsonSerializer.Deserialize<ExclusionSettings>(json, _jsonOptions)
-                           ?? new ExclusionSettings();
-                }
-            }
-            catch { /* Fichier corrompu → valeurs par défaut */ }
+            // 1. Format chiffré DPAPI + HMAC
+            var loaded = SecureStore.Load<ExclusionSettings>(SettingsPath);
+            if (loaded != null) return loaded;
 
+            // 2. Migration depuis l'ancien JSON en clair
+            var migrated = SecureStore.MigrateFromPlaintext<ExclusionSettings>(LegacyPath, SettingsPath);
+            if (migrated != null) return migrated;
+
+            // 3. Premier lancement
             return new ExclusionSettings();
         }
 
-        /// <summary>Sauvegarde les paramètres dans le fichier JSON.</summary>
         public void Save()
         {
-            try
+            lock (_saveLock)
             {
-                Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
-                File.WriteAllText(SettingsPath, JsonSerializer.Serialize(this, _jsonOptions));
+                try
+                {
+                    Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
+                    SecureStore.Save(SettingsPath, this);
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn("ExclusionSettings", "Save", ex);
+                }
             }
-            catch { /* Non bloquant */ }
         }
 
         // ── Helpers de vérification ───────────────────────────────────────────────
+        public bool IsFileExcluded(string filePath)
+        {
+            if (string.IsNullOrEmpty(filePath)) return false;
 
-        /// <summary>
-        /// Retourne true si le chemin donné se trouve dans un dossier exclu
-        /// (comparaison insensible à la casse, préfixe).
-        /// </summary>
+            var norm = filePath.Replace('/', '\\');
+            foreach (var f in ExcludedFilePaths)
+                if (string.Equals(f.Replace('/', '\\'), norm, StringComparison.OrdinalIgnoreCase))
+                    return true;
+
+            return IsFolderExcluded(filePath);
+        }
+
         public bool IsFolderExcluded(string path)
         {
             if (string.IsNullOrEmpty(path)) return false;
+
+            if (AppInstallPaths.IsUnderInstallRoot(path))
+                return true;
 
             foreach (var folder in ExcludedFolders)
             {
                 if (string.IsNullOrWhiteSpace(folder)) continue;
 
-                // Normaliser les séparateurs pour une comparaison fiable
-                var normPath   = path.Replace('/', '\\').TrimEnd('\\');
+                var normPath = path.Replace('/', '\\').TrimEnd('\\');
                 var normFolder = folder.Replace('/', '\\').TrimEnd('\\');
 
                 if (normPath.StartsWith(normFolder, StringComparison.OrdinalIgnoreCase))
@@ -103,9 +121,6 @@ namespace optiSCAN.Services
             return false;
         }
 
-        /// <summary>
-        /// Retourne true si le nom de règle est dans la liste des exclusions.
-        /// </summary>
         public bool IsRuleExcluded(string ruleName)
         {
             if (string.IsNullOrEmpty(ruleName)) return false;
@@ -117,39 +132,30 @@ namespace optiSCAN.Services
             return false;
         }
 
-        // ── Modification de la liste ──────────────────────────────────────────────
-
-        /// <summary>Ajoute un dossier aux exclusions et sauvegarde.</summary>
+        // ── Modification ──────────────────────────────────────────────────────────
         public bool AddFolder(string path)
         {
             if (string.IsNullOrWhiteSpace(path)) return false;
             var norm = path.TrimEnd('\\', '/');
-            if (ExcludedFolders.Exists(f =>
-                    string.Equals(f.TrimEnd('\\', '/'), norm, StringComparison.OrdinalIgnoreCase)))
-                return false; // déjà présent
+            if (ExcludedFolders.Exists(f => string.Equals(f.TrimEnd('\\', '/'), norm, StringComparison.OrdinalIgnoreCase)))
+                return false;
 
             ExcludedFolders.Add(norm);
             Save();
             return true;
         }
 
-        /// <summary>Retire un dossier des exclusions et sauvegarde.</summary>
         public bool RemoveFolder(string path)
         {
-            var removed = ExcludedFolders.RemoveAll(f =>
-                string.Equals(f.TrimEnd('\\', '/'),
-                              path.TrimEnd('\\', '/'),
-                              StringComparison.OrdinalIgnoreCase)) > 0;
+            var removed = ExcludedFolders.RemoveAll(f => string.Equals(f.TrimEnd('\\', '/'), path.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase)) > 0;
             if (removed) Save();
             return removed;
         }
 
-        /// <summary>Ajoute un nom de règle aux exclusions et sauvegarde.</summary>
         public bool AddRule(string ruleName)
         {
             if (string.IsNullOrWhiteSpace(ruleName)) return false;
-            if (ExcludedRuleNames.Exists(r =>
-                    string.Equals(r, ruleName, StringComparison.OrdinalIgnoreCase)))
+            if (ExcludedRuleNames.Exists(r => string.Equals(r, ruleName, StringComparison.OrdinalIgnoreCase)))
                 return false;
 
             ExcludedRuleNames.Add(ruleName.Trim());
@@ -157,11 +163,28 @@ namespace optiSCAN.Services
             return true;
         }
 
-        /// <summary>Retire un nom de règle des exclusions et sauvegarde.</summary>
         public bool RemoveRule(string ruleName)
         {
-            var removed = ExcludedRuleNames.RemoveAll(r =>
-                string.Equals(r, ruleName, StringComparison.OrdinalIgnoreCase)) > 0;
+            var removed = ExcludedRuleNames.RemoveAll(r => string.Equals(r, ruleName, StringComparison.OrdinalIgnoreCase)) > 0;
+            if (removed) Save();
+            return removed;
+        }
+
+        public bool AddFile(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath)) return false;
+            var norm = filePath.Replace('/', '\\').TrimEnd('\\');
+            if (ExcludedFilePaths.Exists(f => string.Equals(f.Replace('/', '\\').TrimEnd('\\'), norm, StringComparison.OrdinalIgnoreCase)))
+                return false;
+
+            ExcludedFilePaths.Add(norm);
+            Save();
+            return true;
+        }
+
+        public bool RemoveFile(string filePath)
+        {
+            var removed = ExcludedFilePaths.RemoveAll(f => string.Equals(f.Replace('/', '\\').TrimEnd('\\'), filePath.Replace('/', '\\').TrimEnd('\\'), StringComparison.OrdinalIgnoreCase)) > 0;
             if (removed) Save();
             return removed;
         }

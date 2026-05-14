@@ -1,11 +1,8 @@
-using System;
-using System.Collections.Generic;
+using optiSCAN.Models;
+using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.IO;
 using System.Text.RegularExpressions;
-using System.Threading;
-using System.Threading.Tasks;
-using optiSCAN.Models;
 
 namespace optiSCAN.Services
 {
@@ -23,6 +20,11 @@ namespace optiSCAN.Services
         private static readonly Regex InfectedRegex =
             new Regex(@"^(.+):\s+(.+)\s+FOUND\s*$", RegexOptions.Compiled);
 
+        // Lignes de scan : "C:\path\file.exe: OK" ou "...: ... FOUND"
+        private static readonly Regex ScannedFileLineRegex =
+            new(@"^(?<path>.+):\s+(?<verdict>OK|FOUND|Empty file|Excluded|Symbolic link)\s*$",
+                RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
         // Regex statistiques finales : "Scanned files: 123"
         private static readonly Regex StatsRegex =
             new Regex(@"^([\w\s]+):\s+(\d+)", RegexOptions.Compiled);
@@ -31,7 +33,7 @@ namespace optiSCAN.Services
 
         public ClamAvEngine(string? clamavDir = null)
         {
-            _clamavDir   = clamavDir ?? ResolveClamAvDir();
+            _clamavDir = clamavDir ?? ResolveClamAvDir();
             _clamscanExe = Path.Combine(_clamavDir, "clamscan.exe");
         }
 
@@ -42,7 +44,7 @@ namespace optiSCAN.Services
         private static string ResolveClamAvDir()
         {
             var baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            var arch    = Environment.Is64BitProcess ? "x64" : "x86";
+            var arch = Environment.Is64BitProcess ? "x64" : "x86";
 
             // 1) clamav/<arch>/clamscan.exe  (binaires embarqués)
             var archPath = Path.Combine(baseDir, "clamav", arch);
@@ -56,7 +58,7 @@ namespace optiSCAN.Services
 
             // 3) Program Files (installation système)
             var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-            var systemPath   = Path.Combine(programFiles, "ClamAV");
+            var systemPath = Path.Combine(programFiles, "ClamAV");
             if (File.Exists(Path.Combine(systemPath, "clamscan.exe")))
                 return systemPath;
 
@@ -72,20 +74,9 @@ namespace optiSCAN.Services
         {
             get
             {
-                // Chercher database/ à côté des binaires
-                var local = Path.Combine(_clamavDir, "database");
-                if (Directory.Exists(local)) return local;
-
-                // Chercher un niveau au-dessus (clamav/database/)
-                var parent = Path.GetDirectoryName(_clamavDir);
-                if (parent != null)
-                {
-                    var parentDb = Path.Combine(parent, "database");
-                    if (Directory.Exists(parentDb)) return parentDb;
-                }
-
-                // Laisser ClamAV trouver sa base (install système)
-                return string.Empty;
+                // Même logique que FreshclamUpdater : dossier inscriptible (souvent
+                // %LocalAppData% si l'app est sous Program Files).
+                return ClamAvDatabasePaths.ResolveWritableDatabaseDir(_clamavDir);
             }
         }
 
@@ -102,7 +93,11 @@ namespace optiSCAN.Services
                 proc.WaitForExit(3000);
                 return output.Contains("ClamAV");
             }
-            catch { return false; }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ClamAvEngine", "IsClamAvInstalled — version ou processus indisponible", ex);
+                return false;
+            }
         }
 
         public async Task<string> GetVersionAsync()
@@ -113,7 +108,11 @@ namespace optiSCAN.Services
                 var (stdout, _) = await RunProcessAsync(_clamscanExe, "--version");
                 return stdout.Trim().Split('\n')[0]; // Première ligne seulement
             }
-            catch { return "Erreur"; }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ClamAvEngine", "GetVersionAsync", ex);
+                return "Erreur";
+            }
         }
 
         // ── Méthodes de scan publiques ────────────────────────────────────────────
@@ -142,19 +141,15 @@ namespace optiSCAN.Services
             IProgress<ScanProgress>? progress = null,
             CancellationToken ct = default)
         {
-            var targets = GetQuickScanTargets();
-            return await RunMultiTargetScanAsync(ScanType.QuickScan, targets, progress, ct);
+            // Chemins du scan rapide : classe ScanTargets (liste centralisée).
+            return await RunMultiTargetScanAsync(ScanType.QuickScan, ScanTargets.QuickScanTargets(), progress, ct);
         }
 
         public async Task<ScanResult> FullScanAsync(
             IProgress<ScanProgress>? progress = null,
             CancellationToken ct = default)
         {
-            var targets = new List<string>();
-            foreach (var d in DriveInfo.GetDrives())
-                if (d.IsReady && d.DriveType == DriveType.Fixed)
-                    targets.Add(d.RootDirectory.FullName);
-            return await RunMultiTargetScanAsync(ScanType.FullScan, targets, progress, ct);
+            return await RunMultiTargetScanAsync(ScanType.FullScan, ScanTargets.FullScanTargets(), progress, ct);
         }
 
         // ── Implémentation interne ────────────────────────────────────────────────
@@ -167,23 +162,24 @@ namespace optiSCAN.Services
 
             var result = new ScanResult
             {
-                Type       = type,
+                Type = type,
                 TargetPath = targetPath,
-                StartedAt  = DateTime.Now,
-                Status     = ScanStatus.Running
+                StartedAt = DateTime.Now,
+                Status = ScanStatus.Running
             };
-
-            var args = BuildScanArgs(targetPath, recursive);
 
             progress?.Report(new ScanProgress
             {
                 Message = $"ClamAV — démarrage : {Path.GetFileName(targetPath)}",
-                Phase   = ScanPhase.Starting
+                Phase = ScanPhase.Starting,
+                CurrentFilePath = targetPath,
             });
 
             try
             {
-                using var proc = new Process { StartInfo = BuildStartInfo(_clamscanExe, args) };
+                var startInfo = BuildStartInfo(_clamscanExe);
+                BuildScanArgs(startInfo.ArgumentList, targetPath, recursive);
+                using var proc = new Process { StartInfo = startInfo };
 
                 proc.OutputDataReceived += (_, e) =>
                 {
@@ -193,7 +189,7 @@ namespace optiSCAN.Services
                 proc.ErrorDataReceived += (_, e) =>
                 {
                     if (!string.IsNullOrWhiteSpace(e.Data))
-                        Debug.WriteLine($"[ClamAV stderr] {e.Data}");
+                        AppLogger.Warn("ClamAV", $"stderr: {e.Data}");
                 };
 
                 proc.Start();
@@ -201,6 +197,12 @@ namespace optiSCAN.Services
                 proc.BeginErrorReadLine();
 
                 await WaitForProcessAsync(proc, ct);
+
+                // Drain : selon la doc Microsoft, après un WaitForExit asynchrone
+                // avec des async readers (BeginOutputReadLine), il faut un appel
+                // synchrone WaitForExit() pour garantir que les derniers buffers
+                // stdout/stderr aient été remis aux handlers.
+                try { proc.WaitForExit(); } catch { /* déjà terminé */ }
 
                 result.FinishedAt = DateTime.Now;
                 result.Status = ct.IsCancellationRequested
@@ -212,20 +214,20 @@ namespace optiSCAN.Services
             }
             catch (OperationCanceledException)
             {
-                result.Status     = ScanStatus.Cancelled;
+                result.Status = ScanStatus.Cancelled;
                 result.FinishedAt = DateTime.Now;
             }
             catch (Exception ex)
             {
-                result.Status       = ScanStatus.Error;
+                result.Status = ScanStatus.Error;
                 result.ErrorMessage = ex.Message;
-                result.FinishedAt   = DateTime.Now;
+                result.FinishedAt = DateTime.Now;
             }
 
             progress?.Report(new ScanProgress
             {
-                Message      = result.SummaryDisplay,
-                Phase        = ScanPhase.Completed,
+                Message = result.SummaryDisplay,
+                Phase = ScanPhase.Completed,
                 FilesScanned = result.FilesScanned,
                 ThreatsFound = result.ThreatsFound
             });
@@ -233,34 +235,17 @@ namespace optiSCAN.Services
             return result;
         }
 
-        private async Task<ScanResult> RunMultiTargetScanAsync(
+        private Task<ScanResult> RunMultiTargetScanAsync(
             ScanType type, List<string> targets,
-            IProgress<ScanProgress>? progress, CancellationToken ct)
-        {
-            var merged = new ScanResult
-            {
-                Type      = type,
-                TargetPath = string.Join(", ", targets),
-                StartedAt = DateTime.Now,
-                Status    = ScanStatus.Running
-            };
-
-            foreach (var target in targets)
-            {
-                if (ct.IsCancellationRequested) break;
-                var sub = await RunScanAsync(type, target, recursive: true, progress, ct);
-                merged.FilesScanned      += sub.FilesScanned;
-                merged.FilesSkipped      += sub.FilesSkipped;
-                merged.TotalBytesScanned += sub.TotalBytesScanned;
-                merged.Threats.AddRange(sub.Threats);
-            }
-
-            merged.FinishedAt = DateTime.Now;
-            merged.Status = ct.IsCancellationRequested
-                ? ScanStatus.Cancelled
-                : ScanStatus.Completed;
-            return merged;
-        }
+            IProgress<ScanProgress>? progress, CancellationToken ct) =>
+            MultiTargetScanAggregator.AggregateAsync(
+                type,
+                targets,
+                t => RunScanAsync(type, t, recursive: true, progress, ct),
+                ct,
+                progress,
+                skipIfDirectoryMissing: false,
+                reportTargetProgress: true);
 
         // ── Parsing ──────────────────────────────────────────────────────────────
 
@@ -270,30 +255,34 @@ namespace optiSCAN.Services
             var infectedMatch = InfectedRegex.Match(line);
             if (infectedMatch.Success)
             {
-                var filePath  = infectedMatch.Groups[1].Value.Trim();
+                var filePath = infectedMatch.Groups[1].Value.Trim();
                 var virusName = infectedMatch.Groups[2].Value.Trim();
+
+                if (ExclusionSettings.Current.IsFileExcluded(filePath))
+                    return;
 
                 long fileSize = -1;
                 try { fileSize = new FileInfo(filePath).Length; } catch { }
 
                 var threat = new ThreatInfo
                 {
-                    FilePath   = filePath,
-                    VirusName  = virusName,
+                    FilePath = filePath,
+                    VirusName = virusName,
                     DetectedAt = DateTime.Now,
-                    Status     = ThreatStatus.Detected,
-                    FileSize   = fileSize,
+                    Status = ThreatStatus.Detected,
+                    FileSize = fileSize,
                     DetectedBy = "ClamAV"
                 };
                 result.Threats.Add(threat);
 
                 progress?.Report(new ScanProgress
                 {
-                    Message      = $"Menace : {threat.VirusName} [{threat.FileName}]",
-                    Phase        = ScanPhase.ThreatFound,
-                    ThreatInfo   = threat,
+                    Message = $"Menace : {threat.VirusName} [{threat.FileName}]",
+                    Phase = ScanPhase.ThreatFound,
+                    ThreatInfo = threat,
                     FilesScanned = result.FilesScanned,
-                    ThreatsFound = result.ThreatsFound
+                    ThreatsFound = result.ThreatsFound,
+                    CurrentFilePath = filePath,
                 });
                 return;
             }
@@ -301,21 +290,38 @@ namespace optiSCAN.Services
             if (line.StartsWith("Scanned files:") || line.StartsWith("Data scanned:"))
             {
                 ParseStats(line, result);
+                // Mise à jour finale du compteur depuis les stats officielles de
+                // clamscan (autorité absolue) — remplace l'estimation incrémentale.
+                progress?.Report(new ScanProgress
+                {
+                    Message = $"ClamAV : {result.FilesScanned} fichiers analysés.",
+                    Phase = ScanPhase.Scanning,
+                    FilesScanned = result.FilesScanned,
+                    ThreatsFound = result.ThreatsFound,
+                });
                 return;
             }
 
-            // Comptage fichiers en cours
-            if (line.Contains(":") && !line.StartsWith("-") && !line.StartsWith(" "))
+            // Comptage strict : seules les lignes au format "<chemin>: <verdict>"
+            // sont comptabilisées. L'ancienne heuristique (line.Contains(":"))
+            // captait aussi les lignes de stats, warnings et lettres de lecteur,
+            // donnant un compteur systématiquement faux.
+            if (ScannedFileLineRegex.IsMatch(line))
             {
+                var m = ScannedFileLineRegex.Match(line);
+                var scannedPath = m.Success ? m.Groups["path"].Value.Trim() : string.Empty;
+
                 result.FilesScanned++;
-                if (result.FilesScanned % 50 == 0)
+                const int pathUpdateEvery = 12;
+                if (result.FilesScanned % pathUpdateEvery == 0 || result.FilesScanned % 50 == 0)
                 {
                     progress?.Report(new ScanProgress
                     {
-                        Message      = $"ClamAV : {result.FilesScanned} fichiers analysés…",
-                        Phase        = ScanPhase.Scanning,
+                        Message = $"ClamAV : {result.FilesScanned} fichiers analysés…",
+                        Phase = ScanPhase.Scanning,
                         FilesScanned = result.FilesScanned,
-                        ThreatsFound = result.ThreatsFound
+                        ThreatsFound = result.ThreatsFound,
+                        CurrentFilePath = string.IsNullOrEmpty(scannedPath) ? null : scannedPath,
                     });
                 }
             }
@@ -325,44 +331,61 @@ namespace optiSCAN.Services
         {
             var m = StatsRegex.Match(line);
             if (!m.Success) return;
-            var key   = m.Groups[1].Value.Trim().ToLower();
+            var key = m.Groups[1].Value.Trim().ToLower();
             var value = long.Parse(m.Groups[2].Value);
             switch (key)
             {
-                case "scanned files": result.FilesScanned      = (int)value; break;
-                case "data scanned":  result.TotalBytesScanned = value * 1024; break;
+                case "scanned files": result.FilesScanned = (int)value; break;
+                case "data scanned": result.TotalBytesScanned = value * 1024; break;
             }
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────────
 
-        private string BuildScanArgs(string target, bool recursive)
+        /// <summary>
+        /// Remplit ArgumentList plutôt que de construire une string.
+        /// ArgumentList échappe correctement les espaces, guillemets et
+        /// caractères spéciaux (CommandLineToArgvW round-trip), évitant les
+        /// pièges d'injection si target contient un caractère exotique.
+        /// </summary>
+        private void BuildScanArgs(Collection<string> args, string target, bool recursive)
         {
-            var parts = new List<string>();
-            if (recursive) parts.Add("--recursive");
-            parts.Add("--stdout");
-            parts.Add("--no-summary");
+            if (recursive) args.Add("--recursive");
+            args.Add("--stdout");
+            // NB: --no-summary supprimé. Le résumé "Scanned files: N" en fin
+            // d'output est notre source de vérité pour le compteur final
+            // (cf. ParseStats), à la place de l'incrément ligne par ligne.
 
-            // Base de signatures locale (si disponible)
             var dbDir = DatabaseDir;
             if (!string.IsNullOrEmpty(dbDir))
-                parts.Add($"--database=\"{dbDir}\"");
+                args.Add($"--database={dbDir}"); // ArgumentList gère le quoting
 
-            parts.Add($"\"{target}\"");
-            return string.Join(" ", parts);
+            args.Add(target);
         }
 
-        private static ProcessStartInfo BuildStartInfo(string exe, string args) =>
+        /// <summary>
+        /// Crée un ProcessStartInfo avec les bons flags I/O. Le caller doit
+        /// remplir <c>ArgumentList</c> via une surcharge dédiée (BuildScanArgs).
+        /// On ne définit jamais Arguments en string — pour échappement sûr.
+        /// </summary>
+        private static ProcessStartInfo BuildStartInfo(string exe) =>
             new ProcessStartInfo
             {
-                FileName               = exe,
-                Arguments              = args,
-                UseShellExecute        = false,
+                FileName = exe,
+                UseShellExecute = false,
                 RedirectStandardOutput = true,
-                RedirectStandardError  = true,
-                CreateNoWindow         = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
                 StandardOutputEncoding = System.Text.Encoding.UTF8
             };
+
+        /// <summary>Surcharge pour les commandes simples (--version) avec un seul argument.</summary>
+        private static ProcessStartInfo BuildStartInfo(string exe, string singleArg)
+        {
+            var psi = BuildStartInfo(exe);
+            psi.ArgumentList.Add(singleArg);
+            return psi;
+        }
 
         private static async Task WaitForProcessAsync(Process proc, CancellationToken ct)
         {
@@ -400,21 +423,8 @@ namespace optiSCAN.Services
                     "Placez les binaires ClamAV dans 'clamav/x64/' ou 'clamav/x86/'.");
         }
 
-        private static List<string> GetQuickScanTargets()
-        {
-            var dirs = new List<string>();
-            void Add(string path) { if (Directory.Exists(path)) dirs.Add(path); }
-
-            Add(Environment.GetEnvironmentVariable("TEMP") ?? "");
-            Add(Environment.GetEnvironmentVariable("TMP")  ?? "");
-            Add(@"C:\Windows\Temp");
-            Add(Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "Downloads"));
-            Add(Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
-            Add(Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Temp"));
-            return dirs;
-        }
+        // GetQuickScanTargets retiré : la source unique est désormais
+        // ScanTargets.QuickScanTargets() (cf. ScanTargets.cs).
     }
 
 }
