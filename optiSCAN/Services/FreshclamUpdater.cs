@@ -19,6 +19,7 @@ namespace optiSCAN.Services
         private readonly string _freshclamConf;
         private readonly string _certsDir;
         private readonly string _caBundlePath;
+        private readonly string _clamavRootCertPath;
 
         private System.Threading.Timer? _autoUpdateTimer;  // ← Correction ici
 
@@ -41,7 +42,8 @@ namespace optiSCAN.Services
             _databaseDir = Path.Combine(dir, "database");
             _freshclamConf = Path.Combine(dir, "freshclam.conf");
             _certsDir = Path.Combine(Path.GetDirectoryName(_freshclamExe) ?? dir, "certs");
-            _caBundlePath = Path.Combine(_certsDir, "cacert.pem");
+            _caBundlePath = Path.Combine(Path.GetDirectoryName(_freshclamExe) ?? dir, "cacert.pem");
+            _clamavRootCertPath = Path.Combine(_certsDir, "clamav.crt");
 
             EnsureDirectoryExists(_databaseDir);
             EnsureDirectoryExists(_certsDir);
@@ -77,6 +79,13 @@ namespace optiSCAN.Services
                     result.FinishedAt = DateTime.Now;
                     return result;
                 }
+                if (!await EnsureClamAvCodeSignCertificateAsync().ConfigureAwait(false))
+                {
+                    result.Success = false;
+                    result.Message = "Impossible de préparer le certificat de signature ClamAV (clamav.crt).";
+                    result.FinishedAt = DateTime.Now;
+                    return result;
+                }
 
                 var args = $"--config-file=\"{_freshclamConf}\" --datadir=\"{_databaseDir}\" --verbose";
 
@@ -94,7 +103,7 @@ namespace optiSCAN.Services
                 };
                 proc.StartInfo.EnvironmentVariables["CURL_CA_BUNDLE"] = _caBundlePath;
                 proc.StartInfo.EnvironmentVariables["SSL_CERT_FILE"] = _caBundlePath;
-                proc.StartInfo.EnvironmentVariables["SSL_CERT_DIR"] = _certsDir;
+                proc.StartInfo.EnvironmentVariables["SSL_CERT_DIR"] = string.Empty;
 
                 proc.OutputDataReceived += (_, e) =>
                 {
@@ -275,18 +284,28 @@ namespace optiSCAN.Services
 
         private void EnsureFreshclamConf()
         {
-            if (File.Exists(_freshclamConf)) return;
-
             var content = $@"# freshclam.conf généré par optiSCAN
 DatabaseDirectory {_databaseDir}
 UpdateLogFile {Path.Combine(_databaseDir, "freshclam.log")}
 LogTime yes
 DatabaseMirror database.clamav.net
+CVDCertsDirectory {_certsDir}
 MaxAttempts 3
 ConnectTimeout 30
 ReceiveTimeout 30
 ";
-            File.WriteAllText(_freshclamConf, content);
+
+            if (!File.Exists(_freshclamConf))
+            {
+                File.WriteAllText(_freshclamConf, content);
+                return;
+            }
+
+            var existing = File.ReadAllText(_freshclamConf);
+            if (existing.Contains("CVDCertsDirectory", StringComparison.OrdinalIgnoreCase))
+                return;
+
+            File.WriteAllText(_freshclamConf, existing.TrimEnd() + Environment.NewLine + $"CVDCertsDirectory {_certsDir}" + Environment.NewLine);
         }
 
         private async Task<bool> EnsureCertificateBundleAsync()
@@ -302,6 +321,37 @@ ReceiveTimeout 30
                     return false;
 
                 await File.WriteAllTextAsync(_caBundlePath, pem).ConfigureAwait(false);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private async Task<bool> EnsureClamAvCodeSignCertificateAsync()
+        {
+            try
+            {
+                // Evite le panic connu de ClamAV 1.5.x en retirant les certificats non ClamAV du dossier certs.
+                foreach (var file in Directory.GetFiles(_certsDir))
+                {
+                    string name = Path.GetFileName(file);
+                    if (!name.Equals("clamav.crt", StringComparison.OrdinalIgnoreCase))
+                    {
+                        try { File.Delete(file); } catch { }
+                    }
+                }
+
+                if (File.Exists(_clamavRootCertPath))
+                    return true;
+
+                using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(20) };
+                string cert = await http.GetStringAsync("https://raw.githubusercontent.com/Cisco-Talos/clamav/main/certs/clamav.crt").ConfigureAwait(false);
+                if (string.IsNullOrWhiteSpace(cert) || !cert.Contains("BEGIN CERTIFICATE"))
+                    return false;
+
+                await File.WriteAllTextAsync(_clamavRootCertPath, cert).ConfigureAwait(false);
                 return true;
             }
             catch

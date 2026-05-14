@@ -13,7 +13,7 @@
     <!-- Voir app.manifest : requestedExecutionLevel level="requireAdministrator" -->
     <AssemblyName>optiSCAN</AssemblyName>
     <RootNamespace>optiSCAN</RootNamespace>
-    <Version>2.0.0</Version>
+    <Version>1.0.0</Version>
     <Company>optiSCAN</Company>
     <Product>optiSCAN — ClamAV Edition</Product>
     <Copyright>Copyright 2026</Copyright>
@@ -46,16 +46,38 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Binaires ClamAV (x64 + x86) -->
-    <Content Include="clamav\**\*">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Content>
     <!-- Binaires YARA -->
     <Content Include="yara\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
     <!-- Règles YARA (.yar) -->
     <Content Include="rules\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <!-- Base de signatures ClamAV partagée -->
+    <Content Include="clamav\database\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' Or '$(PlatformTarget)' == 'x64'">
+    <Content Include="clamav\x64\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'win-x86' Or '$(PlatformTarget)' == 'x86'">
+    <Content Include="clamav\x86\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Fallback IDE: si aucune architecture n'est précisée, on copie les deux. -->
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == '' And '$(PlatformTarget)' == ''">
+    <Content Include="clamav\x64\**\*">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="clamav\x86\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
