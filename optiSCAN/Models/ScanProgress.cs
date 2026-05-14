@@ -1,6 +1,4 @@
-﻿using System;
-
-namespace optiSCAN.Models
+﻿namespace optiSCAN.Models
 {
     /// <summary>
     /// Phases possibles du scan.
@@ -26,6 +24,19 @@ namespace optiSCAN.Models
         /// <summary>Nombre total de fichiers scannés.</summary>
         public int FilesScanned { get; set; }
 
+        /// <summary>
+        /// Nombre total de fichiers à scanner (connu seulement après énumération).
+        /// 0 = inconnu (la progressbar restera indéterminée).
+        /// </summary>
+        public int TotalFiles { get; set; }
+
+        /// <summary>
+        /// Pourcentage d'avancement [0, 100]. -1 si TotalFiles est inconnu.
+        /// </summary>
+        public double PercentComplete => TotalFiles > 0
+            ? Math.Min(100.0, FilesScanned * 100.0 / TotalFiles)
+            : -1.0;
+
         /// <summary>Nombre total de menaces trouvées.</summary>
         public int ThreatsFound { get; set; }
 
@@ -34,6 +45,9 @@ namespace optiSCAN.Models
 
         /// <summary>Information sur la dernière menace trouvée (si Phase == ThreatFound).</summary>
         public ThreatInfo? ThreatInfo { get; set; }
+
+        /// <summary>Dernier fichier ou dossier en cours d’analyse (affichage type suite antivirus).</summary>
+        public string? CurrentFilePath { get; set; }
 
         /// <summary>Nombre de fichiers scannés par YARA.</summary>
         public int YaraFilesScanned { get; set; }
@@ -70,6 +84,8 @@ namespace optiSCAN.Models
             YaraMatchesFound = other.YaraMatchesFound;
             ClamFilesScanned = other.ClamFilesScanned;
             ClamThreatsFound = other.ClamThreatsFound;
+            TotalFiles = other.TotalFiles;
+            CurrentFilePath = other.CurrentFilePath;
         }
 
         /// <summary>
@@ -96,6 +112,8 @@ namespace optiSCAN.Models
             YaraMatchesFound = other.YaraMatchesFound;
             ClamFilesScanned = other.ClamFilesScanned;
             ClamThreatsFound = other.ClamThreatsFound;
+            TotalFiles = other.TotalFiles;
+            CurrentFilePath = other.CurrentFilePath;
         }
 
         /// <summary>
@@ -112,6 +130,8 @@ namespace optiSCAN.Models
             YaraMatchesFound = 0;
             ClamFilesScanned = 0;
             ClamThreatsFound = 0;
+            TotalFiles = 0;
+            CurrentFilePath = null;
         }
 
         /// <summary>
@@ -136,7 +156,8 @@ namespace optiSCAN.Models
                 Message = $"Menace détectée : {threat.VirusName}",
                 Phase = ScanPhase.ThreatFound,
                 ThreatInfo = threat,
-                ThreatsFound = 1
+                ThreatsFound = 1,
+                CurrentFilePath = threat.FilePath,
             };
         }
 

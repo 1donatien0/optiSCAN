@@ -1,6 +1,6 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <assembly manifestVersion="1.0" xmlns="urn:schemas-microsoft-com:asm.v1">
-  <assemblyIdentity version="1.0.0.0" name="optiSCAN"/>
+  <assemblyIdentity version="4.0.0.0" name="optiSCAN"/>
   <trustInfo xmlns="urn:schemas-microsoft-com:asm.v2">
     <security>
       <requestedPrivileges xmlns="urn:schemas-microsoft-com:asm.v3">
@@ -16,7 +16,21 @@
             Supprimez cet élément si votre application a besoin de la virtualisation pour des
             raisons de compatibilité descendante.
         -->
-        <requestedExecutionLevel level="requireAdministrator" uiAccess="false" />
+        <!--
+          Exécution en utilisateur standard (asInvoker) plutôt qu'en administrateur permanent.
+          Justification : la majeure partie des opérations (UI, scan utilisateur,
+          quarantaine dans LocalAppData, mises à jour, préférences) ne requiert
+          pas les droits admin. Pour les opérations privilégiées (scan
+          C:\Windows\System32, suppression de fichiers protégés), on relancera
+          une copie élevée d'optiSCAN via UAC à la demande (cf. ElevationHelper).
+
+          Bénéfice sécurité : surface d'attaque drastiquement réduite. Une faille
+          dans le parsing JSON ou freshclam ne donne plus de SYSTEM accès.
+
+          Compatibilité : le scan de C:\Windows ne fonctionnera qu'après élévation
+          explicite par l'utilisateur (bouton "Scanner avec privilèges").
+        -->
+        <requestedExecutionLevel level="asInvoker" uiAccess="false" />
       </requestedPrivileges>
     </security>
   </trustInfo>

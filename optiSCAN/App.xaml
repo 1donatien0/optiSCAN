@@ -6,13 +6,111 @@
     <Application.Resources>
         <ResourceDictionary>
             <ResourceDictionary.MergedDictionaries>
-                <!-- Thème Material Design (Light, Blue) -->
-                <materialDesign:BundledTheme BaseTheme="Light"
-                                             PrimaryColor="Blue"
-                                             SecondaryColor="Blue"/>
-                <!-- Styles et icônes Material Design -->
+
+                <!-- MaterialDesign base (Dark pour compatibilité) -->
+                <materialDesign:BundledTheme BaseTheme="Dark"
+                                             PrimaryColor="DeepPurple"
+                                             SecondaryColor="DeepPurple"/>
+
+                <!-- Styles et icônes Material Design 2 -->
                 <ResourceDictionary Source="pack://application:,,,/MaterialDesignThemes.Wpf;component/Themes/MaterialDesign2.Defaults.xaml"/>
+
+                <!-- ═══════════════════════════════════════════════
+                     Thème Donaby au 1er frame : clair (cohérent avec UserPreferences).
+                     App.xaml.cs appelle ThemeManager.Initialize() après OnStartup
+                     pour appliquer la préférence persistée (clair ou sombre).
+                ═══════════════════════════════════════════════ -->
+                <ResourceDictionary Source="/Themes/Donaby.Light.xaml"/>
+
+                <!-- Styles des controles (boutons, DataGrid, ProgressBar) -->
+                <ResourceDictionary Source="/Styles/Controls.xaml"/>
+
             </ResourceDictionary.MergedDictionaries>
+
+            <!-- ═══════════════════════════════════════════════════════
+                 STYLE SCROLLBAR — adapté dynamiquement via DynamicResource
+            ═══════════════════════════════════════════════════════ -->
+            <Style TargetType="ScrollBar">
+                <Setter Property="Background" Value="{DynamicResource AppBg}"/>
+                <Setter Property="Width" Value="5"/>
+                <Setter Property="Template">
+                    <Setter.Value>
+                        <ControlTemplate TargetType="ScrollBar">
+                            <Grid Background="{DynamicResource AppBg}">
+                                <Track x:Name="PART_Track" IsDirectionReversed="True">
+                                    <Track.Thumb>
+                                        <Thumb>
+                                            <Thumb.Template>
+                                                <ControlTemplate TargetType="Thumb">
+                                                    <Border CornerRadius="3"
+                                                            Background="{DynamicResource BorderStrong}"
+                                                            Margin="1,0"/>
+                                                </ControlTemplate>
+                                            </Thumb.Template>
+                                        </Thumb>
+                                    </Track.Thumb>
+                                </Track>
+                            </Grid>
+                        </ControlTemplate>
+                    </Setter.Value>
+                </Setter>
+            </Style>
+
+            <!-- ═══════════════════════════════════════════════════════
+                 STYLE CHECKBOX
+            ═══════════════════════════════════════════════════════ -->
+            <Style TargetType="CheckBox" BasedOn="{StaticResource MaterialDesignCheckBox}">
+                <Setter Property="Foreground"  Value="{DynamicResource TextSecondary}"/>
+                <Setter Property="FontFamily"  Value="Segoe UI"/>
+                <Setter Property="FontSize"    Value="12"/>
+            </Style>
+
+            <!-- ═══════════════════════════════════════════════════════
+                 STYLE TABITEM
+            ═══════════════════════════════════════════════════════ -->
+            <Style TargetType="TabItem">
+                <Setter Property="Foreground"      Value="{DynamicResource TextSecondary}"/>
+                <Setter Property="Background"      Value="Transparent"/>
+                <Setter Property="FontFamily"      Value="Segoe UI"/>
+                <Setter Property="FontSize"        Value="12"/>
+                <Setter Property="Padding"         Value="12,6"/>
+                <Setter Property="BorderThickness" Value="0"/>
+            </Style>
+
+            <!-- ═══════════════════════════════════════════════════════
+                 STYLE TEXTBOX
+            ═══════════════════════════════════════════════════════ -->
+            <Style TargetType="TextBox">
+                <Setter Property="Background"      Value="{DynamicResource SurfaceBg}"/>
+                <Setter Property="Foreground"      Value="{DynamicResource TextDark}"/>
+                <Setter Property="CaretBrush"      Value="{DynamicResource AccentBlue}"/>
+                <Setter Property="BorderBrush"     Value="{DynamicResource BorderColor}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="FontFamily"      Value="Segoe UI"/>
+                <Setter Property="FontSize"        Value="12"/>
+                <Setter Property="Padding"         Value="8,6"/>
+                <Setter Property="SelectionBrush"  Value="{DynamicResource AccentBg}"/>
+            </Style>
+
+            <!-- ═══════════════════════════════════════════════════════
+                 STYLE LISTBOX
+            ═══════════════════════════════════════════════════════ -->
+            <Style TargetType="ListBox">
+                <Setter Property="Background"      Value="{DynamicResource SurfaceBg}"/>
+                <Setter Property="Foreground"      Value="{DynamicResource TextSecondary}"/>
+                <Setter Property="BorderBrush"     Value="{DynamicResource BorderColor}"/>
+                <Setter Property="BorderThickness" Value="1"/>
+                <Setter Property="FontFamily"      Value="Segoe UI"/>
+                <Setter Property="FontSize"        Value="12"/>
+            </Style>
+
+            <!-- ═══════════════════════════════════════════════════════
+                 STYLE SEPARATOR
+            ═══════════════════════════════════════════════════════ -->
+            <Style TargetType="Separator">
+                <Setter Property="Background" Value="{DynamicResource BorderColor}"/>
+            </Style>
+
         </ResourceDictionary>
     </Application.Resources>
 </Application>

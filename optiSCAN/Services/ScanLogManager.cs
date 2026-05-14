@@ -1,23 +1,22 @@
-using System;
-using System.Collections.Generic;
+using optiSCAN.Models;
 using System.IO;
 using System.Text;
 using System.Text.Json;
-using optiSCAN.Models;
 
 namespace optiSCAN.Services
 {
     /// <summary>
-    /// Gère l'historique des scans (persistance JSON) et les journaux texte.
-    /// Fournit les méthodes pour sauvegarder, charger et effacer l'historique.
+    /// Gère l'historique des scans et des nettoyages système (JSON) et le journal texte.
     /// </summary>
     public class ScanLogManager
     {
         private readonly string _logDir;
         private readonly string _historyPath;
+        private readonly string _cleanHistoryPath;
         private readonly string _textLogPath;
 
         private List<ScanSession> _history;
+        private List<CleanSession> _cleanHistory;
 
         public ScanLogManager(string? logDir = null)
         {
@@ -27,10 +26,12 @@ namespace optiSCAN.Services
                     "optiSCAN", "Logs");
 
             _historyPath = Path.Combine(_logDir, "scan_history.json");
+            _cleanHistoryPath = Path.Combine(_logDir, "clean_history.json");
             _textLogPath = Path.Combine(_logDir, "optiSCAN.log");
 
             EnsureDirectory(_logDir);
             _history = LoadHistory();
+            _cleanHistory = LoadCleanHistory();
         }
 
         // ── Historique des scans ────────────────────────────────────────────────
@@ -57,6 +58,20 @@ namespace optiSCAN.Services
         /// Retourne l'historique complet (plus récent en premier).
         /// </summary>
         public IReadOnlyList<ScanSession> GetHistory() => _history.AsReadOnly();
+
+        // ── Historique des nettoyages système (vue Historique → Nettoyages) ───────
+
+        /// <summary>Enregistre un nettoyage terminé (plus récent en tête, max 100).</summary>
+        public void SaveCleanSession(CleanSession session)
+        {
+            _cleanHistory.Insert(0, session);
+            if (_cleanHistory.Count > 100)
+                _cleanHistory.RemoveRange(100, _cleanHistory.Count - 100);
+            PersistCleanHistory();
+            WriteToLog($"Nettoyage système — {session.BytesDisplay} libéré(s) — {session.TargetsSummary}");
+        }
+
+        public IReadOnlyList<CleanSession> GetCleanHistory() => _cleanHistory.AsReadOnly();
 
         /// <summary>
         /// Efface tout l'historique.
@@ -132,14 +147,10 @@ namespace optiSCAN.Services
 
         private List<ScanSession> LoadHistory()
         {
-            if (!File.Exists(_historyPath)) return new List<ScanSession>();
-            try
-            {
-                var json = File.ReadAllText(_historyPath);
-                return JsonSerializer.Deserialize<List<ScanSession>>(json)
-                    ?? new List<ScanSession>();
-            }
-            catch { return new List<ScanSession>(); }
+            return AtomicFile.ReadWithBackup(
+                _historyPath,
+                json => JsonSerializer.Deserialize<List<ScanSession>>(json) ?? new List<ScanSession>(),
+                fallbackValue: new List<ScanSession>());
         }
 
         private void PersistHistory()
@@ -148,9 +159,34 @@ namespace optiSCAN.Services
             {
                 var json = JsonSerializer.Serialize(_history,
                     new JsonSerializerOptions { WriteIndented = true });
-                File.WriteAllText(_historyPath, json);
+                AtomicFile.WriteAllText(_historyPath, json);
             }
-            catch { /* Ne pas crasher si le disque est plein */ }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ScanLogManager", "PersistHistory", ex);
+            }
+        }
+
+        private List<CleanSession> LoadCleanHistory()
+        {
+            return AtomicFile.ReadWithBackup(
+                _cleanHistoryPath,
+                json => JsonSerializer.Deserialize<List<CleanSession>>(json) ?? new List<CleanSession>(),
+                fallbackValue: new List<CleanSession>());
+        }
+
+        private void PersistCleanHistory()
+        {
+            try
+            {
+                var json = JsonSerializer.Serialize(_cleanHistory,
+                    new JsonSerializerOptions { WriteIndented = true });
+                AtomicFile.WriteAllText(_cleanHistoryPath, json);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ScanLogManager", "PersistCleanHistory", ex);
+            }
         }
 
         private static void EnsureDirectory(string dir)
