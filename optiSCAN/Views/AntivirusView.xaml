@@ -4,6 +4,7 @@
              xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:c="clr-namespace:optiSCAN.Converters"
              mc:Ignorable="d"
              d:DesignHeight="600" d:DesignWidth="920"
              AllowDrop="True"
@@ -12,6 +13,7 @@
     <Grid>
         <Grid.Resources>
             <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+            <c:PositiveIntToVisibilityConverter x:Key="PosIntVis"/>
         </Grid.Resources>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="240"/>
@@ -312,12 +314,12 @@
                                         <TextBlock x:Name="antivirusRealtimeThreats" Text="{Binding ThreatsFound}"
                                                    Foreground="{DynamicResource DangerRed}" FontWeight="Bold"
                                                    FontSize="12" VerticalAlignment="Center"/>
-                                        <Border x:Name="threatsBadge" Visibility="Collapsed"
-                                                CornerRadius="8" Padding="6,1" Margin="10,0,0,0"
-                                                Background="{DynamicResource DangerRed}">
-                                            <TextBlock x:Name="threatsBadgeText"
-                                                       FontSize="10" FontWeight="Bold"
-                                                       Foreground="{DynamicResource TextDark}"/>
+                                        <Border CornerRadius="8" Padding="6,1" Margin="10,0,0,0"
+                                                Background="{DynamicResource DangerRed}"
+                                                Visibility="{Binding ThreatsFound, Converter={StaticResource PosIntVis}}">
+                                            <TextBlock FontSize="10" FontWeight="Bold"
+                                                       Foreground="{DynamicResource TextDark}"
+                                                       Text="{Binding ThreatsFound, StringFormat=! {0}}"/>
                                         </Border>
                                     </StackPanel>
                                 </Border>

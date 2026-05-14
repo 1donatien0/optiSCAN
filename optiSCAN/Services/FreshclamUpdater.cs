@@ -112,6 +112,9 @@ namespace optiSCAN.Services
             _autoUpdateTimer = null;
         }
 
+        /// <summary>Indique si le timer de mise à jour périodique est actif.</summary>
+        public bool IsAutoUpdateEnabled => _autoUpdateTimer != null;
+
         // ── Annulation ─────────────────────────────────────────────────────────────
 
         /// <summary>

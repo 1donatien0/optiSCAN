@@ -95,11 +95,11 @@ namespace optiSCAN.Services
             Save();
         }
 
-        /// <summary>Incrémente le compteur de scans et sauvegarde.</summary>
+        /// <summary>Incrémente le compteur de scans terminés et sauvegarde.</summary>
+        /// <remarks>Ne modifie pas <see cref="FavoriteScanType"/> (préférence utilisateur distincte).</remarks>
         public void IncrementScanCount(ScanType scanType)
         {
             TotalScansCount++;
-            FavoriteScanType = scanType;
             if (scanType == ScanType.FullScan)
                 LastFullScanDate = DateTime.Now;
             Save();

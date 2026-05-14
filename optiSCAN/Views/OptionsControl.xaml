@@ -97,7 +97,7 @@
                     <!-- Quarantaine automatique -->
                     <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
                         <CheckBox x:Name="chkAutoQuarantine"
-                                  IsChecked="True"
+                                  IsChecked="False"
                                   VerticalAlignment="Top"
                                   Margin="0,2,16,0"
                                   Checked="CheckOption_Changed"
@@ -132,6 +132,50 @@
                         </StackPanel>
                     </StackPanel>
 
+                    <!-- Scan planifié (schtasks) -->
+                    <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
+                        <CheckBox x:Name="chkScheduledScan"
+                                  VerticalAlignment="Top"
+                                  Margin="0,2,16,0"
+                                  Checked="CheckOption_Changed"
+                                  Unchecked="CheckOption_Changed"
+                                  Tag="ScheduledScan"/>
+                        <StackPanel>
+                            <TextBlock Text="Analyse complète planifiée (tous les jours, 02h00)"
+                                       FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextDark}"/>
+                            <TextBlock Text="Crée une tâche Windows « optiSCAN_DailyScan » (mode silencieux --fullscan --quiet)"
+                                       FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                       Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                </StackPanel>
+            </Border>
+
+            <!-- ── APPLICATION (mises à jour binaire) ───────────────────── -->
+            <Border Background="{DynamicResource CardBg}"
+                    CornerRadius="12" Padding="24,20"
+                    Effect="{DynamicResource CardShadow}"
+                    Margin="0,0,0,14">
+                <StackPanel>
+                    <TextBlock Text="APPLICATION"
+                               FontSize="11" FontWeight="Bold"
+                               Foreground="{DynamicResource AlertGoldLight}"
+                               Margin="0,0,0,12"/>
+                    <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource TextMuted}"
+                               Margin="0,0,0,12"
+                               Text="Les signatures antivirus se mettent à jour dans l’onglet Antivirus. Pour une nouvelle version du programme :"/>
+                    <StackPanel Orientation="Horizontal">
+                        <Button Content="À propos des mises à jour…"
+                                Click="BtnCheckAppUpdate_Click"
+                                Style="{StaticResource SecondaryButton}"
+                                Height="34" Padding="14,6" Margin="0,0,10,0"/>
+                        <Button Content="Page SourceForge"
+                                Click="BtnOpenSourceForge_Click"
+                                Style="{StaticResource SecondaryButton}"
+                                Height="34" Padding="14,6"/>
+                    </StackPanel>
                 </StackPanel>
             </Border>
 
@@ -170,11 +214,18 @@
                                      md:HintAssist.Foreground="{DynamicResource TextMuted}"
                                      VerticalAlignment="Center"/>
                         </Border>
-                        <Button Grid.Column="2"
-                                Content="Parcourir..."
-                                Click="BtnAddExclusion_Click"
-                                Style="{StaticResource SecondaryButton}"
-                                Height="34" Padding="14,6"/>
+                        <Border Grid.Column="2">
+                            <StackPanel Orientation="Horizontal">
+                                <Button Content="Ajouter"
+                                        Click="BtnAddTypedExclusion_Click"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Height="34" Padding="12,6" Margin="0,0,8,0"/>
+                                <Button Content="Parcourir…"
+                                        Click="BtnAddExclusion_Click"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Height="34" Padding="14,6"/>
+                            </StackPanel>
+                        </Border>
                     </Grid>
 
                     <!-- Liste des exclusions -->

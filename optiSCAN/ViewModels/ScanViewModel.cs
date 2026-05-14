@@ -20,6 +20,7 @@ namespace optiSCAN.ViewModels
         // ── Services ─────────────────────────────────────────────────────────────
         private readonly ScanOrchestrator _orchestrator;
         private readonly ClamAvEngine _clamAv;
+        private readonly IScanEngine _scanEngine;
         private readonly FreshclamUpdater _updater;
         private readonly YaraForgeUpdater _rulesUpdater;
         private readonly QuarantineManager _quarantine;
@@ -275,6 +276,7 @@ namespace optiSCAN.ViewModels
         public ScanViewModel(ServiceContainer container)
         {
             _clamAv = container.ClamAv;
+            _scanEngine = container.ScanEngine;
             _yara = container.Yara;
             _orchestrator = container.Orchestrator;
             _updater = container.FreshclamUpdater;
@@ -316,7 +318,7 @@ namespace optiSCAN.ViewModels
 
                 await TryStepAsync("Version ClamAV", async () =>
                 {
-                    ClamAvVersion = await _clamAv.GetVersionAsync();
+                    ClamAvVersion = await _scanEngine.GetVersionAsync();
                 });
 
                 TryStep("Base de signatures", () =>
@@ -342,6 +344,7 @@ namespace optiSCAN.ViewModels
                 });
 
                 TryStep("Chargement historique", LoadHistory);
+                TryStep("Compteur analyses (migration)", MigrateScanCountFromHistoryIfNeeded);
                 TryStep("Chargement quarantaine", () => LoadQuarantine());
 
                 if (!IsClamAvAvailable)
@@ -437,6 +440,7 @@ namespace optiSCAN.ViewModels
 
                 LastResult = result;
                 _logger.SaveScanResult(result);
+                UserPreferences.Current.IncrementScanCount(type);
                 LoadHistory();
                 ServiceContainer.Default.RequestScanHistoryViewsRefresh();
 
@@ -676,6 +680,20 @@ namespace optiSCAN.ViewModels
             CommandManager.InvalidateRequerySuggested();
         }
 
+        /// <summary>
+        /// Anciennes builds n'appelaient pas <see cref="UserPreferences.IncrementScanCount"/> :
+        /// si le compteur est encore à zéro alors qu'un historique existe, on l'aligne une fois.
+        /// </summary>
+        private void MigrateScanCountFromHistoryIfNeeded()
+        {
+            var prefs = UserPreferences.Current;
+            if (prefs.TotalScansCount > 0) return;
+            int n = _logger.GetHistory().Count;
+            if (n <= 0) return;
+            prefs.TotalScansCount = n;
+            prefs.Save();
+        }
+
         private void LoadHistory()
         {
             WpfApp.Current?.Dispatcher.Invoke(() =>
@@ -683,6 +701,20 @@ namespace optiSCAN.ViewModels
                 History.Clear();
                 foreach (var s in _logger.GetHistory())
                     History.Add(s);
+            });
+        }
+
+        /// <summary>Ajoute une menace détectée par la protection temps réel (hors scan manuel).</summary>
+        public void AppendLiveThreat(ThreatInfo threat)
+        {
+            if (string.IsNullOrWhiteSpace(threat.FilePath)) return;
+            WpfApp.Current?.Dispatcher.Invoke(() =>
+            {
+                if (Threats.Any(t => string.Equals(t.FilePath, threat.FilePath, StringComparison.OrdinalIgnoreCase)))
+                    return;
+                Threats.Add(threat);
+                ThreatsFound = Threats.Count;
+                OnPropertyChanged(nameof(SummaryDisplay));
             });
         }
 

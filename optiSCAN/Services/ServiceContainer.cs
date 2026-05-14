@@ -39,6 +39,8 @@ namespace optiSCAN.Services
         public QuarantineManager Quarantine { get; }
         public ScanLogManager Logger { get; }
         public NotificationService Notifications { get; }
+        /// <summary>Surveillance fichiers sensibles (désactivable via Options / exclusions).</summary>
+        public RealTimeProtection RealTimeProtection { get; }
 
         // Adapters interfaces — à utiliser pour les futurs tests ou substitutions
         public IScanEngine ScanEngine { get; }
@@ -61,6 +63,37 @@ namespace optiSCAN.Services
 
         public void TriggerSignatureUpdate() =>
             RequestSignatureUpdate?.Invoke(this, EventArgs.Empty);
+
+        /// <summary>Active ou arrête la protection temps réel et persiste dans <see cref="ExclusionSettings"/>.</summary>
+        public void ApplyRealtimeProtection(bool enabled)
+        {
+            ExclusionSettings.Current.RealTimeEnabled = enabled;
+            ExclusionSettings.Current.Save();
+            if (enabled) RealTimeProtection.Start();
+            else RealTimeProtection.Stop();
+        }
+
+        /// <summary>Persiste la quarantaine automatique (RTP + mode headless).</summary>
+        public void ApplyAutoQuarantine(bool enabled)
+        {
+            ExclusionSettings.Current.AutoQuarantineEnabled = enabled;
+            ExclusionSettings.Current.Save();
+        }
+
+        /// <summary>Active ou coupe les timers freshclam / règles YARA.</summary>
+        public void ApplySignatureAutoUpdate(bool enabled)
+        {
+            if (enabled)
+            {
+                FreshclamUpdater.EnableAutoUpdate(TimeSpan.FromHours(4));
+                RulesUpdater.EnableAutoUpdate(TimeSpan.FromHours(24));
+            }
+            else
+            {
+                FreshclamUpdater.DisableAutoUpdate();
+                RulesUpdater.DisableAutoUpdate();
+            }
+        }
 
         // Audit A3 : événements + méthodes Request* (plus de Action? mutables
         // assignées après coup — pas de NRE silencieuse si un service appelait
@@ -90,6 +123,28 @@ namespace optiSCAN.Services
         public void RequestScanHistoryViewsRefresh() =>
             _scanHistoryViewsRefreshHandlers?.Invoke(this, EventArgs.Empty);
 
+        private EventHandler? _exportScanHistoryHtmlHandlers;
+        /// <summary>Demande l’export HTML du rapport (écouteur : <see cref="optiSCAN.MainWindow"/>).</summary>
+        public event EventHandler? ExportScanHistoryHtmlRequested
+        {
+            add => _exportScanHistoryHtmlHandlers += value;
+            remove => _exportScanHistoryHtmlHandlers -= value;
+        }
+
+        public void RequestExportScanHistoryHtml() =>
+            _exportScanHistoryHtmlHandlers?.Invoke(this, EventArgs.Empty);
+
+        private EventHandler? _exportLastScanPdfHandlers;
+        /// <summary>Demande l’export PDF de la dernière analyse enregistrée.</summary>
+        public event EventHandler? ExportLastScanPdfRequested
+        {
+            add => _exportLastScanPdfHandlers += value;
+            remove => _exportLastScanPdfHandlers -= value;
+        }
+
+        public void RequestExportLastScanPdf() =>
+            _exportLastScanPdfHandlers?.Invoke(this, EventArgs.Empty);
+
         private ServiceContainer()
         {
             // Ordre de construction : du plus indépendant au plus dépendant.
@@ -104,6 +159,7 @@ namespace optiSCAN.Services
             Orchestrator = new ScanOrchestrator(ClamAv, Yara);
             ScanEngine = new ClamAvScanEngineAdapter(ClamAv);
             Actions = new AntivirusActions(this);
+            RealTimeProtection = new RealTimeProtection(Orchestrator, Quarantine, Notifications);
 
             // MAJ silencieuses alignées sur le guide produit (Options peut les couper).
             FreshclamUpdater.EnableAutoUpdate(TimeSpan.FromHours(4));
@@ -137,6 +193,10 @@ namespace optiSCAN.Services
         {
             _focusAntivirusSignaturesHandlers = null;
             _scanHistoryViewsRefreshHandlers = null;
+            _exportScanHistoryHtmlHandlers = null;
+            _exportLastScanPdfHandlers = null;
+            try { RealTimeProtection.Dispose(); }
+            catch (Exception ex) { AppLogger.Warn("ServiceContainer", "RealTimeProtection.Dispose", ex); }
             try { FreshclamUpdater.DisableAutoUpdate(); }
             catch (Exception ex) { AppLogger.Warn("ServiceContainer", "FreshclamUpdater.DisableAutoUpdate", ex); }
             try { RulesUpdater.DisableAutoUpdate(); }

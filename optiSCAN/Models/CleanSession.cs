@@ -1,17 +1,35 @@
+using System.Globalization;
+using System.Text.Json.Serialization;
+
 namespace optiSCAN.Models
 {
-    /// <summary>
-    /// Entrée d'historique d'une session de nettoyage système.
-    /// </summary>
-    public class CleanSession
+    /// <summary>Entrée d'historique d'une session de nettoyage système (fichiers temp, caches, corbeille).</summary>
+    public sealed class CleanSession
     {
-        public DateTime Date { get; set; }
-        public int ItemsRemoved { get; set; }
+        public DateTime StartedAt { get; set; }
+        public DateTime FinishedAt { get; set; }
+
+        /// <summary>Résumé des cibles cochées (ex. « Temp Windows, Corbeille, Edge »).</summary>
+        public string TargetsSummary { get; set; } = "";
+
         public long BytesFreed { get; set; }
 
+        [JsonIgnore]
         public string DateDisplay =>
-            Date.ToString("dd/MM/yyyy HH:mm");
+            StartedAt.ToString("dd/MM/yyyy HH:mm", CultureInfo.CurrentCulture);
 
+        [JsonIgnore]
+        public string DurationDisplay
+        {
+            get
+            {
+                var d = FinishedAt - StartedAt;
+                if (d < TimeSpan.Zero) d = TimeSpan.Zero;
+                return ScanDisplayFormatter.FormatDuration(d);
+            }
+        }
+
+        [JsonIgnore]
         public string BytesDisplay
         {
             get

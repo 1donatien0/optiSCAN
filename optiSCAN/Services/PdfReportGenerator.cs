@@ -205,6 +205,54 @@ namespace optiSCAN.Services
         }
 
         /// <summary>
+        /// Rapport PDF à partir d’une entrée d’historique (sans liste détaillée des fichiers si elle n’a pas été conservée).
+        /// </summary>
+        public byte[] GenerateReportFromSession(ScanSession session, string outputPath = "")
+        {
+            var result = new ScanResult
+            {
+                SessionId = session.SessionId,
+                StartedAt = session.StartedAt,
+                FinishedAt = session.FinishedAt,
+                TargetPath = session.TargetPath,
+                FilesScanned = session.FilesScanned,
+                Status = Enum.TryParse<ScanStatus>(session.StatusDisplay, ignoreCase: true, out var st)
+                    ? st
+                    : ScanStatus.Completed,
+                Type = MapScanType(session.TypeDisplay),
+            };
+
+            if (session.ThreatsFound > 0)
+            {
+                var path = string.IsNullOrWhiteSpace(session.TargetPath) ? "—" : session.TargetPath;
+                var at = session.FinishedAt ?? session.StartedAt;
+                for (int i = 0; i < session.ThreatsFound; i++)
+                {
+                    result.Threats.Add(new ThreatInfo
+                    {
+                        FilePath = path,
+                        VirusName = session.ThreatsFound == 1
+                            ? "Menace détectée (détail non conservé dans l’historique)"
+                            : $"Menace {i + 1}/{session.ThreatsFound} (détail non conservé)",
+                        DetectedAt = at,
+                        DetectedBy = "historique"
+                    });
+                }
+            }
+
+            return GenerateReport(result, outputPath);
+        }
+
+        private static ScanType MapScanType(string typeDisplay) => typeDisplay switch
+        {
+            "Fichier" => ScanType.File,
+            "Dossier" => ScanType.Folder,
+            "Analyse complète" => ScanType.FullScan,
+            "Analyse rapide" => ScanType.QuickScan,
+            _ => ScanType.Folder
+        };
+
+        /// <summary>
         /// Génère et sauvegarde automatiquement dans %LocalAppData%\optiSCAN\Reports\
         /// Retourne le chemin du fichier créé.
         /// </summary>

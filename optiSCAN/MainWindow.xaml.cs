@@ -2,7 +2,10 @@ using optiSCAN.Models;
 using optiSCAN.Services;
 using optiSCAN.ViewModels;
 using System.ComponentModel;
+using System.IO;
+using System.Linq;
 using System.Runtime.Versioning;
+using System.Text;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
@@ -83,6 +86,9 @@ namespace optiSCAN
                 // (ex. carte "Update" d'OverviewControl).
                 c.RequestSignatureUpdate += OnRequestSignatureUpdate;
                 c.ScanHistoryViewsRefreshRequested += OnScanHistoryViewsRefreshRequested;
+                c.ExportScanHistoryHtmlRequested += OnExportScanHistoryHtmlRequested;
+                c.ExportLastScanPdfRequested += OnExportLastScanPdfRequested;
+                c.RealTimeProtection.ThreatDetected += OnRtpThreatDetected;
 
                 // Abonnement aux événements
                 this.Loaded += async (s, e) => await OnMainWindowLoaded();
@@ -124,6 +130,8 @@ namespace optiSCAN
                 RefreshQuarantineList();
                 RefreshHistory();
                 RefreshSignaturesDisplay();
+                ApplyRealtimeProtectionFromSettings();
+                RefreshOverviewProtectionAndRecommendations();
 
                 // Afficher la vue d'accueil par défaut
                 _navigationService.NavigateTo("Overview");
@@ -173,7 +181,10 @@ namespace optiSCAN
             var c = ServiceContainer.Default;
             c.RequestSignatureUpdate -= OnRequestSignatureUpdate;
             c.ScanHistoryViewsRefreshRequested -= OnScanHistoryViewsRefreshRequested;
+            c.ExportScanHistoryHtmlRequested -= OnExportScanHistoryHtmlRequested;
+            c.ExportLastScanPdfRequested -= OnExportLastScanPdfRequested;
             c.FocusAntivirusSignaturesRequested -= OnFocusAntivirusSignaturesRequested;
+            c.RealTimeProtection.ThreatDetected -= OnRtpThreatDetected;
         }
 
         // ═══════════════════════════════════════════════════════════════════
@@ -228,6 +239,9 @@ namespace optiSCAN
 
             switch (panelName)
             {
+                case "Overview":
+                    RefreshHistory();
+                    break;
                 case "Antivirus":
                     RefreshAntivirusData();
                     break;
@@ -274,9 +288,13 @@ namespace optiSCAN
         private void RefreshHistory()
         {
             var sessions = _logManager?.GetHistory() ?? Array.Empty<ScanSession>();
+            var cleanSessions = _logManager?.GetCleanHistory() ?? Array.Empty<CleanSession>();
             (panelAntivirus as Views.AntivirusView)?.UpdateHistory(sessions);
             (panelHistory as Views.HistoryControl)?.UpdateScanHistory(sessions);
+            (panelHistory as Views.HistoryControl)?.UpdateCleanHistory(cleanSessions);
             ApplyLastScanSummary(sessions);
+            (panelOverview as Views.OverviewControl)?.UpdateProtectionStatistics(sessions);
+            RefreshOverviewProtectionAndRecommendations();
         }
 
         /// <summary>Synchronise « Dernière analyse » (vue d’ensemble + colonne Antivirus) avec l’historique réel.</summary>
@@ -285,6 +303,84 @@ namespace optiSCAN
             DateTime? last = sessions.Count == 0 ? null : sessions.Max(s => s.StartedAt);
             (panelOverview as Views.OverviewControl)?.UpdateLastScanTime(last);
             (panelAntivirus as Views.AntivirusView)?.UpdateLastScanDisplay(last);
+        }
+
+        private void ApplyRealtimeProtectionFromSettings()
+        {
+            try
+            {
+                var c = ServiceContainer.Default;
+                if (ExclusionSettings.Current.RealTimeEnabled)
+                    c.RealTimeProtection.Start();
+                else
+                    c.RealTimeProtection.Stop();
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("MainWindow", "ApplyRealtimeProtectionFromSettings", ex);
+            }
+        }
+
+        private void OnRtpThreatDetected(object? sender, ThreatInfo threat)
+        {
+            Dispatcher.BeginInvoke(new Action(() =>
+            {
+                ViewModel?.AppendLiveThreat(threat);
+                RefreshQuarantineList();
+                RefreshOverviewProtectionAndRecommendations();
+            }), DispatcherPriority.Background);
+        }
+
+        /// <summary>Bannière + recommandations de la vue d’ensemble (données réelles).</summary>
+        private void RefreshOverviewProtectionAndRecommendations()
+        {
+            var overview = panelOverview as Views.OverviewControl;
+            if (overview == null) return;
+
+            bool clam = _clamAvEngine?.IsClamAvInstalled() ?? false;
+            int yaraRules = _yaraEngine?.RulesCount ?? 0;
+            bool yaraAvail = _yaraEngine?.IsAvailable ?? false;
+            bool protectedOk = clam && (!yaraAvail || yaraRules > 0);
+
+            var clamVer = _freshclamUpdater?.GetLocalDatabaseVersion() ?? "—";
+            var clamWhen = _freshclamUpdater?.GetLastSignatureChangeDisplay() ?? "—";
+            var yaraPack = _rulesUpdater?.GetRulesPackVersionDisplay() ?? "—";
+            var yaraWhen = _rulesUpdater?.GetRulesLastUpdateDisplay() ?? "—";
+
+            var statusSb = new StringBuilder();
+            if (clam)
+                statusSb.AppendLine($"ClamAV — base {clamVer} (MAJ {clamWhen})");
+            else
+                statusSb.AppendLine("ClamAV — non détecté (dossier clamav/x64 attendu à côté de l’exécutable).");
+            statusSb.Append($"YARA — {yaraRules:N0} règle(s), paquet {yaraPack} (MAJ {yaraWhen})");
+            overview.UpdateProtectionStatus(protectedOk, statusSb.ToString().Trim());
+
+            string sig = !clam
+                ? "ClamAV est absent : copiez les binaires ClamAV ou réinstallez optiSCAN avec le dossier clamav."
+                : (!yaraAvail || yaraRules == 0
+                    ? "YARA : aucune règle chargée — ouvrez Antivirus → onglet Signatures pour mettre à jour."
+                    : $"Moteurs prêts — {yaraRules:N0} règle(s) YARA actives avec ClamAV.");
+            int sigSev = !clam || !yaraAvail || yaraRules == 0 ? 1 : 0;
+
+            var cleanHist = _logManager?.GetCleanHistory() ?? Array.Empty<CleanSession>();
+            DateTime? lastClean = cleanHist.Count > 0 ? cleanHist[0].StartedAt : null;
+            bool suggestClean = !lastClean.HasValue || (DateTime.Now - lastClean.Value).TotalDays > 14;
+            string hyp = suggestClean
+                ? "Envisagez un nettoyage des fichiers temporaires et caches (menu Nettoyer) si ce n’est pas fait récemment."
+                : $"Dernier nettoyage enregistré le {lastClean:dd/MM/yyyy} — priorité basse.";
+            int hypSev = suggestClean ? 1 : 0;
+
+            var sessions = _logManager?.GetHistory() ?? Array.Empty<ScanSession>();
+            var cutoff = DateTime.Now.AddDays(-30);
+            int threats30 = sessions.Where(s => s.StartedAt >= cutoff).Sum(s => s.ThreatsFound);
+            string act = sessions.Count == 0
+                ? "Aucune analyse dans l’historique — lancez une analyse rapide (Antivirus)."
+                : threats30 > 0
+                    ? $"30 derniers jours : {threats30:N0} menace(s) signalée(s) — consultez Historique / onglet Analyse."
+                    : "Historique d’analyses disponible — ouvrez l’onglet Historique pour le détail.";
+            int actSev = threats30 > 0 ? 1 : (sessions.Count == 0 ? 1 : 2);
+
+            overview.UpdateRecommendations(sig, sigSev, hyp, hypSev, act, actSev);
         }
 
         public void RefreshAntivirusData()
@@ -313,6 +409,77 @@ namespace optiSCAN
                 ViewModel.RulesPackVersion = yaraVer;
                 ViewModel.LastUpdateDisplay = clamWhen == "—" ? "Jamais" : clamWhen;
                 ViewModel.RulesLastUpdateDisplay = yaraWhen == "—" ? "Jamais" : yaraWhen;
+            }
+
+            RefreshOverviewProtectionAndRecommendations();
+        }
+
+        private void OnExportScanHistoryHtmlRequested(object? sender, EventArgs e) =>
+            Dispatcher.BeginInvoke(new Action(TryExportScanReportHtml), DispatcherPriority.Background);
+
+        private void OnExportLastScanPdfRequested(object? sender, EventArgs e) =>
+            Dispatcher.BeginInvoke(new Action(TryExportLastScanPdf), DispatcherPriority.Background);
+
+        private void TryExportScanReportHtml()
+        {
+            try
+            {
+                var dlg = new Microsoft.Win32.SaveFileDialog
+                {
+                    Filter = "Page web HTML (*.html)|*.html|Tous les fichiers (*.*)|*.*",
+                    FileName = $"optiSCAN_rapport_{DateTime.Now:yyyyMMdd_HHmm}.html",
+                    DefaultExt = ".html",
+                    AddExtension = true
+                };
+                if (dlg.ShowDialog(this) != true) return;
+
+                var html = new HtmlExportService();
+                var hist = _logManager?.GetHistory() ?? Array.Empty<ScanSession>();
+                var threats = ViewModel?.Threats ?? Enumerable.Empty<ThreatInfo>();
+                var quar = _quarantineManager?.GetEntries() ?? Array.Empty<QuarantineEntry>();
+                html.ExportFullReport(hist, threats, quar, UserPreferences.Current, dlg.FileName);
+                SetStatus($"Rapport HTML enregistré : {dlg.FileName}");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("MainWindow", "Export HTML", ex);
+                SetStatus($"Export HTML impossible : {ex.Message}", isError: true);
+            }
+        }
+
+        private void TryExportLastScanPdf()
+        {
+            try
+            {
+                var sessions = _logManager?.GetHistory() ?? Array.Empty<ScanSession>();
+                if (sessions.Count == 0)
+                {
+                    System.Windows.MessageBox.Show(this,
+                        "Aucune analyse n’est enregistrée dans l’historique. Lancez d’abord une analyse depuis l’onglet Antivirus.",
+                        "Export PDF",
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    return;
+                }
+
+                var last = sessions[0];
+                var dlg = new Microsoft.Win32.SaveFileDialog
+                {
+                    Filter = "Document PDF (*.pdf)|*.pdf|Tous les fichiers (*.*)|*.*",
+                    FileName = $"optiSCAN_scan_{last.StartedAt:yyyyMMdd_HHmm}.pdf",
+                    DefaultExt = ".pdf",
+                    AddExtension = true
+                };
+                if (dlg.ShowDialog(this) != true) return;
+
+                var gen = new PdfReportGenerator();
+                gen.GenerateReportFromSession(last, dlg.FileName);
+                SetStatus($"Rapport PDF enregistré : {dlg.FileName}");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("MainWindow", "Export PDF", ex);
+                SetStatus($"Export PDF impossible : {ex.Message}", isError: true);
             }
         }
 

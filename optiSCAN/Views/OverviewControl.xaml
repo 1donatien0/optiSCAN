@@ -28,7 +28,8 @@
 
                     <!-- Texte -->
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
-                        <TextBlock Text="Votre ordinateur est protégé"
+                        <TextBlock x:Name="txtProtectionHeadline"
+                                   Text="Votre ordinateur est protégé"
                                    FontSize="16" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextDark}"/>
                         <TextBlock x:Name="txtProtectionStatus"
@@ -170,19 +171,23 @@
                         <TextBlock Text="Statistiques de protection"
                                    FontSize="13" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextDark}"/>
-                        <TextBlock Text="Tendance sur 30 jours (bientôt disponible)"
+                        <TextBlock Text="Synthèse sur les 30 derniers jours"
                                    FontSize="11" Foreground="{DynamicResource TextMuted}"
-                                   Margin="0,2,0,10"/>
+                                   Margin="0,2,0,2"/>
+                        <TextBlock x:Name="txtProtectionStatsUpdated"
+                                   FontSize="10" Foreground="{DynamicResource TextMuted}"
+                                   Margin="0,0,0,10"/>
 
                         <Border MinHeight="128" CornerRadius="8"
                                 Background="{DynamicResource SurfaceBg}"
                                 Padding="14,12">
-                            <TextBlock TextWrapping="Wrap"
+                            <TextBlock x:Name="txtProtectionStatsBody"
+                                       TextWrapping="Wrap"
                                        FontSize="12"
-                                       Foreground="{DynamicResource TextMuted}"
-                                       VerticalAlignment="Center"
-                                       LineHeight="18"
-                                       Text="Les graphiques seront dérivés de votre historique d’analyses. Pour l’instant, consultez l’onglet Historique pour chaque session (fichiers parcourus, durée, menaces)."/>
+                                       Foreground="{DynamicResource TextDark}"
+                                       VerticalAlignment="Top"
+                                       LineHeight="20"
+                                       Text="Chargement des statistiques…"/>
                         </Border>
                     </StackPanel>
                 </Border>
@@ -197,39 +202,39 @@
                                    FontSize="13" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextDark}" Margin="0,0,0,12"/>
 
-                        <Border Background="{DynamicResource SuccessBg}"
+                        <Border x:Name="brRecSignatures" Background="{DynamicResource SuccessBg}"
                                 CornerRadius="8" Padding="12,10" Margin="0,0,0,8">
                             <StackPanel Orientation="Horizontal">
-                                <md:PackIcon Kind="CheckCircle" Width="16" Height="16"
+                                <md:PackIcon x:Name="icRecSignatures" Kind="CheckCircle" Width="16" Height="16"
                                              Foreground="{DynamicResource SuccessGreen}"
                                              VerticalAlignment="Center"/>
-                                <TextBlock Text=" Système à jour"
+                                <TextBlock x:Name="txtRecSignatures" Text="Moteurs antivirus"
                                            FontSize="12" Foreground="{DynamicResource SuccessGreen}"
-                                           VerticalAlignment="Center"/>
+                                           VerticalAlignment="Center" TextWrapping="Wrap" Margin="6,0,0,0"/>
                             </StackPanel>
                         </Border>
 
-                        <Border Background="{DynamicResource AlertBg}"
+                        <Border x:Name="brRecHygiene" Background="{DynamicResource AlertBg}"
                                 CornerRadius="8" Padding="12,10" Margin="0,0,0,8">
                             <StackPanel Orientation="Horizontal">
-                                <md:PackIcon Kind="Broom" Width="16" Height="16"
+                                <md:PackIcon x:Name="icRecHygiene" Kind="Broom" Width="16" Height="16"
                                              Foreground="{DynamicResource AlertGoldLight}"
                                              VerticalAlignment="Center"/>
-                                <TextBlock Text=" Nettoyage recommandé"
+                                <TextBlock x:Name="txtRecHygiene" Text="Nettoyage disque"
                                            FontSize="12" Foreground="{DynamicResource AlertGold}"
-                                           VerticalAlignment="Center"/>
+                                           VerticalAlignment="Center" TextWrapping="Wrap" Margin="6,0,0,0"/>
                             </StackPanel>
                         </Border>
 
-                        <Border Background="{DynamicResource SurfaceBg}"
+                        <Border x:Name="brRecActivity" Background="{DynamicResource SurfaceBg}"
                                 CornerRadius="8" Padding="12,10">
                             <StackPanel Orientation="Horizontal">
-                                <md:PackIcon Kind="History" Width="16" Height="16"
+                                <md:PackIcon x:Name="icRecActivity" Kind="History" Width="16" Height="16"
                                              Foreground="{DynamicResource SuccessGreen}"
                                              VerticalAlignment="Center"/>
-                                <TextBlock Text=" Détail des analyses dans Historique"
+                                <TextBlock x:Name="txtRecActivity" Text="Analyses"
                                            FontSize="12" Foreground="{DynamicResource TextMedium}"
-                                           VerticalAlignment="Center"/>
+                                           VerticalAlignment="Center" TextWrapping="Wrap" Margin="6,0,0,0"/>
                             </StackPanel>
                         </Border>
                     </StackPanel>

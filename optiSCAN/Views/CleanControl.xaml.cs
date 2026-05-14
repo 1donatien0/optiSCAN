@@ -1,4 +1,6 @@
+using optiSCAN.Models;
 using optiSCAN.Services;
+using System.Collections.Generic;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -68,81 +70,120 @@ namespace optiSCAN.Views
         {
             if (!_analysed) return;
 
-            // Audit A2 : on n'a plus besoin de remonter à MainWindow ; le statut
-            // de nettoyage est géré localement par AppendLog et les compteurs
-            // ci-dessous.
+            // Capturer les cases à cocher sur le thread UI : lire IsChecked dans
+            // Task.Run provoque une InvalidOperationException WPF et peut fermer l'app.
+            bool doTempWin = chkTempWin?.IsChecked == true;
+            bool doTempUser = chkTempUser?.IsChecked == true;
+            bool doRecycle = chkRecycleBin?.IsChecked == true;
+            bool doEdge = chkEdge?.IsChecked == true;
+            bool doChrome = chkChrome?.IsChecked == true;
+            bool doFirefox = chkFirefox?.IsChecked == true;
+            bool doBrave = chkBrave?.IsChecked == true;
+            bool doLogs = chkLogs?.IsChecked == true;
+
             btnAnalyze.IsEnabled = false;
             btnCleanNow.IsEnabled = false;
             AppendLog("=== NETTOYAGE EN COURS ===");
+            var cleanStarted = DateTime.Now;
 
-            await Task.Run(() =>
+            try
             {
-                long freed = 0;
+                await Task.Run(() =>
+                {
+                    long freed = 0;
 
-                if (chkTempWin?.IsChecked == true)
-                {
-                    string path = Path.Combine(Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows", "Temp");
-                    freed += CleanDir(path);
-                    Dispatcher.Invoke(() => AppendLog($"Temp Windows nettoyé : {FormatSize(freed)}"));
-                }
-                if (chkTempUser?.IsChecked == true)
-                {
-                    long f = CleanDir(Path.GetTempPath());
-                    freed += f;
-                    Dispatcher.Invoke(() => AppendLog($"Temp utilisateur nettoyé : {FormatSize(f)}"));
-                }
-                if (chkRecycleBin?.IsChecked == true)
-                {
-                    SHEmptyRecycleBin(IntPtr.Zero, null, 0x0007);
-                    Dispatcher.Invoke(() => AppendLog("Corbeille vidée."));
-                }
-                if (chkEdge?.IsChecked == true)
-                {
-                    long f = CleanDir(EdgeCachePath());
-                    freed += f;
-                    Dispatcher.Invoke(() => AppendLog($"Cache Edge : {FormatSize(f)}"));
-                }
-                if (chkChrome?.IsChecked == true)
-                {
-                    long f = CleanDir(ChromeCachePath());
-                    freed += f;
-                    Dispatcher.Invoke(() => AppendLog($"Cache Chrome : {FormatSize(f)}"));
-                }
-                if (chkFirefox?.IsChecked == true)
-                {
-                    long f = CleanDir(FirefoxCachePath());
-                    freed += f;
-                    Dispatcher.Invoke(() => AppendLog($"Cache Firefox : {FormatSize(f)}"));
-                }
-                if (chkBrave?.IsChecked == true)
-                {
-                    long f = CleanDir(BraveCachePath());
-                    freed += f;
-                    Dispatcher.Invoke(() => AppendLog($"Cache Brave : {FormatSize(f)}"));
-                }
-                if (chkLogs?.IsChecked == true)
-                {
-                    long f = CleanDir(WindowsLogsPath());
-                    freed += f;
-                    Dispatcher.Invoke(() => AppendLog($"Journaux système nettoyés : {FormatSize(f)}"));
-                }
+                    if (doTempWin)
+                    {
+                        string path = Path.Combine(Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows", "Temp");
+                        freed += CleanDir(path);
+                        Dispatcher.Invoke(() => AppendLog($"Temp Windows nettoyé : {FormatSize(freed)}"));
+                    }
+                    if (doTempUser)
+                    {
+                        long f = CleanDir(Path.GetTempPath());
+                        freed += f;
+                        Dispatcher.Invoke(() => AppendLog($"Temp utilisateur nettoyé : {FormatSize(f)}"));
+                    }
+                    if (doRecycle)
+                    {
+                        SHEmptyRecycleBin(IntPtr.Zero, null, 0x0007);
+                        Dispatcher.Invoke(() => AppendLog("Corbeille vidée."));
+                    }
+                    if (doEdge)
+                    {
+                        long f = CleanDir(EdgeCachePath());
+                        freed += f;
+                        Dispatcher.Invoke(() => AppendLog($"Cache Edge : {FormatSize(f)}"));
+                    }
+                    if (doChrome)
+                    {
+                        long f = CleanDir(ChromeCachePath());
+                        freed += f;
+                        Dispatcher.Invoke(() => AppendLog($"Cache Chrome : {FormatSize(f)}"));
+                    }
+                    if (doFirefox)
+                    {
+                        long f = CleanDir(FirefoxCachePath());
+                        freed += f;
+                        Dispatcher.Invoke(() => AppendLog($"Cache Firefox : {FormatSize(f)}"));
+                    }
+                    if (doBrave)
+                    {
+                        long f = CleanDir(BraveCachePath());
+                        freed += f;
+                        Dispatcher.Invoke(() => AppendLog($"Cache Brave : {FormatSize(f)}"));
+                    }
+                    if (doLogs)
+                    {
+                        long f = CleanDir(WindowsLogsPath());
+                        freed += f;
+                        Dispatcher.Invoke(() => AppendLog($"Journaux système nettoyés : {FormatSize(f)}"));
+                    }
 
-                Dispatcher.Invoke(() =>
-                {
-                    AppendLog($"─────────────────────────");
-                    AppendLog($"Total libéré : {FormatSize(freed)}");
-                    AppendLog("=== NETTOYAGE TERMINÉ ===");
-                    txtTempSize.Text = "0 Mo";
-                    txtBrowserSize.Text = "0 Mo";
-                    txtTotalSize.Text = "0 Mo";
-                    _analysed = false;
-                    btnCleanNow.IsEnabled = false;
-                    txtAnalyzeHint.Visibility = Visibility.Visible;
-                    txtAnalyzeHint.Text = "  ✅ Nettoyage effectué";
+                    Dispatcher.Invoke(() =>
+                    {
+                        AppendLog($"─────────────────────────");
+                        AppendLog($"Total libéré : {FormatSize(freed)}");
+                        AppendLog("=== NETTOYAGE TERMINÉ ===");
+                        txtTempSize.Text = "0 Mo";
+                        txtBrowserSize.Text = "0 Mo";
+                        txtTotalSize.Text = "0 Mo";
+                        _analysed = false;
+                        btnCleanNow.IsEnabled = false;
+                        txtAnalyzeHint.Visibility = Visibility.Visible;
+                        txtAnalyzeHint.Text = "  ✅ Nettoyage effectué";
+
+                        var cleanEnd = DateTime.Now;
+                        var targets = BuildCleanTargetsSummary(doTempWin, doTempUser, doRecycle, doEdge, doChrome, doFirefox, doBrave, doLogs);
+                        try
+                        {
+                            ServiceContainer.Default.Logger.SaveCleanSession(new CleanSession
+                            {
+                                StartedAt = cleanStarted,
+                                FinishedAt = cleanEnd,
+                                TargetsSummary = targets,
+                                BytesFreed = freed
+                            });
+                            ServiceContainer.Default.RequestScanHistoryViewsRefresh();
+                        }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Warn("CleanControl", "Enregistrement historique nettoyage", ex);
+                        }
+                    });
                 });
-            });
-
-            btnAnalyze.IsEnabled = true;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("CleanControl", "Nettoyage système", ex);
+                AppendLog($"Erreur pendant le nettoyage : {ex.Message}");
+            }
+            finally
+            {
+                btnAnalyze.IsEnabled = true;
+                if (_analysed)
+                    btnCleanNow.IsEnabled = true;
+            }
         }
 
         // ── Journalisation ───────────────────────────────────────────────────
@@ -217,6 +258,21 @@ namespace optiSCAN.Views
                 AppLogger.Warn("CleanControl", $"Nettoyage incomplet « {path} » : {ex.Message}");
             }
             return freed;
+        }
+
+        private static string BuildCleanTargetsSummary(
+            bool tempWin, bool tempUser, bool recycle, bool edge, bool chrome, bool firefox, bool brave, bool logs)
+        {
+            var parts = new List<string>(8);
+            if (tempWin) parts.Add("Temp Windows");
+            if (tempUser) parts.Add("Temp utilisateur");
+            if (recycle) parts.Add("Corbeille");
+            if (edge) parts.Add("Edge");
+            if (chrome) parts.Add("Chrome");
+            if (firefox) parts.Add("Firefox");
+            if (brave) parts.Add("Brave");
+            if (logs) parts.Add("Journaux système");
+            return parts.Count == 0 ? "—" : string.Join(", ", parts);
         }
 
         private static string FormatSize(long bytes)

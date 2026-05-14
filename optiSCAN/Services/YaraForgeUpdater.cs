@@ -134,6 +134,9 @@ namespace optiSCAN.Services
             _autoTimer = null;
         }
 
+        /// <summary>Indique si le timer de mise à jour périodique est actif.</summary>
+        public bool IsAutoUpdateEnabled => _autoTimer != null;
+
         /// <summary>
         /// Annule la mise à jour des règles en cours (interrompt téléchargement
         /// HTTP / extraction). Sans effet si aucune mise à jour n'est active.

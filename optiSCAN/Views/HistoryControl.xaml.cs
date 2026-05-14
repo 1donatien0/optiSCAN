@@ -20,6 +20,15 @@ namespace optiSCAN.Views
             });
         }
 
+        public void UpdateCleanHistory(IEnumerable<CleanSession> sessions)
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                if (dgCleanHistory != null)
+                    dgCleanHistory.ItemsSource = sessions;
+            });
+        }
+
         private void BtnOpenAntivirus_Click(object sender, RoutedEventArgs e)
         {
             // Audit A2 : navigation via le service exposé par le container,
@@ -27,5 +36,11 @@ namespace optiSCAN.Views
             // indépendamment du host (testable, design-time).
             Services.ServiceContainer.Default.Navigation?.NavigateTo("Antivirus");
         }
+
+        private void BtnExportHtml_Click(object sender, RoutedEventArgs e) =>
+            Services.ServiceContainer.Default.RequestExportScanHistoryHtml();
+
+        private void BtnExportPdf_Click(object sender, RoutedEventArgs e) =>
+            Services.ServiceContainer.Default.RequestExportLastScanPdf();
     }
 }

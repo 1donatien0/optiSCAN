@@ -6,16 +6,17 @@ using System.Text.Json;
 namespace optiSCAN.Services
 {
     /// <summary>
-    /// Gère l'historique des scans (persistance JSON) et les journaux texte.
-    /// Fournit les méthodes pour sauvegarder, charger et effacer l'historique.
+    /// Gère l'historique des scans et des nettoyages système (JSON) et le journal texte.
     /// </summary>
     public class ScanLogManager
     {
         private readonly string _logDir;
         private readonly string _historyPath;
+        private readonly string _cleanHistoryPath;
         private readonly string _textLogPath;
 
         private List<ScanSession> _history;
+        private List<CleanSession> _cleanHistory;
 
         public ScanLogManager(string? logDir = null)
         {
@@ -25,10 +26,12 @@ namespace optiSCAN.Services
                     "optiSCAN", "Logs");
 
             _historyPath = Path.Combine(_logDir, "scan_history.json");
+            _cleanHistoryPath = Path.Combine(_logDir, "clean_history.json");
             _textLogPath = Path.Combine(_logDir, "optiSCAN.log");
 
             EnsureDirectory(_logDir);
             _history = LoadHistory();
+            _cleanHistory = LoadCleanHistory();
         }
 
         // ── Historique des scans ────────────────────────────────────────────────
@@ -55,6 +58,20 @@ namespace optiSCAN.Services
         /// Retourne l'historique complet (plus récent en premier).
         /// </summary>
         public IReadOnlyList<ScanSession> GetHistory() => _history.AsReadOnly();
+
+        // ── Historique des nettoyages système (vue Historique → Nettoyages) ───────
+
+        /// <summary>Enregistre un nettoyage terminé (plus récent en tête, max 100).</summary>
+        public void SaveCleanSession(CleanSession session)
+        {
+            _cleanHistory.Insert(0, session);
+            if (_cleanHistory.Count > 100)
+                _cleanHistory.RemoveRange(100, _cleanHistory.Count - 100);
+            PersistCleanHistory();
+            WriteToLog($"Nettoyage système — {session.BytesDisplay} libéré(s) — {session.TargetsSummary}");
+        }
+
+        public IReadOnlyList<CleanSession> GetCleanHistory() => _cleanHistory.AsReadOnly();
 
         /// <summary>
         /// Efface tout l'historique.
@@ -147,6 +164,28 @@ namespace optiSCAN.Services
             catch (Exception ex)
             {
                 AppLogger.Warn("ScanLogManager", "PersistHistory", ex);
+            }
+        }
+
+        private List<CleanSession> LoadCleanHistory()
+        {
+            return AtomicFile.ReadWithBackup(
+                _cleanHistoryPath,
+                json => JsonSerializer.Deserialize<List<CleanSession>>(json) ?? new List<CleanSession>(),
+                fallbackValue: new List<CleanSession>());
+        }
+
+        private void PersistCleanHistory()
+        {
+            try
+            {
+                var json = JsonSerializer.Serialize(_cleanHistory,
+                    new JsonSerializerOptions { WriteIndented = true });
+                AtomicFile.WriteAllText(_cleanHistoryPath, json);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ScanLogManager", "PersistCleanHistory", ex);
             }
         }
 
