@@ -1,5 +1,3 @@
-using System;
-
 namespace optiSCAN.Models
 {
     /// <summary>

@@ -1,7 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
-
 namespace optiSCAN.Models
 {
     /// <summary>
@@ -36,22 +32,34 @@ namespace optiSCAN.Models
         public string SummaryDisplay =>
             Status switch
             {
-                ScanStatus.Running    => $"Scan en cours… ({FilesScanned} fichiers analysés)",
-                ScanStatus.Completed  => ThreatsFound == 0
-                    ? $"✅ Aucune menace — {FilesScanned} fichiers analysés en {Duration.TotalSeconds:F1}s"
-                    : $"⚠️ {ThreatsFound} menace(s) détectée(s) sur {FilesScanned} fichiers",
-                ScanStatus.Cancelled  => $"⛔ Scan annulé ({FilesScanned} fichiers parcourus)",
-                ScanStatus.Error      => $"❌ Erreur : {ErrorMessage}",
-                _                     => "Inconnu"
+                ScanStatus.Running => $"Analyse en cours… ({FilesScanned:N0} fichier(s) déjà parcourus)",
+                ScanStatus.Completed => ThreatsFound == 0
+                    ? $"Aucune menace — {FilesScanned:N0} fichier(s) en {ScanDisplayFormatter.FormatDuration(Duration)}"
+                    : $"Attention : {ThreatsFound} menace(s) sur {FilesScanned:N0} fichier(s)",
+                ScanStatus.Cancelled => $"Analyse interrompue ({FilesScanned:N0} fichier(s) parcourus)",
+                ScanStatus.Error => $"Erreur : {ErrorMessage}",
+                _ => "État inconnu"
             };
 
         public string TypeDisplay => Type switch
         {
-            ScanType.File      => "Fichier",
-            ScanType.Folder    => "Dossier",
-            ScanType.FullScan  => "Scan complet",
-            ScanType.QuickScan => "Scan rapide",
-            _                  => "Scan"
+            ScanType.File => "Fichier",
+            ScanType.Folder => "Dossier",
+            ScanType.FullScan => "Analyse complète",
+            ScanType.QuickScan => "Analyse rapide",
+            _ => "Analyse"
+        };
+
+        public string DurationDisplay => ScanDisplayFormatter.FormatDuration(Duration);
+
+        public string ThreatsBadge => Status switch
+        {
+            ScanStatus.Running => "En cours…",
+            ScanStatus.Cancelled => "Interrompu",
+            ScanStatus.Error => "Erreur",
+            _ => ThreatsFound == 0
+                ? "Aucune menace"
+                : $"Attention : {ThreatsFound} menace{(ThreatsFound > 1 ? "s" : "")}"
         };
     }
 
