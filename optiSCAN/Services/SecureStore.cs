@@ -9,26 +9,23 @@ namespace optiSCAN.Services
     /// <summary>
     /// Persistance JSON sécurisée :
     ///   - Sérialisation JSON
-    ///   - HMAC-SHA256 sur le contenu (clé dérivée du master key utilisateur)
+    ///   - HMAC-SHA256 sur le contenu (clé aléatoire 256 bits protégée par DPAPI — audit S2)
     ///   - Chiffrement DPAPI (CurrentUser scope) sur le tout
     ///
     /// Format du fichier :
     ///   <DPAPI_blob> = encrypt({ "Hmac": "...base64...", "Json": "..." })
     ///
-    /// Usage typique :
-    ///   var prefs = SecureStore.Load&lt;UserPreferences&gt;(path) ?? new UserPreferences();
-    ///   ...
-    ///   SecureStore.Save(path, prefs);
-    ///
-    /// Pourquoi : les anciens stockages JSON en clair (UserPreferences,
-    /// ExclusionSettings) permettaient à un attaquant local d'éditer le
-    /// fichier pour ajouter des dossiers à ExcludedFolders et cacher du
-    /// malware aux scans. DPAPI + HMAC empêche modification ou substitution.
+    /// Migration : les fichiers signés avec l’ancienne dérivation déterministe
+    /// (profil utilisateur) sont rechargés puis ré-enregistrés avec la nouvelle clé.
     /// </summary>
     [SupportedOSPlatform("windows")]
     public static class SecureStore
     {
         private const string HmacInfo = "optiSCAN-securestore-hmac";
+
+        private static string HmacKeyPath => Path.Combine(
+            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+            "optiSCAN", ".securestore_hmac.key");
 
         /// <summary>
         /// Charge un objet T depuis un fichier sécurisé. Retourne default(T)
@@ -47,27 +44,49 @@ namespace optiSCAN.Services
                 if (envelope == null || string.IsNullOrEmpty(envelope.Json))
                     return null;
 
-                // Vérification HMAC (intégrité)
-                var key = DeriveHmacKey();
-                try
+                if (!string.IsNullOrEmpty(envelope.Hmac))
                 {
-                    using var hmac = new HMACSHA256(key);
-                    var expected = hmac.ComputeHash(Encoding.UTF8.GetBytes(envelope.Json));
-                    var actual = Convert.FromBase64String(envelope.Hmac);
-                    if (!CryptographicOperations.FixedTimeEquals(expected, actual))
+                    var dpapiKey = TryLoadDpapiHmacKey();
+                    try
                     {
-                        AppLogger.Fatal("SecureStore", $"HMAC invalide pour {Path.GetFileName(path)} — refus de chargement");
+                        if (dpapiKey != null && TryVerifyHmac(envelope, dpapiKey))
+                            return JsonSerializer.Deserialize<T>(envelope.Json);
+
+                        var legacyKey = DeriveLegacyHmacKey();
+                        try
+                        {
+                            if (TryVerifyHmac(envelope, legacyKey))
+                            {
+                                var migrated = JsonSerializer.Deserialize<T>(envelope.Json);
+                                if (migrated != null)
+                                {
+                                    Save(path, migrated);
+                                    AppLogger.Info("SecureStore",
+                                        $"Clé HMAC migrée (DPAPI) pour {Path.GetFileName(path)}");
+                                }
+                                return migrated;
+                            }
+                        }
+                        finally
+                        {
+                            CryptographicOperations.ZeroMemory(legacyKey);
+                        }
+
+                        AppLogger.Fatal("SecureStore",
+                            $"HMAC invalide pour {Path.GetFileName(path)} — refus de chargement");
                         return null;
                     }
+                    finally
+                    {
+                        if (dpapiKey != null)
+                            CryptographicOperations.ZeroMemory(dpapiKey);
+                    }
                 }
-                finally { CryptographicOperations.ZeroMemory(key); }
 
                 return JsonSerializer.Deserialize<T>(envelope.Json);
             }
             catch (CryptographicException ex)
             {
-                // Échec DPAPI : changement de profil utilisateur, ou fichier copié
-                // depuis une autre machine. On ne peut rien décrypter.
                 AppLogger.Warn("SecureStore", $"DPAPI Unprotect échoué pour {Path.GetFileName(path)}", ex);
                 return null;
             }
@@ -87,7 +106,7 @@ namespace optiSCAN.Services
             {
                 var json = JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = false });
 
-                var key = DeriveHmacKey();
+                var key = GetOrCreateDpapiHmacKeyMaterial();
                 string hmacB64;
                 try
                 {
@@ -95,7 +114,10 @@ namespace optiSCAN.Services
                     var sig = hmac.ComputeHash(Encoding.UTF8.GetBytes(json));
                     hmacB64 = Convert.ToBase64String(sig);
                 }
-                finally { CryptographicOperations.ZeroMemory(key); }
+                finally
+                {
+                    CryptographicOperations.ZeroMemory(key);
+                }
 
                 var envelope = new Envelope { Json = json, Hmac = hmacB64 };
                 var envelopeBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(envelope));
@@ -126,8 +148,6 @@ namespace optiSCAN.Services
 
                 Save(securePath, obj);
 
-                // Renommage du fichier en clair pour conserver une trace mais
-                // empêcher qu'il soit relu comme source de vérité.
                 try { File.Move(plaintextPath, plaintextPath + ".legacy", overwrite: true); }
                 catch (Exception ex) { AppLogger.Warn("SecureStore", $"Migration cleanup {plaintextPath}", ex); }
 
@@ -143,13 +163,23 @@ namespace optiSCAN.Services
 
         // ── Helpers privés ───────────────────────────────────────────────────────
 
-        /// <summary>
-        /// Dérive une clé HMAC stable propre à l'utilisateur Windows courant.
-        /// (Une ancienne version utilisait Protect puis SHA256 : chaque appel à
-        /// Protect produit un blob différent, donc la clé changeait entre Save
-        /// et Load et l'HMAC était toujours rejeté.)
-        /// </summary>
-        private static byte[] DeriveHmacKey()
+        private static bool TryVerifyHmac(Envelope envelope, byte[] key)
+        {
+            try
+            {
+                using var hmac = new HMACSHA256(key);
+                var expected = hmac.ComputeHash(Encoding.UTF8.GetBytes(envelope.Json));
+                var actual = Convert.FromBase64String(envelope.Hmac);
+                return CryptographicOperations.FixedTimeEquals(expected, actual);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>Ancienne dérivation — conservée uniquement pour migration S2.</summary>
+        private static byte[] DeriveLegacyHmacKey()
         {
             var identity =
                 HmacInfo + "|" +
@@ -157,6 +187,50 @@ namespace optiSCAN.Services
                 Environment.UserDomainName + "|" +
                 Environment.UserName;
             return SHA256.HashData(Encoding.UTF8.GetBytes(identity));
+        }
+
+        private static byte[]? TryLoadDpapiHmacKey()
+        {
+            if (!File.Exists(HmacKeyPath))
+                return null;
+            try
+            {
+                var dec = ProtectedData.Unprotect(
+                    File.ReadAllBytes(HmacKeyPath),
+                    optionalEntropy: null,
+                    DataProtectionScope.CurrentUser);
+                return dec.Length == 32 ? dec : null;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("SecureStore", "Lecture clé HMAC DPAPI", ex);
+                return null;
+            }
+        }
+
+        /// <summary>Clé aléatoire 256 bits persistée sous DPAPI (audit S2).</summary>
+        private static byte[] GetOrCreateDpapiHmacKeyMaterial()
+        {
+            var existing = TryLoadDpapiHmacKey();
+            if (existing != null)
+                return existing;
+
+            var key = RandomNumberGenerator.GetBytes(32);
+            try
+            {
+                var enc = ProtectedData.Protect(key, optionalEntropy: null, DataProtectionScope.CurrentUser);
+                var dir = Path.GetDirectoryName(HmacKeyPath);
+                if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                    Directory.CreateDirectory(dir);
+                AtomicFile.WriteAllBytes(HmacKeyPath, enc);
+                try { File.SetAttributes(HmacKeyPath, FileAttributes.Hidden | FileAttributes.System); }
+                catch { /* best effort */ }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("SecureStore", "Persistance clé HMAC DPAPI", ex);
+            }
+            return key;
         }
 
         private class Envelope

@@ -90,7 +90,7 @@ namespace optiSCAN.Views
             if (target == "Update")
             {
                 container.Navigation?.NavigateTo("Antivirus");
-                container.FocusAntivirusSignaturesTab?.Invoke();
+                container.RequestFocusAntivirusSignaturesTab();
                 container.TriggerSignatureUpdate(); // MainWindow écoute cet event
             }
             else

@@ -12,15 +12,16 @@
 #define AppRelease     "v4.0"
 #define AppIconFile    "..\optiSCAN\optiSCAN.ico"
 
-; ── ISPP : emplacement de publish (VS peut sortir dans publish\ ou publish\win-x64\)
-; Le .csproj supprime win-x64 / win-x86 / publish avant chaque « dotnet publish »
-; pour éviter d'embarquer des restes d'une build précédente dans ce setup.
-#if FileExists(AddBackslash(SourcePath) + "..\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\optiSCAN.exe")
-  #define AppPublishSource "..\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\*"
-#elif FileExists(AddBackslash(SourcePath) + "..\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\optiSCAN.exe")
+; ── ISPP : emplacement de publish (VS / dotnet peuvent sortir dans publish\win-x64\ ou publish\)
+; Préférer win-x64 en premier : c'est la sortie d'un « dotnet publish -r win-x64 » / profil dossier,
+; et un vieux optiSCAN.exe à la racine de publish\ ne doit pas masquer une publication RID récente.
+; Le .csproj supprime win-x64 / win-x86 / publish avant chaque publish (cible CleanStalePublishOutput).
+#if FileExists(AddBackslash(SourcePath) + "..\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\optiSCAN.exe")
   #define AppPublishSource "..\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\*"
+#elif FileExists(AddBackslash(SourcePath) + "..\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\optiSCAN.exe")
+  #define AppPublishSource "..\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\*"
 #else
-  #expr Error("optiSCAN.exe introuvable. Ouvrez optiSCAN.csproj puis menu Build > Publish (Release), ou en ligne de commande : dotnet publish -c Release")
+  #expr Error("optiSCAN.exe introuvable. Ouvrez optiSCAN.csproj puis menu Build > Publish (Release), ou en ligne de commande : dotnet publish -c Release -r win-x64")
 #endif
 
 [Setup]

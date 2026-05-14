@@ -1,6 +1,5 @@
 using Microsoft.Toolkit.Uwp.Notifications;
 using optiSCAN.Models;
-using System.Diagnostics;
 
 namespace optiSCAN.Services
 {
@@ -57,7 +56,7 @@ namespace optiSCAN.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[NotificationService] Erreur notification menace : {ex.Message}");
+                AppLogger.Error("NotificationService", "ShowThreatDetected", ex);
             }
         }
 
@@ -81,7 +80,7 @@ namespace optiSCAN.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[NotificationService] Erreur notification quarantaine : {ex.Message}");
+                AppLogger.Error("NotificationService", "ShowQuarantined", ex);
             }
         }
 
@@ -114,7 +113,7 @@ namespace optiSCAN.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[NotificationService] Erreur notification scan terminé : {ex.Message}");
+                AppLogger.Error("NotificationService", "ShowScanCompleted", ex);
             }
         }
 
@@ -137,7 +136,7 @@ namespace optiSCAN.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[NotificationService] Erreur notification mise à jour : {ex.Message}");
+                AppLogger.Error("NotificationService", "ShowUpdateAvailable", ex);
             }
         }
 
@@ -158,7 +157,7 @@ namespace optiSCAN.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[NotificationService] Erreur notification RTP : {ex.Message}");
+                AppLogger.Error("NotificationService", "ShowRealTimeProtectionStarted", ex);
             }
         }
 

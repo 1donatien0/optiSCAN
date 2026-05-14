@@ -7,10 +7,10 @@ namespace optiSCAN.Services
     /// gérées par <see cref="FreshclamUpdater"/> et les règles par <see cref="YaraForgeUpdater"/>.
     /// </summary>
     /// <remarks>
-    /// Audit H1 : aucun canal de téléchargement applicatif n'est encore relié (pas d'URL
-    /// de mise à jour ni de vérification de version distante). Lorsque le produit en aura
-    /// besoin, brancher ici un manifest signé + téléchargement vérifié, ou désactiver
-    /// l'appel depuis <c>MainWindow</c> si l'OTA reste hors périmètre.
+    /// Audit H1 / Q3 : aucun canal de téléchargement applicatif n'est encore relié.
+    /// <see cref="optiSCAN.MainWindow"/> n'appelle plus cette API au démarrage tant que l'OTA
+    /// n'est pas implémentée (manifest signé + téléchargement vérifié). Réactiver
+    /// l'appel depuis l'UI uniquement lorsque le flux complet sera branché ici.
     /// </remarks>
     public class UpdateService
     {

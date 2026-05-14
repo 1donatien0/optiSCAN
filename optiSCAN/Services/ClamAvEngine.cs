@@ -93,7 +93,11 @@ namespace optiSCAN.Services
                 proc.WaitForExit(3000);
                 return output.Contains("ClamAV");
             }
-            catch { return false; }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ClamAvEngine", "IsClamAvInstalled — version ou processus indisponible", ex);
+                return false;
+            }
         }
 
         public async Task<string> GetVersionAsync()
@@ -104,7 +108,11 @@ namespace optiSCAN.Services
                 var (stdout, _) = await RunProcessAsync(_clamscanExe, "--version");
                 return stdout.Trim().Split('\n')[0]; // Première ligne seulement
             }
-            catch { return "Erreur"; }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ClamAvEngine", "GetVersionAsync", ex);
+                return "Erreur";
+            }
         }
 
         // ── Méthodes de scan publiques ────────────────────────────────────────────

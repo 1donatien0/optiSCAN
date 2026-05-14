@@ -1,4 +1,5 @@
 using MaterialDesignThemes.Wpf;
+using optiSCAN.Services;
 
 namespace optiSCAN
 {
@@ -69,7 +70,7 @@ namespace optiSCAN
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[ThemeManager] ApplyTheme: {ex.Message}");
+                AppLogger.Warn("ThemeManager", "ApplyTheme", ex);
             }
         }
 

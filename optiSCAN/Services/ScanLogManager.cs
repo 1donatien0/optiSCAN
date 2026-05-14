@@ -146,7 +146,7 @@ namespace optiSCAN.Services
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[ScanLogManager] PersistHistory: {ex.Message}");
+                AppLogger.Warn("ScanLogManager", "PersistHistory", ex);
             }
         }
 

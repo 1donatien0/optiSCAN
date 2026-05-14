@@ -110,7 +110,8 @@ namespace optiSCAN.Services
                 var matches = allMatches.FindAll(m => !excl.IsRuleExcluded(m.RuleName));
 
                 long fileSize = -1;
-                try { fileSize = new FileInfo(filePath).Length; } catch { }
+                try { fileSize = new FileInfo(filePath).Length; }
+                catch { /* taille indisponible — non bloquant */ }
 
                 foreach (var m in matches)
                 {
@@ -224,7 +225,8 @@ namespace optiSCAN.Services
                     if (!seen.Add(key)) continue;
 
                     long fileSize = -1;
-                    try { fileSize = new FileInfo(m.FilePath).Length; } catch { }
+                    try { fileSize = new FileInfo(m.FilePath).Length; }
+                    catch { /* taille indisponible */ }
 
                     var threat = new ThreatInfo
                     {
@@ -260,7 +262,7 @@ namespace optiSCAN.Services
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[ScanOrchestrator] RunYaraOnFolderAsync: {ex.Message}");
+                AppLogger.Warn("ScanOrchestrator", $"RunYaraOnFolderAsync ({folderPath})", ex);
                 result.Status = ScanStatus.Completed;
                 result.FinishedAt = DateTime.Now;
             }

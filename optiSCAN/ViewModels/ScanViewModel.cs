@@ -214,6 +214,33 @@ namespace optiSCAN.ViewModels
         public ObservableCollection<ScanSession> History { get; } = new();
         public ObservableCollection<QuarantineEntry> QuarantineEntries { get; } = new();
 
+        /// <summary>Taille d'une page chargée depuis <see cref="QuarantineManager.GetEntriesPaged"/> (audit P4).</summary>
+        private const int QuarantinePageSize = 200;
+
+        private int _quarantineTotalCount;
+        /// <summary>Nombre total d'entrées en quarantaine (manifest).</summary>
+        public int QuarantineTotalCount
+        {
+            get => _quarantineTotalCount;
+            private set { _quarantineTotalCount = value; OnPropertyChanged(); }
+        }
+
+        /// <summary>Indique s'il reste des entrées à charger dans <see cref="QuarantineEntries"/>.</summary>
+        public bool QuarantineHasMore => QuarantineTotalCount > 0 && QuarantineEntries.Count < QuarantineTotalCount;
+
+        /// <summary>Texte d'état pour l'onglet quarantaine (pagination).</summary>
+        public string QuarantinePagingStatus
+        {
+            get
+            {
+                if (QuarantineTotalCount == 0)
+                    return "Aucun fichier en quarantaine.";
+                if (!QuarantineHasMore)
+                    return $"Toutes les entrées sont affichées ({QuarantineTotalCount:N0}).";
+                return $"{QuarantineEntries.Count:N0} sur {QuarantineTotalCount:N0} affiché(s) — « Charger plus » pour la suite.";
+            }
+        }
+
         // ── Commandes ────────────────────────────────────────────────────────────
 
         public bool CanScan => !IsScanning;
@@ -229,6 +256,7 @@ namespace optiSCAN.ViewModels
         public ICommand RestoreFileCommand { get; }
         public ICommand DeleteFileCommand { get; }
         public ICommand PurgeQuarantineCommand { get; }
+        public ICommand LoadMoreQuarantineCommand { get; }
 
         /// <summary>
         /// Déclenché au début d’un scan rapide ou complet pour basculer l’UI vers
@@ -268,7 +296,8 @@ namespace optiSCAN.ViewModels
             QuarantineAllCommand = new RelayCommand(_ => QuarantineAllThreats(), _ => Threats.Count > 0);
             RestoreFileCommand = new RelayCommand(p => RestoreFromQuarantine(p as string));
             DeleteFileCommand = new RelayCommand(p => DeleteFromQuarantine(p as string));
-            PurgeQuarantineCommand = new RelayCommand(_ => PurgeAll(), _ => QuarantineEntries.Count > 0);
+            PurgeQuarantineCommand = new RelayCommand(_ => PurgeAll(), _ => _quarantine.Count > 0);
+            LoadMoreQuarantineCommand = new RelayCommand(_ => LoadMoreQuarantinePage(), _ => QuarantineHasMore);
 
             _ = InitializeAsync();
         }
@@ -313,7 +342,7 @@ namespace optiSCAN.ViewModels
                 });
 
                 TryStep("Chargement historique", LoadHistory);
-                TryStep("Chargement quarantaine", LoadQuarantine);
+                TryStep("Chargement quarantaine", () => LoadQuarantine());
 
                 if (!IsClamAvAvailable)
                     StatusMessage = "Attention : ClamAV est introuvable. Vérifiez le dossier « clamav/x64/ » à côté de l’application.";
@@ -321,7 +350,7 @@ namespace optiSCAN.ViewModels
                     StatusMessage = "Prêt — analyse ClamAV et YARA disponible.";
 
                 AppLogger.Info("ScanViewModel", "Initialisation terminée");
-                ServiceContainer.Default.RefreshScanHistoryViews?.Invoke();
+                ServiceContainer.Default.RequestScanHistoryViewsRefresh();
             }
             catch (Exception ex)
             {
@@ -409,7 +438,7 @@ namespace optiSCAN.ViewModels
                 LastResult = result;
                 _logger.SaveScanResult(result);
                 LoadHistory();
-                ServiceContainer.Default.RefreshScanHistoryViews?.Invoke();
+                ServiceContainer.Default.RequestScanHistoryViewsRefresh();
 
                 WpfApp.Current?.Dispatcher.Invoke(() =>
                 {
@@ -623,14 +652,28 @@ namespace optiSCAN.ViewModels
             StatusMessage = $"{count} fichier(s) supprimé(s) de la quarantaine.";
         }
 
-        private void LoadQuarantine()
+        /// <summary>Recharge la première page de quarantaine (réinitialise la liste affichée).</summary>
+        public void LoadQuarantine(bool reset = true)
         {
             WpfApp.Current?.Dispatcher.Invoke(() =>
             {
-                QuarantineEntries.Clear();
-                foreach (var e in _quarantine.GetEntries())
+                QuarantineTotalCount = _quarantine.Count;
+                if (reset)
+                    QuarantineEntries.Clear();
+                var offset = QuarantineEntries.Count;
+                foreach (var e in _quarantine.GetEntriesPaged(offset, QuarantinePageSize))
                     QuarantineEntries.Add(e);
+                NotifyQuarantinePaging();
             });
+        }
+
+        private void LoadMoreQuarantinePage() => LoadQuarantine(reset: false);
+
+        private void NotifyQuarantinePaging()
+        {
+            OnPropertyChanged(nameof(QuarantineHasMore));
+            OnPropertyChanged(nameof(QuarantinePagingStatus));
+            CommandManager.InvalidateRequerySuggested();
         }
 
         private void LoadHistory()
@@ -645,10 +688,7 @@ namespace optiSCAN.ViewModels
 
         // ── Méthodes publiques pour l'interface ───────────────────────────────────
 
-        public void RefreshQuarantineList()
-        {
-            LoadQuarantine();
-        }
+        public void RefreshQuarantineList() => LoadQuarantine(reset: true);
 
         public void RefreshHistory()
         {

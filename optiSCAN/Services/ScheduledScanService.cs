@@ -53,15 +53,19 @@ namespace optiSCAN.Services
                 psi.ArgumentList.Add("DAILY");
                 psi.ArgumentList.Add("/ST");
                 psi.ArgumentList.Add(startTime);
+                // Audit S1 : moindre privilège — /RL LIMITED évite d'exécuter la tâche
+                // avec le niveau « le plus élevé » du compte utilisateur (HIGHEST).
+                // Si un scan planifié doit accéder à des chemins protégés, préférer
+                // une élévation ponctuelle (ElevationHelper) plutôt qu'une tâche HIGHEST.
                 psi.ArgumentList.Add("/RL");
-                psi.ArgumentList.Add("HIGHEST");
+                psi.ArgumentList.Add("LIMITED");
                 psi.ArgumentList.Add("/F");
 
                 return RunSchtasksCapture(psi).ExitCode == 0;
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[ScheduledScanService] Erreur création tâche : {ex.Message}");
+                AppLogger.Warn("ScheduledScanService", "Erreur création tâche planifiée", ex);
                 return false;
             }
         }
@@ -88,7 +92,11 @@ namespace optiSCAN.Services
                 RunSchtasksCapture(psi);
                 return true;
             }
-            catch { return false; }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ScheduledScanService", "DeleteTask", ex);
+                return false;
+            }
         }
 
         /// <summary>
@@ -111,7 +119,11 @@ namespace optiSCAN.Services
                 psi.ArgumentList.Add(TaskName);
                 return RunSchtasksCapture(psi).ExitCode == 0;
             }
-            catch { return false; }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ScheduledScanService", "IsTaskExists", ex);
+                return false;
+            }
         }
 
         /// <summary>
@@ -163,9 +175,9 @@ namespace optiSCAN.Services
                 if (listRes.ExitCode == 0 && TryParseNextRunFromListOutput(listRes.CombinedOutput, out var fromList))
                     return fromList;
             }
-            catch
+            catch (Exception ex)
             {
-                // repli
+                AppLogger.Warn("ScheduledScanService", "GetNextRunTime — repli sur heure mémoire", ex);
             }
 
             return FallbackFromScheduledMemory();
@@ -191,7 +203,11 @@ namespace optiSCAN.Services
                 psi.ArgumentList.Add(TaskName);
                 return RunSchtasksCapture(psi).ExitCode == 0;
             }
-            catch { return false; }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ScheduledScanService", "RunNow", ex);
+                return false;
+            }
         }
 
         private DateTime? FallbackFromScheduledMemory()
@@ -300,7 +316,13 @@ namespace optiSCAN.Services
             bool finished = Task.WhenAll(stdoutTask, stderrTask)
                 .Wait(TimeSpan.FromSeconds(15));
             if (!finished)
-                try { p.Kill(entireProcessTree: true); } catch { }
+            {
+                try { p.Kill(entireProcessTree: true); }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn("ScheduledScanService", "schtasks timeout — Kill", ex);
+                }
+            }
 
             p.WaitForExit(1_000);
 

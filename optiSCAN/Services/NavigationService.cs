@@ -54,7 +54,7 @@ namespace optiSCAN.Services
         {
             if (!_panels.TryGetValue(name, out var target))
             {
-                System.Diagnostics.Debug.WriteLine($"[NavigationService] Panneau inconnu : '{name}'");
+                AppLogger.Warn("NavigationService", $"Panneau inconnu : '{name}'");
                 return;
             }
 

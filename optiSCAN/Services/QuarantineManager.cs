@@ -16,13 +16,15 @@ namespace optiSCAN.Services
     ///
     /// Format des fichiers .quar (binaire) :
     ///   Magic:    4 octets   "OPTQ"
-    ///   Version:  1 octet    0x02       (0x01 = legacy XOR, géré en lecture)
+    ///   Version:  1 octet    0x02       (0x01 = legacy XOR, migration auto S3 au démarrage)
     ///   Nonce:    12 octets
     ///   Tag:      16 octets  (GCM auth tag)
     ///   Cipher:   N octets   (taille = taille du fichier original)
     ///
     /// Format manifest.json :
     ///   { "Version": 2, "Hmac": "...base64...", "Entries": [...] }
+    ///
+    /// Pagination : <see cref="GetEntriesPaged"/> pour les grosses listes (audit P4).
     /// </summary>
     [SupportedOSPlatform("windows")]
     public class QuarantineManager
@@ -62,6 +64,7 @@ namespace optiSCAN.Services
             EnsureDirectoryExists(_quarantineDir);
             _masterKey = LoadOrCreateMasterKey();
             _doc = LoadManifest();
+            _ = Task.Run(TryMigrateLegacyQuarantineFiles);
         }
 
         // ── Clé maîtresse (DPAPI) ────────────────────────────────────────────────
@@ -233,7 +236,7 @@ namespace optiSCAN.Services
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[QuarantineManager] RestoreTo: {ex.Message}");
+                AppLogger.Warn("QuarantineManager", $"RestoreTo: {ex.Message}", ex);
                 return false;
             }
         }
@@ -251,11 +254,15 @@ namespace optiSCAN.Services
                 var fullDest = Path.GetFullPath(destination);
                 if (IsSensitivePath(fullDest))
                 {
-                    System.Diagnostics.Debug.WriteLine($"[QuarantineManager] Restauration refusée vers chemin sensible: {fullDest}");
+                    AppLogger.Warn("QuarantineManager", $"Restauration refusée vers chemin sensible: {fullDest}");
                     return false;
                 }
             }
-            catch { return false; }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("QuarantineManager", $"Résolution chemin restauration: {destination}", ex);
+                return false;
+            }
 
             try
             {
@@ -267,7 +274,7 @@ namespace optiSCAN.Services
                     var actual = Convert.ToHexString(SHA256.HashData(plaintext));
                     if (!string.Equals(actual, entry.Sha256, StringComparison.OrdinalIgnoreCase))
                     {
-                        System.Diagnostics.Debug.WriteLine($"[QuarantineManager] SHA-256 mismatch pour {entry.Id}");
+                        AppLogger.Warn("QuarantineManager", $"SHA-256 mismatch pour {entry.Id}");
                         CryptographicOperations.ZeroMemory(plaintext);
                         return false;
                     }
@@ -290,7 +297,7 @@ namespace optiSCAN.Services
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[QuarantineManager] RestoreToPath ({entry.Id}): {ex.Message}");
+                AppLogger.Warn("QuarantineManager", $"RestoreToPath ({entry.Id})", ex);
                 return false;
             }
         }
@@ -335,12 +342,7 @@ namespace optiSCAN.Services
                 && raw[2] == Magic[2] && raw[3] == Magic[3];
 
             if (!isV2)
-            {
-                // Format legacy : XOR octet-par-octet avec 0x5A.
-                var legacy = new byte[raw.Length];
-                for (int i = 0; i < raw.Length; i++) legacy[i] = (byte)(raw[i] ^ LegacyXorKey);
-                return legacy;
-            }
+                return DecryptLegacyXorPayload(raw);
 
             byte version = raw[4];
             if (version != FormatVersion)
@@ -361,6 +363,82 @@ namespace optiSCAN.Services
                 aes.Decrypt(nonce, ciphertext, tag, plaintext);
             }
             return plaintext;
+        }
+
+        /// <summary>
+        /// Audit S3 : migration XOR → AES-GCM au démarrage (hors thread UI).
+        /// </summary>
+        private void TryMigrateLegacyQuarantineFiles()
+        {
+            try
+            {
+                int migrated = 0;
+                lock (_lock)
+                {
+                    foreach (var entry in _doc.Entries.ToList())
+                    {
+                        try
+                        {
+                            if (!File.Exists(entry.QuarantinePath))
+                                continue;
+                            var raw = File.ReadAllBytes(entry.QuarantinePath);
+                            if (IsV2QuarantineBlob(raw))
+                                continue;
+
+                            var plaintext = DecryptLegacyXorPayload(raw);
+                            var v2 = BuildV2QuarantineBlob(plaintext);
+                            CryptographicOperations.ZeroMemory(plaintext);
+                            AtomicFile.WriteAllBytes(entry.QuarantinePath, v2);
+                            migrated++;
+                        }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Warn("QuarantineManager", $"Migration legacy {entry.Id}", ex);
+                        }
+                    }
+
+                    if (migrated > 0)
+                    {
+                        SaveManifest();
+                        AppLogger.Info("QuarantineManager",
+                            $"Audit S3 : {migrated} fichier(s) quarantaine migrés XOR → AES-GCM");
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("QuarantineManager", "TryMigrateLegacyQuarantineFiles", ex);
+            }
+        }
+
+        private static bool IsV2QuarantineBlob(byte[] raw) =>
+            raw.Length >= HeaderSize
+            && raw[0] == Magic[0] && raw[1] == Magic[1]
+            && raw[2] == Magic[2] && raw[3] == Magic[3];
+
+        private static byte[] DecryptLegacyXorPayload(byte[] raw)
+        {
+            var legacy = new byte[raw.Length];
+            for (int i = 0; i < raw.Length; i++)
+                legacy[i] = (byte)(raw[i] ^ LegacyXorKey);
+            return legacy;
+        }
+
+        private byte[] BuildV2QuarantineBlob(byte[] plaintext)
+        {
+            var nonce = RandomNumberGenerator.GetBytes(NonceSize);
+            var ciphertext = new byte[plaintext.Length];
+            var tag = new byte[TagSize];
+            using (var aes = new AesGcm(_masterKey, TagSize))
+                aes.Encrypt(nonce, plaintext, ciphertext, tag);
+
+            var blob = new byte[HeaderSize + ciphertext.Length];
+            Buffer.BlockCopy(Magic, 0, blob, 0, 4);
+            blob[4] = FormatVersion;
+            Buffer.BlockCopy(nonce, 0, blob, 5, NonceSize);
+            Buffer.BlockCopy(tag, 0, blob, 5 + NonceSize, TagSize);
+            Buffer.BlockCopy(ciphertext, 0, blob, HeaderSize, ciphertext.Length);
+            return blob;
         }
 
         // ── Suppression / Purge ──────────────────────────────────────────────────
@@ -385,7 +463,7 @@ namespace optiSCAN.Services
             }
             catch (Exception ex)
             {
-                System.Diagnostics.Debug.WriteLine($"[QuarantineManager] DeletePermanently ({quarantineId}): {ex.Message}");
+                AppLogger.Warn("QuarantineManager", $"DeletePermanently ({quarantineId})", ex);
                 return false;
             }
         }
@@ -398,6 +476,24 @@ namespace optiSCAN.Services
             foreach (var entry in snapshot)
                 if (DeletePermanently(entry.Id)) count++;
             return count;
+        }
+
+        /// <summary>
+        /// Fenêtre paginée sur les entrées (audit P4) — évite de copier toute la liste côté UI.
+        /// </summary>
+        public IReadOnlyList<QuarantineEntry> GetEntriesPaged(int offset, int count)
+        {
+            if (offset < 0) offset = 0;
+            if (count <= 0)
+                return Array.Empty<QuarantineEntry>();
+            lock (_lock)
+            {
+                var list = _doc.Entries;
+                if (offset >= list.Count)
+                    return Array.Empty<QuarantineEntry>();
+                var take = Math.Min(count, list.Count - offset);
+                return list.GetRange(offset, take);
+            }
         }
 
         public IReadOnlyList<QuarantineEntry> GetEntries()

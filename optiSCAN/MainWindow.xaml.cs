@@ -2,7 +2,6 @@ using optiSCAN.Models;
 using optiSCAN.Services;
 using optiSCAN.ViewModels;
 using System.ComponentModel;
-using System.Diagnostics;
 using System.Runtime.Versioning;
 using System.Windows;
 using System.Windows.Media;
@@ -25,7 +24,6 @@ namespace optiSCAN
         private ScanOrchestrator? _antivirusOrchestrator;
         private ScanLogManager? _logManager;
         private QuarantineManager? _quarantineManager;
-        private UpdateService? _updateService;
         private FreshclamUpdater? _freshclamUpdater;
         private YaraForgeUpdater? _rulesUpdater;
 
@@ -66,9 +64,6 @@ namespace optiSCAN
                 _freshclamUpdater = c.FreshclamUpdater;
                 _rulesUpdater = c.RulesUpdater;
 
-                // UpdateService : contrôle OTA applicatif (staging) — distinct des signatures ClamAV / YARA.
-                _updateService = new UpdateService();
-
                 _freshclamUpdater.UpdateOutput += OnFreshclamOutput;
                 _rulesUpdater.UpdateOutput += OnRulesUpdaterOutput;
                 _freshclamUpdater.UpdateCompleted += (_, _) =>
@@ -86,11 +81,8 @@ namespace optiSCAN
 
                 // Écoute les demandes de mise à jour émises par les vues
                 // (ex. carte "Update" d'OverviewControl).
-                c.RequestSignatureUpdate += (s, e) =>
-                    BtnManualUpdateSignatures_Click(this, new RoutedEventArgs());
-
-                c.RefreshScanHistoryViews = () =>
-                    Dispatcher.BeginInvoke(new Action(RefreshHistory), DispatcherPriority.Background);
+                c.RequestSignatureUpdate += OnRequestSignatureUpdate;
+                c.ScanHistoryViewsRefreshRequested += OnScanHistoryViewsRefreshRequested;
 
                 // Abonnement aux événements
                 this.Loaded += async (s, e) => await OnMainWindowLoaded();
@@ -109,7 +101,7 @@ namespace optiSCAN
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Erreur Initialisation : {ex.Message}");
+                AppLogger.Error("MainWindow", "Initialisation fenêtre principale", ex);
                 SetStatus($"Erreur: {ex.Message}", isError: true);
             }
         }
@@ -127,9 +119,6 @@ namespace optiSCAN
                 bool clamAvOk = _clamAvEngine?.IsClamAvInstalled() ?? false;
                 SetStatus(clamAvOk ? "ClamAV est opérationnel." : "ClamAV est introuvable sur cette machine.", isWarning: !clamAvOk);
 
-                if (_updateService != null)
-                    _ = Task.Run(async () => await _updateService.CheckAndPrepareUpdatesAsync());
-
                 RefreshYaraStatus();
                 RefreshAntivirusStatus();
                 RefreshQuarantineList();
@@ -143,7 +132,7 @@ namespace optiSCAN
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"Erreur : {ex.Message}");
+                AppLogger.Error("MainWindow", "OnMainWindowLoaded", ex);
                 SetStatus($"Erreur: {ex.Message}", isError: true);
             }
             await Task.CompletedTask;
@@ -163,11 +152,28 @@ namespace optiSCAN
             if (panelHistory != null) _navigationService.RegisterPanel("History", panelHistory);
             if (panelOptions != null) _navigationService.RegisterPanel("Options", panelOptions);
 
-            ServiceContainer.Default.FocusAntivirusSignaturesTab = () =>
-            {
-                if (panelAntivirus is Views.AntivirusView av)
-                    av.SelectSignaturesTab();
-            };
+            ServiceContainer.Default.FocusAntivirusSignaturesRequested -= OnFocusAntivirusSignaturesRequested;
+            ServiceContainer.Default.FocusAntivirusSignaturesRequested += OnFocusAntivirusSignaturesRequested;
+        }
+
+        private void OnRequestSignatureUpdate(object? sender, EventArgs e) =>
+            BtnManualUpdateSignatures_Click(this, new RoutedEventArgs());
+
+        private void OnScanHistoryViewsRefreshRequested(object? sender, EventArgs e) =>
+            Dispatcher.BeginInvoke(new Action(RefreshHistory), DispatcherPriority.Background);
+
+        private void OnFocusAntivirusSignaturesRequested(object? sender, EventArgs e)
+        {
+            if (panelAntivirus is Views.AntivirusView av)
+                av.SelectSignaturesTab();
+        }
+
+        private void UnhookServiceContainerEvents()
+        {
+            var c = ServiceContainer.Default;
+            c.RequestSignatureUpdate -= OnRequestSignatureUpdate;
+            c.ScanHistoryViewsRefreshRequested -= OnScanHistoryViewsRefreshRequested;
+            c.FocusAntivirusSignaturesRequested -= OnFocusAntivirusSignaturesRequested;
         }
 
         // ═══════════════════════════════════════════════════════════════════
@@ -201,7 +207,10 @@ namespace optiSCAN
                     UseShellExecute = true
                 });
             }
-            catch { }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("MainWindow", "Ouverture du site web (Process.Start)", ex);
+            }
         }
 
         // Ancien handler Button conservé pour compatibilité
@@ -259,9 +268,7 @@ namespace optiSCAN
 
         private void RefreshQuarantineList()
         {
-            var entries = _quarantineManager?.GetEntries() ?? new List<QuarantineEntry>();
-            var antivirusView = panelAntivirus as Views.AntivirusView;
-            antivirusView?.UpdateQuarantineList(entries);
+            ViewModel?.RefreshQuarantineList();
         }
 
         private void RefreshHistory()
@@ -326,7 +333,7 @@ namespace optiSCAN
                     else
                         lblStatus.Foreground = new SolidColorBrush(MediaColor.FromRgb(148, 163, 184));
                 }
-                Debug.WriteLine($"[{DateTime.Now:HH:mm:ss}] {text}");
+                AppLogger.Debug("MainWindow", $"Statut: {text}");
             });
         }
 
@@ -395,6 +402,8 @@ namespace optiSCAN
                 // Désabonnement local des events branchés ici
                 if (_freshclamUpdater != null) _freshclamUpdater.UpdateOutput -= OnFreshclamOutput;
                 if (_rulesUpdater != null) _rulesUpdater.UpdateOutput -= OnRulesUpdaterOutput;
+
+                UnhookServiceContainerEvents();
 
                 // Dispose du ViewModel (CTS, abonnements, timers)
                 ViewModel?.Dispose();
@@ -533,47 +542,14 @@ namespace optiSCAN
                 await Task.Yield();
 
                 if (antivirusView != null)
-                {
                     antivirusView.SetSignatureUpdating(true);
-                    antivirusView.AppendSignatureLog("=== MISE À JOUR COMPLÈTE ===");
-                    antivirusView.AppendSignatureLog("1. Mise à jour des signatures ClamAV...");
-                }
 
                 // Travail réseau / sous-processus hors thread UI pour garder la fenêtre réactive.
                 completedOk = await Task.Run(async () =>
-                {
-                    var innerOk = true;
-
-                    if (_freshclamUpdater != null)
-                    {
-                        var clamResult = await _freshclamUpdater.UpdateAsync().ConfigureAwait(false);
-                        antivirusView?.AppendSignatureLog(
-                            clamResult.Success
-                                ? $"✅ ClamAV : {clamResult.Message}"
-                                : $"❌ ClamAV : {clamResult.Message}");
-                        if (!clamResult.Success)
-                            innerOk = false;
-                    }
-
-                    antivirusView?.AppendSignatureLog("");
-                    antivirusView?.AppendSignatureLog("2. Mise à jour des règles de détection...");
-
-                    if (_rulesUpdater != null)
-                    {
-                        var progress = new Progress<string>(msg => antivirusView?.AppendSignatureLog(msg));
-                        var rulesResult = await _rulesUpdater.UpdateAsync(progress).ConfigureAwait(false);
-                        antivirusView?.AppendSignatureLog(
-                            rulesResult.Success
-                                ? $"✅ Règles : {rulesResult.Message}"
-                                : $"❌ Règles : {rulesResult.Message}");
-                        if (!rulesResult.Success)
-                            innerOk = false;
-                    }
-
-                    antivirusView?.AppendSignatureLog("");
-                    antivirusView?.AppendSignatureLog("=== MISE À JOUR TERMINÉE ===");
-                    return innerOk;
-                }).ConfigureAwait(true);
+                    await SignatureUpdateCoordinator.RunFullSignatureUpdateAsync(
+                        _freshclamUpdater,
+                        _rulesUpdater,
+                        line => antivirusView?.AppendSignatureLog(line)).ConfigureAwait(false)).ConfigureAwait(true);
 
                 RefreshSignaturesDisplay();
             }
@@ -607,10 +583,10 @@ namespace optiSCAN
             // Sans cet appel, le bouton ne faisait que masquer le spinner pendant
             // que freshclam continuait à tourner en arrière-plan.
             try { _freshclamUpdater?.CancelUpdate(); }
-            catch (Exception ex) { Debug.WriteLine($"Cancel ClamAV: {ex.Message}"); }
+            catch (Exception ex) { AppLogger.Warn("MainWindow", "CancelUpdate ClamAV", ex); }
 
             try { _rulesUpdater?.CancelUpdate(); }
-            catch (Exception ex) { Debug.WriteLine($"Cancel Règles: {ex.Message}"); }
+            catch (Exception ex) { AppLogger.Warn("MainWindow", "CancelUpdate règles", ex); }
 
             antivirusView?.AppendSignatureLog("Mise à jour interrompue par l'utilisateur");
             antivirusView?.SetSignatureUpdating(false);

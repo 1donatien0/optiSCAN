@@ -62,17 +62,33 @@ namespace optiSCAN.Services
         public void TriggerSignatureUpdate() =>
             RequestSignatureUpdate?.Invoke(this, EventArgs.Empty);
 
-        /// <summary>
-        /// Sélectionne l'onglet « Signatures » dans Analyser (panneau Antivirus).
-        /// Renseigné par <see cref="MainWindow"/> après <c>RegisterPanels</c>.
-        /// </summary>
-        public Action? FocusAntivirusSignaturesTab { get; set; }
+        // Audit A3 : événements + méthodes Request* (plus de Action? mutables
+        // assignées après coup — pas de NRE silencieuse si un service appelait
+        // avant l’init UI ; les handlers sont simplement absents).
 
-        /// <summary>
-        /// Renseigné par <see cref="MainWindow"/> : synchronise grilles d’historique
-        /// et libellé « dernière analyse » (vue d’ensemble + panneau Antivirus).
-        /// </summary>
-        public Action? RefreshScanHistoryViews { get; set; }
+        private EventHandler? _focusAntivirusSignaturesHandlers;
+        /// <summary>Demande d’afficher l’onglet Signatures (écouteur : <see cref="optiSCAN.MainWindow"/>).</summary>
+        public event EventHandler? FocusAntivirusSignaturesRequested
+        {
+            add => _focusAntivirusSignaturesHandlers += value;
+            remove => _focusAntivirusSignaturesHandlers -= value;
+        }
+
+        /// <summary>Demande d’afficher l’onglet Signatures dans Analyser (panneau Antivirus).</summary>
+        public void RequestFocusAntivirusSignaturesTab() =>
+            _focusAntivirusSignaturesHandlers?.Invoke(this, EventArgs.Empty);
+
+        private EventHandler? _scanHistoryViewsRefreshHandlers;
+        /// <summary>Synchronise grilles d’historique et libellé « dernière analyse » (vues multiples).</summary>
+        public event EventHandler? ScanHistoryViewsRefreshRequested
+        {
+            add => _scanHistoryViewsRefreshHandlers += value;
+            remove => _scanHistoryViewsRefreshHandlers -= value;
+        }
+
+        /// <summary>Demande un rafraîchissement des vues d’historique (thread UI : écouteur).</summary>
+        public void RequestScanHistoryViewsRefresh() =>
+            _scanHistoryViewsRefreshHandlers?.Invoke(this, EventArgs.Empty);
 
         private ServiceContainer()
         {
@@ -94,6 +110,23 @@ namespace optiSCAN.Services
             RulesUpdater.EnableAutoUpdate(TimeSpan.FromHours(24));
 
             AppLogger.Info("ServiceContainer", "Services initialisés");
+
+            var yara = Yara;
+            _ = Task.Run(async () =>
+            {
+                try
+                {
+                    if (!await yara.CompileRulesAsync().ConfigureAwait(false) && yara.IsAvailable)
+                    {
+                        AppLogger.Warn("ServiceContainer",
+                            "Précompilation YARA (.yarc) absente ou échouée au démarrage — sera retentée au premier scan.");
+                    }
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn("ServiceContainer", "Précompilation YARA au démarrage", ex);
+                }
+            });
         }
 
         /// <summary>
@@ -102,10 +135,12 @@ namespace optiSCAN.Services
         /// </summary>
         public void Shutdown()
         {
-            FocusAntivirusSignaturesTab = null;
-            RefreshScanHistoryViews = null;
-            try { FreshclamUpdater.DisableAutoUpdate(); } catch { }
-            try { RulesUpdater.DisableAutoUpdate(); } catch { }
+            _focusAntivirusSignaturesHandlers = null;
+            _scanHistoryViewsRefreshHandlers = null;
+            try { FreshclamUpdater.DisableAutoUpdate(); }
+            catch (Exception ex) { AppLogger.Warn("ServiceContainer", "FreshclamUpdater.DisableAutoUpdate", ex); }
+            try { RulesUpdater.DisableAutoUpdate(); }
+            catch (Exception ex) { AppLogger.Warn("ServiceContainer", "RulesUpdater.DisableAutoUpdate", ex); }
             (ClamAv as IDisposable)?.Dispose();
             (Yara as IDisposable)?.Dispose();
             AppLogger.Info("ServiceContainer", "Services fermés");

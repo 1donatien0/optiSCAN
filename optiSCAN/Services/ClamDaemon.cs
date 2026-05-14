@@ -52,7 +52,7 @@ namespace optiSCAN.Services
 
             if (!File.Exists(_clamdExe))
             {
-                Debug.WriteLine("[ClamDaemon] clamd.exe introuvable");
+                AppLogger.Warn("ClamDaemon", "clamd.exe introuvable");
                 return false;
             }
 
@@ -83,7 +83,7 @@ namespace optiSCAN.Services
             }
             catch (Exception ex)
             {
-                Debug.WriteLine($"[ClamDaemon] Erreur démarrage : {ex.Message}");
+                AppLogger.Warn("ClamDaemon", "Erreur démarrage clamd", ex);
                 return false;
             }
         }

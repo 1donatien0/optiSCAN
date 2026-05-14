@@ -4,6 +4,7 @@ using optiSCAN.ViewModels;
 using System.Collections.Concurrent;
 using System.Text;
 using System.Windows;
+using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Color = System.Windows.Media.Color;
@@ -26,6 +27,8 @@ namespace optiSCAN.Views
         private readonly ConcurrentQueue<string> _signatureLogQueue = new();
         private DispatcherTimer? _signatureLogFlushTimer;
         private int _signatureLogArmPosted;
+        /// <summary>ScrollViewer du template TextBox (mis en cache après ApplyTemplate).</summary>
+        private ScrollViewer? _signatureLogScrollHost;
 
         public AntivirusView()
         {
@@ -60,6 +63,7 @@ namespace optiSCAN.Views
             _signatureLogFlushTimer = null;
             while (_signatureLogQueue.TryDequeue(out _)) { }
             Interlocked.Exchange(ref _signatureLogArmPosted, 0);
+            _signatureLogScrollHost = null;
         }
 
         private void OnVmDisplayScanProgressRequested(object? sender, EventArgs e)
@@ -112,17 +116,12 @@ namespace optiSCAN.Views
             });
         }
 
-        /// <summary>Peuple le DataGrid de quarantaine et met à jour le compteur.</summary>
-        public void UpdateQuarantineList(IEnumerable<QuarantineEntry> entries)
+        /// <summary>
+        /// Compatibilité : délègue au ViewModel (liste paginée liée au DataGrid).
+        /// </summary>
+        public void UpdateQuarantineList(IEnumerable<QuarantineEntry>? _ = null)
         {
-            Dispatcher.InvokeAsync(() =>
-            {
-                var list = entries as IList<QuarantineEntry> ?? entries.ToList();
-                if (quarantineGrid != null)
-                    quarantineGrid.ItemsSource = list;
-                if (antivirusQuarantineCount != null)
-                    antivirusQuarantineCount.Text = list.Count.ToString();
-            });
+            Dispatcher.InvokeAsync(() => VM?.LoadQuarantine(reset: true));
         }
 
         /// <summary>Peuple le DataGrid d'historique des scans.</summary>
@@ -169,6 +168,11 @@ namespace optiSCAN.Views
             if (signatureLog == null)
                 return;
 
+            EnsureSignatureLogScrollHost();
+            // Ne forcer le bas que si l'utilisateur y est déjà : sinon ScrollToEnd à chaque tick
+            // empêche de faire défiler le journal pendant la MAJ (effet « qui remonte »).
+            bool pinTail = IsSignatureLogPinnedToTail(_signatureLogScrollHost);
+
             var sb = new StringBuilder(8192);
             for (var i = 0; i < 500 && _signatureLogQueue.TryDequeue(out var line); i++)
                 sb.AppendLine(line);
@@ -176,11 +180,44 @@ namespace optiSCAN.Views
             if (sb.Length > 0)
             {
                 signatureLog.AppendText(sb.ToString());
-                signatureLog.ScrollToEnd();
+                if (pinTail)
+                    signatureLog.ScrollToEnd();
             }
 
             if (!_signatureLogQueue.IsEmpty)
                 _signatureLogFlushTimer?.Start();
+        }
+
+        private void EnsureSignatureLogScrollHost()
+        {
+            if (_signatureLogScrollHost != null || signatureLog == null)
+                return;
+            signatureLog.ApplyTemplate();
+            _signatureLogScrollHost = FindChildScrollViewer(signatureLog);
+        }
+
+        private static ScrollViewer? FindChildScrollViewer(DependencyObject root)
+        {
+            var n = VisualTreeHelper.GetChildrenCount(root);
+            for (var i = 0; i < n; i++)
+            {
+                var child = VisualTreeHelper.GetChild(root, i);
+                if (child is ScrollViewer sv)
+                    return sv;
+                var nested = FindChildScrollViewer(child);
+                if (nested != null)
+                    return nested;
+            }
+            return null;
+        }
+
+        private static bool IsSignatureLogPinnedToTail(ScrollViewer? sv)
+        {
+            if (sv == null)
+                return true;
+            if (sv.ExtentHeight <= 0)
+                return true;
+            return sv.VerticalOffset + sv.ViewportHeight >= sv.ExtentHeight - 2.5;
         }
 
         /// <summary>Affiche ou masque la barre de progression et les boutons pendant une MAJ.</summary>
