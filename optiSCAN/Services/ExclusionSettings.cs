@@ -9,6 +9,10 @@ namespace optiSCAN.Services
     /// Paramètres d'exclusion persistants (dossiers + règles de détection ignorés).
     /// Stockés chiffrés DPAPI + intégrité HMAC dans %LOCALAPPDATA%\optiSCAN\exclusions.dat.
     ///
+    /// Exclusion implicite : tout chemin sous le répertoire d'installation du processus
+    /// (<see cref="AppInstallPaths"/>) est traité comme exclu (scans + RTP), sans entrée
+    /// dans ExcludedFolders — évite les auto-détections YARA/ClamAV sur rules/, yara/, etc.
+    ///
     /// Pourquoi protégé : un attaquant local pourrait sinon ajouter des dossiers
     /// à ExcludedFolders (en éditant le JSON en clair) pour cacher du malware
     /// aux scans suivants. Avec DPAPI+HMAC, toute modification est détectée.
@@ -100,6 +104,9 @@ namespace optiSCAN.Services
         public bool IsFolderExcluded(string path)
         {
             if (string.IsNullOrEmpty(path)) return false;
+
+            if (AppInstallPaths.IsUnderInstallRoot(path))
+                return true;
 
             foreach (var folder in ExcludedFolders)
             {

@@ -2,14 +2,8 @@ using optiSCAN.Models;
 
 namespace optiSCAN.Services
 {
-    // Interfaces principales pour permettre les tests unitaires (mocks) et
-    // découpler MainWindow / ScanViewModel des implémentations concrètes.
-    //
-    // Rationale audit (A1, A3) : ScanViewModel construisait ses propres
-    // ClamAvEngine/YaraEngine/FreshclamUpdater via `new`, ET MainWindow
-    // construisait les siens en parallèle. Double instanciation, états
-    // divergents, tests impossibles. Avec ces interfaces et le ServiceContainer
-    // ci-dessous, les services sont singleton et substituables.
+    // Interfaces pour tests (mocks) et pour découpler les couches UI des implémentations.
+    // Les services concrets sont des singletons exposés par ServiceContainer.
 
     /// <summary>
     /// Moteur de scan antivirus (ClamAV, ou alternatif).

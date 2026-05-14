@@ -5,12 +5,8 @@ using System.Windows.Interop;
 namespace optiSCAN.Services
 {
     /// <summary>
-    /// Communication inter-instance basée sur un message Windows broadcast.
-    /// Permet à une seconde instance qui se ferme aussitôt (App.xaml.cs) de
-    /// faire remonter la fenêtre principale de la première instance.
-    ///
-    /// Avant ce refactor (audit A5), cette logique cohabitait dans MainWindow
-    /// avec navigation, raccourcis, refresh — God Object 570 lignes.
+    /// Communication inter-instance : message Windows broadcast pour qu’une seconde instance
+    /// en cours de fermeture demande à la première de réafficher sa fenêtre principale.
     /// </summary>
     public static class IpcManager
     {

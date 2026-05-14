@@ -177,10 +177,7 @@ namespace optiSCAN.Services
 
                 await EnsureCodeSigningCertificatesPresentAsync(token).ConfigureAwait(false);
 
-                // Audit S4 : ArgumentList plutôt que string. Le chemin du conf
-                // et le datadir contiennent des chemins Windows avec espaces
-                // potentiels (LocalAppData\optiSCAN\...). ArgumentList échappe
-                // correctement chaque token.
+                // ArgumentList : pas de concaténation de chaîne ; conf et datadir (chemins avec espaces) sont échappés token par token.
                 var psi = new ProcessStartInfo
                 {
                     FileName = _freshclamExe,
@@ -432,7 +429,7 @@ namespace optiSCAN.Services
         }
 
         /// <summary>
-        /// Audit S4 : remplit ArgumentList plutôt que de retourner une string.
+        /// Remplit <see cref="ProcessStartInfo.ArgumentList"/> (échappement sûr des chemins) au lieu de concaténer une ligne de commande.
         /// .NET gère le quoting Windows pour chaque token.
         ///
         /// IMPORTANT : freshclam exige le format "--option=valeur" (un seul

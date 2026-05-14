@@ -40,7 +40,7 @@ namespace optiSCAN
             if (!createdNew)
             {
                 // Une autre instance tourne : on lui demande de remonter sa fenêtre
-                // via le message broadcast géré par IpcManager (audit A5).
+                // via le message broadcast géré par IpcManager.
                 Services.IpcManager.NotifyShowExistingInstance();
                 _instanceMutex.Close();
                 _instanceMutex = null;
@@ -153,5 +153,5 @@ namespace optiSCAN
     }
 
     // NativeMethods retiré : la logique IPC est désormais dans
-    // Services.IpcManager (audit A5 — décomposition de MainWindow).
+    // Logique IPC : Services.IpcManager.
 }

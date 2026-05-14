@@ -1,5 +1,6 @@
 using optiSCAN.Models;
 using System.IO;
+using System.Linq;
 
 namespace optiSCAN.Services
 {
@@ -50,6 +51,20 @@ namespace optiSCAN.Services
 
         private async Task<ScanResult> RunPipelineAsync(ScanType type, string target, bool recursive, IProgress<ScanProgress>? progress, CancellationToken ct)
         {
+            if (recursive && AppInstallPaths.IsUnderInstallRoot(target))
+            {
+                var now = DateTime.Now;
+                return new ScanResult
+                {
+                    Type = type,
+                    TargetPath = target,
+                    StartedAt = now,
+                    FinishedAt = now,
+                    Status = ScanStatus.Completed,
+                    FilesSkipped = 1,
+                };
+            }
+
             var clamProgress = new Progress<ScanProgress>(p =>
             {
                 var c = p.Clone();
@@ -211,7 +226,7 @@ namespace optiSCAN.Services
                 // Filtre exclusions (dossiers + règles ignorées).
                 var exclusions = ExclusionSettings.Current;
                 var filteredMatches = allMatches
-                    .Where(m => !exclusions.IsFolderExcluded(m.FilePath))
+                    .Where(m => !exclusions.IsFileExcluded(m.FilePath))
                     .Where(m => !exclusions.IsRuleExcluded(m.RuleName))
                     .ToList();
 
@@ -285,11 +300,15 @@ namespace optiSCAN.Services
                     ? ScanStatus.Cancelled : ScanStatus.Completed
             };
 
+            var excl = ExclusionSettings.Current;
+            var clamThreats = clamResult.Threats.Where(t => !excl.IsFileExcluded(t.FilePath)).ToList();
+            var yaraThreats = yaraResult.Threats.Where(t => !excl.IsFileExcluded(t.FilePath)).ToList();
+
             var clamByPath = new Dictionary<string, ThreatInfo>(StringComparer.OrdinalIgnoreCase);
-            foreach (var t in clamResult.Threats)
+            foreach (var t in clamThreats)
                 clamByPath[t.FilePath] = t;
 
-            merged.Threats.AddRange(clamResult.Threats);
+            merged.Threats.AddRange(clamThreats);
 
             // Pour chaque match YARA on agrège proprement les noms de règles
             // dans un set (HashSet) afin d'éviter les VirusName en accumulation
@@ -297,7 +316,7 @@ namespace optiSCAN.Services
             var yaraNamesByPath = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
             var seenYaraTriples = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var yaraT in yaraResult.Threats)
+            foreach (var yaraT in yaraThreats)
             {
                 var triple = $"{yaraT.FilePath}|{yaraT.VirusName}";
                 if (!seenYaraTriples.Add(triple)) continue; // déjà compté

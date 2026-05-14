@@ -18,7 +18,7 @@ namespace optiSCAN.Services
         private readonly string _compiledRulesPath;
         private readonly string _rulesCountCachePath;
 
-        /// <summary>Limite de caractères capturés depuis stdout yara (audit P3).</summary>
+        /// <summary>Limite de caractères capturés depuis la sortie standard de yara.</summary>
         private const int MaxYaraStdoutCaptureChars = 2_000_000;
 
         public bool IsAvailable { get; private set; }
@@ -144,7 +144,7 @@ namespace optiSCAN.Services
             }
         }
 
-        /// <summary>Accumule stdout yara avec plafond (audit P3).</summary>
+        /// <summary>Accumule stdout yara avec un plafond pour limiter la mémoire.</summary>
         private sealed class YaraStdoutCapture
         {
             public readonly StringBuilder Builder = new();
@@ -180,7 +180,7 @@ namespace optiSCAN.Services
             var ruleFiles = Directory.GetFiles(_rulesDirectory, "*.yar");
             if (ruleFiles.Length == 0) return false;
 
-            // Audit S4 : ArgumentList plutôt que concatenation de string —
+            // ArgumentList plutôt que concaténation de chaîne —
             // chaque fichier de règle est passé comme argument distinct, le
             // quoting est géré par .NET (CommandLineToArgvW round-trip safe)
             // même si un chemin contient des espaces ou des guillemets.
@@ -289,7 +289,7 @@ namespace optiSCAN.Services
 
             // Construction de la commande : --recursive + dossier en argument.
             // -N (no-warnings) supprime les avertissements verbeux.
-            // ArgumentList systématique (audit S4) → quoting sûr.
+            // ArgumentList : guillemets et chemins correctement échappés.
             string[] args;
             if (HasCompiled)
             {
@@ -389,7 +389,7 @@ namespace optiSCAN.Services
         {
             var matches = new List<YaraMatch>();
 
-            // Audit S4 + R4 : ArgumentList + using var (dispose garanti).
+            // ArgumentList + using Process : libération du processus garantie.
             var psi = new ProcessStartInfo
             {
                 FileName = _yaraExe,

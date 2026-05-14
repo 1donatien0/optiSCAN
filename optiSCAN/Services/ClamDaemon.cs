@@ -217,10 +217,9 @@ namespace optiSCAN.Services
 
         private async Task ConnectAsync()
         {
-            // Audit S2 : avant de se connecter, on vérifie que le process qui
-            // écoute sur le port 3310 est bien NOTRE _clamdProcess. Sinon, un
-            // autre process local pourrait s'être inséré (via un crash + race
-            // sur le port). On refuse la connexion dans ce cas.
+            // Avant connexion TCP : vérifier que le processus en écoute sur le port 3310
+            // est bien NOTRE _clamdProcess. Sinon, un autre processus local pourrait
+            // s'être inséré (crash + réutilisation du port). On refuse la connexion dans ce cas.
             if (_clamdProcess != null && !VerifyListenerIsOwn(ClamdPort, _clamdProcess.Id))
             {
                 AppLogger.Fatal("ClamDaemon",
@@ -236,7 +235,7 @@ namespace optiSCAN.Services
             _isConnected = true;
         }
 
-        // ── Audit S2 — vérification d'identité du listener ───────────────────────
+        // ── Vérification que le listener TCP est bien notre clamd ───────────────────
 
         /// <summary>
         /// Vérifie qu'au moins une socket en LISTEN sur le port donné appartient

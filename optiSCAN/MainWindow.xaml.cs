@@ -36,10 +36,8 @@ namespace optiSCAN
 
         private const string OptiscanWebsiteUrl = "https://sourceforge.net/projects/optiscan/";
 
-        // Constructeur statique : enregistre l'instance NavigationService de
-        // MainWindow dans le container pour que les vues y accèdent sans cast
-        // (audit A2). Le set se fait dans le constructeur d'instance, mais on
-        // doit attendre que _navigationService soit assigné.
+        // Après InitializeComponent / RegisterPanels, le constructeur assigne
+        // ServiceContainer.Default.Navigation : les vues naviguent sans référencer MainWindow.
 
         public MainWindow()
         {
@@ -55,9 +53,7 @@ namespace optiSCAN
 
             try
             {
-                // Résolution depuis le ServiceContainer global : une seule
-                // instance de chaque service partagée avec ScanViewModel
-                // (cf. audit A1 — fini la double instanciation).
+                // Services partagés via le singleton applicatif (mêmes instances que ScanViewModel).
                 var c = ServiceContainer.Default;
                 _clamAvEngine = c.ClamAv;
                 _yaraEngine = c.Yara;
@@ -78,8 +74,7 @@ namespace optiSCAN
                 ViewModel = new ScanViewModel(c);
                 this.DataContext = ViewModel;
 
-                // Expose le NavigationService au container — les vues peuvent
-                // s'en servir sans cast (System.Windows.Application.Current.MainWindow as MainWindow).
+                // Les vues utilisent c.Navigation (INavigationService) au lieu de caster MainWindow.
                 c.Navigation = _navigationService;
 
                 // Écoute les demandes de mise à jour émises par les vues
@@ -95,12 +90,10 @@ namespace optiSCAN
                 this.Closing += OnWindowClosing;
                 this.StateChanged += OnWindowStateChanged;
 
-                // IPC : remontée de fenêtre lorsqu'une 2e instance est lancée
-                // (audit A5 — extrait dans IpcManager).
+                // IPC : une seconde instance envoie un message Windows pour réafficher cette fenêtre (IpcManager).
                 IpcManager.HookShowMessage(this, ShowWindow);
 
-                // Raccourcis Ctrl+1..Ctrl+5 (audit A5/P10 — un seul RoutedCommand
-                // paramétré par le tag du panneau, au lieu de 5 commandes).
+                // Raccourcis Ctrl+1..Ctrl+5 : une seule RoutedCommand, le paramètre est le nom du panneau.
                 KeyboardShortcuts.Register(this,
                     new[] { "Overview", "Antivirus", "Clean", "History", "Options" },
                     SwitchPanel);
@@ -518,8 +511,7 @@ namespace optiSCAN
         // ═══════════════════════════════════════════════════════════════════
         // RÉ-AFFICHAGE DEPUIS LA SYSTRAY OU IPC
         // ═══════════════════════════════════════════════════════════════════
-        // (Le hook WM_SHOWME et la gestion ComponentDispatcher ont été extraits
-        // dans Services.IpcManager — cf. audit A5.)
+        // WM_SHOWME et le hook WndProc sont implémentés dans IpcManager.
         private void ShowWindow()
         {
             if (WindowState == WindowState.Minimized)
@@ -530,8 +522,7 @@ namespace optiSCAN
             Topmost = false;
         }
 
-        // RegisterKeyboardShortcuts retiré : extrait dans Services.KeyboardShortcuts
-        // (audit A5/P10 — un seul RoutedCommand paramétré au lieu de 5).
+        // Raccourcis clavier : voir Services.KeyboardShortcuts.
 
         // ═══════════════════════════════════════════════════════════════════
         // GESTION DE L'ÉTAT DE LA FENÊTRE (minimize → systray)

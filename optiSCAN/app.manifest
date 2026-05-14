@@ -17,7 +17,7 @@
             raisons de compatibilité descendante.
         -->
         <!--
-          Audit S5 (mitigation) : on passe de requireAdministrator à asInvoker.
+          Exécution en utilisateur standard (asInvoker) plutôt qu'en administrateur permanent.
           Justification : la majeure partie des opérations (UI, scan utilisateur,
           quarantaine dans LocalAppData, mises à jour, préférences) ne requiert
           pas les droits admin. Pour les opérations privilégiées (scan

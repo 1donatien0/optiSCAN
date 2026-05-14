@@ -3,25 +3,15 @@ using System.Runtime.Versioning;
 namespace optiSCAN.Services
 {
     /// <summary>
-    /// Container DI minimaliste — singleton statique pour éviter d'ajouter
-    /// une dépendance Microsoft.Extensions.DependencyInjection sur ce projet.
-    ///
-    /// Problème résolu (audit A1) : MainWindow et ScanViewModel construisaient
-    /// CHACUN leurs propres instances de ClamAvEngine, YaraEngine, etc. via
-    /// `new`. Conséquences :
-    ///   - Double consommation mémoire
-    ///   - Vérifications dupliquées (version ClamAV lue 2×)
-    ///   - Caches divergents (RulesCount calculé deux fois)
-    ///   - Logs en double dans freshclam, abonnements aux events doublés
-    ///
-    /// Solution : tous les services lifetime-long passent par <see cref="Default"/>.
-    /// Les VM et la fenêtre principale obtiennent leurs dépendances via les
-    /// propriétés exposées ici.
-    ///
-    /// Resté volontairement simple : pas de scopes, pas de lazy resolution
-    /// par type, pas de constructor injection automatique. Suffisant pour
-    /// la dizaine de services à durée de vie applicative qu'optiSCAN gère.
+    /// Regroupe les services à longue durée de vie (singleton <see cref="Default"/>).
+    /// MainWindow et <see cref="optiSCAN.ViewModels.ScanViewModel"/> s’appuient sur les mêmes
+    /// instances (moteurs, journaux, quarantaine) pour éviter double charge mémoire, caches
+    /// divergents et abonnements dupliqués.
     /// </summary>
+    /// <remarks>
+    /// Pas de conteneur Microsoft.Extensions.DependencyInjection : volontairement simple
+    /// (pas de scopes ni d’injection par constructeur automatique).
+    /// </remarks>
     [SupportedOSPlatform("windows")]
     public sealed class ServiceContainer
     {
@@ -95,9 +85,8 @@ namespace optiSCAN.Services
             }
         }
 
-        // Audit A3 : événements + méthodes Request* (plus de Action? mutables
-        // assignées après coup — pas de NRE silencieuse si un service appelait
-        // avant l’init UI ; les handlers sont simplement absents).
+        // Demandes UI (export, onglet Signatures, etc.) : événements nommés plutôt que des
+        // callbacks assignables après coup — si personne n’est abonné, l’appel est simplement ignoré.
 
         private EventHandler? _focusAntivirusSignaturesHandlers;
         /// <summary>Demande d’afficher l’onglet Signatures (écouteur : <see cref="optiSCAN.MainWindow"/>).</summary>

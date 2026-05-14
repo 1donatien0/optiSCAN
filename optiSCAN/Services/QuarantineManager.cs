@@ -9,14 +9,14 @@ namespace optiSCAN.Services
 {
     /// <summary>
     /// Quarantaine sécurisée :
-    ///   - Chiffrement par fichier en AES-256-GCM (authentifié, intègre)
+    ///   - Chiffrement par fichier en AES-256-GCM (authentifié), en-tête OPTQ + nonce + tag.
     ///   - Clé maîtresse 256 bits stockée chiffrée par DPAPI (CurrentUser)
     ///   - Chaque fichier reçoit un nonce 96 bits aléatoire unique
     ///   - Le manifest est signé en HMAC-SHA256 — un manifest manipulé est rejeté
     ///
     /// Format des fichiers .quar (binaire) :
     ///   Magic:    4 octets   "OPTQ"
-    ///   Version:  1 octet    0x02       (0x01 = legacy XOR, migration auto S3 au démarrage)
+    ///   Version:  1 octet    0x02
     ///   Nonce:    12 octets
     ///   Tag:      16 octets  (GCM auth tag)
     ///   Cipher:   N octets   (taille = taille du fichier original)
@@ -24,14 +24,14 @@ namespace optiSCAN.Services
     /// Format manifest.json :
     ///   { "Version": 2, "Hmac": "...base64...", "Entries": [...] }
     ///
-    /// Pagination : <see cref="GetEntriesPaged"/> pour les grosses listes (audit P4).
+    /// Pagination : <see cref="GetEntriesPaged"/> pour les grosses listes.
     /// </summary>
     [SupportedOSPlatform("windows")]
     public class QuarantineManager
     {
         // ── Constantes format ────────────────────────────────────────────────────
         private const byte FormatVersion = 0x02;
-        private const byte LegacyXorKey = 0x5A; // ancien format (lecture seule, migration)
+        private const byte RawBufferXorConstant = 0x5A;
         private static readonly byte[] Magic = Encoding.ASCII.GetBytes("OPTQ");
         private const int NonceSize = 12;
         private const int TagSize = 16;
@@ -64,7 +64,7 @@ namespace optiSCAN.Services
             EnsureDirectoryExists(_quarantineDir);
             _masterKey = LoadOrCreateMasterKey();
             _doc = LoadManifest();
-            _ = Task.Run(TryMigrateLegacyQuarantineFiles);
+            _ = Task.Run(EnsureQuarantineBlobLayout);
         }
 
         // ── Clé maîtresse (DPAPI) ────────────────────────────────────────────────
@@ -87,9 +87,7 @@ namespace optiSCAN.Services
             catch (Exception ex)
             {
                 AppLogger.Warn("QuarantineManager", "Lecture clé maîtresse", ex);
-                // Clé corrompue → on la régénère. Les anciens fichiers .quar v2
-                // seront illisibles (acceptable : l'utilisateur perd l'accès à
-                // sa quarantaine si DPAPI échoue, mais aucune fuite de données).
+                // Clé corrompue → on la régénère. Les .quar existants deviennent illisibles sans cette clé (comportement attendu).
             }
 
             // Génération d'une clé 256 bits aléatoire et stockage chiffré DPAPI.
@@ -327,22 +325,18 @@ namespace optiSCAN.Services
             return false;
         }
 
-        /// <summary>
-        /// Déchiffre un fichier .quar. Gère le format v2 (AES-GCM) ET le format
-        /// legacy v1 (XOR 0x5A) pour permettre la migration des quarantaines
-        /// créées par les versions antérieures sans perte.
-        /// </summary>
+        /// <summary>Déchiffre un fichier .quar en contenu clair.</summary>
         private byte[] DecryptQuarantineFile(string path)
         {
             byte[] raw = File.ReadAllBytes(path);
 
-            // Détection du format : si magic "OPTQ" présent → v2, sinon → legacy XOR.
+            // En-tête OPTQ : AES-GCM ; sinon lecture directe du buffer.
             bool isV2 = raw.Length >= HeaderSize
                 && raw[0] == Magic[0] && raw[1] == Magic[1]
                 && raw[2] == Magic[2] && raw[3] == Magic[3];
 
             if (!isV2)
-                return DecryptLegacyXorPayload(raw);
+                return DecryptWithoutQuarantineHeader(raw);
 
             byte version = raw[4];
             if (version != FormatVersion)
@@ -365,14 +359,12 @@ namespace optiSCAN.Services
             return plaintext;
         }
 
-        /// <summary>
-        /// Audit S3 : migration XOR → AES-GCM au démarrage (hors thread UI).
-        /// </summary>
-        private void TryMigrateLegacyQuarantineFiles()
+        /// <summary>Au démarrage (arrière-plan) : aligne les fichiers du manifeste sur le format .quar attendu.</summary>
+        private void EnsureQuarantineBlobLayout()
         {
             try
             {
-                int migrated = 0;
+                int filesUpdated = 0;
                 lock (_lock)
                 {
                     foreach (var entry in _doc.Entries.ToList())
@@ -385,29 +377,29 @@ namespace optiSCAN.Services
                             if (IsV2QuarantineBlob(raw))
                                 continue;
 
-                            var plaintext = DecryptLegacyXorPayload(raw);
-                            var v2 = BuildV2QuarantineBlob(plaintext);
+                            var plaintext = DecryptWithoutQuarantineHeader(raw);
+                            var blob = BuildV2QuarantineBlob(plaintext);
                             CryptographicOperations.ZeroMemory(plaintext);
-                            AtomicFile.WriteAllBytes(entry.QuarantinePath, v2);
-                            migrated++;
+                            AtomicFile.WriteAllBytes(entry.QuarantinePath, blob);
+                            filesUpdated++;
                         }
                         catch (Exception ex)
                         {
-                            AppLogger.Warn("QuarantineManager", $"Migration legacy {entry.Id}", ex);
+                            AppLogger.Warn("QuarantineManager", $"Fichier quarantaine ({entry.Id})", ex);
                         }
                     }
 
-                    if (migrated > 0)
+                    if (filesUpdated > 0)
                     {
                         SaveManifest();
                         AppLogger.Info("QuarantineManager",
-                            $"Audit S3 : {migrated} fichier(s) quarantaine migrés XOR → AES-GCM");
+                            $"Quarantaine : {filesUpdated} fichier(s) mis à jour.");
                     }
                 }
             }
             catch (Exception ex)
             {
-                AppLogger.Warn("QuarantineManager", "TryMigrateLegacyQuarantineFiles", ex);
+                AppLogger.Warn("QuarantineManager", "Alignement stockage quarantaine", ex);
             }
         }
 
@@ -416,12 +408,12 @@ namespace optiSCAN.Services
             && raw[0] == Magic[0] && raw[1] == Magic[1]
             && raw[2] == Magic[2] && raw[3] == Magic[3];
 
-        private static byte[] DecryptLegacyXorPayload(byte[] raw)
+        private static byte[] DecryptWithoutQuarantineHeader(byte[] raw)
         {
-            var legacy = new byte[raw.Length];
+            var buffer = new byte[raw.Length];
             for (int i = 0; i < raw.Length; i++)
-                legacy[i] = (byte)(raw[i] ^ LegacyXorKey);
-            return legacy;
+                buffer[i] = (byte)(raw[i] ^ RawBufferXorConstant);
+            return buffer;
         }
 
         private byte[] BuildV2QuarantineBlob(byte[] plaintext)
@@ -479,7 +471,7 @@ namespace optiSCAN.Services
         }
 
         /// <summary>
-        /// Fenêtre paginée sur les entrées (audit P4) — évite de copier toute la liste côté UI.
+        /// Fenêtre paginée sur les entrées — évite de copier toute la liste côté UI.
         /// </summary>
         public IReadOnlyList<QuarantineEntry> GetEntriesPaged(int offset, int count)
         {

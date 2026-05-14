@@ -4,9 +4,8 @@ using System.Windows.Input;
 namespace optiSCAN.Services
 {
     /// <summary>
-    /// Centralisation de l'enregistrement des raccourcis clavier de l'app.
-    /// Avant (audit A5/P10), MainWindow créait 5 RoutedCommand distincts pour
-    /// Ctrl+1..Ctrl+5 — ici un seul, paramétré par le tag du panneau.
+    /// Centralisation de l'enregistrement des raccourcis clavier de l'application.
+    /// Une seule <see cref="RoutedCommand"/> paramétrée remplace cinq commandes distinctes pour Ctrl+1..Ctrl+5.
     /// </summary>
     public static class KeyboardShortcuts
     {

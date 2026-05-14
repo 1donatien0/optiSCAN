@@ -2,8 +2,7 @@ namespace optiSCAN.Services
 {
     /// <summary>
     /// Orchestre la mise à jour manuelle ClamAV (freshclam) puis les règles YARA (YaraForge).
-    /// Extrait de <see cref="optiSCAN.MainWindow"/> (audit A2) pour isoler le flux métier
-    /// du code-behind WPF.
+    /// Logique extraite de <see cref="optiSCAN.MainWindow"/> pour isoler le flux métier du code-behind WPF.
     /// </summary>
     public static class SignatureUpdateCoordinator
     {

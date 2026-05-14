@@ -16,12 +16,12 @@ public sealed class SecureStoreTests
         var path = Path.Combine(Path.GetTempPath(), "optiscan_ut_secure_" + Guid.NewGuid().ToString("N") + ".dat");
         try
         {
-            var original = new TestDto { Value = "audit-roundtrip", N = 42 };
+            var original = new TestDto { Value = "roundtrip-payload", N = 42 };
             SecureStore.Save(path, original);
 
             var loaded = SecureStore.Load<TestDto>(path);
             Assert.NotNull(loaded);
-            Assert.Equal("audit-roundtrip", loaded.Value);
+            Assert.Equal("roundtrip-payload", loaded.Value);
             Assert.Equal(42, loaded.N);
         }
         finally

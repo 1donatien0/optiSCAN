@@ -327,8 +327,7 @@ namespace optiSCAN.Views
         }
 
         // ═══════════════════════════════════════════════════════════════════
-        // HANDLERS — appellent directement le service AntivirusActions du
-        // ServiceContainer plutôt que de remonter vers MainWindow (audit A2).
+        // HANDLERS — actions via ServiceContainer.AntivirusActions (sans remonter vers MainWindow).
         // ═══════════════════════════════════════════════════════════════════
 
         private static Services.AntivirusActions Actions => Services.ServiceContainer.Default.Actions;

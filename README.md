@@ -8,6 +8,22 @@
 > **Design system : Donaby Design** — thème sombre/clair dynamique, tokens DynamicResource WPF.
 > Développé par **© 2026 Donatien Byakombe (Dona By)**.
 
+## Sommaire
+
+| Chapitre | Contenu |
+|:---:|:---|
+| **1** | Architecture technique (stack, arborescence du dépôt) |
+| **2** | Donaby Design (thèmes, tokens) |
+| **3** | Installation et configuration ClamAV |
+| **4** | Application mono-fenêtre (panneaux, antivirus, pipeline, persistance, exports, vue d’ensemble) |
+| **5** | Services complémentaires (clamd côté code, RTP, planificateur, notifications, scoring) |
+| **6** | Workflow démarrage UI et ligne de commande |
+| **7** | Bonnes pratiques (droits, perfs, faux positifs, Defender) |
+| **8** | Publication et installateur Inno Setup |
+| **9** | Dépendances et licences |
+| **10** | Historique des versions produit |
+| **11** | Crédits |
+
 ---
 
 ## 1. Architecture technique
@@ -49,11 +65,15 @@
     │   ├── ExclusionSettings.cs       ← Dossiers et règles exclus (singleton JSON)
     │   ├── YaraEngine.cs              ← Moteur de détection comportementale
     │   ├── YaraForgeUpdater.cs        ← Mise à jour automatique règles de détection
-    │   ├── ScanOrchestrator.cs        ← Pipeline ClamAV + détection en parallèle
-    │   ├── QuarantineManager.cs       ← Déplace/restaure/supprime les fichiers infectés
+    │   ├── ServiceContainer.cs        ← Singleton : ClamAV, YARA, orchestrateur, MAJ, quarantaine, RTP, logs…
+    │   ├── ScanOrchestrator.cs        ← Pipeline ClamAV + YARA en parallèle
+    │   ├── QuarantineManager.cs       ← Quarantaine chiffrée (AES-GCM), manifeste signé
     │   ├── ScanLogManager.cs          ← Historique JSON + journal texte
-    │   ├── RealTimeProtection.cs      ← FileSystemWatcher sur dossiers critiques
-    │   ├── ScheduledScanService.cs    ← Tâche planifiée via schtasks.exe
+    │   ├── RealTimeProtection.cs      ← Surveillance FileSystemWatcher (démarrage selon Options)
+    │   ├── ScheduledScanService.cs    ← Tâche planifiée Windows (schtasks.exe)
+    │   ├── IpcManager.cs              ← Instance unique : message WM_SHOWME
+    │   ├── HtmlExportService.cs       ← Rapport HTML (export depuis l’onglet Historique)
+    │   ├── SignatureUpdateCoordinator.cs ← Enchaînement freshclam + règles (hors code-behind lourd)
     │   ├── NotificationService.cs     ← Toasts Windows natifs
     │   ├── RiskScoringService.cs      ← Score 0-100 par menace
     │   └── PdfReportGenerator.cs      ← Export rapport PDF (QuestPDF)
@@ -177,19 +197,21 @@ après la date textuelle (le premier champ est une date lisible, pas un entier).
 
 ## 4. Architecture mono-fenêtre (v4.0)
 
+Les sous-sections **4.1** à **4.11** suivent une lecture « produit » : navigation et panneaux, détail du panneau Antivirus, menaces et pipeline, options techniques (MAJ, exclusions, quarantaine, logs), exports, puis contenu de la vue d’ensemble.
+
 ### 4.1 Les 5 panneaux de MainWindow
 
 Les vues sont empilées dans un seul `Grid` (`MainWindow.xaml`) : une seule est `Visible`, les autres `Collapsed`. La navigation passe par `NavigationService.NavigateTo("…")` (clés insensibles à la casse), enregistrées dans `MainWindow.RegisterPanels()`.
 
 | Clé `NavigateTo` | Panneau | Contrôle | Rôle principal |
 |---|---|---|---|
-| `Overview` | Vue d'ensemble | `OverviewControl` | Cartes d'action, graphique illustratif, recommandations, état ClamAV/YARA et versions |
+| `Overview` | Vue d'ensemble | `OverviewControl` | Cartes d'action, statistiques 30 j., recommandations dynamiques, état ClamAV/YARA et signatures |
+| `Antivirus` | Antivirus | `AntivirusView` | Scans ; onglets **Analyse en cours** / **Quarantaine** / **Historique** / **Signatures** (`ScanViewModel`) |
 | `Clean` | Nettoyer | `CleanControl` | Analyse / suppression des fichiers temporaires et caches (ex. Brave, journaux Windows) |
-| `Antivirus` | Antivirus | `AntivirusView` | Scans, onglets Scan / Quarantaine / Historique / Signatures (`ScanViewModel`) |
-| `History` | Historique | `HistoryControl` | Liste des sessions enregistrées |
-| `Options` | Options | `OptionsControl` | Démarrage Windows, notifications, MAJ auto signatures+règles, cases antivirus (RTP / quarantaine auto — UI présente, branchement incomplet), exclusions |
+| `History` | Historique | `HistoryControl` | Sessions de scan et nettoyages ; export rapport **HTML** / **PDF** (dernier scan) |
+| `Options` | Options | `OptionsControl` | Démarrage Windows, MAJ auto signatures + règles, protection temps réel, quarantaine auto, **planification** (`schtasks`), exclusions |
 
-Raccourcis clavier : `Ctrl+1` … `Ctrl+5` (`KeyboardShortcuts`) mappés sur cet ordre : Overview, Clean, Antivirus, History, Options.
+Raccourcis clavier : `Ctrl+1` … `Ctrl+5` (`KeyboardShortcuts`) — ordre des panneaux : **Vue d’ensemble**, **Antivirus**, **Nettoyer**, **Historique**, **Options**.
 
 ### 4.2 Fenêtre principale et icône
 
@@ -200,10 +222,10 @@ L'interface v4.0 repose sur la fenêtre principale (`MainWindow`) et la barre la
 Panneau divisé en deux colonnes :
 - **Colonne gauche (210px)** : boutons de scan + statistiques en temps réel
 - **Colonne droite** : TabControl avec 4 onglets :
-  - **Scan en cours** — progression, liste des menaces, actions par menace, quarantaine globale
-  - **Quarantaine** — fichiers mis en quarantaine, restauration/suppression unitaire
-  - **Historique** — tous les scans enregistrés (horodatés)
-  - **Signatures** — version base ClamAV, MAJ manuelle, logs freshclam
+  - **Analyse en cours** — progression, fichier courant, liste des menaces, actions par menace, quarantaine groupée
+  - **Quarantaine** — entrées paginées, restauration / suppression, purge
+  - **Historique** — sessions enregistrées (aperçu dans ce panneau ; détail complet dans le menu **Historique**)
+  - **Signatures** — version de la base ClamAV, mise à jour manuelle, journaux freshclam / règles
 
 ### 4.4 Nettoyer une menace détectée
 
@@ -252,37 +274,53 @@ Configurable depuis **Options → EXCLUSIONS**.
 
 ### 4.8 QuarantineManager — sécurité des fichiers infectés
 
-Les fichiers en quarantaine sont chiffrés en **AES-256-GCM** (format binaire `OPTQ` v2, nonce + tag d’authentification). L’ancien format **XOR 0x5A** (v1) reste pris en charge en **lecture seule** pour migration.
+Les fichiers en quarantaine sont stockés en **AES-256-GCM** (format binaire `OPTQ`, nonce et tag d’authentification).
 
-- Clé maîtresse 256 bits, stockée chiffrée **DPAPI CurrentUser** (fichier `.key` à côté du manifeste).
+- Clé maîtresse 256 bits, **DPAPI CurrentUser** (fichier `.key`).
 - Manifeste `manifest.json` signé **HMAC-SHA256** (intégrité).
 
-Stockage : `%LOCALAPPDATA%\optiSCAN\Quarantine\` — fichiers `{guid}.quar` + `manifest.json`.
+Stockage : `%LOCALAPPDATA%\optiSCAN\Quarantine\` — `{guid}.quar` + `manifest.json`.
 
 ### 4.9 ScanLogManager — persistance
 
 - Historique : `%LOCALAPPDATA%\optiSCAN\Logs\scan_history.json` (100 entrées max)
 - Journal : `%LOCALAPPDATA%\optiSCAN\Logs\optiSCAN.log`
 
+### 4.10 Exports PDF et HTML
+
+- **PDF** — `PdfReportGenerator` (QuestPDF) : rapport A4 (résumé, évaluation de risque si menaces, tableau des menaces, pied de page). Sortie typique : `%LOCALAPPDATA%\optiSCAN\Reports\SCAN_{Type}_{yyyyMMdd_HHmmss}.pdf` (`GenerateAndSave`).
+- **HTML** — `HtmlExportService` : rapport depuis l’onglet **Historique** (sessions, quarantaine, préférences), enregistrement au chemin choisi par l’utilisateur.
+
+### 4.11 Vue d'ensemble (dashboard)
+
+Le panneau **Vue d'ensemble** (`OverviewControl`, clé `Overview`) regroupe :
+
+- **Bannière** : état de protection (ClamAV / YARA / signatures) et libellé principal, rafraîchi au chargement et après les mises à jour.
+- **Quatre cartes d'action** : Nettoyer, Antivirus, Historique, mise à jour des signatures (navigation via `ServiceContainer` / `INavigationService`).
+- **Trois colonnes** sous les cartes :
+  - **Statistiques de protection** : synthèse textuelle sur **30 jours** (analyses, fichiers parcourus, menaces) à partir de l’historique persisté ; horodatage de dernière actualisation.
+  - **Recommandations** : trois encarts (signatures / hygiène disque / activité analyses) mis à jour dynamiquement selon l’état réel des moteurs, du nettoyage et de l’historique.
+  - **Cartes d'information** : état ClamAV et nombre de règles YARA, dernière analyse, résumé des versions de signatures (ClamAV + pack YARA).
+
 ---
 
-## 5. Services avancés
+## 5. Services avancés (modules complémentaires)
 
-> **Transparence code / README** — Les sections ci-dessous décrivent des **modules présents dans le dépôt**. Lorsque l’intégration UI ou le pipeline de scan n’est pas encore branché, c’est indiqué explicitement.
+> **Note** — **ClamDaemon** (TCP clamd) est présent dans le code mais **n’alimente pas** le pipeline de scan interactif (`clamscan` par défaut). Les autres blocs correspondent au comportement actuel de l’application.
 
-### 5.1 ClamDaemon — mode démon TCP (code prêt, non branché au pipeline)
+### ClamDaemon — mode démon TCP (code prêt, non branché au pipeline)
 
 `ClamDaemon.cs` implémente démarrage de `clamd.exe`, génération de `clamd.conf`, connexion **TCP 127.0.0.1:3310** et commandes `SCAN` / statistiques, avec garde-fous (vérification du PID à l’écoute). **Les scans utilisateur passent aujourd’hui uniquement par `clamscan.exe`** (`ClamAvEngine`) ; l’activation « Utiliser clamd » dans l’UI n’est pas câblée.
 
-### 5.2 RealTimeProtection — surveillance temps réel (implémenté, non branché)
+### RealTimeProtection — surveillance temps réel
 
-`RealTimeProtection.cs` décrit la surveillance `FileSystemWatcher` (dossiers utilisateur / `ProgramData` / `Temp`, extensions dangereuses), délai de stabilisation, déduplication et **SemaphoreSlim(3)**. La classe n’est **pas encore instanciée** depuis `ServiceContainer` ou `MainWindow` ; la case **Protection temps réel** dans Options n’appelle pas ce service (branchement à compléter).
+`RealTimeProtection.cs` : `FileSystemWatcher` sur dossiers sensibles (profil utilisateur, `ProgramData`, `Temp`, etc.), filtre sur extensions à risque, délai de stabilisation, déduplication et **SemaphoreSlim(3)** parallèle. Une instance est créée dans **`ServiceContainer`** ; **Options** active ou coupe la surveillance et persiste le réglage. Les menaces détectées remontent vers l’UI (badge / liste) via événements consommés par **`MainWindow`**.
 
-### 5.3 ScheduledScanService — tâche planifiée Windows (API prête)
+### ScheduledScanService — tâche planifiée Windows
 
-`ScheduledScanService.cs` enveloppe **`schtasks.exe`** (`/Create`, `/Delete`, `/Query`, `/Run`) pour la tâche **`optiSCAN_DailyScan`** (`optiSCAN.exe --fullscan --quiet`, `/RL HIGHEST`, quotidien à 02:00 par défaut). **Aucun écran Options ne crée encore la tâche** ; en revanche `App.xaml.cs` gère bien `--fullscan` / `--quickscan` / `--quiet` en **mode headless** pour l’automatisation ou une tâche créée manuellement.
+`ScheduledScanService.cs` enveloppe **`schtasks.exe`** (`/Create`, `/Delete`, `/Query`, `/Run`) pour la tâche **`optiSCAN_DailyScan`** (`optiSCAN.exe --fullscan --quiet`, **`/RL LIMITED`**, quotidien à **02:00** par défaut). La case **Planifier une analyse quotidienne** dans **Options** crée ou supprime cette tâche. **`App.xaml.cs`** gère `--fullscan` / `--quickscan` / `--quiet` en **mode headless** (y compris quarantaine auto si l’option est activée).
 
-### 5.4 NotificationService — toasts Windows natifs
+### NotificationService — toasts Windows natifs
 
 `NotificationService.cs` utilise `Microsoft.Toolkit.Uwp.Notifications` pour envoyer des toasts système Windows :
 
@@ -294,7 +332,7 @@ Stockage : `%LOCALAPPDATA%\optiSCAN\Quarantine\` — fichiers `{guid}.quar` + `m
 | `ShowUpdateAvailable(version)` | Nouvelle mise à jour disponible |
 | `ShowRealTimeProtectionStarted()` | Confirmation d'activation de la RTP |
 
-### 5.5 RiskScoringService — score de risque par menace
+### RiskScoringService — score de risque par menace
 
 `RiskScoringService.cs` attribue un score numérique (0–100+) à chaque menace selon trois critères cumulatifs :
 
@@ -331,34 +369,9 @@ Stockage : `%LOCALAPPDATA%\optiSCAN\Quarantine\` — fichiers `{guid}.quar` + `m
 | ≥ 25 | MINEUR | `#F1C40F` | Surveillance ou quarantaine préventive |
 | < 25 | INFORMATIONNEL | `#27AE60` | Aucune action immédiate |
 
-### 5.6 PdfReportGenerator — rapport PDF
-
-`PdfReportGenerator.cs` utilise **QuestPDF** (licence Community) pour générer un rapport A4 en PDF :
-
-- En-tête : titre « optiSCAN », date, version
-- Bloc résumé : fichiers scannés, menaces, durée
-- Bloc évaluation risque (si menace critique détectée)
-- Tableau des menaces : nom du fichier, virus, moteur, horodatage
-- Pied de page : numéros de page
-
-Sortie : `%LOCALAPPDATA%\optiSCAN\Reports\optiSCAN_Report_YYYYMMDD_HHmmss.pdf`
-
 ---
 
-## 6. Dashboard Vue d'ensemble
-
-Le panneau **Vue d'ensemble** (`OverviewControl`, entrée de menu **Vue d'ensemble**) comprend notamment :
-
-- **Bannière** : message de protection et état des définitions.
-- **Quatre cartes d'action** : raccourcis vers Nettoyer, Antivirus, Historique et la mise à jour des signatures.
-- **Trois colonnes** sous les cartes :
-  - **Statistiques de Protection** : graphique décoratif (polylignes statiques sur `Canvas`) avec légende « Menaces / Scans » — illustration visuelle, pas un historique dynamique branché sur les données réelles.
-  - **Recommandations d'Action** : encarts d'état (ex. système à jour, nettoyage conseillé).
-  - **Cartes d'information** : état ClamAV / YARA, dernière analyse, versions des signatures ClamAV et du pack YARA (alimentées par `MainWindow` / `ScanViewModel`).
-
----
-
-## 7. Workflow utilisateur optiSCAN v4.0
+## 6. Workflow utilisateur optiSCAN v4.0
 
 ```
 DÉMARRAGE (UI)
@@ -368,13 +381,14 @@ DÉMARRAGE (UI)
     ├─→ `MainWindow` + `ServiceContainer.Default` (services partagés : ClamAV, YARA, orchestrateur, MAJ, quarantaine, logs, notifications, `AntivirusActions`)
     ├─→ Minuteries MAJ : freshclam **4 h**, règles YARA **24 h** (désactivables via Options)
     ├─→ `ScanViewModel.InitializeAsync` : versions, base, YARA, historique, quarantaine
-    └─→ Fenêtre principale — pas d’icône zone de notification dédiée
+    ├─→ Protection temps réel : état selon **Options** (`ServiceContainer.RealTimeProtection`)
+    └─→ Fenêtre principale — pas d’icône dédiée dans la zone de notification (réduction = fenêtre masquée)
             │
-            ├─→ [VUE D'ENSEMBLE] — cartes d’action, graphique illustratif, recommandations, état antivirus / signatures
+            ├─→ [VUE D'ENSEMBLE] — cartes d’action, statistiques 30 j., recommandations dynamiques, état antivirus / signatures
             ├─→ [NETTOYER] — analyse et suppression des temporaires (avec confirmation)
-            ├─→ [ANTIVIRUS] — scans rapide/complet/dossier/fichier, quarantaine, PDF, signatures
-            ├─→ [HISTORIQUE] — sessions enregistrées
-            └─→ [OPTIONS] — démarrage auto, notifications, MAJ auto, exclusions ; cases RTP / quarantaine auto (UI, câblage partiel)
+            ├─→ [ANTIVIRUS] — scans rapide/complet/dossier/fichier, quarantaine, historique de session, signatures
+            ├─→ [HISTORIQUE] — sessions enregistrées ; exports **HTML** / **PDF**
+            └─→ [OPTIONS] — démarrage auto, MAJ auto, RTP, quarantaine auto, planification, exclusions
 
 DÉMARRAGE (ligne de commande)
     `--fullscan` / `--quickscan` [+ `--quiet` ] → `App.RunHeadlessAsync` : orchestrateur, journal, quarantaine auto si `ExclusionSettings.Current.AutoQuarantineEnabled`, notification fin si menaces et non quiet.
@@ -382,36 +396,33 @@ DÉMARRAGE (ligne de commande)
 
 ---
 
-## 8. Bonnes pratiques
+## 7. Bonnes pratiques
 
-### 8.1 Permissions et droits
+### Permissions et droits
 
-```xml
-<!-- app.manifest — OBLIGATOIRE pour scanner C:\Windows -->
-<requestedExecutionLevel level="requireAdministrator" uiAccess="false"/>
-```
+L’application est publiée en **`asInvoker`** (`app.manifest`) : exécution avec les droits de l’utilisateur connecté. Les opérations sur chemins protégés (ex. analyse large sous `C:\Windows`) peuvent demander une **élévation UAC ponctuelle** (`ElevationHelper`) plutôt qu’un administrateur permanent.
 
-### 8.2 Performance
+### Performance
 
 | Technique | Impact |
 |---|---|
 | Mode clamd (TCP daemon) | ✅ Gain théorique majeur — **module présent, non utilisé par le pipeline actuel** |
 | Pipeline parallèle (Task.WhenAll) | ✅ ClamAV + YARA simultanés sur chaque cible |
 | Règles pré-compilées (_compiled.yarc) | ✅ Scan comportemental accéléré |
-| SemaphoreSlim(3) RTP | ✅ Prévu dans `RealTimeProtection` (non branché) |
+| SemaphoreSlim(3) RTP | ✅ `RealTimeProtection` (activable depuis Options) |
 | Scan rapide limité aux dossiers critiques | ✅ `ScanTargets.QuickScanTargets()` |
 | ExclusionSettings.Current (singleton lazy) | ✅ Pas de rechargement JSON par fichier |
 | ServiceContainer (singleton services) | ✅ Une instance ClamAV/YARA/orchestrateur pour toute l’app |
 | ThemeManager + UserPreferences | ✅ Bascule de thème sans redémarrage |
 
-### 8.3 Faux positifs
+### Faux positifs
 
 - `SuspiciousDownloads` exclue par défaut (trop agressive sur le dossier Downloads)
 - Ne jamais supprimer automatiquement — toujours mettre en quarantaine en premier
 - L'utilisateur confirme avant toute action destructrice (boîte de dialogue `MessageBoxButton.YesNo`)
 - Le test EICAR est géré normalement par ClamAV (aucun traitement spécial dans le scoring)
 
-### 8.4 Exclusion Windows Defender
+### Exclusion Windows Defender
 
 ```powershell
 Add-MpPreference -ExclusionPath "C:\Program Files\optiSCAN\clamav\database"
@@ -419,19 +430,32 @@ Add-MpPreference -ExclusionPath "C:\Program Files\optiSCAN\clamav\database"
 
 ---
 
-## 9. Packaging final (v4.0)
+## 8. Packaging final (v4.0)
+
+Exécuter depuis la **racine du dépôt** (dossier contenant `optiSCAN.sln`). La sortie du profil **FolderProfile** est `optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\` (chemin attendu par `installer\setup.iss`).
+
+**Étape A — publication .NET**
 
 ```powershell
-# 1. À la racine du dépôt (dossier contenant optiSCAN.sln)
-dotnet publish .\optiSCAN\optiSCAN.csproj -c Release -r win-x64 --self-contained false -o .\build\app
-
-# 2. Première base ClamAV (exemple)
-.\build\app\clamav\x64\freshclam.exe --datadir=".\build\app\clamav\x64\database"
-
-# 3. Inno Setup
-& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" .\installer\setup.iss
-# → installer\output\optiSCAN_Setup_v4.0.0.exe (voir #define AppVersion dans setup.iss)
+dotnet publish .\optiSCAN\optiSCAN.csproj -c Release /p:PublishProfile=FolderProfile
 ```
+
+**Étape B — première base ClamAV** (adapter `$pub` si vous publiez ailleurs)
+
+```powershell
+$pub = ".\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64"
+& "$pub\clamav\x64\freshclam.exe" --datadir="$pub\clamav\x64\database"
+```
+
+**Étape C — compilateur Inno Setup**
+
+```powershell
+& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" .\installer\setup.iss
+```
+
+Sortie typique : `installer\output\optiSCAN_Setup_v4.0.0.exe` (versions dans `#define` de `setup.iss`).
+
+**Variante** : `dotnet publish ... -c Release -r win-x64 -o <dossier>` avec le même dossier que **`PublishDir`** du profil **FolderProfile**, pour que **`setup.iss`** trouve `optiSCAN.exe`.
 
 **Contenu de l'installateur (~260 Mo avec signatures initiales) :**
 
@@ -447,7 +471,7 @@ optiSCAN_Setup_v4.0.0.exe
 
 ---
 
-## 10. Dépendances et licences
+## 9. Dépendances et licences
 
 | Composant | Version | Licence | Notes |
 |---|---|---|---|
@@ -463,15 +487,19 @@ optiSCAN_Setup_v4.0.0.exe
 
 ---
 
-## 11. Historique des versions
+## 10. Historique des versions produit
 
 ### v4.0 — Version majeure (alignement produit)
 
-- **Versioning unifié** — même convention que les releases précédentes : nom **v4.0** + build **4.0.0** (`Directory.Build.props`, Inno `AppVersion` / `AppRelease`, CLUF **LICENSE.txt**, manifeste, rapports PDF/HTML, User-Agent réseau)
-- **Interface d’analyse** — bannière « analyse en cours », progression, fichier courant (ClamAV / YARA / agrégateur multi-cibles)
-- **Vue d’ensemble** — retrait du graphique décoratif trompeur ; textes et recommandations alignés sur l’état réel
-- **Dernière analyse** — rafraîchissement depuis l’historique après scan et au chargement
-- **Français** — ton et libellés (crédits Dona By, statuts, options) harmonisés
+- **Versioning unifié** — nom **v4.0** + build **4.0.0** (`Directory.Build.props`, Inno Setup, **LICENSE.txt**, manifeste, rapports PDF/HTML)
+- **Interface d’analyse** — progression, fichier courant, fusion ClamAV + YARA (`ScanOrchestrator`)
+- **Vue d’ensemble** — statistiques sur 30 jours, recommandations et bannière de protection **branchées** sur les services et l’historique
+- **Options** — temps réel, quarantaine auto, MAJ signatures, planification `schtasks`, exclusions et démarrage Windows reliés au stockage et au **`ServiceContainer`**
+- **Historique** — export rapport **HTML** (aperçu complet) et **PDF** (dernière session enregistrée)
+- **Quarantaine** — format stockage **AES-256-GCM** (`OPTQ`) ; alignement silencieux des fichiers au format attendu au démarrage
+- **Instance unique** — seconde exécution : **IPC** (`IpcManager`, WM_SHOWME) pour réafficher la fenêtre existante
+- **Manifeste** — **`asInvoker`** + élévation ponctuelle (`ElevationHelper`) pour réduire la surface d’attaque
+- **Français** — libellés et documentation alignés sur le comportement réel de l’application
 
 ### v3.0 — Donaby Design System + Stabilisation
 
@@ -481,7 +509,7 @@ optiSCAN_Setup_v4.0.0.exe
 - **CleanControl** — support complet `chkBrave` (cache Brave Browser) et `chkLogs` (journaux Windows) dans analyse et nettoyage
 - **FreshclamUpdater** — `EnsureConfExists()` : résolution automatique du conf manquant (`x64\` → parent → `x86` → génération) ; `ResolveDbDir()` : résolution intelligente du dossier de base de données selon la hiérarchie clamav
 - ✅ Correction CS0104 `CheckBox`/`Button` ambiguous — aliases `WpfCheckBox`/`WpfButton` dans `OptionsControl.xaml.cs`
-- ✅ **README aligné code** — navigation `NavigationService`, quarantaine AES-GCM, pipeline clamscan+YARA, état d’intégration clamd/RTP/planificateur, workflow et packaging
+- ✅ **README aligné code** — navigation, quarantaine AES-GCM, pipeline clamscan + YARA, RTP / planificateur / packaging
 - ✅ **MAJ auto** — `ServiceContainer` arme freshclam (4 h) + YARA-Forge (24 h) ; Options coupe/réactive les deux
 
 ### v2.0 — Phase 2 : Services Avancés + Donaby Design
@@ -492,17 +520,17 @@ optiSCAN_Setup_v4.0.0.exe
 - Correction affichage **version signatures ClamAV** (regex `ClamAV-VDB:[^:]+:(\d+):`)
 - Mode démon **clamd** (TCP 3310) — scan sans rechargement signatures
 - **Protection en temps réel** (FileSystemWatcher, 3 workers simultanés)
-- **Tâche planifiée Windows** — API `schtasks` (`ScheduledScanService`), création UI à venir ; headless `--fullscan` opérationnel
+- **Tâche planifiée Windows** — API `schtasks` (`ScheduledScanService`) ; case **Options** + headless `--fullscan` opérationnel
 - **Notifications toast** Windows natives (`Microsoft.Toolkit.Uwp.Notifications`)
 - **Score de risque** (`RiskScoringService`) — CRITIQUE / MAJEUR / MINEUR / INFORMATIONNEL
 - **Rapport PDF** (`PdfReportGenerator`, QuestPDF Community)
-- **Vue d'ensemble** — cartes d'action, graphique illustratif, recommandations, état antivirus (sans jauges CPU matérielles dans l'UI actuelle)
+- **Vue d'ensemble** — cartes d'action, encarts d'état / recommandations (évolution continue selon les versions)
 
 ### v1.0 — Phase 1 : Fondations
 
 - Scanner ClamAV (rapide / complet / dossier / fichier)
 - Moteur YARA comportemental + règles YARA-Forge
-- Quarantaine XOR (`.quar` + `manifest.json`)
+- Quarantaine locale chiffrée (`.quar` + `manifest.json`)
 - Historique des scans (JSON, 100 entrées)
 - Mise à jour automatique signatures (4 h) et règles (24 h)
 - Système d'exclusions (dossiers + règles)
@@ -510,7 +538,7 @@ optiSCAN_Setup_v4.0.0.exe
 
 ---
 
-## 👤 Crédits
+## 11. Crédits
 
-Développé par **© 2026 Donatien Byakombe**
+Développé par **© 2026 Donatien Byakombe**  
 Design system : **Donaby Design**

@@ -31,9 +31,7 @@ namespace optiSCAN.Views
 
         private void BtnOpenAntivirus_Click(object sender, RoutedEventArgs e)
         {
-            // Audit A2 : navigation via le service exposé par le container,
-            // plus de cast vers MainWindow. Cette vue compile et fonctionne
-            // indépendamment du host (testable, design-time).
+            // Navigation via le container (INavigationService), sans référencer MainWindow.
             Services.ServiceContainer.Default.Navigation?.NavigateTo("Antivirus");
         }
 

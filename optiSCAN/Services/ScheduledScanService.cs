@@ -53,7 +53,7 @@ namespace optiSCAN.Services
                 psi.ArgumentList.Add("DAILY");
                 psi.ArgumentList.Add("/ST");
                 psi.ArgumentList.Add(startTime);
-                // Audit S1 : moindre privilège — /RL LIMITED évite d'exécuter la tâche
+                // Moindre privilège : /RL LIMITED évite d'exécuter la tâche
                 // avec le niveau « le plus élevé » du compte utilisateur (HIGHEST).
                 // Si un scan planifié doit accéder à des chemins protégés, préférer
                 // une élévation ponctuelle (ElevationHelper) plutôt qu'une tâche HIGHEST.

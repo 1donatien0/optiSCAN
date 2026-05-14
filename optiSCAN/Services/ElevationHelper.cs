@@ -6,7 +6,7 @@ using System.Security.Principal;
 namespace optiSCAN.Services
 {
     /// <summary>
-    /// Audit S5 (mitigation) : helpers pour l'élévation UAC à la demande.
+    /// Helpers pour une élévation UAC ponctuelle lorsque l'opération le requiert.
     ///
     /// Avant cette session, optiSCAN tournait en administrateur en permanence
     /// (manifest requireAdministrator). Toute faille → escalade SYSTEM directe.

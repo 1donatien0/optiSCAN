@@ -15,8 +15,7 @@ namespace optiSCAN.Services
         private readonly ConcurrentDictionary<string, DateTime> _recentlyScanned;
         private readonly List<FileSystemWatcher> _watchers;
         private readonly SemaphoreSlim _scanSemaphore;
-        // Audit R14 : timer dédié pour le nettoyage périodique du cache, garantit
-        // la libération même quand FileSystemWatcher reste silencieux.
+        // Timer dédié au nettoyage périodique du cache, même si le watcher ne reçoit pas d'événements.
         private System.Threading.Timer? _cacheCleanupTimer;
         private bool _isEnabled;
         private bool _disposed;
@@ -70,8 +69,7 @@ namespace optiSCAN.Services
 
             // Cleanup périodique du cache : toutes les 5 min, on supprime les
             // entrées de plus de 5 min. Indépendant de l'arrivée d'événements,
-            // ce qui évite la croissance silencieuse du cache si la machine
-            // reste idle (audit R14).
+            // ce qui évite la croissance silencieuse du cache si la machine reste inactive.
             _cacheCleanupTimer = new System.Threading.Timer(
                 _ => { try { CleanupRecentCache(); } catch { /* swallow */ } },
                 state: null,

@@ -9,7 +9,7 @@ namespace optiSCAN.Services
     /// <summary>
     /// Persistance JSON sécurisée :
     ///   - Sérialisation JSON
-    ///   - HMAC-SHA256 sur le contenu (clé aléatoire 256 bits protégée par DPAPI — audit S2)
+    ///   - HMAC-SHA256 sur le contenu (clé aléatoire 256 bits protégée par DPAPI)
     ///   - Chiffrement DPAPI (CurrentUser scope) sur le tout
     ///
     /// Format du fichier :
@@ -208,7 +208,7 @@ namespace optiSCAN.Services
             }
         }
 
-        /// <summary>Clé aléatoire 256 bits persistée sous DPAPI (audit S2).</summary>
+        /// <summary>Clé aléatoire 256 bits persistée sous DPAPI.</summary>
         private static byte[] GetOrCreateDpapiHmacKeyMaterial()
         {
             var existing = TryLoadDpapiHmacKey();

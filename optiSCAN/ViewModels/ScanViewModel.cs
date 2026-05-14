@@ -215,7 +215,7 @@ namespace optiSCAN.ViewModels
         public ObservableCollection<ScanSession> History { get; } = new();
         public ObservableCollection<QuarantineEntry> QuarantineEntries { get; } = new();
 
-        /// <summary>Taille d'une page chargée depuis <see cref="QuarantineManager.GetEntriesPaged"/> (audit P4).</summary>
+        /// <summary>Taille d'une page chargée depuis <see cref="QuarantineManager.GetEntriesPaged"/>.</summary>
         private const int QuarantinePageSize = 200;
 
         private int _quarantineTotalCount;
@@ -267,10 +267,8 @@ namespace optiSCAN.ViewModels
 
         // ── Constructeur ─────────────────────────────────────────────────────────
 
-        // Constructeur sans paramètre : résout depuis le container global pour
-        // partager les services avec MainWindow (cf. audit A1 — fini la double
-        // instanciation). Le constructeur paramétré ci-dessous reste disponible
-        // pour les tests unitaires ou la substitution.
+        // Sans paramètre : utilise ServiceContainer.Default (mêmes services que MainWindow).
+        // Le constructeur avec injection de container reste pour les tests ou scénarios avancés.
         public ScanViewModel() : this(ServiceContainer.Default) { }
 
         public ScanViewModel(ServiceContainer container)

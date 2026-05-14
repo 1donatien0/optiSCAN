@@ -206,9 +206,8 @@ namespace optiSCAN.Views
 
             if (target == null) return;
 
-            // Audit A2 : navigation + déclenchement via ServiceContainer plutôt
-            // que cast vers MainWindow. Cette vue est ainsi testable et
-            // utilisable en design-time.
+            // Navigation et actions via ServiceContainer (pas de cast vers MainWindow) :
+            // la vue reste utilisable en design-time et dans les tests.
             var container = Services.ServiceContainer.Default;
 
             if (target == "Update")

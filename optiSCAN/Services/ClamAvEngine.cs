@@ -141,7 +141,7 @@ namespace optiSCAN.Services
             IProgress<ScanProgress>? progress = null,
             CancellationToken ct = default)
         {
-            // Source unique : ScanTargets (cf. A4 audit)
+            // Chemins du scan rapide : classe ScanTargets (liste centralisée).
             return await RunMultiTargetScanAsync(ScanType.QuickScan, ScanTargets.QuickScanTargets(), progress, ct);
         }
 
@@ -257,6 +257,9 @@ namespace optiSCAN.Services
             {
                 var filePath = infectedMatch.Groups[1].Value.Trim();
                 var virusName = infectedMatch.Groups[2].Value.Trim();
+
+                if (ExclusionSettings.Current.IsFileExcluded(filePath))
+                    return;
 
                 long fileSize = -1;
                 try { fileSize = new FileInfo(filePath).Length; } catch { }
