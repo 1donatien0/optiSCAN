@@ -14,6 +14,8 @@
         <Grid.Resources>
             <BooleanToVisibilityConverter x:Key="BoolToVis"/>
             <c:PositiveIntToVisibilityConverter x:Key="PosIntVis"/>
+            <c:ThreatRiskSeverityConverter x:Key="ThreatRiskSeverity"/>
+            <c:ThreatRiskColorConverter x:Key="ThreatRiskColor"/>
         </Grid.Resources>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="240"/>
@@ -101,6 +103,30 @@
                             </Grid>
 
                             <Separator Background="{DynamicResource BorderColor}" Margin="0,6"/>
+
+                            <TextBlock Text="CIBLES RÉCENTES" Foreground="{DynamicResource AlertGold}"
+                                       FontFamily="Segoe UI" FontSize="10"
+                                       FontWeight="Bold" Margin="0,4,0,6"/>
+                            <ListBox ItemsSource="{Binding RecentTargets}"
+                                     MaxHeight="110" Margin="0,0,0,8"
+                                     BorderBrush="{DynamicResource BorderColor}"
+                                     BorderThickness="1"
+                                     Background="{DynamicResource SurfaceBg}">
+                                <ListBox.ItemTemplate>
+                                    <DataTemplate>
+                                        <Button Command="{Binding DataContext.ScanRecentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                CommandParameter="{Binding}"
+                                                HorizontalContentAlignment="Left"
+                                                Padding="6,4" Margin="0,1"
+                                                Background="Transparent" BorderThickness="0"
+                                                Cursor="Hand" ToolTip="{Binding Path}">
+                                            <TextBlock Text="{Binding ListLabel}" FontSize="10"
+                                                       Foreground="{DynamicResource TextDark}"
+                                                       TextTrimming="CharacterEllipsis"/>
+                                        </Button>
+                                    </DataTemplate>
+                                </ListBox.ItemTemplate>
+                            </ListBox>
 
                             <Button x:Name="btnStopScan" Style="{StaticResource DangerButton}"
                                     Command="{Binding StopScanCommand}" IsEnabled="{Binding CanStop}" HorizontalAlignment="Stretch">
@@ -335,6 +361,18 @@
                                           ColumnHeaderStyle="{StaticResource DgHeader}"
                                           RowStyle="{StaticResource DgRow}">
                                     <DataGrid.Columns>
+                                        <DataGridTemplateColumn Header="Risque" Width="95">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Border CornerRadius="4" Padding="6,2" Margin="2,0"
+                                                            Background="{Binding Converter={StaticResource ThreatRiskColor}}">
+                                                        <TextBlock Text="{Binding Converter={StaticResource ThreatRiskSeverity}}"
+                                                                   FontSize="10" FontWeight="Bold"
+                                                                   Foreground="White" HorizontalAlignment="Center"/>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
                                         <DataGridTextColumn Header="Fichier" Binding="{Binding FileName}" Width="130"/>
                                         <DataGridTextColumn Header="Menace" Binding="{Binding VirusName}" Width="*"/>
                                         <DataGridTextColumn Header="Source" Binding="{Binding DetectedBy}" Width="70"/>

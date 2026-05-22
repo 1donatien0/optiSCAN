@@ -4,25 +4,49 @@ using System.Linq;
 
 namespace optiSCAN.Services
 {
+    /// <summary>
+    /// Coordonne les moteurs ClamAV et YARA pour produire un <see cref="ScanResult"/> unifié.
+    /// Lance les deux moteurs en parallèle (<see cref="Task.WhenAll"/>) puis fusionne leurs
+    /// résultats en déduplicant les menaces détectées par les deux.
+    /// </summary>
+    /// <remarks>
+    /// YaraParallelism retiré : depuis le passage en single-process (un seul
+    /// yara64.exe avec --recursive), YARA gère lui-même son parallélisme
+    /// interne et l'orchestration n'a plus à le faire.
+    /// </remarks>
     public class ScanOrchestrator
     {
         private readonly ClamAvEngine _clamAv;
         private readonly YaraEngine _yara;
 
-        // YaraParallelism retiré : depuis le passage en single-process (un seul
-        // yara64.exe avec --recursive), yara gère lui-même son parallélisme
-        // interne et l'orchestration n'a plus à le faire.
+        // ── État ─────────────────────────────────────────────────────────────────
 
+        /// <summary><c>true</c> si clamscan.exe est détecté et opérationnel.</summary>
         public bool IsClamAvAvailable => _clamAv.IsClamAvInstalled();
+
+        /// <summary><c>true</c> si le moteur YARA est disponible et possède des règles compilées.</summary>
         public bool IsYaraAvailable => _yara.IsAvailable;
+
+        /// <summary>Nombre de règles YARA actuellement chargées.</summary>
         public int YaraRulesCount => _yara.RulesCount;
 
+        // ── Construction ─────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Crée un orchestrateur avec les moteurs fournis (ou de nouveaux si <c>null</c>).
+        /// </summary>
         public ScanOrchestrator(ClamAvEngine? clamAv = null, YaraEngine? yara = null)
         {
             _clamAv = clamAv ?? new ClamAvEngine();
             _yara = yara ?? new YaraEngine();
         }
 
+        // ── API publique ─────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Analyse un fichier unique avec ClamAV et YARA en parallèle.
+        /// Retourne immédiatement un résultat vide si le fichier est dans les exclusions.
+        /// </summary>
         public Task<ScanResult> ScanFileAsync(string filePath, IProgress<ScanProgress>? progress = null, CancellationToken ct = default)
         {
             if (ExclusionSettings.Current.IsFileExcluded(filePath))
@@ -40,15 +64,24 @@ namespace optiSCAN.Services
             return RunPipelineAsync(ScanType.File, filePath, false, progress, ct);
         }
 
+        /// <summary>Analyse récursivement un dossier avec ClamAV et YARA en parallèle.</summary>
         public Task<ScanResult> ScanFolderAsync(string folderPath, IProgress<ScanProgress>? progress = null, CancellationToken ct = default)
             => RunPipelineAsync(ScanType.Folder, folderPath, true, progress, ct);
 
+        /// <summary>Analyse rapide sur les dossiers système prioritaires (voir <see cref="ScanTargets"/>).</summary>
         public Task<ScanResult> QuickScanAsync(IProgress<ScanProgress>? progress = null, CancellationToken ct = default)
             => RunMultiTargetPipelineAsync(ScanType.QuickScan, ScanTargets.QuickScanTargets(), progress, ct);
 
+        /// <summary>Analyse complète sur l'ensemble des cibles définies dans <see cref="ScanTargets"/>.</summary>
         public Task<ScanResult> FullScanAsync(IProgress<ScanProgress>? progress = null, CancellationToken ct = default)
             => RunMultiTargetPipelineAsync(ScanType.FullScan, ScanTargets.FullScanTargets(), progress, ct);
 
+        // ── Pipeline interne ─────────────────────────────────────────────────────
+
+        /// <summary>
+        /// Exécute ClamAV et YARA en parallèle sur une cible unique, puis fusionne les résultats.
+        /// Les dossiers appartenant au répertoire d'installation sont automatiquement exclus.
+        /// </summary>
         private async Task<ScanResult> RunPipelineAsync(ScanType type, string target, bool recursive, IProgress<ScanProgress>? progress, CancellationToken ct)
         {
             if (recursive && AppInstallPaths.IsUnderInstallRoot(target))
@@ -92,6 +125,7 @@ namespace optiSCAN.Services
             return MergeResults(type, target, await clamTask, await yaraTask);
         }
 
+        /// <summary>Délègue l'agrégation multi-cibles à <see cref="MultiTargetScanAggregator"/>.</summary>
         private Task<ScanResult> RunMultiTargetPipelineAsync(ScanType type, List<string> targets, IProgress<ScanProgress>? progress, CancellationToken ct) =>
             MultiTargetScanAggregator.AggregateAsync(
                 type,
@@ -102,6 +136,9 @@ namespace optiSCAN.Services
                 skipIfDirectoryMissing: true,
                 reportTargetProgress: true);
 
+        // ── YARA helpers ─────────────────────────────────────────────────────────
+
+        /// <summary>Exécute YARA sur un fichier unique et convertit les matchs en <see cref="ThreatInfo"/>.</summary>
         private async Task<ScanResult> RunYaraOnFileAsync(string filePath, IProgress<ScanProgress>? progress, CancellationToken ct)
         {
             var result = new ScanResult
@@ -118,11 +155,20 @@ namespace optiSCAN.Services
                 return result;
             }
 
+            if (ExclusionSettings.Current.IsFileExcluded(filePath))
+            {
+                result.Status = ScanStatus.Completed;
+                result.FinishedAt = DateTime.Now;
+                result.FilesSkipped = 1;
+                return result;
+            }
+
             try
             {
                 var allMatches = await _yara.ScanFileAsync(filePath, ct);
                 var excl = ExclusionSettings.Current;
-                var matches = allMatches.FindAll(m => !excl.IsRuleExcluded(m.RuleName));
+                var matches = allMatches
+                    .FindAll(m => !excl.IsFileExcluded(m.FilePath) && !excl.IsRuleExcluded(m.RuleName));
 
                 long fileSize = -1;
                 try { fileSize = new FileInfo(filePath).Length; }
@@ -155,8 +201,16 @@ namespace optiSCAN.Services
                 result.Status = ScanStatus.Completed;
                 result.FinishedAt = DateTime.Now;
             }
-            catch
+            catch (OperationCanceledException)
             {
+                result.Status = ScanStatus.Cancelled;
+                result.FinishedAt = DateTime.Now;
+            }
+            catch (Exception ex)
+            {
+                // CORRECTION : catch vide silencieux → impossible de diagnostiquer
+                // un crash YARA (binaire manquant, règles corrompues, etc.).
+                AppLogger.Warn("ScanOrchestrator", $"RunYaraOnFileAsync ({filePath})", ex);
                 result.Status = ScanStatus.Completed;
                 result.FinishedAt = DateTime.Now;
             }
@@ -164,6 +218,7 @@ namespace optiSCAN.Services
             return result;
         }
 
+        /// <summary>Exécute YARA en mode récursif (single-process) sur un dossier et convertit les matchs en <see cref="ThreatInfo"/>.</summary>
         private async Task<ScanResult> RunYaraOnFolderAsync(string folderPath, IProgress<ScanProgress>? progress, CancellationToken ct)
         {
             var result = new ScanResult
@@ -191,9 +246,11 @@ namespace optiSCAN.Services
                 int total = 0;
                 try
                 {
-                    foreach (var _ in Directory.EnumerateFiles(folderPath, "*.*", SearchOption.AllDirectories))
+                    foreach (var file in Directory.EnumerateFiles(folderPath, "*.*", SearchOption.AllDirectories))
                     {
                         if (ct.IsCancellationRequested) break;
+                        if (ExclusionSettings.Current.IsFileExcluded(file))
+                            continue;
                         if (++total >= CountCap) { total = 0; break; } // 0 = inconnu
                     }
                 }
@@ -285,6 +342,13 @@ namespace optiSCAN.Services
             return result;
         }
 
+        // ── Fusion ClamAV + YARA ─────────────────────────────────────────────────
+
+        /// <summary>
+        /// Fusionne les résultats ClamAV et YARA en un <see cref="ScanResult"/> unique.
+        /// Les menaces détectées par les deux moteurs sont agrégées sous <c>DetectedBy = "ClamAV+YARA"</c>
+        /// avec déduplication par chemin + nom de règle.
+        /// </summary>
         private static ScanResult MergeResults(ScanType type, string target, ScanResult clamResult, ScanResult yaraResult)
         {
             var merged = new ScanResult

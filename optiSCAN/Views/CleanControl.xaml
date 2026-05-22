@@ -67,7 +67,7 @@
                         <TextBlock x:Name="txtBrowserSize" Text="0 Mo"
                                    FontSize="26" FontWeight="Bold"
                                    Foreground="{DynamicResource AlertGoldLight}"/>
-                        <TextBlock Text="Edge + Chrome + Firefox"
+                        <TextBlock Text="Edge, Chrome, Firefox, Brave, Opera, Vivaldi, Arc"
                                    FontSize="11" Foreground="{DynamicResource TextMuted}"
                                    Margin="0,4,0,0"/>
                     </StackPanel>
@@ -200,6 +200,15 @@
                                         <CheckBox x:Name="chkBrave"
                                                   Content="Brave" IsChecked="False"
                                                   Margin="0,6"/>
+                                        <CheckBox x:Name="chkOpera"
+                                                  Content="Opera" IsChecked="False"
+                                                  Margin="0,6"/>
+                                        <CheckBox x:Name="chkVivaldi"
+                                                  Content="Vivaldi" IsChecked="False"
+                                                  Margin="0,6"/>
+                                        <CheckBox x:Name="chkArc"
+                                                  Content="Arc" IsChecked="False"
+                                                  Margin="0,6"/>
                                     </StackPanel>
                                 </Border>
 
@@ -231,6 +240,53 @@
                     </StackPanel>
                 </Border>
             </Grid>
+
+            <!-- Historique des sessions de nettoyage (BytesFreed / BytesDisplay) -->
+            <Border CornerRadius="12" Margin="0,14,0,0"
+                    Background="{DynamicResource CardBg}"
+                    Effect="{DynamicResource CardShadow}" Padding="20,16">
+                <StackPanel>
+                    <TextBlock Text="Historique des nettoyages"
+                               FontSize="14" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextDark}"
+                               Margin="0,0,0,4"/>
+                    <TextBlock Text="Sessions enregistrées localement. Rapport détaillé : Historique → Nettoyages système."
+                               FontSize="11" Foreground="{DynamicResource TextMuted}"
+                               TextWrapping="Wrap" Margin="0,0,0,10"/>
+                    <DataGrid x:Name="dgCleanHistory"
+                              AutoGenerateColumns="False"
+                              IsReadOnly="True"
+                              CanUserAddRows="False"
+                              MaxHeight="220"
+                              GridLinesVisibility="Horizontal"
+                              HorizontalGridLinesBrush="{DynamicResource BorderSubtle}"
+                              Background="Transparent"
+                              BorderThickness="0"
+                              ColumnHeaderStyle="{DynamicResource DgHeader}"
+                              RowStyle="{DynamicResource DgRow}">
+                        <DataGrid.Columns>
+                            <DataGridTextColumn Header="Date"
+                                                Binding="{Binding DateDisplay}"
+                                                Width="155"/>
+                            <DataGridTextColumn Header="Cibles"
+                                                Binding="{Binding TargetsSummary}"
+                                                Width="*">
+                                <DataGridTextColumn.ElementStyle>
+                                    <Style TargetType="TextBlock" BasedOn="{StaticResource DgCellTextEllipsis}">
+                                        <Setter Property="ToolTip" Value="{Binding TargetsSummary}"/>
+                                    </Style>
+                                </DataGridTextColumn.ElementStyle>
+                            </DataGridTextColumn>
+                            <DataGridTextColumn Header="Libéré"
+                                                Binding="{Binding BytesDisplay}"
+                                                Width="100"/>
+                            <DataGridTextColumn Header="Durée"
+                                                Binding="{Binding DurationDisplay}"
+                                                Width="100"/>
+                        </DataGrid.Columns>
+                    </DataGrid>
+                </StackPanel>
+            </Border>
 
         </StackPanel>
     </ScrollViewer>

@@ -14,12 +14,16 @@ using MediaColor = System.Windows.Media.Color;
 
 namespace optiSCAN
 {
+    /// <summary>
+    /// Fenêtre principale d'optiSCAN. Orchestre la navigation entre les 5 panneaux,
+    /// coordonne les mises à jour de signatures, les exports et la protection temps réel
+    /// en s'appuyant sur <see cref="Services.ServiceContainer"/> et <see cref="ViewModels.ScanViewModel"/>.
+    /// </summary>
     [SupportedOSPlatform("windows")]
     public partial class MainWindow : Window
     {
-        // ═══════════════════════════════════════════════════════════════════
-        // SERVICES & VIEWMODEL
-        // ═══════════════════════════════════════════════════════════════════
+        // ── Services & ViewModel ─────────────────────────────────────────────────
+        /// <summary>ViewModel partagé (scan, quarantaine, progression). DataContext de la fenêtre.</summary>
         public ScanViewModel? ViewModel { get; private set; }
 
         private ClamAvEngine? _clamAvEngine;
@@ -72,6 +76,8 @@ namespace optiSCAN
 
                 // ViewModel partage le même container : pas de re-instanciation.
                 ViewModel = new ScanViewModel(c);
+                c.ThreatLookup = path => ViewModel?.Threats.FirstOrDefault(t =>
+                    string.Equals(t.FilePath, path, StringComparison.OrdinalIgnoreCase));
                 this.DataContext = ViewModel;
 
                 // Les vues utilisent c.Navigation (INavigationService) au lieu de caster MainWindow.
@@ -83,6 +89,7 @@ namespace optiSCAN
                 c.ScanHistoryViewsRefreshRequested += OnScanHistoryViewsRefreshRequested;
                 c.ExportScanHistoryHtmlRequested += OnExportScanHistoryHtmlRequested;
                 c.ExportLastScanPdfRequested += OnExportLastScanPdfRequested;
+                c.ExportScanSessionPdfRequested += OnExportScanSessionPdfRequested;
                 c.RealTimeProtection.ThreatDetected += OnRtpThreatDetected;
 
                 // Abonnement aux événements
@@ -105,9 +112,7 @@ namespace optiSCAN
             }
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // INITIALISATION
-        // ═══════════════════════════════════════════════════════════════════
+        // ── Initialisation ───────────────────────────────────────────────────────
         private async Task OnMainWindowLoaded()
         {
             try
@@ -176,13 +181,12 @@ namespace optiSCAN
             c.ScanHistoryViewsRefreshRequested -= OnScanHistoryViewsRefreshRequested;
             c.ExportScanHistoryHtmlRequested -= OnExportScanHistoryHtmlRequested;
             c.ExportLastScanPdfRequested -= OnExportLastScanPdfRequested;
+            c.ExportScanSessionPdfRequested -= OnExportScanSessionPdfRequested;
             c.FocusAntivirusSignaturesRequested -= OnFocusAntivirusSignaturesRequested;
             c.RealTimeProtection.ThreatDetected -= OnRtpThreatDetected;
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // NAVIGATION
-        // ═══════════════════════════════════════════════════════════════════
+        // ── Navigation ───────────────────────────────────────────────────────────
 
         /// <summary>Déclenché par un RadioButton NavItem coché dans la sidebar.</summary>
         private void NavItem_Checked(object sender, RoutedEventArgs e)
@@ -224,6 +228,10 @@ namespace optiSCAN
                 SwitchPanel(target);
         }
 
+        /// <summary>
+        /// Navigue vers le panneau identifié par <paramref name="panelName"/> et déclenche
+        /// les rafraîchissements de données associés.
+        /// </summary>
         public void SwitchPanel(string panelName)
         {
             // La visibilité est gérée intégralement par le NavigationService (SRP).
@@ -234,9 +242,15 @@ namespace optiSCAN
             {
                 case "Overview":
                     RefreshHistory();
+                    RefreshAntivirusStatus();
+                    RefreshSignaturesDisplay();
                     break;
                 case "Antivirus":
                     RefreshAntivirusData();
+                    break;
+                case "Clean":
+                    RefreshHistory();
+                    (panelClean as Views.CleanControl)?.RefreshCleanHistory();
                     break;
                 case "History":
                     RefreshHistory();
@@ -244,9 +258,7 @@ namespace optiSCAN
             }
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // MÉTHODES DE RAFRAÎCHISSEMENT
-        // ═══════════════════════════════════════════════════════════════════
+        // ── Rafraîchissement ─────────────────────────────────────────────────────
         private void RefreshYaraStatus()
         {
             bool yaraOk = _yaraEngine?.IsAvailable ?? false;
@@ -413,6 +425,9 @@ namespace optiSCAN
         private void OnExportLastScanPdfRequested(object? sender, EventArgs e) =>
             Dispatcher.BeginInvoke(new Action(TryExportLastScanPdf), DispatcherPriority.Background);
 
+        private void OnExportScanSessionPdfRequested(object? sender, ScanSession session) =>
+            Dispatcher.BeginInvoke(new Action(() => TryExportScanSessionPdf(session)), DispatcherPriority.Background);
+
         private void TryExportScanReportHtml()
         {
             try
@@ -442,31 +457,34 @@ namespace optiSCAN
 
         private void TryExportLastScanPdf()
         {
+            var sessions = _logManager?.GetHistory() ?? Array.Empty<ScanSession>();
+            if (sessions.Count == 0)
+            {
+                System.Windows.MessageBox.Show(this,
+                    "Aucune analyse n’est enregistrée dans l’historique. Lancez d’abord une analyse depuis l’onglet Antivirus.",
+                    "Export PDF",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+            TryExportScanSessionPdf(sessions[0]);
+        }
+
+        private void TryExportScanSessionPdf(ScanSession session)
+        {
             try
             {
-                var sessions = _logManager?.GetHistory() ?? Array.Empty<ScanSession>();
-                if (sessions.Count == 0)
-                {
-                    System.Windows.MessageBox.Show(this,
-                        "Aucune analyse n’est enregistrée dans l’historique. Lancez d’abord une analyse depuis l’onglet Antivirus.",
-                        "Export PDF",
-                        MessageBoxButton.OK,
-                        MessageBoxImage.Information);
-                    return;
-                }
-
-                var last = sessions[0];
                 var dlg = new Microsoft.Win32.SaveFileDialog
                 {
                     Filter = "Document PDF (*.pdf)|*.pdf|Tous les fichiers (*.*)|*.*",
-                    FileName = $"optiSCAN_scan_{last.StartedAt:yyyyMMdd_HHmm}.pdf",
+                    FileName = $"optiSCAN_scan_{session.StartedAt:yyyyMMdd_HHmm}.pdf",
                     DefaultExt = ".pdf",
                     AddExtension = true
                 };
                 if (dlg.ShowDialog(this) != true) return;
 
                 var gen = new PdfReportGenerator();
-                gen.GenerateReportFromSession(last, dlg.FileName);
+                gen.GenerateReportFromSession(session, dlg.FileName);
                 SetStatus($"Rapport PDF enregistré : {dlg.FileName}");
             }
             catch (Exception ex)
@@ -476,9 +494,7 @@ namespace optiSCAN
             }
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // MÉTHODES DE STATUT
-        // ═══════════════════════════════════════════════════════════════════
+        // ── Statut ───────────────────────────────────────────────────────────────
         private void SetStatus(string text, bool isError = false, bool isWarning = false)
         {
             Dispatcher.InvokeAsync(() =>
@@ -508,9 +524,7 @@ namespace optiSCAN
                 txtFooterVersion.Text = $"optiSCAN {release} — Fourni par Dona By";
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // RÉ-AFFICHAGE DEPUIS LA SYSTRAY OU IPC
-        // ═══════════════════════════════════════════════════════════════════
+        // ── Ré-affichage depuis la systray ou IPC ────────────────────────────────
         // WM_SHOWME et le hook WndProc sont implémentés dans IpcManager.
         private void ShowWindow()
         {
@@ -524,9 +538,7 @@ namespace optiSCAN
 
         // Raccourcis clavier : voir Services.KeyboardShortcuts.
 
-        // ═══════════════════════════════════════════════════════════════════
-        // GESTION DE L'ÉTAT DE LA FENÊTRE (minimize → systray)
-        // ═══════════════════════════════════════════════════════════════════
+        // ── Gestion de l'état de la fenêtre (minimize → systray) ────────────────
         private void OnWindowStateChanged(object? sender, EventArgs e)
         {
             if (WindowState == WindowState.Minimized)
@@ -536,9 +548,7 @@ namespace optiSCAN
             }
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // GESTION DE LA FERMETURE
-        // ═══════════════════════════════════════════════════════════════════
+        // ── Fermeture ────────────────────────────────────────────────────────────
         private void OnWindowClosing(object? sender, CancelEventArgs e)
         {
             if (!_isClosing)
@@ -575,35 +585,28 @@ namespace optiSCAN
             }
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // MÉTHODES DE QUARANTAINE
-        // ═══════════════════════════════════════════════════════════════════
+        // ── Quarantaine ──────────────────────────────────────────────────────────
+
+        /// <summary>Met le fichier identifié par <c>btn.Tag</c> en quarantaine chiffrée.</summary>
         public void BtnQuarantineThreat_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn && btn.Tag is string filePath)
             {
-                var threat = new ThreatInfo
+                var c = ServiceContainer.Default;
+                var known = c.FindKnownThreat(filePath);
+                var result = known != null
+                    ? c.Actions.QuarantineThreat(known.Clone())
+                    : c.Actions.QuarantineThreat(filePath);
+                SetStatus(result.Message, isError: result.IsError);
+                if (result.Success)
                 {
-                    FilePath = filePath,
-                    VirusName = "Détecté",
-                    DetectedAt = DateTime.Now,
-                    Status = ThreatStatus.Detected,
-                    FileSize = System.IO.File.Exists(filePath) ? new System.IO.FileInfo(filePath).Length : 0
-                };
-
-                if (_quarantineManager?.Quarantine(threat) == true)
-                {
-                    SetStatus($"✅ Fichier mis en quarantaine : {System.IO.Path.GetFileName(filePath)}");
                     RefreshQuarantineList();
                     ((Views.AntivirusView)panelAntivirus)?.RefreshAllData();
-                }
-                else
-                {
-                    SetStatus($"❌ Erreur lors de la mise en quarantaine", isError: true);
                 }
             }
         }
 
+        /// <summary>Ajoute le fichier identifié par <c>btn.Tag</c> aux exclusions (ignoré lors des futurs scans).</summary>
         public void BtnIgnoreThreat_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn && btn.Tag is string filePath)
@@ -614,6 +617,7 @@ namespace optiSCAN
             }
         }
 
+        /// <summary>Supprime définitivement le fichier identifié par <c>btn.Tag</c>.</summary>
         public void BtnDeleteThreat_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn && btn.Tag is string filePath)
@@ -634,6 +638,7 @@ namespace optiSCAN
             }
         }
 
+        /// <summary>Restaure un fichier depuis la quarantaine vers son emplacement d'origine.</summary>
         public void BtnRestoreFromQuarantine_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn && btn.Tag is string quarantineId)
@@ -651,6 +656,7 @@ namespace optiSCAN
             }
         }
 
+        /// <summary>Supprime définitivement un fichier de la quarantaine (pas de restauration possible).</summary>
         public void BtnDeleteFromQuarantine_Click(object sender, RoutedEventArgs e)
         {
             if (sender is Button btn && btn.Tag is string quarantineId)
@@ -668,9 +674,7 @@ namespace optiSCAN
             }
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // MÉTHODES DE MISE À JOUR DES SIGNATURES
-        // ═══════════════════════════════════════════════════════════════════
+        // ── Mise à jour des signatures ───────────────────────────────────────────
 
         // Handlers nommés — souscrits une seule fois à l'init pour éviter
         // l'accumulation de lambdas anonymes à chaque clic.
@@ -732,6 +736,7 @@ namespace optiSCAN
             }
         }
 
+        /// <summary>Annule la mise à jour de signatures en cours (freshclam.exe + règles YARA).</summary>
         public void BtnStopUpdateSignatures_Click(object sender, RoutedEventArgs e)
         {
             SetStatus("⏹️ Arrêt de la mise à jour...");
@@ -750,13 +755,16 @@ namespace optiSCAN
             antivirusView?.SetSignatureUpdating(false);
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // MÉTHODES D'ACCÈS AUX SERVICES
-        // ═══════════════════════════════════════════════════════════════════
+        // ── Accès aux services ───────────────────────────────────────────────────
+        /// <summary>Retourne le gestionnaire de quarantaine partagé.</summary>
         public QuarantineManager? GetQuarantineManager() => _quarantineManager;
+        /// <summary>Retourne le gestionnaire de journaux de scan.</summary>
         public ScanLogManager? GetLogManager() => _logManager;
+        /// <summary>Retourne l'orchestrateur ClamAV + YARA partagé.</summary>
         public ScanOrchestrator? GetOrchestrator() => _antivirusOrchestrator;
+        /// <summary>Retourne le service de mise à jour des signatures ClamAV.</summary>
         public FreshclamUpdater? GetFreshclamUpdater() => _freshclamUpdater;
+        /// <summary>Retourne le service de mise à jour des règles YARA.</summary>
         public YaraForgeUpdater? GetRulesUpdater() => _rulesUpdater;
     }
 }

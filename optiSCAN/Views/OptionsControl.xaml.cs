@@ -2,6 +2,7 @@ using Microsoft.Win32;
 using optiSCAN.Models;
 using optiSCAN.Services;
 using System.Collections.ObjectModel;
+using System.Globalization;
 using System.IO;
 using System.Windows;
 using WinForms = System.Windows.Forms;
@@ -10,17 +11,41 @@ using WpfCheckBox = System.Windows.Controls.CheckBox;
 
 namespace optiSCAN.Views
 {
+    /// <summary>
+    /// Vue Options — exclusions, protection temps réel, scans planifiés, thème et préférences utilisateur.
+    /// </summary>
     public partial class OptionsControl : System.Windows.Controls.UserControl
     {
         private readonly ObservableCollection<string> _exclusions = new();
-        private readonly ScheduledScanService _scheduledScan = new();
+        private ScheduledScanService ScheduledScan => ServiceContainer.Default.ScheduledScan;
         private bool _suppressPreferenceEvents;
 
         public OptionsControl()
         {
             InitializeComponent();
             lstExclusions.ItemsSource = _exclusions;
+            InitScheduleTimeComboBoxes();
             LoadPreferences();
+        }
+
+        private void InitScheduleTimeComboBoxes()
+        {
+            if (cmbScheduleHour == null || cmbScheduleMinute == null) return;
+            for (int h = 0; h < 24; h++)
+                cmbScheduleHour.Items.Add(h.ToString("00", CultureInfo.InvariantCulture));
+            for (int m = 0; m < 60; m += 15)
+                cmbScheduleMinute.Items.Add(m.ToString("00", CultureInfo.InvariantCulture));
+            cmbScheduleHour.SelectedIndex = 2;
+            cmbScheduleMinute.SelectedIndex = 0;
+        }
+
+        private TimeSpan GetSelectedScheduleTime()
+        {
+            int h = cmbScheduleHour?.SelectedIndex ?? 2;
+            int m = 0;
+            if (cmbScheduleMinute?.SelectedItem is string ms && int.TryParse(ms, out var parsed))
+                m = parsed;
+            return new TimeSpan(h, m, 0);
         }
 
         private void LoadPreferences()
@@ -29,33 +54,70 @@ namespace optiSCAN.Views
             try
             {
                 var prefs = UserPreferences.Current;
-            if (chkNotifications != null)
-                chkNotifications.IsChecked = prefs.ActionNotificationsEnabled;
+                if (chkNotifications != null)
+                    chkNotifications.IsChecked = prefs.ActionNotificationsEnabled;
+                if (chkAutoStart != null)
+                    chkAutoStart.IsChecked = IsAutoStartRegistered();
+                if (chkDarkTheme != null)
+                    chkDarkTheme.IsChecked = prefs.DarkTheme;
+                if (chkSyncWindowsTheme != null)
+                    chkSyncWindowsTheme.IsChecked = prefs.SyncWindowsTheme;
+                if (chkDarkTheme != null)
+                    chkDarkTheme.IsEnabled = prefs.SyncWindowsTheme != true;
 
-            if (chkAutoStart != null)
-                chkAutoStart.IsChecked = IsAutoStartRegistered();
+                if (cmbFavoriteScan != null)
+                {
+                    cmbFavoriteScan.SelectedIndex = prefs.FavoriteScanType switch
+                    {
+                        ScanType.FullScan => 1,
+                        ScanType.Folder => 2,
+                        ScanType.File => 3,
+                        _ => 0
+                    };
+                }
 
-            var ex = ExclusionSettings.Current;
-            if (chkRealtimeProtection != null)
-                chkRealtimeProtection.IsChecked = ex.RealTimeEnabled;
-            if (chkAutoQuarantine != null)
-                chkAutoQuarantine.IsChecked = ex.AutoQuarantineEnabled;
+                var ex = ExclusionSettings.Current;
+                if (chkRealtimeProtection != null)
+                    chkRealtimeProtection.IsChecked = ex.RealTimeEnabled;
+                if (chkAutoQuarantine != null)
+                    chkAutoQuarantine.IsChecked = ex.AutoQuarantineEnabled;
 
-            var c = ServiceContainer.Default;
-            if (chkAutoUpdate != null)
-                chkAutoUpdate.IsChecked = c.FreshclamUpdater.IsAutoUpdateEnabled && c.RulesUpdater.IsAutoUpdateEnabled;
+                var c = ServiceContainer.Default;
+                if (chkAutoUpdate != null)
+                    chkAutoUpdate.IsChecked = c.FreshclamUpdater.IsAutoUpdateEnabled && c.RulesUpdater.IsAutoUpdateEnabled;
 
-            if (chkScheduledScan != null)
-                chkScheduledScan.IsChecked = _scheduledScan.IsTaskExists();
+                if (chkScheduledScan != null)
+                    chkScheduledScan.IsChecked = ScheduledScan.IsTaskExists();
 
-            _exclusions.Clear();
-            foreach (var path in ex.ExcludedFolders)
-                _exclusions.Add(path);
+                _exclusions.Clear();
+                foreach (var path in ex.ExcludedFolders)
+                    _exclusions.Add(path);
+
+                RefreshScheduledStatus();
             }
             finally
             {
                 _suppressPreferenceEvents = false;
             }
+        }
+
+        private void RefreshScheduledStatus()
+        {
+            if (txtScheduledNextRun == null) return;
+            if (!ScheduledScan.IsTaskExists())
+            {
+                txtScheduledNextRun.Text = "Aucune tâche planifiée.";
+                if (btnScheduledRunNow != null) btnScheduledRunNow.IsEnabled = false;
+                if (pnlScheduleTime != null) pnlScheduleTime.IsEnabled = true;
+                return;
+            }
+
+            if (btnScheduledRunNow != null) btnScheduledRunNow.IsEnabled = true;
+            if (pnlScheduleTime != null) pnlScheduleTime.IsEnabled = false;
+            var next = ScheduledScan.GetNextRunTime();
+            txtScheduledNextRun.Text = next.HasValue
+                ? $"Prochaine exécution : {next.Value:dddd dd/MM/yyyy à HH:mm}"
+                : "Tâche active — prochaine exécution non lue (schtasks).";
         }
 
         private static bool IsAutoStartRegistered()
@@ -101,10 +163,25 @@ namespace optiSCAN.Views
                     c.ApplyAutoQuarantine(isOn);
                     break;
 
+                case "DarkTheme":
+                    if (!prefs.SyncWindowsTheme)
+                        ThemeManager.Apply(isOn);
+                    break;
+
+                case "SyncWindowsTheme":
+                    ThemeManager.SetSyncWithWindows(isOn);
+                    if (chkDarkTheme != null)
+                    {
+                        chkDarkTheme.IsEnabled = !isOn;
+                        if (isOn)
+                            chkDarkTheme.IsChecked = ThemeManager.IsDarkTheme;
+                    }
+                    break;
+
                 case "ScheduledScan":
                     if (isOn)
                     {
-                        if (!_scheduledScan.CreateDailyScan())
+                        if (!ScheduledScan.CreateDailyScan(GetSelectedScheduleTime()))
                             System.Windows.MessageBox.Show(
                                 "Impossible de créer la tâche planifiée Windows (schtasks). Vérifiez les droits ou l’orthographe du nom d’utilisateur.",
                                 "optiSCAN — Planification",
@@ -113,17 +190,53 @@ namespace optiSCAN.Views
                     }
                     else
                     {
-                        _scheduledScan.DeleteTask();
+                        ScheduledScan.DeleteTask();
                     }
                     _suppressPreferenceEvents = true;
                     try
                     {
                         if (chkScheduledScan != null)
-                            chkScheduledScan.IsChecked = _scheduledScan.IsTaskExists();
+                            chkScheduledScan.IsChecked = ScheduledScan.IsTaskExists();
                     }
                     finally { _suppressPreferenceEvents = false; }
+                    RefreshScheduledStatus();
                     break;
             }
+        }
+
+        private void CmbFavoriteScan_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        {
+            if (_suppressPreferenceEvents || cmbFavoriteScan == null) return;
+            var prefs = UserPreferences.Current;
+            prefs.FavoriteScanType = cmbFavoriteScan.SelectedIndex switch
+            {
+                1 => ScanType.FullScan,
+                2 => ScanType.Folder,
+                3 => ScanType.File,
+                _ => ScanType.QuickScan
+            };
+            prefs.Save();
+        }
+
+        private void BtnScheduledRunNow_Click(object sender, RoutedEventArgs e)
+        {
+            if (!ScheduledScan.IsTaskExists())
+            {
+                System.Windows.MessageBox.Show("Activez d’abord l’analyse planifiée.", "optiSCAN", MessageBoxButton.OK, MessageBoxImage.Information);
+                return;
+            }
+            if (!ScheduledScan.RunNow())
+            {
+                System.Windows.MessageBox.Show("Impossible de lancer la tâche maintenant (schtasks /Run).", "optiSCAN",
+                    MessageBoxButton.OK, MessageBoxImage.Warning);
+                return;
+            }
+            System.Windows.MessageBox.Show(
+                "La tâche « optiSCAN_DailyScan » a été déclenchée. L’analyse s’exécute en arrière-plan (--fullscan --quiet).",
+                "optiSCAN",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+            RefreshScheduledStatus();
         }
 
         private static void SetAutoStart(bool enable)

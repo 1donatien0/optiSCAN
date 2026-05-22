@@ -3,6 +3,10 @@ using System.Windows;
 
 namespace optiSCAN.Views
 {
+    /// <summary>
+    /// Vue historique — affiche les sessions de scan et de nettoyage passées,
+    /// et permet d'exporter les rapports en HTML ou PDF.
+    /// </summary>
     public partial class HistoryControl : System.Windows.Controls.UserControl
     {
         public HistoryControl()
@@ -17,9 +21,20 @@ namespace optiSCAN.Views
             {
                 if (dgScanHistory != null)
                     dgScanHistory.ItemsSource = sessions;
+                RefreshScanJournal();
             });
         }
 
+        private void RefreshScanJournal()
+        {
+            if (txtScanJournal == null) return;
+            var lines = Services.ServiceContainer.Default.Logger.ReadLastLogLines(80);
+            txtScanJournal.Text = lines.Length == 0
+                ? "Aucune entrée dans le journal des analyses."
+                : string.Join(Environment.NewLine, lines);
+        }
+
+        /// <summary>Alimente le DataGrid avec les sessions de nettoyage.</summary>
         public void UpdateCleanHistory(IEnumerable<CleanSession> sessions)
         {
             Dispatcher.InvokeAsync(() =>
@@ -40,5 +55,17 @@ namespace optiSCAN.Views
 
         private void BtnExportPdf_Click(object sender, RoutedEventArgs e) =>
             Services.ServiceContainer.Default.RequestExportLastScanPdf();
+
+        private void BtnExportSelectedPdf_Click(object sender, RoutedEventArgs e)
+        {
+            if (dgScanHistory?.SelectedItem is ScanSession session)
+                Services.ServiceContainer.Default.RequestExportScanSessionPdf(session);
+            else
+                System.Windows.MessageBox.Show(
+                    "Sélectionnez une ligne dans l’onglet « Scans antivirus », puis cliquez sur Exporter PDF (sélection).",
+                    "optiSCAN — Historique",
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+        }
     }
 }
