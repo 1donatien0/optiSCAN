@@ -129,10 +129,6 @@
                                        VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
-                    <TextBlock x:Name="txtAnalyzeHint"
-                               Text="  ← Lancez d'abord une analyse"
-                               FontSize="11" Foreground="{DynamicResource TextMuted}"
-                               VerticalAlignment="Center" Margin="12,0,0,0"/>
                 </StackPanel>
             </Border>
 

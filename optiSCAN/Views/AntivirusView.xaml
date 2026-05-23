@@ -275,7 +275,7 @@
                                                    FontSize="13" FontWeight="SemiBold"
                                                    Foreground="{DynamicResource TextDark}" Margin="0,0,0,6"/>
 
-                                        <TextBlock Text="Élément en cours :"
+                                        <TextBlock Text="Emplacement (analyse ou détection) :"
                                                    FontSize="10" FontWeight="SemiBold"
                                                    Foreground="{DynamicResource TextMuted}" Margin="0,0,0,2"/>
                                         <TextBlock Text="{Binding CurrentScanItem}"
@@ -373,9 +373,20 @@
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>
                                         </DataGridTemplateColumn>
-                                        <DataGridTextColumn Header="Fichier" Binding="{Binding FileName}" Width="130"/>
-                                        <DataGridTextColumn Header="Menace" Binding="{Binding VirusName}" Width="*"/>
-                                        <DataGridTextColumn Header="Source" Binding="{Binding DetectedBy}" Width="70"/>
+                                        <DataGridTextColumn Header="Emplacement" Binding="{Binding FilePath}" Width="*">
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource DgCellTextEllipsis}">
+                                                    <Setter Property="ToolTip" Value="{Binding FilePath}"/>
+                                                </Style>
+                                            </DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Header="Menace" Binding="{Binding VirusName}" Width="*">
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource DgCellTextEllipsis}">
+                                                    <Setter Property="ToolTip" Value="{Binding VirusName}"/>
+                                                </Style>
+                                            </DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
                                         <DataGridTextColumn Header="Heure" Binding="{Binding DetectedAt, StringFormat='HH:mm:ss'}" Width="60"/>
                                         <DataGridTextColumn Header="Statut" Binding="{Binding Status}" Width="70"/>
                                         <DataGridTemplateColumn Header="Nettoyer" Width="270">
@@ -459,8 +470,14 @@
                                           BorderThickness="0" ColumnHeaderStyle="{StaticResource DgHeader}"
                                           RowStyle="{StaticResource DgRow}">
                                     <DataGrid.Columns>
-                                        <DataGridTextColumn Header="Fichier" Binding="{Binding FileName}" Width="170"/>
-                                        <DataGridTextColumn Header="Virus" Binding="{Binding VirusName}" Width="*"/>
+                                        <DataGridTextColumn Header="Emplacement d'origine" Binding="{Binding OriginalPath}" Width="*">
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource DgCellTextEllipsis}">
+                                                    <Setter Property="ToolTip" Value="{Binding OriginalPath}"/>
+                                                </Style>
+                                            </DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Header="Virus" Binding="{Binding VirusName}" Width="140"/>
                                         <DataGridTextColumn Header="Taille" Binding="{Binding SizeDisplay}" Width="75"/>
                                         <DataGridTextColumn Header="Quarantaine" Binding="{Binding QuarantinedAt, StringFormat='dd/MM HH:mm'}" Width="110"/>
                                         <DataGridTemplateColumn Header="Actions" Width="175">

@@ -515,7 +515,7 @@ namespace optiSCAN
 
         private void ApplyVersionLabels()
         {
-            // Nomenclature : vM.m (README, v3.0 / v4.0) + M.m.p (assembly / installateur).
+            // Nomenclature : vM.m (README, v5.0) + M.m.p (assembly / installateur).
             var release = ProductVersionInfo.ReleaseLabel;
             var semver = ProductVersionInfo.SemVer;
             if (txtSidebarVersion != null)

@@ -1,9 +1,9 @@
-# Guide Complet — optiSCAN v4.0
+# Guide Complet — optiSCAN v5.0
 
 > **Version de référence.** Ce guide décrit l'architecture, les modules et les procédures
-> de la version **v4.0** du produit (build **4.0.0**, édition ClamAV). Architecture mono-fenêtre avec services avancés Phase 2 + Donaby Design System.
+> de la version **v5.0** du produit (build **5.0.0**, édition ClamAV). Architecture mono-fenêtre avec services avancés + Donaby Design System.
 >
-> **Nomenclature (comme v1.0 / v2.0 / v3.0)** — **v4.0** : nom de release (documentation, CLUF). **4.0.0** : identifiant d’assembly et d’installateur (`Directory.Build.props`, Inno Setup).
+> **Nomenclature (comme v1.0 … v4.0)** — **v5.0** : nom de release (documentation, CLUF). **5.0.0** : identifiant d’assembly et d’installateur (`Directory.Build.props`, Inno Setup).
 >
 > **Design system : Donaby Design** — thème sombre/clair dynamique, tokens DynamicResource WPF.
 > Développé par **© 2026 Donatien Byakombe (Dona By)**.
@@ -201,7 +201,7 @@ après la date textuelle (le premier champ est une date lisible, pas un entier).
 
 ---
 
-## 4. Architecture mono-fenêtre (v4.0)
+## 4. Architecture mono-fenêtre (v5.0)
 
 Les sous-sections **4.1** à **4.11** suivent une lecture « produit » : navigation et panneaux, détail du panneau Antivirus, menaces et pipeline, options techniques (MAJ, exclusions, quarantaine, logs), exports, puis contenu de la vue d’ensemble.
 
@@ -221,7 +221,7 @@ Raccourcis clavier : `Ctrl+1` … `Ctrl+5` (`KeyboardShortcuts`) — ordre des p
 
 ### 4.2 Fenêtre principale et icône
 
-L'interface v4.0 repose sur la fenêtre principale (`MainWindow`) et la barre latérale de navigation ; il n'y a pas d'icône dédiée dans la zone de notification système dans cette branche. L'icône `optiSCAN.ico` sert à la fenêtre, à la barre des tâches et à l'installateur.
+L'interface v5.0 repose sur la fenêtre principale (`MainWindow`) et la barre latérale de navigation ; il n'y a pas d'icône dédiée dans la zone de notification système dans cette branche. L'icône `optiSCAN.ico` sert à la fenêtre, à la barre des tâches et à l'installateur.
 
 ### 4.3 Panneau Antivirus (`NavigateTo("Antivirus")`)
 
@@ -381,7 +381,7 @@ Instance unique : **`ServiceContainer.Default.ScheduledScan`** (partagée avec *
 
 ---
 
-## 6. Workflow utilisateur optiSCAN v4.0
+## 6. Workflow utilisateur optiSCAN v5.0
 
 ```
 DÉMARRAGE (UI)
@@ -444,7 +444,7 @@ Add-MpPreference -ExclusionPath "C:\Program Files\optiSCAN\clamav\database"
 
 ---
 
-## 8. Packaging final (v4.0)
+## 8. Packaging final (v5.0)
 
 Exécuter depuis la **racine du dépôt** (dossier contenant `optiSCAN.sln`). La sortie du profil **FolderProfile** est `optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\` (chemin attendu par `installer\setup.iss`).
 
@@ -467,14 +467,14 @@ $pub = ".\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64"
 & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" .\installer\setup.iss
 ```
 
-Sortie typique : `installer\output\optiSCAN_Setup_v4.0.0.exe` (versions dans `#define` de `setup.iss`).
+Sortie typique : `installer\output\optiSCAN_Setup_v5.0.0.exe` (versions dans `#define` de `setup.iss`).
 
 **Variante** : `dotnet publish ... -c Release -r win-x64 -o <dossier>` avec le même dossier que **`PublishDir`** du profil **FolderProfile**, pour que **`setup.iss`** trouve `optiSCAN.exe`.
 
 **Contenu de l'installateur (~260 Mo avec signatures initiales) :**
 
 ```
-optiSCAN_Setup_v4.0.0.exe
+optiSCAN_Setup_v5.0.0.exe
     ├── optiSCAN.exe
     ├── optiSCAN.ico
     ├── *.dll (runtime .NET 8)
@@ -502,6 +502,14 @@ optiSCAN_Setup_v4.0.0.exe
 ---
 
 ## 10. Historique des versions produit
+
+### v5.0 — Version majeure (publication)
+
+- **Versioning unifié** — nom **v5.0** + build **5.0.0** (`Directory.Build.props`, Inno Setup, **LICENSE.txt**, manifeste, rapports PDF/HTML)
+- **Nettoyer** — historique des sessions dans `CleanControl` (colonne **Libéré** / `BytesDisplay`) + onglet Historique
+- **Stabilité** — `ThreatInfo.Id` SHA-256 déterministe ; quarantaine avec nom de menace réel ; `ServiceContainer.Shutdown()` à la fermeture
+- **UI / services** — cibles récentes, colonne **Risque**, planification partagée, journal des analyses, auto-exclusion du dossier d’installation
+- **Documentation** — README et CLUF alignés sur le code (plus de référence à `ClamDaemon.cs`)
 
 ### v4.0 — Version majeure (alignement produit)
 

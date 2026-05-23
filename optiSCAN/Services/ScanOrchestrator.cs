@@ -189,7 +189,7 @@ namespace optiSCAN.Services
 
                     progress?.Report(new ScanProgress
                     {
-                        Message = $"Match : {m.RuleName} [{Path.GetFileName(filePath)}]",
+                        Message = $"{m.RuleName} — {filePath}",
                         Phase = ScanPhase.ThreatFound,
                         ThreatInfo = threat,
                         ThreatsFound = result.ThreatsFound,
@@ -313,12 +313,13 @@ namespace optiSCAN.Services
 
                     progress?.Report(new ScanProgress
                     {
-                        Message = $"Menace : {m.RuleName} [{Path.GetFileName(m.FilePath)}]",
+                        Message = $"{m.RuleName} — {m.FilePath}",
                         Phase = ScanPhase.ThreatFound,
                         FilesScanned = total, // yara a tout itéré
                         TotalFiles = total,
                         ThreatsFound = result.Threats.Count,
                         ThreatInfo = threat,
+                        CurrentFilePath = m.FilePath,
                         YaraMatchesFound = result.Threats.Count,
                     });
                 }

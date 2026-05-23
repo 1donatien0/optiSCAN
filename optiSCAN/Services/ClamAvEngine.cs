@@ -310,7 +310,7 @@ namespace optiSCAN.Services
 
                 progress?.Report(new ScanProgress
                 {
-                    Message = $"Menace : {threat.VirusName} [{threat.FileName}]",
+                    Message = $"{threat.VirusName} — {filePath}",
                     Phase = ScanPhase.ThreatFound,
                     ThreatInfo = threat,
                     FilesScanned = result.FilesScanned,

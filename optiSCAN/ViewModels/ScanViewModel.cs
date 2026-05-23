@@ -540,8 +540,9 @@ namespace optiSCAN.ViewModels
 
                 if (p.Phase == ScanPhase.ThreatFound && p.ThreatInfo != null)
                 {
-                    // Éviter les doublons
-                    if (!Threats.Any(t => t.FilePath == p.ThreatInfo.FilePath))
+                    CurrentScanItem = p.ThreatInfo.FilePath;
+                    StatusMessage = p.ThreatInfo.VirusName;
+                    if (!Threats.Any(t => string.Equals(t.FilePath, p.ThreatInfo.FilePath, StringComparison.OrdinalIgnoreCase)))
                         Threats.Add(p.ThreatInfo);
                 }
             }));

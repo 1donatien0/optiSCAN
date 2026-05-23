@@ -79,7 +79,6 @@ namespace optiSCAN.Views
 
                     _analysed = true;
                     btnCleanNow.IsEnabled = true;
-                    txtAnalyzeHint.Visibility = Visibility.Collapsed;
                 });
             });
 
@@ -192,8 +191,6 @@ namespace optiSCAN.Views
                         txtTotalSize.Text = "0 Mo";
                         _analysed = false;
                         btnCleanNow.IsEnabled = false;
-                        txtAnalyzeHint.Visibility = Visibility.Visible;
-                        txtAnalyzeHint.Text = "  ✅ Nettoyage effectué";
 
                         var cleanEnd = DateTime.Now;
                         var targets = BuildCleanTargetsSummary(doTempWin, doTempUser, doRecycle, doEdge, doChrome, doFirefox, doBrave, doOpera, doVivaldi, doArc, doLogs);
