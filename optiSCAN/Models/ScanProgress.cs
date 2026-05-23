@@ -153,7 +153,7 @@
         {
             return new ScanProgress
             {
-                Message = $"Menace détectée : {threat.VirusName}",
+                Message = $"{threat.VirusName} — {threat.FilePath}",
                 Phase = ScanPhase.ThreatFound,
                 ThreatInfo = threat,
                 ThreatsFound = 1,

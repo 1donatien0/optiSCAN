@@ -144,25 +144,22 @@ namespace optiSCAN.Services
                                     {
                                         table.ColumnsDefinition(cols =>
                                         {
+                                            cols.RelativeColumn(4);
                                             cols.RelativeColumn(3);
-                                            cols.RelativeColumn(3);
-                                            cols.RelativeColumn(2);
-                                            cols.RelativeColumn(2);
+                                            cols.RelativeColumn(1);
                                         });
 
                                         table.Header(header =>
                                         {
-                                            header.Cell().Text("Fichier").FontSize(10).Bold();
+                                            header.Cell().Text("Emplacement").FontSize(10).Bold();
                                             header.Cell().Text("Menace").FontSize(10).Bold();
-                                            header.Cell().Text("Moteur").FontSize(10).Bold();
                                             header.Cell().Text("Heure").FontSize(10).Bold();
                                         });
 
                                         foreach (var threat in result.Threats)
                                         {
-                                            table.Cell().Text(Path.GetFileName(threat.FilePath)).FontSize(9);
+                                            table.Cell().Text(threat.FilePath).FontSize(8);
                                             table.Cell().Text(threat.VirusName).FontSize(9).FontColor(Colors.Red.Medium);
-                                            table.Cell().Text(threat.DetectedBy ?? "ClamAV").FontSize(9);
                                             table.Cell().Text(threat.DetectedAt.ToString("HH:mm:ss")).FontSize(9);
                                         }
                                     });

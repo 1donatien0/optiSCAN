@@ -42,7 +42,7 @@
                     </StackPanel>
 
                     <!-- Notifications -->
-                    <StackPanel Orientation="Horizontal">
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
                         <CheckBox x:Name="chkNotifications"
                                   IsChecked="True"
                                   VerticalAlignment="Top"
@@ -58,6 +58,61 @@
                                        FontSize="11" Foreground="{DynamicResource TextMuted}"
                                        Margin="0,3,0,0"/>
                         </StackPanel>
+                    </StackPanel>
+
+                    <!-- Thème sombre -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <CheckBox x:Name="chkDarkTheme"
+                                  VerticalAlignment="Top"
+                                  Margin="0,2,16,0"
+                                  Checked="CheckOption_Changed"
+                                  Unchecked="CheckOption_Changed"
+                                  Tag="DarkTheme"/>
+                        <StackPanel>
+                            <TextBlock Text="Thème sombre"
+                                       FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextDark}"/>
+                            <TextBlock Text="Même réglage que le bouton Mode dans la barre latérale"
+                                       FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                       Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Suivre le thème Windows -->
+                    <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                        <CheckBox x:Name="chkSyncWindowsTheme"
+                                  VerticalAlignment="Top"
+                                  Margin="0,2,16,0"
+                                  Checked="CheckOption_Changed"
+                                  Unchecked="CheckOption_Changed"
+                                  Tag="SyncWindowsTheme"/>
+                        <StackPanel>
+                            <TextBlock Text="Suivre le thème Windows"
+                                       FontSize="13" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextDark}"/>
+                            <TextBlock Text="S’adapte automatiquement au mode clair/sombre de Windows"
+                                       FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                       Margin="0,3,0,0"/>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Type de scan favori -->
+                    <StackPanel Margin="0,0,0,4">
+                        <TextBlock Text="Type d’analyse favori"
+                                   FontSize="13" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextDark}"
+                                   Margin="0,0,0,6"/>
+                        <ComboBox x:Name="cmbFavoriteScan"
+                                  SelectionChanged="CmbFavoriteScan_SelectionChanged"
+                                  Height="32" Width="220" HorizontalAlignment="Left">
+                            <ComboBoxItem Content="Analyse rapide"/>
+                            <ComboBoxItem Content="Analyse complète"/>
+                            <ComboBoxItem Content="Dossier"/>
+                            <ComboBoxItem Content="Fichier"/>
+                        </ComboBox>
+                        <TextBlock Text="Mis à jour après chaque analyse terminée"
+                                   FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                   Margin="0,4,0,0"/>
                     </StackPanel>
 
                 </StackPanel>
@@ -133,21 +188,38 @@
                     </StackPanel>
 
                     <!-- Scan planifié (schtasks) -->
-                    <StackPanel Orientation="Horizontal" Margin="0,16,0,0">
-                        <CheckBox x:Name="chkScheduledScan"
-                                  VerticalAlignment="Top"
-                                  Margin="0,2,16,0"
-                                  Checked="CheckOption_Changed"
-                                  Unchecked="CheckOption_Changed"
-                                  Tag="ScheduledScan"/>
-                        <StackPanel>
-                            <TextBlock Text="Analyse complète planifiée (tous les jours, 02h00)"
-                                       FontSize="13" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource TextDark}"/>
-                            <TextBlock Text="Crée une tâche Windows « optiSCAN_DailyScan » (mode silencieux --fullscan --quiet)"
-                                       FontSize="11" Foreground="{DynamicResource TextMuted}"
-                                       Margin="0,3,0,0"/>
+                    <StackPanel Margin="0,16,0,0">
+                        <StackPanel Orientation="Horizontal">
+                            <CheckBox x:Name="chkScheduledScan"
+                                      VerticalAlignment="Top"
+                                      Margin="0,2,16,0"
+                                      Checked="CheckOption_Changed"
+                                      Unchecked="CheckOption_Changed"
+                                      Tag="ScheduledScan"/>
+                            <StackPanel>
+                                <TextBlock Text="Analyse complète planifiée (quotidienne)"
+                                           FontSize="13" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextDark}"/>
+                                <TextBlock Text="Tâche Windows « optiSCAN_DailyScan » (--fullscan --quiet)"
+                                           FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                           Margin="0,3,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
                         </StackPanel>
+                        <StackPanel x:Name="pnlScheduleTime" Orientation="Horizontal" Margin="32,10,0,6">
+                            <TextBlock Text="Heure :" VerticalAlignment="Center" Margin="0,0,8,0"
+                                       Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
+                            <ComboBox x:Name="cmbScheduleHour" Width="56" Height="28" Margin="0,0,6,0"/>
+                            <TextBlock Text=":" VerticalAlignment="Center" Margin="0,0,6,0"/>
+                            <ComboBox x:Name="cmbScheduleMinute" Width="56" Height="28"/>
+                        </StackPanel>
+                        <TextBlock x:Name="txtScheduledNextRun"
+                                   FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                   Margin="32,4,0,8" TextWrapping="Wrap"/>
+                        <Button x:Name="btnScheduledRunNow"
+                                Content="Lancer maintenant"
+                                Click="BtnScheduledRunNow_Click"
+                                Style="{StaticResource SecondaryButton}"
+                                Height="32" Padding="12,4" Margin="32,0,0,0" HorizontalAlignment="Left"/>
                     </StackPanel>
 
                 </StackPanel>

@@ -23,8 +23,3 @@ Audit_optiSCAN*.docx
 # Dossier output de l'installer
 installer/output/
 
-# Converters non suivis
-optiSCAN/Converters/
-
-# Fichier AppInstallPaths.cs
-optiSCAN/Services/AppInstallPaths.cs

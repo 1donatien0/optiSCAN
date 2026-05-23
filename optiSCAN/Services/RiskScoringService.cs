@@ -83,7 +83,7 @@ namespace optiSCAN.Services
             if (!string.IsNullOrEmpty(threat.DetectedBy) && threat.DetectedBy.Contains('+'))
             {
                 score += 20;
-                reasons.Add($"Double confirmation ({threat.DetectedBy})");
+                reasons.Add("Détection corroborée");
             }
 
             // 4. Taille du fichier

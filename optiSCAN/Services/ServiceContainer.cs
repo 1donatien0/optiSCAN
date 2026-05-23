@@ -32,6 +32,9 @@ namespace optiSCAN.Services
         /// <summary>Surveillance fichiers sensibles (désactivable via Options / exclusions).</summary>
         public RealTimeProtection RealTimeProtection { get; }
 
+        /// <summary>Tâche planifiée Windows (schtasks) — instance partagée pour Options et diagnostics.</summary>
+        public ScheduledScanService ScheduledScan { get; }
+
         // Adapters interfaces — à utiliser pour les futurs tests ou substitutions
         public IScanEngine ScanEngine { get; }
 
@@ -43,6 +46,12 @@ namespace optiSCAN.Services
         // référence). Les vues peuvent alors appeler Navigation.NavigateTo("...")
         // sans connaître MainWindow.
         public INavigationService? Navigation { get; set; }
+
+        /// <summary>Résout une menace connue par chemin (liste live du ViewModel, enregistrée par MainWindow).</summary>
+        public Func<string, Models.ThreatInfo?>? ThreatLookup { get; set; }
+
+        public Models.ThreatInfo? FindKnownThreat(string filePath) =>
+            string.IsNullOrEmpty(filePath) ? null : ThreatLookup?.Invoke(filePath);
 
         /// <summary>
         /// Émis par une vue qui veut déclencher une mise à jour manuelle des
@@ -134,6 +143,17 @@ namespace optiSCAN.Services
         public void RequestExportLastScanPdf() =>
             _exportLastScanPdfHandlers?.Invoke(this, EventArgs.Empty);
 
+        private EventHandler<Models.ScanSession>? _exportScanSessionPdfHandlers;
+        /// <summary>Export PDF d'une session d'historique précise (pas seulement la dernière).</summary>
+        public event EventHandler<Models.ScanSession>? ExportScanSessionPdfRequested
+        {
+            add => _exportScanSessionPdfHandlers += value;
+            remove => _exportScanSessionPdfHandlers -= value;
+        }
+
+        public void RequestExportScanSessionPdf(Models.ScanSession session) =>
+            _exportScanSessionPdfHandlers?.Invoke(this, session);
+
         private ServiceContainer()
         {
             // Ordre de construction : du plus indépendant au plus dépendant.
@@ -149,6 +169,7 @@ namespace optiSCAN.Services
             ScanEngine = new ClamAvScanEngineAdapter(ClamAv);
             Actions = new AntivirusActions(this);
             RealTimeProtection = new RealTimeProtection(Orchestrator, Quarantine, Notifications);
+            ScheduledScan = new ScheduledScanService();
 
             // MAJ silencieuses alignées sur le guide produit (Options peut les couper).
             FreshclamUpdater.EnableAutoUpdate(TimeSpan.FromHours(4));
@@ -184,6 +205,7 @@ namespace optiSCAN.Services
             _scanHistoryViewsRefreshHandlers = null;
             _exportScanHistoryHtmlHandlers = null;
             _exportLastScanPdfHandlers = null;
+            _exportScanSessionPdfHandlers = null;
             try { RealTimeProtection.Dispose(); }
             catch (Exception ex) { AppLogger.Warn("ServiceContainer", "RealTimeProtection.Dispose", ex); }
             try { FreshclamUpdater.DisableAutoUpdate(); }

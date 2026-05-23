@@ -17,6 +17,10 @@ using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 
 namespace optiSCAN.Views
 {
+    /// <summary>
+    /// Vue principale de l'onglet Antivirus — scan, historique, signatures et quarantaine.
+    /// Se connecte au <see cref="ViewModels.ScanViewModel"/> via DataContext.
+    /// </summary>
     public partial class AntivirusView : System.Windows.Controls.UserControl
     {
         private ScanViewModel? _vmScanTabSubscription;
@@ -336,7 +340,11 @@ namespace optiSCAN.Views
         {
             if (sender is System.Windows.Controls.Button btn && btn.Tag is string filePath)
             {
-                Actions.QuarantineThreat(filePath);
+                var known = Services.ServiceContainer.Default.FindKnownThreat(filePath);
+                if (known != null)
+                    Actions.QuarantineThreat(known.Clone());
+                else
+                    Actions.QuarantineThreat(filePath);
                 RefreshAllData();
             }
         }
