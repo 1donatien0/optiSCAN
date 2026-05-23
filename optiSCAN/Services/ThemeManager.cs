@@ -1,4 +1,5 @@
 using MaterialDesignThemes.Wpf;
+using Microsoft.Win32;
 using optiSCAN.Services;
 
 namespace optiSCAN
@@ -34,25 +35,70 @@ namespace optiSCAN
         /// </summary>
         public static void Initialize()
         {
-            bool saved = Services.UserPreferences.Current.DarkTheme;
-            _isDarkTheme = saved;
-            ApplyTheme(saved);
+            var prefs = UserPreferences.Current;
+            if (prefs.SyncWindowsTheme)
+            {
+                bool dark = IsWindowsAppsDarkTheme();
+                _isDarkTheme = dark;
+                ApplyTheme(dark);
+                prefs.DarkTheme = dark;
+                prefs.Save();
+            }
+            else
+            {
+                _isDarkTheme = prefs.DarkTheme;
+                ApplyTheme(prefs.DarkTheme);
+            }
+        }
+
+        /// <summary>Indique si Windows est en mode applications sombres (registre Personalize).</summary>
+        public static bool IsWindowsAppsDarkTheme()
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(
+                    @"Software\Microsoft\Windows\CurrentVersion\Themes\Personalize", writable: false);
+                var v = key?.GetValue("AppsUseLightTheme");
+                if (v is int light)
+                    return light == 0;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ThemeManager", "IsWindowsAppsDarkTheme", ex);
+            }
+            return false;
         }
 
         /// <summary>Bascule sombre ↔ clair et sauvegarde la préférence.</summary>
         public static void Toggle()
         {
-            IsDarkTheme = !IsDarkTheme;
-            Services.UserPreferences.Current.DarkTheme = IsDarkTheme;
-            Services.UserPreferences.Current.Save();
+            var prefs = UserPreferences.Current;
+            prefs.SyncWindowsTheme = false;
+            Apply(!IsDarkTheme);
         }
 
         /// <summary>Applique explicitement un thème et sauvegarde.</summary>
         public static void Apply(bool dark)
         {
             IsDarkTheme = dark;
-            Services.UserPreferences.Current.DarkTheme = dark;
-            Services.UserPreferences.Current.Save();
+            var prefs = UserPreferences.Current;
+            prefs.DarkTheme = dark;
+            prefs.Save();
+        }
+
+        /// <summary>Active ou désactive le suivi du thème Windows.</summary>
+        public static void SetSyncWithWindows(bool sync)
+        {
+            var prefs = UserPreferences.Current;
+            prefs.SyncWindowsTheme = sync;
+            if (sync)
+            {
+                bool dark = IsWindowsAppsDarkTheme();
+                _isDarkTheme = dark;
+                ApplyTheme(dark);
+                prefs.DarkTheme = dark;
+            }
+            prefs.Save();
         }
 
         private static void ApplyTheme(bool isDark)

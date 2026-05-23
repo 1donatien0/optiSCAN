@@ -52,12 +52,20 @@ namespace optiSCAN.Services
                 merged.FilesScanned += sub.FilesScanned;
                 merged.FilesSkipped += sub.FilesSkipped;
                 merged.TotalBytesScanned += sub.TotalBytesScanned;
-                merged.Threats.AddRange(sub.Threats);
+                foreach (var t in sub.Threats)
+                {
+                    if (!merged.Threats.Any(existing => ThreatsMatch(existing, t)))
+                        merged.Threats.Add(t);
+                }
             }
 
             merged.FinishedAt = DateTime.Now;
             merged.Status = ct.IsCancellationRequested ? ScanStatus.Cancelled : ScanStatus.Completed;
             return merged;
         }
+
+        private static bool ThreatsMatch(ThreatInfo a, ThreatInfo b) =>
+            string.Equals(a.FilePath, b.FilePath, StringComparison.OrdinalIgnoreCase)
+            && string.Equals(a.VirusName, b.VirusName, StringComparison.OrdinalIgnoreCase);
     }
 }

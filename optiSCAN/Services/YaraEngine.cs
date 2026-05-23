@@ -17,13 +17,22 @@ namespace optiSCAN.Services
         private readonly string _rulesDirectory;
         private readonly string _compiledRulesPath;
         private readonly string _rulesCountCachePath;
+        // Empreinte enregistrée au moment de la dernière compilation réussie.
+        // Permet de détecter qu'un .yar a été modifié depuis la dernière compilation
+        // sans attendre la suppression manuelle de _compiled.yarc.
+        private readonly string _compiledStampPath;
 
         /// <summary>Limite de caractères capturés depuis la sortie standard de yara.</summary>
         private const int MaxYaraStdoutCaptureChars = 2_000_000;
 
         public bool IsAvailable { get; private set; }
         public int RulesCount { get; private set; }
-        public bool HasCompiled => File.Exists(_compiledRulesPath);
+
+        /// <summary>
+        /// <c>true</c> si <c>_compiled.yarc</c> existe ET correspond à l'état actuel des fichiers .yar.
+        /// Un <c>false</c> ici déclenche automatiquement une recompilation au prochain scan.
+        /// </summary>
+        public bool HasCompiled => IsCompiledUpToDate();
 
         // ── Constructeur ─────────────────────────────────────────────────────────
 
@@ -40,6 +49,7 @@ namespace optiSCAN.Services
             _rulesDirectory = rulesDir ?? Path.Combine(baseDir, "rules");
             _compiledRulesPath = Path.Combine(_rulesDirectory, "_compiled.yarc");
             _rulesCountCachePath = Path.Combine(_rulesDirectory, ".rules_count.cache");
+            _compiledStampPath = Path.Combine(_rulesDirectory, "_compiled.stamp");
 
             IsAvailable = CheckAvailability();
             if (IsAvailable)
@@ -55,6 +65,31 @@ namespace optiSCAN.Services
             if (!Directory.Exists(_rulesDirectory))
                 return false;
             return Directory.GetFiles(_rulesDirectory, "*.yar").Length > 0;
+        }
+
+        /// <summary>
+        /// Vérifie que <c>_compiled.yarc</c> existe ET que son empreinte correspond
+        /// à l'état actuel des fichiers .yar. Retourne <c>false</c> si le fichier
+        /// est absent, si <c>_compiled.stamp</c> est absent ou périmé (modification
+        /// manuelle d'une règle, ajout/suppression d'un .yar).
+        /// </summary>
+        private bool IsCompiledUpToDate()
+        {
+            if (!File.Exists(_compiledRulesPath)) return false;
+            if (!File.Exists(_compiledStampPath)) return false;
+            try
+            {
+                var files = Directory.GetFiles(_rulesDirectory, "*.yar");
+                if (files.Length == 0) return false;
+                Array.Sort(files, StringComparer.OrdinalIgnoreCase);
+                var currentStamp = ComputeRulesDirectoryFingerprint(files);
+                var savedStamp = File.ReadAllText(_compiledStampPath, Encoding.UTF8).Trim();
+                return string.Equals(currentStamp, savedStamp, StringComparison.Ordinal);
+            }
+            catch
+            {
+                return false; // En cas de doute → recompilation
+            }
         }
 
         // L2 fix : regex multiline plutôt que StartsWith("rule ") ligne par ligne.
@@ -210,7 +245,23 @@ namespace optiSCAN.Services
                 if (!string.IsNullOrWhiteSpace(err))
                     AppLogger.Warn("yarac", err);
 
-                return process.ExitCode == 0 && File.Exists(_compiledRulesPath);
+                var success = process.ExitCode == 0 && File.Exists(_compiledRulesPath);
+                if (success)
+                {
+                    // Persiste l'empreinte courante → HasCompiled détectera tout
+                    // changement ultérieur dans les .yar sans attendre une suppression manuelle.
+                    try
+                    {
+                        Array.Sort(ruleFiles, StringComparer.OrdinalIgnoreCase);
+                        var stamp = ComputeRulesDirectoryFingerprint(ruleFiles);
+                        File.WriteAllText(_compiledStampPath, stamp, Encoding.UTF8);
+                    }
+                    catch (Exception stampEx)
+                    {
+                        AppLogger.Warn("yarac", "Écriture _compiled.stamp échouée", stampEx);
+                    }
+                }
+                return success;
             }
             catch (Exception ex)
             {
@@ -230,6 +281,7 @@ namespace optiSCAN.Services
         {
             var matches = new List<YaraMatch>();
             if (!IsAvailable || !File.Exists(filePath)) return matches;
+            if (ExclusionSettings.Current.IsFileExcluded(filePath)) return matches;
 
             // Tenter compilation si pas encore fait
             if (!HasCompiled)
@@ -282,6 +334,7 @@ namespace optiSCAN.Services
         {
             var matches = new List<YaraMatch>();
             if (!IsAvailable || !Directory.Exists(folderPath)) return matches;
+            if (AppInstallPaths.IsUnderInstallRoot(folderPath)) return matches;
 
             // Compilation au besoin (idem ScanFileAsync).
             if (!HasCompiled)
@@ -342,7 +395,9 @@ namespace optiSCAN.Services
                 process.Start();
 
                 var cap = new YaraStdoutCapture();
+                var stderrLines = new StringBuilder();
                 process.OutputDataReceived += (_, e) => cap.OnLine(e.Data, MaxYaraStdoutCaptureChars);
+                process.ErrorDataReceived += (_, e) => { if (e.Data != null) stderrLines.AppendLine(e.Data); };
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
 
@@ -355,6 +410,10 @@ namespace optiSCAN.Services
                     AppLogger.Warn("YaraEngine",
                         "Sortie stdout YARA tronquée (limite mémoire) — certains matchs peuvent manquer.");
                 }
+
+                var stderrContent = stderrLines.ToString().Trim();
+                if (!string.IsNullOrEmpty(stderrContent))
+                    AppLogger.Warn("YARA/stderr (récursif)", stderrContent);
 
                 foreach (var line in cap.Builder.ToString()
                     .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
@@ -370,7 +429,8 @@ namespace optiSCAN.Services
                     var ruleName = line[..spaceIdx].Trim();
                     var matchedPath = line[(spaceIdx + 1)..].Trim();
 
-                    if (!string.IsNullOrEmpty(ruleName) && !string.IsNullOrEmpty(matchedPath))
+                    if (!string.IsNullOrEmpty(ruleName) && !string.IsNullOrEmpty(matchedPath)
+                        && !ExclusionSettings.Current.IsFileExcluded(matchedPath))
                         matches.Add(new YaraMatch { RuleName = ruleName, FilePath = matchedPath });
                 }
             }
@@ -396,7 +456,11 @@ namespace optiSCAN.Services
                 UseShellExecute = false,
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
-                CreateNoWindow = true
+                CreateNoWindow = true,
+                // CORRECTION : StandardOutputEncoding absent → chemins non-ASCII
+                // (accents, caractères Unicode) tronqués ou mal décodés.
+                // Cohérence avec RunYaraScanRecursiveAsync qui le spécifie déjà.
+                StandardOutputEncoding = Encoding.UTF8,
             };
             foreach (var a in args) psi.ArgumentList.Add(a);
 
@@ -407,9 +471,13 @@ namespace optiSCAN.Services
                 process.Start();
 
                 var cap = new YaraStdoutCapture();
+                var stderrLines = new System.Text.StringBuilder();
                 process.OutputDataReceived += (_, e) => cap.OnLine(e.Data, MaxYaraStdoutCaptureChars);
+                // CORRECTION : BeginErrorReadLine() sans handler = stderr drainé mais
+                // silencieusement perdu. On ajoute un handler pour logger les erreurs YARA.
+                process.ErrorDataReceived += (_, e) => { if (e.Data != null) stderrLines.AppendLine(e.Data); };
                 process.BeginOutputReadLine();
-                process.BeginErrorReadLine(); // Absorber stderr
+                process.BeginErrorReadLine();
 
                 await process.WaitForExitAsync(ct);
 
@@ -423,6 +491,11 @@ namespace optiSCAN.Services
                     AppLogger.Warn("YaraEngine",
                         "Sortie stdout YARA tronquée (limite mémoire) — certains matchs peuvent manquer.");
                 }
+
+                // Log les erreurs/avertissements YARA capturés depuis stderr
+                var stderrContent = stderrLines.ToString().Trim();
+                if (!string.IsNullOrEmpty(stderrContent))
+                    AppLogger.Warn("YARA/stderr", stderrContent);
 
                 // Format sortie YARA : "RuleName FilePath"
                 foreach (var line in cap.Builder.ToString()
@@ -470,6 +543,15 @@ namespace optiSCAN.Services
             catch (Exception ex)
             {
                 AppLogger.Warn("YaraEngine", "InvalidateCompiledRules (cache comptage)", ex);
+            }
+            try
+            {
+                if (File.Exists(_compiledStampPath))
+                    File.Delete(_compiledStampPath);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("YaraEngine", "InvalidateCompiledRules (stamp)", ex);
             }
         }
     }
