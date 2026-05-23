@@ -27,12 +27,12 @@
                     BorderBrush="{DynamicResource BorderSubtle}"
                     Background="{DynamicResource CardBg}"
                     Foreground="{DynamicResource TextDark}"/>
-            <Button Content="Exporter PDF (dernier scan)"
-                    Click="BtnExportPdf_Click"
+            <Button Content="Exporter PDF (sélection)"
+                    Click="BtnExportSelectedPdf_Click"
                     Height="36" Margin="8,0,0,0"
                     Padding="14,0"
                     Cursor="Hand"
-                    ToolTip="PDF basé sur la dernière entrée de l’onglet Scans antivirus"
+                    ToolTip="PDF de la ligne sélectionnée dans Scans antivirus"
                     BorderThickness="1"
                     BorderBrush="{DynamicResource BorderSubtle}"
                     Background="{DynamicResource CardBg}"
@@ -202,6 +202,16 @@
                                                 Width="100"/>
                         </DataGrid.Columns>
                     </DataGrid>
+                </TabItem>
+
+                <TabItem Header="Journal">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12">
+                        <TextBox x:Name="txtScanJournal"
+                                 IsReadOnly="True" TextWrapping="Wrap"
+                                 FontFamily="Consolas" FontSize="11"
+                                 Background="Transparent" BorderThickness="0"
+                                 Foreground="{DynamicResource TextDark}"/>
+                    </ScrollViewer>
                 </TabItem>
 
             </TabControl>

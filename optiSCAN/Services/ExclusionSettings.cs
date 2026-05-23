@@ -62,14 +62,42 @@ namespace optiSCAN.Services
         {
             // 1. Format chiffré DPAPI + HMAC
             var loaded = SecureStore.Load<ExclusionSettings>(SettingsPath);
-            if (loaded != null) return loaded;
+            if (loaded != null)
+            {
+                loaded.EnsureInstallFolderListed();
+                return loaded;
+            }
 
             // 2. Migration depuis l'ancien JSON en clair
             var migrated = SecureStore.MigrateFromPlaintext<ExclusionSettings>(LegacyPath, SettingsPath);
-            if (migrated != null) return migrated;
+            if (migrated != null)
+            {
+                migrated.EnsureInstallFolderListed();
+                return migrated;
+            }
 
             // 3. Premier lancement
-            return new ExclusionSettings();
+            var fresh = new ExclusionSettings();
+            fresh.EnsureInstallFolderListed();
+            return fresh;
+        }
+
+        /// <summary>
+        /// Ajoute le dossier d'installation aux exclusions persistées (visible dans Options),
+        /// en plus de l'exclusion implicite <see cref="IsFolderExcluded"/>.
+        /// </summary>
+        internal void EnsureInstallFolderListed()
+        {
+            var root = AppInstallPaths.GetInstallRoot();
+            if (string.IsNullOrWhiteSpace(root)) return;
+
+            var norm = root.TrimEnd('\\', '/');
+            if (ExcludedFolders.Exists(f =>
+                    string.Equals(f.TrimEnd('\\', '/'), norm, StringComparison.OrdinalIgnoreCase)))
+                return;
+
+            ExcludedFolders.Add(norm);
+            Save();
         }
 
         public void Save()

@@ -6,7 +6,7 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
-    <!-- Windows.Forms requis pour FolderBrowserDialog -->
+    <!-- Windows.Forms : requis pour FolderBrowserDialog -->
     <UseWindowsForms>true</UseWindowsForms>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- Exécution utilisateur standard (asInvoker) : l’élévation UAC n’est demandée que si une fonctionnalité le requiert. -->
@@ -15,19 +15,19 @@
     <Company>optiSCAN</Company>
     <Product>optiSCAN — ClamAV Edition</Product>
     <Copyright>Copyright 2026 Dona By</Copyright>
-    <!-- Icône embarquée dans le .exe (taskbar, explorateur, setup) -->
+    <!-- Icône embarquée dans l'exécutable (barre des tâches, Explorateur, installateur) -->
     <ApplicationIcon>optiSCAN.ico</ApplicationIcon>
   </PropertyGroup>
 
   <PropertyGroup>
-    <!-- Avant chaque publish : supprimer les dossiers RID / publish (voir cible
+    <!-- Avant chaque publication : supprimer les dossiers RID / publish (cible
          CleanStalePublishOutput). Désactiver : dotnet publish -p:CleanPublishArtifactsBeforePublish=false -->
     <CleanPublishArtifactsBeforePublish Condition="'$(CleanPublishArtifactsBeforePublish)' == ''">true</CleanPublishArtifactsBeforePublish>
   </PropertyGroup>
 
   <!-- Inno Setup lit bin\...\publish\ ou publish\win-x64\ : sans ce nettoyage,
-       des fichiers d'une build précédente peuvent rester si le dossier n'est
-       pas vidé et se retrouver dans l'installateur. -->
+       des fichiers d'une compilation antérieure peuvent rester et se retrouver
+       dans l'installateur si le dossier publish n'a pas été vidé. -->
   <Target Name="CleanStalePublishOutput" BeforeTargets="BeforePublish" Condition="'$(CleanPublishArtifactsBeforePublish)' == 'true'">
     <PropertyGroup>
       <_PublishParent>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)</_PublishParent>
@@ -84,7 +84,7 @@
     <Content Include="clamav\database\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
-    <!-- CA Cisco-Talos pour la vérification des signatures CVD (ClamAV ≥ 1.5) — copié à côté de freshclam ou en LocalAppData -->
+    <!-- Certificat CA Cisco-Talos (signatures CVD, ClamAV ≥ 1.5) — copié à côté de freshclam ou en LocalAppData -->
     <Content Include="clamav\certs\clamav.crt">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -92,11 +92,10 @@
 
   <!--
     Exclusion des fichiers .conf de la copie :
-    FreshclamUpdater et ClamDaemon génèrent leur propre conf à l'exécution
-    dans %LocalAppData%\optiSCAN\clamav\. Un freshclam.conf copié depuis le
-    repo contiendrait des chemins de la machine de dev (DatabaseDirectory =
-    D:\Projets\...) qui seraient invalides sur l'installation utilisateur,
-    et provoquerait des erreurs freshclam à l'init.
+    FreshclamUpdater génère freshclam.conf à l'exécution sous
+    %LocalAppData%\optiSCAN\clamav\. Un .conf copié depuis le dépôt
+    embarquerait des chemins de la machine de dev (DatabaseDirectory =
+    D:\Projets\...) invalides chez l'utilisateur et ferait échouer freshclam.
   -->
   <ItemGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' Or '$(PlatformTarget)' == 'x64'">
     <Content Include="clamav\x64\**\*" Exclude="clamav\x64\**\*.conf">
@@ -110,7 +109,7 @@
     </Content>
   </ItemGroup>
 
-  <!-- Fallback IDE: si aucune architecture n'est précisée, on copie les deux. -->
+  <!-- Repli IDE : si aucune architecture n'est précisée, copie des binaires x64 et x86. -->
   <ItemGroup Condition="'$(RuntimeIdentifier)' == '' And '$(PlatformTarget)' == ''">
     <Content Include="clamav\x64\**\*" Exclude="clamav\x64\**\*.conf">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -123,7 +122,7 @@
 
   <ItemGroup>
     <PackageReference Include="MaterialDesignThemes" Version="5.3.1" />
-    <!-- Phase 2 : services avancés -->
+    <!-- Phase 2 — services avancés (PDF, notifications) -->
     <PackageReference Include="QuestPDF" Version="2024.12.2" />
 
     <PackageReference Include="Microsoft.Toolkit.Uwp.Notifications" Version="7.1.3" />

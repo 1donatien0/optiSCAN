@@ -1,3 +1,6 @@
+using System.Security.Cryptography;
+using System.Text;
+
 namespace optiSCAN.Models
 {
     /// <summary>
@@ -26,8 +29,16 @@ namespace optiSCAN.Models
         /// <summary>Moteur qui a détecté la menace : "ClamAV", "YARA" ou "ClamAV+YARA".</summary>
         public string DetectedBy { get; set; } = "ClamAV";
 
-        /// <summary>ID unique pour la quarantaine (généré automatiquement).</summary>
-        public string Id => $"{DetectedBy}_{VirusName}_{FilePath.GetHashCode()}_{DetectedAt.Ticks}";
+        /// <summary>ID stable entre sessions (hash SHA-256 déterministe, pas GetHashCode()).</summary>
+        public string Id
+        {
+            get
+            {
+                var raw = $"{FilePath}|{VirusName}|{DetectedAt:yyyyMMddHHmmss}";
+                var bytes = SHA256.HashData(Encoding.UTF8.GetBytes(raw));
+                return Convert.ToHexString(bytes)[..16];
+            }
+        }
 
         /// <summary>Affichage court du nom de fichier (sans le chemin complet).</summary>
         public string FileName => System.IO.Path.GetFileName(FilePath);

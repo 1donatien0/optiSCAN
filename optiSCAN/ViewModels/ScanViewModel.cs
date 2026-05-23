@@ -213,6 +213,7 @@ namespace optiSCAN.ViewModels
 
         public ObservableCollection<ThreatInfo> Threats { get; } = new();
         public ObservableCollection<ScanSession> History { get; } = new();
+        public ObservableCollection<RecentScanTarget> RecentTargets { get; } = new();
         public ObservableCollection<QuarantineEntry> QuarantineEntries { get; } = new();
 
         /// <summary>Taille d'une page chargée depuis <see cref="QuarantineManager.GetEntriesPaged"/>.</summary>
@@ -251,6 +252,7 @@ namespace optiSCAN.ViewModels
         public ICommand FullScanCommand { get; }
         public ICommand ScanFolderCommand { get; }
         public ICommand ScanFileCommand { get; }
+        public ICommand ScanRecentCommand { get; }
         public ICommand StopScanCommand { get; }
         public ICommand UpdateDbCommand { get; }
         public ICommand QuarantineAllCommand { get; }
@@ -291,6 +293,16 @@ namespace optiSCAN.ViewModels
             FullScanCommand = new AsyncRelayCommand(async _ => await StartScanAsync(ScanType.FullScan));
             ScanFolderCommand = new AsyncRelayCommand(async p => await StartScanAsync(ScanType.Folder, p as string));
             ScanFileCommand = new AsyncRelayCommand(async p => await StartScanAsync(ScanType.File, p as string));
+            ScanRecentCommand = new AsyncRelayCommand(async p =>
+            {
+                if (p is RecentScanTarget t)
+                {
+                    if (t.ScanType is ScanType.File or ScanType.Folder)
+                        await StartScanAsync(t.ScanType, t.Path);
+                    else
+                        await StartScanAsync(t.ScanType);
+                }
+            });
             StopScanCommand = new RelayCommand(_ => _cts?.Cancel(), _ => IsScanning);
             UpdateDbCommand = new AsyncRelayCommand(async _ => await UpdateDatabaseAsync());
             QuarantineAllCommand = new RelayCommand(_ => QuarantineAllThreats(), _ => Threats.Count > 0);
@@ -341,7 +353,7 @@ namespace optiSCAN.ViewModels
                     IsClamAvAvailable = _clamAv.IsClamAvInstalled();
                 });
 
-                TryStep("Chargement historique", LoadHistory);
+                TryStep("Chargement historique", () => { LoadHistory(); RefreshRecentTargets(); });
                 TryStep("Compteur analyses (migration)", MigrateScanCountFromHistoryIfNeeded);
                 TryStep("Chargement quarantaine", () => LoadQuarantine());
 
@@ -438,7 +450,14 @@ namespace optiSCAN.ViewModels
 
                 LastResult = result;
                 _logger.SaveScanResult(result);
-                UserPreferences.Current.IncrementScanCount(type);
+                var prefs = UserPreferences.Current;
+                prefs.FavoriteScanType = type;
+                if (type is ScanType.File or ScanType.Folder && !string.IsNullOrWhiteSpace(path))
+                    prefs.AddRecentTarget(path, type);
+                else if (type is ScanType.QuickScan or ScanType.FullScan)
+                    prefs.AddRecentTarget(string.Empty, type);
+                prefs.IncrementScanCount(type);
+                RefreshRecentTargets();
                 LoadHistory();
                 ServiceContainer.Default.RequestScanHistoryViewsRefresh();
 
@@ -521,8 +540,9 @@ namespace optiSCAN.ViewModels
 
                 if (p.Phase == ScanPhase.ThreatFound && p.ThreatInfo != null)
                 {
-                    // Éviter les doublons
-                    if (!Threats.Any(t => t.FilePath == p.ThreatInfo.FilePath))
+                    CurrentScanItem = p.ThreatInfo.FilePath;
+                    StatusMessage = p.ThreatInfo.VirusName;
+                    if (!Threats.Any(t => string.Equals(t.FilePath, p.ThreatInfo.FilePath, StringComparison.OrdinalIgnoreCase)))
                         Threats.Add(p.ThreatInfo);
                 }
             }));
@@ -723,6 +743,18 @@ namespace optiSCAN.ViewModels
         public void RefreshHistory()
         {
             LoadHistory();
+            RefreshRecentTargets();
+        }
+
+        /// <summary>Recharge les 5 dernières cibles depuis <see cref="UserPreferences"/>.</summary>
+        public void RefreshRecentTargets()
+        {
+            WpfApp.Current?.Dispatcher.Invoke(() =>
+            {
+                RecentTargets.Clear();
+                foreach (var t in UserPreferences.Current.RecentTargets)
+                    RecentTargets.Add(t);
+            });
         }
 
         // ── INotifyPropertyChanged ────────────────────────────────────────────────

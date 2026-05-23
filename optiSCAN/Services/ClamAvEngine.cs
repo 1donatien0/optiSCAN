@@ -82,7 +82,27 @@ namespace optiSCAN.Services
 
         // ── Vérification ─────────────────────────────────────────────────────────
 
+        private bool? _cachedInstalled;
+        private DateTime _cachedInstalledAtUtc = DateTime.MinValue;
+        private static readonly TimeSpan InstallProbeCacheTtl = TimeSpan.FromSeconds(60);
+
+        /// <summary>
+        /// Vérifie que clamscan.exe est présent et fonctionnel en exécutant <c>--version</c>.
+        /// Résultat mis en cache 60 s pour limiter les spawns process à chaque navigation.
+        /// </summary>
         public bool IsClamAvInstalled()
+        {
+            if (_cachedInstalled.HasValue
+                && (DateTime.UtcNow - _cachedInstalledAtUtc) < InstallProbeCacheTtl)
+                return _cachedInstalled.Value;
+
+            var result = ProbeClamAvInstalled();
+            _cachedInstalled = result;
+            _cachedInstalledAtUtc = DateTime.UtcNow;
+            return result;
+        }
+
+        private bool ProbeClamAvInstalled()
         {
             if (!File.Exists(_clamscanExe)) return false;
             try
@@ -100,6 +120,10 @@ namespace optiSCAN.Services
             }
         }
 
+        /// <summary>
+        /// Retourne la version de ClamAV (première ligne de <c>clamscan --version</c>).
+        /// Retourne « Non installé » ou « Erreur » si l'exécutable est absent ou si une exception survient.
+        /// </summary>
         public async Task<string> GetVersionAsync()
         {
             if (!File.Exists(_clamscanExe)) return "Non installé";
@@ -117,6 +141,10 @@ namespace optiSCAN.Services
 
         // ── Méthodes de scan publiques ────────────────────────────────────────────
 
+        /// <summary>
+        /// Analyse un fichier unique avec clamscan.
+        /// Lève <see cref="FileNotFoundException"/> si le fichier est introuvable.
+        /// </summary>
         public Task<ScanResult> ScanFileAsync(
             string filePath,
             IProgress<ScanProgress>? progress = null,
@@ -127,6 +155,10 @@ namespace optiSCAN.Services
             return RunScanAsync(ScanType.File, filePath, recursive: false, progress, ct);
         }
 
+        /// <summary>
+        /// Analyse récursivement un dossier avec clamscan.
+        /// Lève <see cref="DirectoryNotFoundException"/> si le dossier est introuvable.
+        /// </summary>
         public Task<ScanResult> ScanFolderAsync(
             string folderPath,
             IProgress<ScanProgress>? progress = null,
@@ -137,14 +169,15 @@ namespace optiSCAN.Services
             return RunScanAsync(ScanType.Folder, folderPath, recursive: true, progress, ct);
         }
 
+        /// <summary>Analyse rapide sur les dossiers système prioritaires (chemins définis dans <see cref="ScanTargets"/>).</summary>
         public async Task<ScanResult> QuickScanAsync(
             IProgress<ScanProgress>? progress = null,
             CancellationToken ct = default)
         {
-            // Chemins du scan rapide : classe ScanTargets (liste centralisée).
             return await RunMultiTargetScanAsync(ScanType.QuickScan, ScanTargets.QuickScanTargets(), progress, ct);
         }
 
+        /// <summary>Analyse complète sur l'ensemble des cibles définies dans <see cref="ScanTargets"/>.</summary>
         public async Task<ScanResult> FullScanAsync(
             IProgress<ScanProgress>? progress = null,
             CancellationToken ct = default)
@@ -277,7 +310,7 @@ namespace optiSCAN.Services
 
                 progress?.Report(new ScanProgress
                 {
-                    Message = $"Menace : {threat.VirusName} [{threat.FileName}]",
+                    Message = $"{threat.VirusName} — {filePath}",
                     Phase = ScanPhase.ThreatFound,
                     ThreatInfo = threat,
                     FilesScanned = result.FilesScanned,
@@ -351,6 +384,11 @@ namespace optiSCAN.Services
         private void BuildScanArgs(Collection<string> args, string target, bool recursive)
         {
             if (recursive) args.Add("--recursive");
+
+            // Ne pas parcourir le dossier d'optiSCAN lors d'un scan parent (ex. C:\).
+            if (recursive && !AppInstallPaths.IsUnderInstallRoot(target))
+                args.Add($"--exclude={AppInstallPaths.GetClamScanExcludePattern()}");
+
             args.Add("--stdout");
             // NB: --no-summary supprimé. Le résumé "Scanned files: N" en fin
             // d'output est notre source de vérité pour le compteur final
