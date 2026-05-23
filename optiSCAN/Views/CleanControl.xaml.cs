@@ -7,6 +7,10 @@ using System.Windows;
 
 namespace optiSCAN.Views
 {
+    /// <summary>
+    /// Vue Nettoyer — analyse et suppression des fichiers temporaires, caches navigateurs et corbeille.
+    /// L'analyse doit être exécutée avant de pouvoir lancer le nettoyage.
+    /// </summary>
     public partial class CleanControl : System.Windows.Controls.UserControl
     {
         // Analyse doit être lancée avant de pouvoir nettoyer
@@ -15,6 +19,17 @@ namespace optiSCAN.Views
         public CleanControl()
         {
             InitializeComponent();
+            Loaded += (_, _) => RefreshCleanHistory();
+            ServiceContainer.Default.ScanHistoryViewsRefreshRequested += (_, _) =>
+                Dispatcher.BeginInvoke(RefreshCleanHistory);
+        }
+
+        /// <summary>Alimente la grille d'historique (octets libérés via <see cref="CleanSession.BytesDisplay"/>).</summary>
+        public void RefreshCleanHistory()
+        {
+            var sessions = ServiceContainer.Default.Logger.GetCleanHistory();
+            if (dgCleanHistory != null)
+                dgCleanHistory.ItemsSource = sessions;
         }
 
         // ── Analyser ─────────────────────────────────────────────────────────
@@ -33,10 +48,13 @@ namespace optiSCAN.Views
                 long chromeCache = MeasureDir(ChromeCachePath());
                 long ffCache = MeasureDir(FirefoxCachePath());
                 long braveCache = MeasureDir(BraveCachePath());
+                long operaCache = MeasureDir(OperaCachePath());
+                long vivaldiCache = MeasureDir(VivaldiCachePath());
+                long arcCache = MeasureDir(ArcCachePath());
                 long logsSize = MeasureDir(WindowsLogsPath());
 
                 long sysTotal = tempWin + tempUser + logsSize;
-                long browserTotal = edgeCache + chromeCache + ffCache + braveCache;
+                long browserTotal = edgeCache + chromeCache + ffCache + braveCache + operaCache + vivaldiCache + arcCache;
                 long total = sysTotal + browserTotal;
 
                 Dispatcher.Invoke(() =>
@@ -52,13 +70,15 @@ namespace optiSCAN.Views
                     AppendLog($"Chrome           : {FormatSize(chromeCache)}");
                     AppendLog($"Firefox          : {FormatSize(ffCache)}");
                     AppendLog($"Brave            : {FormatSize(braveCache)}");
+                    AppendLog($"Opera            : {FormatSize(operaCache)}");
+                    AppendLog($"Vivaldi          : {FormatSize(vivaldiCache)}");
+                    AppendLog($"Arc              : {FormatSize(arcCache)}");
                     AppendLog($"─────────────────────────");
                     AppendLog($"Total libérable  : {FormatSize(total)}");
                     AppendLog("=== ANALYSE TERMINÉE ===");
 
                     _analysed = true;
                     btnCleanNow.IsEnabled = true;
-                    txtAnalyzeHint.Visibility = Visibility.Collapsed;
                 });
             });
 
@@ -79,6 +99,9 @@ namespace optiSCAN.Views
             bool doChrome = chkChrome?.IsChecked == true;
             bool doFirefox = chkFirefox?.IsChecked == true;
             bool doBrave = chkBrave?.IsChecked == true;
+            bool doOpera = chkOpera?.IsChecked == true;
+            bool doVivaldi = chkVivaldi?.IsChecked == true;
+            bool doArc = chkArc?.IsChecked == true;
             bool doLogs = chkLogs?.IsChecked == true;
 
             btnAnalyze.IsEnabled = false;
@@ -133,6 +156,24 @@ namespace optiSCAN.Views
                         freed += f;
                         Dispatcher.Invoke(() => AppendLog($"Cache Brave : {FormatSize(f)}"));
                     }
+                    if (doOpera)
+                    {
+                        long f = CleanDir(OperaCachePath());
+                        freed += f;
+                        Dispatcher.Invoke(() => AppendLog($"Cache Opera : {FormatSize(f)}"));
+                    }
+                    if (doVivaldi)
+                    {
+                        long f = CleanDir(VivaldiCachePath());
+                        freed += f;
+                        Dispatcher.Invoke(() => AppendLog($"Cache Vivaldi : {FormatSize(f)}"));
+                    }
+                    if (doArc)
+                    {
+                        long f = CleanDir(ArcCachePath());
+                        freed += f;
+                        Dispatcher.Invoke(() => AppendLog($"Cache Arc : {FormatSize(f)}"));
+                    }
                     if (doLogs)
                     {
                         long f = CleanDir(WindowsLogsPath());
@@ -150,11 +191,9 @@ namespace optiSCAN.Views
                         txtTotalSize.Text = "0 Mo";
                         _analysed = false;
                         btnCleanNow.IsEnabled = false;
-                        txtAnalyzeHint.Visibility = Visibility.Visible;
-                        txtAnalyzeHint.Text = "  ✅ Nettoyage effectué";
 
                         var cleanEnd = DateTime.Now;
-                        var targets = BuildCleanTargetsSummary(doTempWin, doTempUser, doRecycle, doEdge, doChrome, doFirefox, doBrave, doLogs);
+                        var targets = BuildCleanTargetsSummary(doTempWin, doTempUser, doRecycle, doEdge, doChrome, doFirefox, doBrave, doOpera, doVivaldi, doArc, doLogs);
                         try
                         {
                             ServiceContainer.Default.Logger.SaveCleanSession(new CleanSession
@@ -164,6 +203,7 @@ namespace optiSCAN.Views
                                 TargetsSummary = targets,
                                 BytesFreed = freed
                             });
+                            RefreshCleanHistory();
                             ServiceContainer.Default.RequestScanHistoryViewsRefresh();
                         }
                         catch (Exception ex)
@@ -211,6 +251,9 @@ namespace optiSCAN.Views
         private static string EdgeCachePath() => Path.Combine(LocalApp, @"Microsoft\Edge\User Data\Default\Cache");
         private static string ChromeCachePath() => Path.Combine(LocalApp, @"Google\Chrome\User Data\Default\Cache");
         private static string BraveCachePath() => Path.Combine(LocalApp, @"BraveSoftware\Brave-Browser\User Data\Default\Cache");
+        private static string OperaCachePath() => Path.Combine(LocalApp, @"Opera Software\Opera Stable\Cache");
+        private static string VivaldiCachePath() => Path.Combine(LocalApp, @"Vivaldi\User Data\Default\Cache");
+        private static string ArcCachePath() => Path.Combine(LocalApp, @"Arc\User Data\Default\Cache");
         private static string WindowsLogsPath() => Path.Combine(
             Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows", @"Logs");
         private static string FirefoxCachePath()
@@ -261,9 +304,10 @@ namespace optiSCAN.Views
         }
 
         private static string BuildCleanTargetsSummary(
-            bool tempWin, bool tempUser, bool recycle, bool edge, bool chrome, bool firefox, bool brave, bool logs)
+            bool tempWin, bool tempUser, bool recycle, bool edge, bool chrome, bool firefox, bool brave,
+            bool opera, bool vivaldi, bool arc, bool logs)
         {
-            var parts = new List<string>(8);
+            var parts = new List<string>(12);
             if (tempWin) parts.Add("Temp Windows");
             if (tempUser) parts.Add("Temp utilisateur");
             if (recycle) parts.Add("Corbeille");
@@ -271,6 +315,9 @@ namespace optiSCAN.Views
             if (chrome) parts.Add("Chrome");
             if (firefox) parts.Add("Firefox");
             if (brave) parts.Add("Brave");
+            if (opera) parts.Add("Opera");
+            if (vivaldi) parts.Add("Vivaldi");
+            if (arc) parts.Add("Arc");
             if (logs) parts.Add("Journaux système");
             return parts.Count == 0 ? "—" : string.Join(", ", parts);
         }

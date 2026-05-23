@@ -5,6 +5,11 @@ using WinApplication = System.Windows.Application;
 
 namespace optiSCAN
 {
+    /// <summary>
+    /// Point d'entrée de l'application WPF optiSCAN.
+    /// Gère l'instance unique (mutex), le mode headless (scans planifiés sans UI)
+    /// et l'initialisation du thème au démarrage.
+    /// </summary>
     public partial class App : WinApplication
     {
         private static Mutex? _instanceMutex;
@@ -17,6 +22,11 @@ namespace optiSCAN
         private const string ArgQuickScan = "--quickscan";
         private const string ArgQuiet = "--quiet";
 
+        /// <summary>
+        /// Appelé au démarrage de l'application. Gère dans l'ordre :
+        /// le mode headless (scan sans UI), puis le contrôle d'instance unique,
+        /// et enfin l'initialisation du thème pour le mode normal.
+        /// </summary>
         protected override async void OnStartup(StartupEventArgs e)
         {
             // ── Mode headless ────────────────────────────────────────────────
@@ -58,6 +68,7 @@ namespace optiSCAN
 
         private enum HeadlessMode { None, FullScan, QuickScan }
 
+        /// <summary>Détecte le mode headless depuis les arguments de ligne de commande.</summary>
         private static HeadlessMode ParseHeadlessMode(string[] args)
         {
             foreach (var a in args)
@@ -70,9 +81,14 @@ namespace optiSCAN
             return HeadlessMode.None;
         }
 
+        /// <summary>Retourne <c>true</c> si l'argument <c>--quiet</c> est présent.</summary>
         private static bool IsQuiet(string[] args)
             => args.Any(a => string.Equals(a, ArgQuiet, StringComparison.OrdinalIgnoreCase));
 
+        /// <summary>
+        /// Exécute un scan en mode headless (sans fenêtre WPF), persiste le résultat
+        /// dans l'historique et déclenche la quarantaine automatique si configurée.
+        /// </summary>
         private async Task RunHeadlessAsync(HeadlessMode mode, bool quiet)
         {
             try
@@ -127,6 +143,10 @@ namespace optiSCAN
             }
         }
 
+        /// <summary>
+        /// Appelé à la fermeture de l'application. Libère le mutex d'instance unique
+        /// et délègue à <see cref="ServiceContainer.Shutdown"/> pour disposer les services.
+        /// </summary>
         protected override void OnExit(ExitEventArgs e)
         {
             // ReleaseMutex doit être appelé sur le même thread que celui qui a

@@ -50,7 +50,8 @@ namespace optiSCAN.Services
         }
 
         /// <summary>
-        /// Démarre la surveillance temps réel
+        /// Démarre la surveillance en temps réel sur les dossiers critiques, le bureau et les téléchargements.
+        /// Sans effet si la protection est déjà active.
         /// </summary>
         public void Start()
         {
@@ -81,7 +82,8 @@ namespace optiSCAN.Services
         }
 
         /// <summary>
-        /// Arrête la surveillance
+        /// Arrête la surveillance en temps réel et libère tous les <see cref="FileSystemWatcher"/> actifs.
+        /// Sans effet si la protection est déjà arrêtée.
         /// </summary>
         public void Stop()
         {
@@ -286,6 +288,7 @@ namespace optiSCAN.Services
             AppLogger.Info("RealTimeProtection", message);
         }
 
+        /// <summary>Arrête la protection et libère le sémaphore et le timer de nettoyage.</summary>
         public void Dispose()
         {
             if (_disposed) return;

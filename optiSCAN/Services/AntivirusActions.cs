@@ -35,12 +35,33 @@ namespace optiSCAN.Services
 
         // ── Actions sur menaces détectées ────────────────────────────────────────
 
-        public ActionResult QuarantineThreat(string filePath)
-        {
-            if (string.IsNullOrEmpty(filePath) || !File.Exists(filePath))
-                return Complete(false, $"Fichier introuvable : {Path.GetFileName(filePath)}");
+        public ActionResult QuarantineThreat(string filePath) =>
+            QuarantineThreat(ResolveThreatForPath(filePath));
 
-            var threat = new ThreatInfo
+        public ActionResult QuarantineThreat(ThreatInfo threat)
+        {
+            if (string.IsNullOrEmpty(threat.FilePath) || !File.Exists(threat.FilePath))
+                return Complete(false, $"Fichier introuvable : {Path.GetFileName(threat.FilePath)}");
+
+            if (threat.FileSize < 0)
+                threat.FileSize = SafeFileSize(threat.FilePath);
+            if (string.IsNullOrWhiteSpace(threat.VirusName))
+                threat.VirusName = "Détecté";
+            threat.Status = ThreatStatus.Detected;
+
+            bool ok = _quarantine.Quarantine(threat);
+            return Complete(ok,
+                ok ? $"✅ Fichier mis en quarantaine : {Path.GetFileName(threat.FilePath)}"
+                   : $"❌ Échec quarantaine : {Path.GetFileName(threat.FilePath)}");
+        }
+
+        private static ThreatInfo ResolveThreatForPath(string filePath)
+        {
+            var known = ServiceContainer.Default.FindKnownThreat(filePath);
+            if (known != null)
+                return known.Clone();
+
+            return new ThreatInfo
             {
                 FilePath = filePath,
                 VirusName = "Détecté",
@@ -48,11 +69,6 @@ namespace optiSCAN.Services
                 Status = ThreatStatus.Detected,
                 FileSize = SafeFileSize(filePath),
             };
-
-            bool ok = _quarantine.Quarantine(threat);
-            return Complete(ok,
-                ok ? $"✅ Fichier mis en quarantaine : {Path.GetFileName(filePath)}"
-                   : $"❌ Échec quarantaine : {Path.GetFileName(filePath)}");
         }
 
         public ActionResult IgnoreThreat(string filePath)

@@ -156,5 +156,16 @@ namespace optiSCAN.Services
 
         /// <summary>Affichage court pour les menus.</summary>
         public string DisplayName => System.IO.Path.GetFileName(Path) is { Length: > 0 } n ? n : Path;
+
+        /// <summary>Ligne pour la liste des cibles récentes (panneau Antivirus).</summary>
+        [JsonIgnore]
+        public string ListLabel => ScanType switch
+        {
+            ScanType.QuickScan => "Analyse rapide",
+            ScanType.FullScan => "Analyse complète",
+            ScanType.Folder => $"Dossier : {DisplayName}",
+            ScanType.File => $"Fichier : {DisplayName}",
+            _ => DisplayName
+        };
     }
 }

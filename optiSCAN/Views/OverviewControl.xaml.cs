@@ -11,6 +11,10 @@ using Brushes = System.Windows.Media.Brushes;
 
 namespace optiSCAN.Views
 {
+    /// <summary>
+    /// Vue d'ensemble (tableau de bord) : état de la protection, dernière analyse,
+    /// statistiques et recommandations. Mise à jour via des méthodes publiques appelées par MainWindow.
+    /// </summary>
     public partial class OverviewControl : System.Windows.Controls.UserControl
     {
         public OverviewControl()

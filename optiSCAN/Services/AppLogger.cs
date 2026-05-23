@@ -29,22 +29,28 @@ namespace optiSCAN.Services
             "optiSCAN", "Logs");
 
         private static readonly object _writeLock = new();
-        private static DateTime _lastCleanup = DateTime.MinValue;
+        private static readonly string LastCleanupMarkerPath = Path.Combine(LogDir, ".lastcleanup");
+        private static DateTime _lastCleanup = LoadLastCleanupUtc();
 
         // ── API publique ─────────────────────────────────────────────────────────
 
+        /// <summary>Journalise un message de niveau DEBUG (console uniquement, non écrit sur disque par défaut).</summary>
         public static void Debug(string component, string message) =>
             Write(Level.Debug, component, message, null);
 
+        /// <summary>Journalise un message informatif.</summary>
         public static void Info(string component, string message) =>
             Write(Level.Info, component, message, null);
 
+        /// <summary>Journalise un avertissement, avec exception optionnelle.</summary>
         public static void Warn(string component, string message, Exception? ex = null) =>
             Write(Level.Warn, component, message, ex);
 
+        /// <summary>Journalise une erreur récupérable avec sa stack trace complète.</summary>
         public static void Error(string component, string message, Exception? ex = null) =>
             Write(Level.Error, component, message, ex);
 
+        /// <summary>Journalise une erreur fatale (non récupérable).</summary>
         public static void Fatal(string component, string message, Exception? ex = null) =>
             Write(Level.Fatal, component, message, ex);
 
@@ -105,11 +111,12 @@ namespace optiSCAN.Services
             return sb.ToString();
         }
 
-        /// <summary>Supprime les logs de plus de 30 jours, max une fois par jour.</summary>
+        /// <summary>Supprime les logs de plus de 30 jours, max une fois par jour (persisté entre sessions).</summary>
         private static void MaybeCleanupOldLogs()
         {
-            if ((DateTime.Now - _lastCleanup).TotalHours < 24) return;
-            _lastCleanup = DateTime.Now;
+            if ((DateTime.UtcNow - _lastCleanup).TotalHours < 24) return;
+            _lastCleanup = DateTime.UtcNow;
+            PersistLastCleanupUtc(_lastCleanup);
 
             try
             {
@@ -123,6 +130,29 @@ namespace optiSCAN.Services
                     }
                     catch { /* fichier verrouillé → tant pis, on le verra demain */ }
                 }
+            }
+            catch { /* best effort */ }
+        }
+
+        private static DateTime LoadLastCleanupUtc()
+        {
+            try
+            {
+                if (!File.Exists(LastCleanupMarkerPath)) return DateTime.MinValue;
+                var text = File.ReadAllText(LastCleanupMarkerPath, Encoding.UTF8).Trim();
+                if (DateTime.TryParse(text, null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt))
+                    return dt.Kind == DateTimeKind.Utc ? dt : dt.ToUniversalTime();
+            }
+            catch { /* premier lancement ou fichier corrompu */ }
+            return DateTime.MinValue;
+        }
+
+        private static void PersistLastCleanupUtc(DateTime utc)
+        {
+            try
+            {
+                if (!Directory.Exists(LogDir)) Directory.CreateDirectory(LogDir);
+                File.WriteAllText(LastCleanupMarkerPath, utc.ToString("o"), Encoding.UTF8);
             }
             catch { /* best effort */ }
         }
