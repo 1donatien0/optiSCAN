@@ -19,7 +19,7 @@ namespace optiSCAN.Services
     ///        - garantit le renommage atomique (NTFS)
     ///        - sauvegarde l'ancienne version dans <c>target.bak</c>
     ///   4. Si <see cref="File.Replace"/> n'est pas disponible (premier write),
-    ///      fallback sur <see cref="File.Move"/>.
+    ///      repli sur <see cref="File.Move"/>.
     /// </summary>
     public static class AtomicFile
     {
@@ -76,13 +76,13 @@ namespace optiSCAN.Services
                 // En cas d'échec du renommage, on tente un cleanup du tmp pour ne
                 // pas laisser de fichier orphelin, puis on relève l'exception au
                 // caller pour qu'il puisse la logger.
-                try { if (File.Exists(tmp)) File.Delete(tmp); } catch { /* best effort */ }
+                try { if (File.Exists(tmp)) File.Delete(tmp); } catch { /* approche prudente */ }
                 throw;
             }
         }
 
         /// <summary>
-        /// Lit un fichier en tentant la version courante, puis le .bak en fallback
+        /// Lit un fichier en tentant la version courante, puis le .bak en repli
         /// si la version courante est corrompue ou inexistante.
         ///
         /// <paramref name="parser"/> doit lever une exception si le contenu est

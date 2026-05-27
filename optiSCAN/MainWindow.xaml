@@ -5,22 +5,23 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
         xmlns:views="clr-namespace:optiSCAN.Views"
+        xmlns:strings="clr-namespace:optiSCAN.Strings"
         mc:Ignorable="d"
         Title="optiSCAN — Optimiseur &amp; Antivirus"
         Height="720" Width="1280"
         MinHeight="600" MinWidth="1024"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource AppBg}"
-        FontFamily="Segoe UI">
+        FontFamily="{DynamicResource AppFontFamily}">
 
     <Grid>
         <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="260"/>
+            <ColumnDefinition Width="90"/>
             <ColumnDefinition Width="*"/>
         </Grid.ColumnDefinitions>
 
         <!-- ═══════════════════════════════════════════════
-             SIDEBAR
+             SIDEBAR SLIM (90 px)
         ═══════════════════════════════════════════════ -->
         <Border Grid.Column="0"
                 Background="{DynamicResource SidebarBg}"
@@ -28,71 +29,55 @@
                 BorderThickness="0,0,1,0">
             <DockPanel>
 
-                <!-- Logo -->
-                <StackPanel DockPanel.Dock="Top" Margin="20,22,20,12">
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <Border Width="42" Height="42" CornerRadius="11"
-                                Background="{DynamicResource AccentBg}">
-                            <md:PackIcon Kind="Shield" Width="24" Height="24"
-                                         Foreground="{DynamicResource PrimaryBlue}"
-                                         HorizontalAlignment="Center"
-                                         VerticalAlignment="Center"/>
-                        </Border>
-                        <StackPanel Margin="11,0,0,0" VerticalAlignment="Center">
-                            <TextBlock Text="optiSCAN"
-                                       FontSize="16" FontWeight="Bold"
-                                       Foreground="{DynamicResource TextDark}"/>
-                            <TextBlock Text="Fourni par Dona By"
-                                       FontSize="10"
-                                       Foreground="{DynamicResource TextMuted}"/>
-                        </StackPanel>
-                    </StackPanel>
+                <!-- Logo (icône seule) -->
+                <StackPanel DockPanel.Dock="Top" Margin="0,18,0,10"
+                            HorizontalAlignment="Center">
+                    <Border Width="42" Height="42" CornerRadius="11"
+                            Background="{DynamicResource AccentBg}"
+                            HorizontalAlignment="Center">
+                        <md:PackIcon Kind="Shield" Width="24" Height="24"
+                                     Foreground="{DynamicResource PrimaryBlue}"
+                                     HorizontalAlignment="Center"
+                                     VerticalAlignment="Center"/>
+                    </Border>
                 </StackPanel>
 
-                <Separator DockPanel.Dock="Top" Background="{DynamicResource BorderSubtle}" Margin="0,0,0,4"/>
+                <Separator DockPanel.Dock="Top" Background="{DynamicResource BorderSubtle}" Margin="10,0,10,4"/>
 
-                <!-- Étiquette MENU -->
-                <TextBlock DockPanel.Dock="Top"
-                           Text="MENU"
-                           FontSize="10" FontWeight="SemiBold"
-                           Foreground="{DynamicResource TextMuted}"
-                           Margin="24,10,0,4"
-                           />
+                <!-- Boutons bas -->
+                <StackPanel DockPanel.Dock="Bottom" Margin="0,0,0,10"
+                            HorizontalAlignment="Center">
 
-                <!-- Boutons bas (Dock=Bottom en premier pour être en bas) -->
-                <StackPanel DockPanel.Dock="Bottom" Margin="12,0,12,14">
+                    <!-- Version -->
                     <TextBlock x:Name="txtSidebarVersion"
                                Text="…"
-                               FontSize="10" Foreground="{DynamicResource TextMuted}"
-                               HorizontalAlignment="Center" Margin="0,8,0,0"/>
+                               FontSize="9" Foreground="{DynamicResource TextMuted}"
+                               HorizontalAlignment="Center" Margin="0,6,0,0"
+                               TextWrapping="Wrap" TextAlignment="Center" Width="80"/>
                 </StackPanel>
 
-                <StackPanel DockPanel.Dock="Bottom" Margin="10,0,10,4">
-                    <!-- Site web -->
+                <StackPanel DockPanel.Dock="Bottom" Margin="0,0,0,4"
+                            HorizontalAlignment="Center">
+
+                    <!-- Site web (icône seule) -->
                     <Button x:Name="btnWebsite"
                             Click="BtnWebsite_Click"
-                            Height="36" Margin="0,3"
+                            Width="48" Height="36" Margin="0,3"
                             Background="{DynamicResource SurfaceBg}"
                             BorderBrush="{DynamicResource BorderColor}"
                             BorderThickness="1"
-                            Cursor="Hand">
+                            Cursor="Hand"
+                            ToolTip="Site web">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="bg" CornerRadius="8"
                                         Background="{TemplateBinding Background}"
                                         BorderBrush="{TemplateBinding BorderBrush}"
                                         BorderThickness="{TemplateBinding BorderThickness}">
-                                    <StackPanel Orientation="Horizontal"
-                                                HorizontalAlignment="Center"
-                                                VerticalAlignment="Center">
-                                        <md:PackIcon Kind="Web" Width="16" Height="16"
-                                                     Foreground="{DynamicResource TextMedium}"
-                                                     VerticalAlignment="Center"/>
-                                        <TextBlock Text=" Site web"
-                                                   FontSize="12"
-                                                   Foreground="{DynamicResource TextMedium}"
-                                                   VerticalAlignment="Center"/>
-                                    </StackPanel>
+                                    <md:PackIcon Kind="Web" Width="16" Height="16"
+                                                 Foreground="{DynamicResource TextMedium}"
+                                                 HorizontalAlignment="Center"
+                                                 VerticalAlignment="Center"/>
                                 </Border>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
@@ -103,29 +88,22 @@
                         </Button.Template>
                     </Button>
 
-                    <!-- Mode sombre -->
+                    <!-- Mode sombre (icône seule) -->
                     <Button x:Name="btnModesSombre"
                             Click="BtnModesSombre_Click"
-                            Height="36" Margin="0,3"
+                            Width="48" Height="36" Margin="0,3"
                             Background="{DynamicResource ThemeToggleBg}"
                             BorderThickness="0"
-                            Cursor="Hand">
+                            Cursor="Hand"
+                            ToolTip="Mode sombre">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="bg" CornerRadius="8"
                                         Background="{TemplateBinding Background}">
-                                    <StackPanel Orientation="Horizontal"
-                                                HorizontalAlignment="Center"
-                                                VerticalAlignment="Center">
-                                        <md:PackIcon Kind="WeatherSunny" Width="16" Height="16"
-                                                     Foreground="{DynamicResource ThemeToggleFg}"
-                                                     VerticalAlignment="Center"/>
-                                        <TextBlock Text=" Mode sombre"
-                                                   FontSize="12"
-                                                   Foreground="{DynamicResource ThemeToggleFg}"
-                                                   FontWeight="SemiBold"
-                                                   VerticalAlignment="Center"/>
-                                    </StackPanel>
+                                    <md:PackIcon Kind="WeatherSunny" Width="16" Height="16"
+                                                 Foreground="{DynamicResource ThemeToggleFg}"
+                                                 HorizontalAlignment="Center"
+                                                 VerticalAlignment="Center"/>
                                 </Border>
                                 <ControlTemplate.Triggers>
                                     <Trigger Property="IsMouseOver" Value="True">
@@ -140,81 +118,90 @@
                 <!-- Séparateur avant boutons bas -->
                 <Separator DockPanel.Dock="Bottom"
                            Background="{DynamicResource BorderSubtle}"
-                           Margin="0,6,0,6"/>
+                           Margin="10,4,10,4"/>
 
-                <!-- Navigation RadioButtons -->
+                <!-- Navigation RadioButtons — icône + label empilés, centrés -->
                 <StackPanel DockPanel.Dock="Top">
 
-                    <!-- Vue d'ensemble — IsChecked défini en code après RegisterPanels()
-                         (sinon Checked se déclenche pendant InitializeComponent avant l'enregistrement des panneaux). -->
+                    <!-- Vue d'ensemble -->
                     <RadioButton x:Name="navOverview"
                                  Style="{StaticResource NavItem}"
-                                 Tag="Overview"
+                                 Tag="{x:Static strings:OptiscanStrings+PanelIds.Overview}"
                                  Checked="NavItem_Checked">
-                        <StackPanel Orientation="Horizontal">
-                            <md:PackIcon Kind="Monitor" Width="18" Height="18"
-                                         VerticalAlignment="Center" Margin="0,0,12,0"/>
-                            <TextBlock Text="Vue d'ensemble" FontSize="13" VerticalAlignment="Center"/>
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <md:PackIcon Kind="Monitor" Width="22" Height="22"
+                                         HorizontalAlignment="Center"
+                                         VerticalAlignment="Center"/>
+                            <TextBlock Text="Accueil" FontSize="9" TextAlignment="Center"
+                                       Margin="0,4,0,0"/>
                         </StackPanel>
                     </RadioButton>
 
                     <!-- Nettoyer -->
                     <RadioButton x:Name="navClean"
                                  Style="{StaticResource NavItem}"
-                                 Tag="Clean"
+                                 Tag="{x:Static strings:OptiscanStrings+PanelIds.Clean}"
                                  Checked="NavItem_Checked">
-                        <StackPanel Orientation="Horizontal">
-                            <md:PackIcon Kind="Broom" Width="18" Height="18"
-                                         VerticalAlignment="Center" Margin="0,0,12,0"/>
-                            <TextBlock Text="Nettoyer" FontSize="13" VerticalAlignment="Center"/>
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <md:PackIcon Kind="Broom" Width="22" Height="22"
+                                         HorizontalAlignment="Center"
+                                         VerticalAlignment="Center"/>
+                            <TextBlock Text="Nettoyer" FontSize="9" TextAlignment="Center"
+                                       Margin="0,4,0,0"/>
                         </StackPanel>
                     </RadioButton>
 
                     <!-- Antivirus -->
                     <RadioButton x:Name="navAntivirus"
                                  Style="{StaticResource NavItem}"
-                                 Tag="Antivirus"
+                                 Tag="{x:Static strings:OptiscanStrings+PanelIds.Antivirus}"
                                  Checked="NavItem_Checked">
-                        <StackPanel Orientation="Horizontal">
-                            <md:PackIcon Kind="ShieldCheck" Width="18" Height="18"
-                                         VerticalAlignment="Center" Margin="0,0,12,0"/>
-                            <StackPanel VerticalAlignment="Center">
-                                <TextBlock Text="Antivirus" FontSize="13"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,1,0,0">
-                                    <md:PackIcon x:Name="icoSidebarClamAv"
-                                                 Kind="ShieldCheck" Width="10" Height="10"
-                                                 VerticalAlignment="Center" Margin="0,0,4,0"
-                                                 Foreground="{DynamicResource SuccessGreen}"/>
-                                    <TextBlock x:Name="txtSidebarClamAvBadge"
-                                               Text="ClamAV actif"
-                                               FontSize="10"
-                                               Foreground="{DynamicResource SuccessGreen}"/>
-                                </StackPanel>
-                            </StackPanel>
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <Grid HorizontalAlignment="Center">
+                                <md:PackIcon Kind="ShieldCheck" Width="22" Height="22"
+                                             HorizontalAlignment="Center"
+                                             VerticalAlignment="Center"/>
+                                <!-- Badge ClamAV (petit point vert) -->
+                                <md:PackIcon x:Name="icoSidebarClamAv"
+                                             Kind="ShieldCheck" Width="10" Height="10"
+                                             HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                                             Foreground="{DynamicResource SuccessGreen}"/>
+                            </Grid>
+                            <TextBlock Text="Antivirus" FontSize="9" TextAlignment="Center"
+                                       Margin="0,4,0,0"/>
+                            <TextBlock x:Name="txtSidebarClamAvBadge"
+                                       Text="actif"
+                                       FontSize="8" TextAlignment="Center"
+                                       Foreground="{DynamicResource SuccessGreen}"
+                                       Margin="0,1,0,0"/>
                         </StackPanel>
                     </RadioButton>
 
                     <!-- Historique -->
                     <RadioButton x:Name="navHistory"
                                  Style="{StaticResource NavItem}"
-                                 Tag="History"
+                                 Tag="{x:Static strings:OptiscanStrings+PanelIds.History}"
                                  Checked="NavItem_Checked">
-                        <StackPanel Orientation="Horizontal">
-                            <md:PackIcon Kind="History" Width="18" Height="18"
-                                         VerticalAlignment="Center" Margin="0,0,12,0"/>
-                            <TextBlock Text="Historique" FontSize="13" VerticalAlignment="Center"/>
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <md:PackIcon Kind="History" Width="22" Height="22"
+                                         HorizontalAlignment="Center"
+                                         VerticalAlignment="Center"/>
+                            <TextBlock Text="Historique" FontSize="9" TextAlignment="Center"
+                                       Margin="0,4,0,0"/>
                         </StackPanel>
                     </RadioButton>
 
                     <!-- Options -->
                     <RadioButton x:Name="navOptions"
                                  Style="{StaticResource NavItem}"
-                                 Tag="Options"
+                                 Tag="{x:Static strings:OptiscanStrings+PanelIds.Options}"
                                  Checked="NavItem_Checked">
-                        <StackPanel Orientation="Horizontal">
-                            <md:PackIcon Kind="Cog" Width="18" Height="18"
-                                         VerticalAlignment="Center" Margin="0,0,12,0"/>
-                            <TextBlock Text="Options" FontSize="13" VerticalAlignment="Center"/>
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <md:PackIcon Kind="Cog" Width="22" Height="22"
+                                         HorizontalAlignment="Center"
+                                         VerticalAlignment="Center"/>
+                            <TextBlock Text="Options" FontSize="9" TextAlignment="Center"
+                                       Margin="0,4,0,0"/>
                         </StackPanel>
                     </RadioButton>
 

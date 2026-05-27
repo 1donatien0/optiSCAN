@@ -5,559 +5,587 @@
              xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:c="clr-namespace:optiSCAN.Converters"
+             xmlns:services="clr-namespace:optiSCAN.Services"
              mc:Ignorable="d"
-             d:DesignHeight="600" d:DesignWidth="920">
-    <Grid>
-        <Grid.Resources>
-            <BooleanToVisibilityConverter x:Key="BoolToVis"/>
-            <c:PositiveIntToVisibilityConverter x:Key="PosIntVis"/>
-            <c:ThreatRiskSeverityConverter x:Key="ThreatRiskSeverity"/>
-            <c:ThreatRiskColorConverter x:Key="ThreatRiskColor"/>
-            <c:ThreatRiskIconConverter x:Key="ThreatRiskIcon"/>
-        </Grid.Resources>
+             d:DesignHeight="650" d:DesignWidth="960">
+
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <c:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis"/>
+        <c:PositiveIntToVisibilityConverter x:Key="PosIntVis"/>
+        <c:ThreatRiskSeverityConverter x:Key="ThreatRiskSeverity"/>
+        <c:ThreatRiskColorConverter x:Key="ThreatRiskColor"/>
+        <c:ThreatRiskIconConverter x:Key="ThreatRiskIcon"/>
+    </UserControl.Resources>
+
+    <DockPanel>
+        <!-- ══ En-tête (thème clair / sombre) ═══════════════════════════════ -->
+        <Border DockPanel.Dock="Top"
+                Margin="16,16,16,0"
+                CornerRadius="12"
+                BorderBrush="{DynamicResource BorderSubtle}"
+                BorderThickness="1"
+                Background="{DynamicResource PageHeaderMica}"
+                Effect="{DynamicResource CardShadow}"
+                Padding="18,14">
+            <Grid>
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="240"/>
+                    <ColumnDefinition Width="*"/>
+                    <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Grid.Column="0" VerticalAlignment="Center">
+                    <StackPanel Orientation="Horizontal">
+                        <md:PackIcon Kind="ShieldCheck" Width="20" Height="20"
+                                     Foreground="{DynamicResource AlertGoldLight}"
+                                     VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <TextBlock Text="Antivirus" FontSize="17" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextDark}"/>
+                    </StackPanel>
+                    <TextBlock x:Name="antivirusHeroLastScan"
+                               Margin="28,3,0,0"
+                               Text="Aucune analyse enregistrée"
+                               FontSize="11" Foreground="{DynamicResource TextMuted}"/>
+                </StackPanel>
+
+                <!-- Badge : ClamAV + YARA + protection temps réel (ProtectionBadgeLevel) -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                    <Border Width="7" Height="7" CornerRadius="4"
+                            Margin="0,0,6,0" VerticalAlignment="Center">
+                        <Border.Style>
+                            <Style TargetType="Border">
+                                <Setter Property="Background" Value="{DynamicResource DangerRed}"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding ProtectionBadgeLevel}"
+                                                 Value="{x:Static services:ProtectionBadgeLevel.Degraded}">
+                                        <Setter Property="Background" Value="{DynamicResource AlertGold}"/>
+                                    </DataTrigger>
+                                    <DataTrigger Binding="{Binding ProtectionBadgeLevel}"
+                                                 Value="{x:Static services:ProtectionBadgeLevel.Active}">
+                                        <Setter Property="Background" Value="{DynamicResource SuccessGreen}"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </Border.Style>
+                    </Border>
+                    <TextBlock Text="{Binding ProtectionBadgeText}"
+                               Foreground="{DynamicResource TextMedium}"
+                               FontSize="11" VerticalAlignment="Center"/>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- ══ CONTENU PRINCIPAL ═══════════════════════════════════════════ -->
+        <Grid Background="{DynamicResource ContentBg}">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto"/>
+                <RowDefinition Height="*"/>
+            </Grid.RowDefinitions>
+
+            <!-- ── Overlay d'initialisation ─────────────────────────────────
+                 Visible tant que IsInitializing = true. Évite d'afficher des
+                 champs "Vérification…" vides si un service met du temps à
+                 démarrer ou échoue. Disparaît automatiquement dès que
+                 InitializeAsync() termine (succès ou erreur partielle). -->
+            <Grid Grid.RowSpan="2"
+                  Background="{DynamicResource ContentBg}"
+                  Visibility="{Binding IsInitializing, Converter={StaticResource BoolToVis}}"
+                  Panel.ZIndex="10">
+                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                    <ProgressBar IsIndeterminate="True" Width="180" Height="3"
+                                 Margin="0,0,0,14"/>
+                    <TextBlock Text="Initialisation en cours…"
+                               FontSize="13" Foreground="{DynamicResource TextMuted}"
+                               HorizontalAlignment="Center"/>
+                    <!-- Message d'erreur : visible dès que InitializationError est non vide -->
+                    <TextBlock Text="{Binding InitializationError}"
+                               FontSize="12" Foreground="{DynamicResource DangerRed}"
+                               HorizontalAlignment="Center" TextWrapping="Wrap"
+                               MaxWidth="420" Margin="0,8,0,0">
+                        <TextBlock.Style>
+                            <Style TargetType="TextBlock">
+                                <Setter Property="Visibility" Value="Visible"/>
+                                <Style.Triggers>
+                                    <DataTrigger Binding="{Binding InitializationError}" Value="">
+                                        <Setter Property="Visibility" Value="Collapsed"/>
+                                    </DataTrigger>
+                                </Style.Triggers>
+                            </Style>
+                        </TextBlock.Style>
+                    </TextBlock>
+                </StackPanel>
+            </Grid>
+
+            <!-- Hub d'actions (masqué pendant un scan) -->
+            <Border Grid.Row="0" Margin="12,8,12,4"
+                    Visibility="{Binding IsScanning, Converter={StaticResource InverseBoolToVis}}"
+                    Background="{DynamicResource CardBg}"
+                    BorderBrush="{DynamicResource BorderColor}"
+                    BorderThickness="1"
+                    CornerRadius="12"
+                    Padding="10"
+                    Effect="{StaticResource CardShadow}">
+                <Grid>
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                        <ColumnDefinition Width="*"/>
+                    </Grid.ColumnDefinitions>
+
+                    <Button x:Name="btnQuickScan" Grid.Column="0"
+                            Style="{StaticResource HubCardButtonStyle}"
+                            Command="{Binding QuickScanCommand}" Margin="0,0,6,0"
+                            ToolTip="Analyse rapide — F5">
+                        <StackPanel HorizontalAlignment="Center">
+                            <Border Width="40" Height="40" CornerRadius="20" Background="{DynamicResource AccentBg}">
+                                <md:PackIcon Kind="Flash" Width="22" Height="22"
+                                             Foreground="{DynamicResource PrimaryBlue}"
+                                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="Rapide" Margin="0,6,0,0" FontWeight="SemiBold" FontSize="12"
+                                       Foreground="{DynamicResource TextDark}" HorizontalAlignment="Center"/>
+                            <TextBlock Text="F5" FontSize="9" Foreground="{DynamicResource TextMuted}"
+                                       HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Button x:Name="btnFullScan" Grid.Column="1"
+                            Style="{StaticResource HubCardButtonStyle}"
+                            Command="{Binding FullScanCommand}" Margin="3,0,3,0">
+                        <StackPanel HorizontalAlignment="Center">
+                            <Border Width="40" Height="40" CornerRadius="20" Background="{DynamicResource SuccessBg}">
+                                <md:PackIcon Kind="Magnify" Width="22" Height="22"
+                                             Foreground="{DynamicResource SuccessGreen}"
+                                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <TextBlock Text="Complète" Margin="0,6,0,0" FontWeight="SemiBold" FontSize="12"
+                                       Foreground="{DynamicResource TextDark}" HorizontalAlignment="Center"/>
+                            <TextBlock Text="Tous disques" FontSize="9" Foreground="{DynamicResource TextMuted}"
+                                       HorizontalAlignment="Center"/>
+                        </StackPanel>
+                    </Button>
+
+                    <Border Grid.Column="2" Margin="6,0,0,0"
+                            Background="{DynamicResource CardBg}"
+                            BorderBrush="{DynamicResource BorderColor}"
+                            BorderThickness="1"
+                            CornerRadius="10" Padding="10,8" MinHeight="88">
+                        <Grid VerticalAlignment="Center">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+                            <Border Grid.Column="0" Width="40" Height="40" CornerRadius="20"
+                                    Background="{DynamicResource AlertBg}" Margin="0,0,10,0">
+                                <md:PackIcon Kind="FolderSearch" Width="22" Height="22"
+                                             Foreground="{DynamicResource AlertGold}"
+                                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                            </Border>
+                            <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                <TextBlock Text="Ciblée" FontWeight="SemiBold" FontSize="12"
+                                           Foreground="{DynamicResource TextDark}" Margin="0,0,0,6"/>
+                                <UniformGrid Columns="2">
+                                    <Button x:Name="btnBrowseFolder"
+                                            Style="{StaticResource AntivirusHubActionButtonStyle}"
+                                            Click="BrowseFolder_Click" Margin="0,0,3,0"
+                                            Padding="6,4" FontSize="10">
+                                        <TextBlock Text="Dossier" HorizontalAlignment="Center"/>
+                                    </Button>
+                                    <Button x:Name="btnBrowseFile"
+                                            Style="{StaticResource AntivirusHubActionButtonStyle}"
+                                            Click="BrowseFile_Click" Margin="3,0,0,0"
+                                            Padding="6,4" FontSize="10">
+                                        <TextBlock Text="Fichier" HorizontalAlignment="Center"/>
+                                    </Button>
+                                </UniformGrid>
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                </Grid>
+            </Border>
+
+            <Grid Grid.Row="1" Margin="12,0,12,12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="200"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <ScrollViewer Grid.Column="0"
-                              VerticalScrollBarVisibility="Auto"
-                              HorizontalScrollBarVisibility="Disabled">
-                <StackPanel Margin="0,0,6,0">
-                    <Border CornerRadius="10" Padding="14" Margin="5"
-                            BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" Background="{DynamicResource CardBg}">
+            <ScrollViewer Grid.Column="0"
+                          VerticalScrollBarVisibility="Auto"
+                          HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="0,0,8,0">
+                    <Border CornerRadius="10" Padding="12" Margin="0,0,0,6"
+                            BorderBrush="{DynamicResource BorderColor}" BorderThickness="1"
+                            Background="{DynamicResource CardBg}"
+                            Effect="{StaticResource CardShadow}">
                         <StackPanel>
-                            <TextBlock Text="LANCER UNE ANALYSE" Foreground="{DynamicResource AlertGold}"
-                                       FontFamily="Segoe UI" FontSize="10"
-                                       FontWeight="Bold" Margin="0,0,0,12"/>
+                            <TextBlock Text="OUTILS" Foreground="{DynamicResource AlertGold}"
+                                       FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
 
-                            <Border CornerRadius="6" Padding="10,6" Margin="0,0,0,10" Background="{DynamicResource SurfaceBg}">
-                                <StackPanel Orientation="Horizontal">
-                                    <md:PackIcon Kind="FileSearch" Width="14" Height="14"
-                                                 Foreground="{DynamicResource SuccessGreen}" Margin="0,0,8,0"
-                                                 VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="antivirusYaraStatus" Text="YARA : chargement..."
-                                               Foreground="{DynamicResource TextSecondary}" FontFamily="Segoe UI"
-                                               FontSize="10" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Border>
-
-                            <Button x:Name="btnQuickScan" Style="{StaticResource PrimaryButton}"
-                                    Command="{Binding QuickScanCommand}" HorizontalAlignment="Stretch" Margin="0,0,0,2"
-                                    ToolTip="Analyse rapide — raccourci F5">
-                                <StackPanel Orientation="Horizontal">
-                                    <md:PackIcon Kind="Flash" Width="14" Height="14"
-                                                 Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Analyse rapide  (F5)" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-
-                            <Button x:Name="btnFullScan" Style="{StaticResource PrimaryButton}"
-                                    Command="{Binding FullScanCommand}" HorizontalAlignment="Stretch" Margin="0,0,0,2">
-                                <StackPanel Orientation="Horizontal">
-                                    <md:PackIcon Kind="Magnify" Width="14" Height="14"
-                                                 Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Analyse complète" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-
-                            <Button x:Name="btnBrowseFolder" Style="{StaticResource PrimaryButton}"
-                                    Click="BrowseFolder_Click" HorizontalAlignment="Stretch" Margin="0,0,0,4">
-                                <StackPanel Orientation="Horizontal">
-                                    <md:PackIcon Kind="FolderOpenOutline" Width="14" Height="14"
-                                                 Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Analyser un dossier" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-
-                            <Button x:Name="btnBrowseFile" Style="{StaticResource PrimaryButton}"
-                                    Click="BrowseFile_Click" HorizontalAlignment="Stretch" Margin="0,0,0,4">
-                                <StackPanel Orientation="Horizontal">
-                                    <md:PackIcon Kind="FileDocumentOutline" Width="14" Height="14"
-                                                 Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Analyser un fichier" VerticalAlignment="Center"/>
-                                </StackPanel>
-                            </Button>
-
-                            <Separator Background="{DynamicResource BorderColor}" Margin="0,10,0,6"/>
-
-                            <TextBlock Text="CIBLES RÉCENTES" Foreground="{DynamicResource AlertGold}"
-                                       FontFamily="Segoe UI" FontSize="10"
-                                       FontWeight="Bold" Margin="0,4,0,6"/>
+                            <TextBlock Text="Récents" Foreground="{DynamicResource TextMuted}"
+                                       FontSize="9" FontWeight="SemiBold" Margin="0,0,0,4"/>
                             <ListBox ItemsSource="{Binding RecentTargets}"
-                                     MaxHeight="110" Margin="0,0,0,8"
+                                     MaxHeight="72" Margin="0,0,0,8"
                                      BorderBrush="{DynamicResource BorderColor}"
                                      BorderThickness="1"
                                      Background="{DynamicResource SurfaceBg}">
+                                <ListBox.ItemContainerStyle>
+                                    <Style TargetType="ListBoxItem">
+                                        <Setter Property="Padding" Value="0"/>
+                                        <Setter Property="Margin" Value="0"/>
+                                    </Style>
+                                </ListBox.ItemContainerStyle>
                                 <ListBox.ItemTemplate>
                                     <DataTemplate>
                                         <Button Command="{Binding DataContext.ScanRecentCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                 CommandParameter="{Binding}"
                                                 HorizontalContentAlignment="Left"
-                                                Padding="6,4" Margin="0,1"
+                                                Padding="8,5" Margin="0"
                                                 Background="Transparent" BorderThickness="0"
                                                 Cursor="Hand" ToolTip="{Binding Path}">
-                                            <TextBlock Text="{Binding ListLabel}" FontSize="10"
-                                                       Foreground="{DynamicResource TextDark}"
-                                                       TextTrimming="CharacterEllipsis"/>
+                                            <StackPanel Orientation="Horizontal">
+                                                <md:PackIcon Kind="History" Width="12" Height="12"
+                                                             Foreground="{DynamicResource TextMuted}"
+                                                             Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="{Binding ListLabel}" FontSize="11"
+                                                           Foreground="{DynamicResource TextDark}"
+                                                           TextTrimming="CharacterEllipsis"/>
+                                            </StackPanel>
                                         </Button>
                                     </DataTemplate>
                                 </ListBox.ItemTemplate>
                             </ListBox>
 
                             <Button x:Name="btnStopScan" Style="{StaticResource DangerButton}"
-                                    Command="{Binding StopScanCommand}" IsEnabled="{Binding CanStop}" HorizontalAlignment="Stretch">
+                                    Command="{Binding StopScanCommand}" IsEnabled="{Binding CanStop}"
+                                    HorizontalAlignment="Stretch">
                                 <StackPanel Orientation="Horizontal">
                                     <md:PackIcon Kind="StopCircleOutline" Width="14" Height="14"
                                                  Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                    <TextBlock Text="Interrompre l’analyse" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Interrompre" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
                         </StackPanel>
                     </Border>
 
-                    <Border CornerRadius="10" Padding="14" Margin="5,4,5,5"
-                            BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" Background="{DynamicResource CardBg}">
+                    <Border CornerRadius="10" Padding="12"
+                            BorderBrush="{DynamicResource BorderColor}" BorderThickness="1"
+                            Background="{DynamicResource CardBg}"
+                            Effect="{StaticResource CardShadow}">
                         <StackPanel>
                             <TextBlock Text="STATISTIQUES" Foreground="{DynamicResource AlertGold}"
-                                       FontFamily="Segoe UI" FontSize="10"
-                                       FontWeight="Bold" Margin="0,0,0,4"/>
-                            <TextBlock Text="Résultats et moteurs actifs"
-                                       Foreground="{DynamicResource TextMuted}"
-                                       FontFamily="Segoe UI" FontSize="10"
-                                       Margin="0,0,0,12"/>
+                                       FontSize="10" FontWeight="Bold" Margin="0,0,0,8"/>
 
-                            <Grid Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <md:PackIcon Kind="Folder" Width="13" Height="13"
-                                                 Foreground="{DynamicResource TextSecondary}" Margin="0,0,6,0"/>
-                                    <TextBlock Text="Fichiers analysés" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
-                                </StackPanel>
-                                <TextBlock x:Name="antivirusFilesScanned" Grid.Column="1" Text="{Binding FilesScanned}"
-                                           Foreground="{DynamicResource AlertGold}" FontWeight="Bold" FontSize="16"
-                                           VerticalAlignment="Center"/>
-                            </Grid>
+                            <Border Background="{DynamicResource SurfaceBg}" CornerRadius="6"
+                                    Padding="8,5" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <md:PackIcon Kind="FileDocument" Width="14" Height="14"
+                                                     Foreground="{DynamicResource PrimaryBlue}" Margin="0,0,8,0"/>
+                                        <TextBlock Text="Analysés" Foreground="{DynamicResource TextSecondary}" FontSize="11"/>
+                                    </StackPanel>
+                                    <TextBlock x:Name="antivirusFilesScanned" Grid.Column="1"
+                                               Text="{Binding FilesScanned}"
+                                               Foreground="{DynamicResource PrimaryBlue}"
+                                               FontWeight="Bold" FontSize="14" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
 
-                            <Grid Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <md:PackIcon Kind="Alert" Width="13" Height="13"
-                                                 Foreground="{DynamicResource AlertGold}" Margin="0,0,6,0"/>
-                                    <TextBlock Text="Menaces trouvées" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
-                                </StackPanel>
-                                <TextBlock x:Name="antivirusThreatsFound" Grid.Column="1" Text="{Binding ThreatsFound}"
-                                           Foreground="{DynamicResource DangerRed}" FontWeight="Bold" FontSize="16"
-                                           VerticalAlignment="Center"/>
-                            </Grid>
+                            <Border Background="{DynamicResource SurfaceBg}" CornerRadius="6"
+                                    Padding="8,5" Margin="0,0,0,4">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <md:PackIcon Kind="AlertCircle" Width="14" Height="14"
+                                                     Foreground="{DynamicResource DangerRed}" Margin="0,0,8,0"/>
+                                        <TextBlock Text="Menaces" Foreground="{DynamicResource TextSecondary}" FontSize="11"/>
+                                    </StackPanel>
+                                    <TextBlock x:Name="antivirusThreatsFound" Grid.Column="1"
+                                               Text="{Binding ThreatsFound}"
+                                               Foreground="{DynamicResource DangerRed}"
+                                               FontWeight="Bold" FontSize="14" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
 
-                            <Grid Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <md:PackIcon Kind="Lock" Width="13" Height="13"
-                                                 Foreground="{DynamicResource TextSecondary}" Margin="0,0,6,0"/>
-                                    <TextBlock Text="En quarantaine" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
-                                </StackPanel>
-                                <TextBlock x:Name="antivirusQuarantineCount" Grid.Column="1"
-                                           Text="{Binding QuarantineTotalCount, StringFormat=N0}"
-                                           Foreground="{DynamicResource WarningOrange}" FontWeight="Bold" FontSize="16"
-                                           VerticalAlignment="Center"/>
-                            </Grid>
+                            <Border Background="{DynamicResource SurfaceBg}" CornerRadius="6"
+                                    Padding="8,5" Margin="0,0,0,0">
+                                <Grid>
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                        <md:PackIcon Kind="Lock" Width="14" Height="14"
+                                                     Foreground="{DynamicResource WarningOrange}" Margin="0,0,8,0"/>
+                                        <TextBlock Text="Quarant." Foreground="{DynamicResource TextSecondary}" FontSize="11"/>
+                                    </StackPanel>
+                                    <TextBlock x:Name="antivirusQuarantineCount" Grid.Column="1"
+                                               Text="{Binding QuarantineTotalCount, StringFormat=N0}"
+                                               Foreground="{DynamicResource WarningOrange}"
+                                               FontWeight="Bold" FontSize="14" VerticalAlignment="Center"/>
+                                </Grid>
+                            </Border>
 
-                            <TextBlock Text="MOTEURS" Foreground="{DynamicResource TextMuted}"
-                                       FontFamily="Segoe UI" FontSize="10"
-                                       FontWeight="SemiBold" Margin="0,2,0,8"/>
-
-                            <Grid Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <md:PackIcon Kind="ShieldCheck" Width="13" Height="13"
-                                                 Foreground="{DynamicResource AlertGold}" Margin="0,0,6,0"/>
-                                    <TextBlock Text="Base ClamAV" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
-                                </StackPanel>
-                                <TextBlock x:Name="antivirusClamDbVersion" Grid.Column="1" Text="—"
-                                           Foreground="{DynamicResource AlertGold}" FontWeight="Bold" FontSize="14"
-                                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
-                                           MaxWidth="72"/>
-                            </Grid>
-
-                            <Grid Margin="0,0,0,10">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <md:PackIcon Kind="Dna" Width="13" Height="13"
-                                                 Foreground="{DynamicResource SuccessGreen}" Margin="0,0,6,0"/>
-                                    <TextBlock Text="Règles YARA" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
-                                </StackPanel>
-                                <TextBlock x:Name="antivirusYaraCount" Grid.Column="1" Text="0"
-                                           Foreground="{DynamicResource SuccessGreen}" FontWeight="Bold" FontSize="16"
-                                           VerticalAlignment="Center"/>
-                            </Grid>
-
-                            <Separator Background="{DynamicResource BorderColor}" Margin="0,2,0,10"/>
-
-                            <TextBlock Text="ACTIVITÉ" Foreground="{DynamicResource TextMuted}"
-                                       FontFamily="Segoe UI" FontSize="10"
-                                       FontWeight="SemiBold" Margin="0,0,0,8"/>
-
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                    <md:PackIcon Kind="ClockOutline" Width="12" Height="12"
-                                                 Foreground="{DynamicResource TextSecondary}" Margin="0,0,6,0"/>
-                                    <TextBlock Text="Dernier scan" Foreground="{DynamicResource TextSecondary}" FontSize="11"/>
-                                </StackPanel>
-                                <TextBlock x:Name="antivirusLastScan" Grid.Column="1" Text="—"
-                                           Foreground="{DynamicResource TextDark}" FontSize="11" VerticalAlignment="Center"/>
-                            </Grid>
+                            <!-- Conservé pour le code-behind -->
+                            <TextBlock x:Name="antivirusLastScan" Visibility="Collapsed" Text="—"/>
                         </StackPanel>
                     </Border>
                 </StackPanel>
-                </ScrollViewer>
+            </ScrollViewer>
 
-                <TabControl x:Name="antivirusMainTabs" Grid.Column="1" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" Background="{DynamicResource CardBg}">
-                    <TabItem Foreground="{DynamicResource TextSecondary}">
-                        <TabItem.Header>
-                            <StackPanel Orientation="Horizontal">
-                                <md:PackIcon Kind="Radar" Width="14" Height="14"
-                                             Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Analyse en cours" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </TabItem.Header>
-                        <Border Padding="12,10" Background="{DynamicResource CardBg}">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
+            <TabControl x:Name="antivirusMainTabs" Grid.Column="1" Margin="0"
+                        BorderBrush="{DynamicResource BorderColor}" BorderThickness="1"
+                        Background="{DynamicResource CardBg}"
+                        Effect="{StaticResource CardShadow}">
+                <TabItem Foreground="{DynamicResource TextSecondary}">
+                    <TabItem.Header>
+                        <StackPanel Orientation="Horizontal">
+                            <md:PackIcon Kind="Radar" Width="14" Height="14"
+                                         Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Analyse" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </TabItem.Header>
+                    <Border Padding="12,10" Background="{DynamicResource CardBg}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
 
-                                <!-- Bandeau « analyse en cours » (style suite antivirus) -->
-                                <Border Grid.Row="0" CornerRadius="10" Padding="14,12" Margin="0,0,0,10"
-                                        BorderBrush="{DynamicResource PrimaryBlue}" BorderThickness="2"
-                                        Background="{DynamicResource AccentBg}"
-                                        Visibility="{Binding IsScanning, Converter={StaticResource BoolToVis}}">
-                                    <StackPanel>
-                                        <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                            <md:PackIcon Kind="ShieldSearch" Width="22" Height="22"
-                                                         Foreground="{DynamicResource PrimaryBlue}" Margin="0,0,10,0"
-                                                         VerticalAlignment="Center"/>
-                                            <StackPanel VerticalAlignment="Center">
-                                                <TextBlock Text="Analyse antivirus en cours"
-                                                           FontSize="16" FontWeight="SemiBold"
-                                                           Foreground="{DynamicResource TextDark}"/>
-                                                <TextBlock Text="Vos fichiers sont analysés en profondeur. Vous pouvez interrompre à tout moment."
-                                                           FontSize="11" Foreground="{DynamicResource TextMuted}"
-                                                           TextWrapping="Wrap" Margin="0,4,0,0"/>
-                                            </StackPanel>
-                                        </StackPanel>
-
-                                        <ProgressBar Height="10" Margin="0,0,0,8"
-                                                     Value="{Binding ProgressValue}"
-                                                     Minimum="0" Maximum="100"
-                                                     IsIndeterminate="{Binding IsIndeterminate}"
-                                                     Foreground="{DynamicResource PrimaryBlue}"
-                                                     Background="{DynamicResource BorderColor}"/>
-
-                                        <TextBlock Text="{Binding ScanProgressDetail}"
-                                                   FontSize="13" FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource TextDark}" Margin="0,0,0,6"/>
-
-                                        <TextBlock Text="Emplacement (analyse ou détection) :"
-                                                   FontSize="10" FontWeight="SemiBold"
-                                                   Foreground="{DynamicResource TextMuted}" Margin="0,0,0,2"/>
-                                        <TextBlock Text="{Binding CurrentScanItem}"
-                                                   FontSize="12"
-                                                   Foreground="{DynamicResource TextDark}"
-                                                   TextTrimming="CharacterEllipsis"
-                                                   ToolTip="{Binding CurrentScanItem}"/>
-
-                                        <Separator Margin="0,10,0,8" Background="{DynamicResource BorderColor}"/>
-
-                                        <TextBlock Text="{Binding StatusMessage}"
-                                                   FontSize="11" Foreground="{DynamicResource TextSecondary}"
-                                                   TextWrapping="Wrap"/>
-                                    </StackPanel>
-                                </Border>
-
-                                <!-- État hors analyse -->
-                                <Grid Grid.Row="0" Margin="0,0,0,8">
-                                    <Grid.Style>
-                                        <Style TargetType="Grid">
-                                            <Setter Property="Visibility" Value="Visible"/>
-                                            <Style.Triggers>
-                                                <DataTrigger Binding="{Binding IsScanning}" Value="True">
-                                                    <Setter Property="Visibility" Value="Collapsed"/>
-                                                </DataTrigger>
-                                            </Style.Triggers>
-                                        </Style>
-                                    </Grid.Style>
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*"/>
-                                        <ColumnDefinition Width="Auto"/>
-                                    </Grid.ColumnDefinitions>
-                                    <TextBlock x:Name="antivirusStatusMessage" Text="{Binding StatusMessage}"
-                                               Foreground="{DynamicResource TextDark}" FontFamily="Segoe UI"
-                                               FontSize="12" TextWrapping="Wrap"
-                                               VerticalAlignment="Center"/>
-                                    <TextBlock x:Name="antivirusSummary" Grid.Column="1"
-                                               Foreground="{DynamicResource TextSecondary}" FontFamily="Segoe UI"
-                                               FontSize="11" VerticalAlignment="Center"
-                                               Margin="8,0,0,0"/>
-                                </Grid>
-
-                                <Border Grid.Row="1" CornerRadius="6" Padding="10,7"
-                                        Margin="0,0,0,8" Background="{DynamicResource SurfaceBg}">
-                                    <StackPanel Orientation="Horizontal">
-                                        <md:PackIcon Kind="ChartBar" Width="13" Height="13"
-                                                     Foreground="{DynamicResource TextSecondary}" Margin="0,0,5,0"
+                            <!-- Bandeau « analyse en cours » -->
+                            <Border Grid.Row="0" CornerRadius="10" Padding="14,12" Margin="0,0,0,10"
+                                    BorderBrush="{DynamicResource PrimaryBlue}" BorderThickness="2"
+                                    Background="{DynamicResource AccentBg}"
+                                    Visibility="{Binding IsScanning, Converter={StaticResource BoolToVis}}">
+                                <StackPanel>
+                                    <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
+                                        <md:PackIcon Kind="ShieldSearch" Width="22" Height="22"
+                                                     Foreground="{DynamicResource PrimaryBlue}" Margin="0,0,10,0"
                                                      VerticalAlignment="Center"/>
-                                        <TextBlock Text="Fichiers analysés :"
-                                                   Foreground="{DynamicResource TextSecondary}" FontSize="11"
-                                                   VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                        <TextBlock x:Name="antivirusRealtimeFiles" Text="{Binding FilesScanned, StringFormat=N0}"
-                                                   Foreground="{DynamicResource TextDark}" FontWeight="Bold"
-                                                   FontSize="12" VerticalAlignment="Center"
-                                                   Margin="0,0,20,0"/>
-                                        <md:PackIcon Kind="Alert" Width="13" Height="13"
-                                                     Foreground="{DynamicResource AlertGold}" Margin="0,0,5,0"
-                                                     VerticalAlignment="Center"/>
-                                        <TextBlock Text="Menaces :"
-                                                   Foreground="{DynamicResource TextSecondary}" FontSize="11"
-                                                   VerticalAlignment="Center" Margin="0,0,5,0"/>
-                                        <TextBlock x:Name="antivirusRealtimeThreats" Text="{Binding ThreatsFound}"
-                                                   Foreground="{DynamicResource DangerRed}" FontWeight="Bold"
-                                                   FontSize="12" VerticalAlignment="Center"/>
-                                        <Border CornerRadius="8" Padding="6,1" Margin="10,0,0,0"
-                                                Background="{DynamicResource DangerRed}"
-                                                Visibility="{Binding ThreatsFound, Converter={StaticResource PosIntVis}}">
-                                            <TextBlock FontSize="10" FontWeight="Bold"
-                                                       Foreground="{DynamicResource TextDark}"
-                                                       Text="{Binding ThreatsFound, StringFormat=! {0}}"/>
-                                        </Border>
-                                    </StackPanel>
-                                </Border>
-
-                                <DataGrid x:Name="antivirusThreatsGrid" ItemsSource="{Binding Threats}"
-                          VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True" Grid.Row="2"
-                                          AutoGenerateColumns="False" CanUserAddRows="False"
-                                          IsReadOnly="True" Background="{DynamicResource AppBg}" RowBackground="{DynamicResource AppBg}"
-                                          AlternatingRowBackground="{DynamicResource HeaderBg}" Foreground="{DynamicResource TextDark}"
-                                          GridLinesVisibility="Horizontal"
-                                          HorizontalGridLinesBrush="{DynamicResource BorderSubtle}" HeadersVisibility="Column"
-                                          BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" SelectionMode="Single"
-                                          ColumnHeaderStyle="{StaticResource DgHeader}"
-                                          RowStyle="{StaticResource DgRow}">
-                                    <DataGrid.Columns>
-                                        <DataGridTemplateColumn Header="Risque" Width="95">
-                                            <DataGridTemplateColumn.CellTemplate>
-                                                <DataTemplate>
-                                                    <Border CornerRadius="4" Padding="6,2" Margin="2,0"
-                                                            Background="{Binding Converter={StaticResource ThreatRiskColor}}">
-                                                        <StackPanel Orientation="Horizontal"
-                                                                    HorizontalAlignment="Center"
-                                                                    VerticalAlignment="Center">
-                                                            <md:PackIcon Width="12" Height="12" Foreground="White"
-                                                                         VerticalAlignment="Center" Margin="0,0,4,0"
-                                                                         Kind="{Binding Converter={StaticResource ThreatRiskIcon}}"/>
-                                                            <TextBlock Text="{Binding Converter={StaticResource ThreatRiskSeverity}}"
-                                                                       FontSize="10" FontWeight="Bold"
-                                                                       Foreground="White" VerticalAlignment="Center"/>
-                                                        </StackPanel>
-                                                    </Border>
-                                                </DataTemplate>
-                                            </DataGridTemplateColumn.CellTemplate>
-                                        </DataGridTemplateColumn>
-                                        <DataGridTextColumn Header="Emplacement" Binding="{Binding FilePath}" Width="*">
-                                            <DataGridTextColumn.ElementStyle>
-                                                <Style TargetType="TextBlock" BasedOn="{StaticResource DgCellTextEllipsis}">
-                                                    <Setter Property="ToolTip" Value="{Binding FilePath}"/>
-                                                </Style>
-                                            </DataGridTextColumn.ElementStyle>
-                                        </DataGridTextColumn>
-                                        <DataGridTextColumn Header="Menace" Binding="{Binding VirusName}" Width="*">
-                                            <DataGridTextColumn.ElementStyle>
-                                                <Style TargetType="TextBlock" BasedOn="{StaticResource DgCellTextEllipsis}">
-                                                    <Setter Property="ToolTip" Value="{Binding VirusName}"/>
-                                                </Style>
-                                            </DataGridTextColumn.ElementStyle>
-                                        </DataGridTextColumn>
-                                        <DataGridTextColumn Header="Heure" Binding="{Binding DetectedAt, StringFormat='HH:mm:ss'}" Width="60"/>
-                                        <DataGridTextColumn Header="Statut" Binding="{Binding Status}" Width="70"/>
-                                        <DataGridTemplateColumn Header="Nettoyer" Width="270">
-                                            <DataGridTemplateColumn.CellTemplate>
-                                                <DataTemplate>
-                                                    <StackPanel Orientation="Horizontal" Margin="2,1">
-                                                        <Button Margin="0,0,4,0" Tag="{Binding FilePath}"
-                                                                Click="BtnQuarantineThreat_Click"
-                                                                Background="{DynamicResource PrimaryBlue}" Foreground="{DynamicResource TextDark}"
-                                                                FontSize="10" Padding="7,4" Cursor="Hand">
-                                                            <StackPanel Orientation="Horizontal">
-                                                                <md:PackIcon Kind="ShieldLock" Width="12" Height="12" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                                                <TextBlock Text="Quarantaine" VerticalAlignment="Center"/>
-                                                            </StackPanel>
-                                                        </Button>
-                                                        <Button Margin="0,0,4,0" Tag="{Binding FilePath}"
-                                                                Click="BtnIgnoreThreat_Click"
-                                                                Background="{DynamicResource WarningOrange}" Foreground="{DynamicResource TextDark}"
-                                                                FontSize="10" Padding="7,4" Cursor="Hand"
-                                                                ToolTip="Ajouter aux exclusions — ce fichier ne sera plus jamais détecté">
-                                                            <StackPanel Orientation="Horizontal">
-                                                                <md:PackIcon Kind="EyeOff" Width="12" Height="12" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                                                <TextBlock Text="Ignorer" VerticalAlignment="Center"/>
-                                                            </StackPanel>
-                                                        </Button>
-                                                        <Button Tag="{Binding FilePath}"
-                                                                Click="BtnDeleteThreat_Click"
-                                                                Background="{DynamicResource DangerRed}" Foreground="{DynamicResource TextDark}"
-                                                                FontSize="10" Padding="7,4" Cursor="Hand">
-                                                            <StackPanel Orientation="Horizontal">
-                                                                <md:PackIcon Kind="TrashCanOutline" Width="12" Height="12" Margin="0,0,4,0" VerticalAlignment="Center"/>
-                                                                <TextBlock Text="Supprimer" VerticalAlignment="Center"/>
-                                                            </StackPanel>
-                                                        </Button>
-                                                    </StackPanel>
-                                                </DataTemplate>
-                                            </DataGridTemplateColumn.CellTemplate>
-                                        </DataGridTemplateColumn>
-                                    </DataGrid.Columns>
-                                </DataGrid>
-
-                                <StackPanel Grid.Row="3" Orientation="Horizontal"
-                                            HorizontalAlignment="Right" Margin="0,8,0,0">
-                                    <Button x:Name="btnQuarantineAll" Style="{StaticResource WarningButton}"
-                                            Command="{Binding QuarantineAllCommand}" Padding="12,6">
-                                        <StackPanel Orientation="Horizontal">
-                                            <md:PackIcon Kind="ShieldLock" Width="13" Height="13"
-                                                         Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                            <TextBlock Text="Tout mettre en quarantaine"
-                                                       FontSize="12" VerticalAlignment="Center"/>
+                                        <StackPanel VerticalAlignment="Center">
+                                            <TextBlock Text="Analyse antivirus en cours"
+                                                       FontSize="16" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource TextDark}"/>
+                                            <TextBlock Text="Vos fichiers sont analysés en profondeur. Vous pouvez interrompre à tout moment."
+                                                       FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                                       TextWrapping="Wrap" Margin="0,4,0,0"/>
                                         </StackPanel>
-                                    </Button>
+                                    </StackPanel>
+
+                                    <ProgressBar Height="10" Margin="0,0,0,8"
+                                                 Value="{Binding ProgressValue}"
+                                                 Minimum="0" Maximum="100"
+                                                 IsIndeterminate="{Binding IsIndeterminate}"
+                                                 Foreground="{DynamicResource PrimaryBlue}"
+                                                 Background="{DynamicResource BorderColor}"/>
+
+                                    <TextBlock Text="{Binding ScanProgressDetail}"
+                                               FontSize="13" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextDark}" Margin="0,0,0,6"/>
+
+                                    <TextBlock Text="Emplacement (analyse ou détection) :"
+                                               FontSize="10" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextMuted}" Margin="0,0,0,2"/>
+                                    <TextBlock Text="{Binding CurrentScanItem}"
+                                               FontSize="12"
+                                               Foreground="{DynamicResource TextDark}"
+                                               TextTrimming="CharacterEllipsis"
+                                               ToolTip="{Binding CurrentScanItem}"/>
+
+                                    <Separator Margin="0,10,0,8" Background="{DynamicResource BorderColor}"/>
+
+                                    <TextBlock Text="{Binding StatusMessage}"
+                                               FontSize="11" Foreground="{DynamicResource TextSecondary}"
+                                               TextWrapping="Wrap"/>
                                 </StackPanel>
+                            </Border>
+
+                            <!-- État hors analyse -->
+                            <Grid Grid.Row="0" Margin="0,0,0,8">
+                                <Grid.Style>
+                                    <Style TargetType="Grid">
+                                        <Setter Property="Visibility" Value="Visible"/>
+                                        <Style.Triggers>
+                                            <DataTrigger Binding="{Binding IsScanning}" Value="True">
+                                                <Setter Property="Visibility" Value="Collapsed"/>
+                                            </DataTrigger>
+                                        </Style.Triggers>
+                                    </Style>
+                                </Grid.Style>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock x:Name="antivirusStatusMessage" Text="{Binding StatusMessage}"
+                                           Foreground="{DynamicResource TextDark}" FontFamily="{DynamicResource AppFontFamily}"
+                                           FontSize="12" TextWrapping="Wrap"
+                                           VerticalAlignment="Center"/>
+                                <TextBlock x:Name="antivirusSummary" Grid.Column="1"
+                                           Foreground="{DynamicResource TextSecondary}" FontFamily="{DynamicResource AppFontFamily}"
+                                           FontSize="11" VerticalAlignment="Center"
+                                           Margin="8,0,0,0"/>
                             </Grid>
-                        </Border>
-                    </TabItem>
 
-                    <TabItem Foreground="{DynamicResource TextSecondary}">
-                        <TabItem.Header>
-                            <StackPanel Orientation="Horizontal">
-                                <md:PackIcon Kind="LockOutline" Width="14" Height="14"
-                                             Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Quarantaine" VerticalAlignment="Center"/>
-                            </StackPanel>
-                        </TabItem.Header>
-                        <Border Padding="12" Background="{DynamicResource CardBg}">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="*"/>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="Auto"/>
-                                </Grid.RowDefinitions>
-                                <DataGrid x:Name="quarantineGrid"
-                          VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True" Grid.Row="0"
-                                          ItemsSource="{Binding QuarantineEntries}"
-                                          AutoGenerateColumns="False" CanUserAddRows="False"
-                                          IsReadOnly="True" Background="{DynamicResource AppBg}" RowBackground="{DynamicResource AppBg}"
-                                          AlternatingRowBackground="{DynamicResource HeaderBg}" Foreground="{DynamicResource TextDark}"
-                                          GridLinesVisibility="Horizontal"
-                                          HorizontalGridLinesBrush="{DynamicResource BorderSubtle}" BorderBrush="{DynamicResource BorderColor}"
-                                          BorderThickness="0" ColumnHeaderStyle="{StaticResource DgHeader}"
-                                          RowStyle="{StaticResource DgRow}">
-                                    <DataGrid.Columns>
-                                        <DataGridTextColumn Header="Emplacement d'origine" Binding="{Binding OriginalPath}" Width="*">
-                                            <DataGridTextColumn.ElementStyle>
-                                                <Style TargetType="TextBlock" BasedOn="{StaticResource DgCellTextEllipsis}">
-                                                    <Setter Property="ToolTip" Value="{Binding OriginalPath}"/>
-                                                </Style>
-                                            </DataGridTextColumn.ElementStyle>
-                                        </DataGridTextColumn>
-                                        <DataGridTextColumn Header="Virus" Binding="{Binding VirusName}" Width="140"/>
-                                        <DataGridTextColumn Header="Taille" Binding="{Binding SizeDisplay}" Width="75"/>
-                                        <DataGridTextColumn Header="Quarantaine" Binding="{Binding QuarantinedAt, StringFormat='dd/MM HH:mm'}" Width="110"/>
-                                        <DataGridTemplateColumn Header="Actions" Width="175">
-                                            <DataGridTemplateColumn.CellTemplate>
-                                                <DataTemplate>
-                                                    <StackPanel Orientation="Horizontal" Margin="2,1">
-                                                        <Button Margin="0,0,4,0" Tag="{Binding Id}"
-                                                                Click="BtnRestoreFromQuarantine_Click"
-                                                                Background="{DynamicResource PrimaryBlue}" Foreground="{DynamicResource TextDark}"
-                                                                FontSize="10" Padding="7,4" Cursor="Hand">
-                                                            <StackPanel Orientation="Horizontal">
-                                                                <md:PackIcon Kind="UndoVariant" Width="12" Height="12" Margin="0,0,4,0"/>
-                                                                <TextBlock Text="Restaurer"/>
-                                                            </StackPanel>
-                                                        </Button>
-                                                        <Button Tag="{Binding Id}"
-                                                                Click="BtnDeleteFromQuarantine_Click"
-                                                                Background="{DynamicResource DangerRed}" Foreground="{DynamicResource TextDark}"
-                                                                FontSize="10" Padding="7,4" Cursor="Hand">
-                                                            <StackPanel Orientation="Horizontal">
-                                                                <md:PackIcon Kind="TrashCanOutline" Width="12" Height="12" Margin="0,0,4,0"/>
-                                                                <TextBlock Text="Supprimer"/>
-                                                            </StackPanel>
-                                                        </Button>
-                                                    </StackPanel>
-                                                </DataTemplate>
-                                            </DataGridTemplateColumn.CellTemplate>
-                                        </DataGridTemplateColumn>
-                                    </DataGrid.Columns>
-                                </DataGrid>
-                                <StackPanel Grid.Row="1" Orientation="Vertical" Margin="0,8,0,0">
-                                    <TextBlock Text="{Binding QuarantinePagingStatus}"
-                                               Foreground="{DynamicResource TextSecondary}"
-                                               FontSize="11" TextWrapping="Wrap" Margin="0,0,0,6"/>
-                                    <Button HorizontalAlignment="Left" Padding="12,6"
-                                            Command="{Binding LoadMoreQuarantineCommand}"
-                                            Style="{StaticResource PrimaryButton}">
-                                        <StackPanel Orientation="Horizontal">
-                                            <md:PackIcon Kind="ChevronDown" Width="14" Height="14"
-                                                         Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                            <TextBlock Text="Charger plus d'entrées" VerticalAlignment="Center"/>
-                                        </StackPanel>
-                                    </Button>
+                            <Border Grid.Row="1" CornerRadius="6" Padding="10,7"
+                                    Margin="0,0,0,8" Background="{DynamicResource SurfaceBg}">
+                                <StackPanel Orientation="Horizontal">
+                                    <md:PackIcon Kind="ChartBar" Width="13" Height="13"
+                                                 Foreground="{DynamicResource TextSecondary}" Margin="0,0,5,0"
+                                                 VerticalAlignment="Center"/>
+                                    <TextBlock Text="Fichiers analysés :"
+                                               Foreground="{DynamicResource TextSecondary}" FontSize="11"
+                                               VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                    <TextBlock x:Name="antivirusRealtimeFiles" Text="{Binding FilesScanned, StringFormat=N0}"
+                                               Foreground="{DynamicResource TextDark}" FontWeight="Bold"
+                                               FontSize="12" VerticalAlignment="Center"
+                                               Margin="0,0,20,0"/>
+                                    <md:PackIcon Kind="Alert" Width="13" Height="13"
+                                                 Foreground="{DynamicResource AlertGold}" Margin="0,0,5,0"
+                                                 VerticalAlignment="Center"/>
+                                    <TextBlock Text="Menaces :"
+                                               Foreground="{DynamicResource TextSecondary}" FontSize="11"
+                                               VerticalAlignment="Center" Margin="0,0,5,0"/>
+                                    <TextBlock x:Name="antivirusRealtimeThreats" Text="{Binding ThreatsFound}"
+                                               Foreground="{DynamicResource DangerRed}" FontWeight="Bold"
+                                               FontSize="12" VerticalAlignment="Center"/>
+                                    <Border CornerRadius="8" Padding="6,1" Margin="10,0,0,0"
+                                            Background="{DynamicResource DangerRed}"
+                                            Visibility="{Binding ThreatsFound, Converter={StaticResource PosIntVis}}">
+                                        <TextBlock FontSize="10" FontWeight="Bold"
+                                                   Foreground="{DynamicResource TextDark}"
+                                                   Text="{Binding ThreatsFound, StringFormat=! {0}}"/>
+                                    </Border>
                                 </StackPanel>
-                                <Button Grid.Row="2" x:Name="btnPurgeQuarantine" Style="{StaticResource DangerButton}"
-                                        Command="{Binding PurgeQuarantineCommand}" HorizontalAlignment="Right" Margin="0,10,0,0">
+                            </Border>
+
+                            <DataGrid x:Name="antivirusThreatsGrid" ItemsSource="{Binding Threats}"
+                                      VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True" Grid.Row="2"
+                                      AutoGenerateColumns="False" CanUserAddRows="False"
+                                      IsReadOnly="True" Background="{DynamicResource AppBg}" RowBackground="{DynamicResource AppBg}"
+                                      AlternatingRowBackground="{DynamicResource HeaderBg}" Foreground="{DynamicResource TextDark}"
+                                      GridLinesVisibility="Horizontal"
+                                      HorizontalGridLinesBrush="{DynamicResource BorderSubtle}" HeadersVisibility="Column"
+                                      BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" SelectionMode="Single"
+                                      ColumnHeaderStyle="{StaticResource DgHeader}"
+                                      RowStyle="{StaticResource DgRow}">
+                                <DataGrid.Columns>
+                                    <DataGridTemplateColumn Header="Risque" Width="95">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <Border CornerRadius="4" Padding="6,2" Margin="2,0"
+                                                        Background="{Binding Converter={StaticResource ThreatRiskColor}}">
+                                                    <StackPanel Orientation="Horizontal"
+                                                                HorizontalAlignment="Center"
+                                                                VerticalAlignment="Center">
+                                                        <md:PackIcon Width="12" Height="12" Foreground="{DynamicResource TextOnPrimary}"
+                                                                     VerticalAlignment="Center" Margin="0,0,4,0"
+                                                                     Kind="{Binding Converter={StaticResource ThreatRiskIcon}}"/>
+                                                        <TextBlock Text="{Binding Converter={StaticResource ThreatRiskSeverity}}"
+                                                                   FontSize="{DynamicResource FontSize.Caption}" FontWeight="Bold"
+                                                                   Foreground="{DynamicResource TextOnPrimary}" VerticalAlignment="Center"/>
+                                                    </StackPanel>
+                                                </Border>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                    <DataGridTextColumn Header="Emplacement" Binding="{Binding FilePath}" Width="*">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource DgCellTextEllipsis}">
+                                                <Setter Property="ToolTip" Value="{Binding FilePath}"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+                                    <DataGridTextColumn Header="Menace" Binding="{Binding VirusName}" Width="*">
+                                        <DataGridTextColumn.ElementStyle>
+                                            <Style TargetType="TextBlock" BasedOn="{StaticResource DgCellTextEllipsis}">
+                                                <Setter Property="ToolTip" Value="{Binding VirusName}"/>
+                                            </Style>
+                                        </DataGridTextColumn.ElementStyle>
+                                    </DataGridTextColumn>
+                                    <DataGridTextColumn Header="Heure" Binding="{Binding DetectedAt, StringFormat='HH:mm:ss'}" Width="60"/>
+                                    <DataGridTextColumn Header="Statut" Binding="{Binding Status}" Width="70"/>
+                                    <DataGridTemplateColumn Header="Nettoyer" Width="270">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" Margin="2,1">
+                                                    <Button Margin="0,0,4,0" Tag="{Binding FilePath}"
+                                                            Click="BtnQuarantineThreat_Click"
+                                                            Background="{DynamicResource PrimaryBlue}" Foreground="{DynamicResource TextOnPrimary}"
+                                                            FontSize="10" Padding="7,4" Cursor="Hand">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <md:PackIcon Kind="ShieldLock" Width="12" Height="12" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                                            <TextBlock Text="Quarantaine" VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                    </Button>
+                                                    <Button Margin="0,0,4,0" Tag="{Binding FilePath}"
+                                                            Click="BtnIgnoreThreat_Click"
+                                                            Background="{DynamicResource WarningOrange}" Foreground="{DynamicResource TextDark}"
+                                                            FontSize="10" Padding="7,4" Cursor="Hand"
+                                                            ToolTip="Ajouter aux exclusions — ce fichier ne sera plus jamais détecté">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <md:PackIcon Kind="EyeOff" Width="12" Height="12" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                                            <TextBlock Text="Ignorer" VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                    </Button>
+                                                    <Button Tag="{Binding FilePath}"
+                                                            Click="BtnDeleteThreat_Click"
+                                                            Background="{DynamicResource DangerRed}" Foreground="{DynamicResource TextDark}"
+                                                            FontSize="10" Padding="7,4" Cursor="Hand">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <md:PackIcon Kind="TrashCanOutline" Width="12" Height="12" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                                            <TextBlock Text="Supprimer" VerticalAlignment="Center"/>
+                                                        </StackPanel>
+                                                    </Button>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
+                                </DataGrid.Columns>
+                            </DataGrid>
+
+                            <StackPanel Grid.Row="3" Orientation="Horizontal"
+                                        HorizontalAlignment="Right" Margin="0,8,0,0">
+                                <Button x:Name="btnQuarantineAll" Style="{StaticResource WarningButton}"
+                                        Command="{Binding QuarantineAllCommand}" Padding="12,6">
                                     <StackPanel Orientation="Horizontal">
-                                        <md:PackIcon Kind="TrashCanOutline" Width="14" Height="14"
-                                                     Margin="0,0,7,0" VerticalAlignment="Center"/>
-                                        <TextBlock Text="Vider toute la quarantaine" VerticalAlignment="Center"/>
+                                        <md:PackIcon Kind="ShieldLock" Width="13" Height="13"
+                                                     Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Tout mettre en quarantaine"
+                                                   FontSize="12" VerticalAlignment="Center"/>
                                     </StackPanel>
                                 </Button>
-                            </Grid>
-                        </Border>
-                    </TabItem>
-
-                    <TabItem Foreground="{DynamicResource TextSecondary}">
-                        <TabItem.Header>
-                            <StackPanel Orientation="Horizontal">
-                                <md:PackIcon Kind="History" Width="14" Height="14"
-                                             Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Historique" VerticalAlignment="Center"/>
                             </StackPanel>
-                        </TabItem.Header>
-                        <Border Padding="12" Background="{DynamicResource CardBg}">
-                            <DataGrid x:Name="antivirusHistoryGrid"
-                          VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True"
+                        </Grid>
+                    </Border>
+                </TabItem>
+
+                <TabItem Foreground="{DynamicResource TextSecondary}">
+                    <TabItem.Header>
+                        <StackPanel Orientation="Horizontal">
+                            <md:PackIcon Kind="LockOutline" Width="14" Height="14"
+                                         Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Quarantaine" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </TabItem.Header>
+                    <Border Padding="12" Background="{DynamicResource CardBg}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="*"/>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="Auto"/>
+                            </Grid.RowDefinitions>
+                            <DataGrid x:Name="quarantineGrid"
+                                      VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" ScrollViewer.CanContentScroll="True" Grid.Row="0"
+                                      ItemsSource="{Binding QuarantineEntries}"
                                       AutoGenerateColumns="False" CanUserAddRows="False"
                                       IsReadOnly="True" Background="{DynamicResource AppBg}" RowBackground="{DynamicResource AppBg}"
                                       AlternatingRowBackground="{DynamicResource HeaderBg}" Foreground="{DynamicResource TextDark}"
@@ -566,155 +594,180 @@
                                       BorderThickness="0" ColumnHeaderStyle="{StaticResource DgHeader}"
                                       RowStyle="{StaticResource DgRow}">
                                 <DataGrid.Columns>
-                                    <DataGridTextColumn Header="Date" Binding="{Binding StartedAt, StringFormat='dd/MM/yyyy HH:mm'}" Width="130"/>
-                                    <DataGridTextColumn Header="Type" Binding="{Binding TypeDisplay}" Width="110"/>
-                                    <DataGridTextColumn Header="Cible" Binding="{Binding TargetPath}" Width="*">
+                                    <DataGridTextColumn Header="Emplacement d'origine" Binding="{Binding OriginalPath}" Width="*">
                                         <DataGridTextColumn.ElementStyle>
                                             <Style TargetType="TextBlock" BasedOn="{StaticResource DgCellTextEllipsis}">
-                                                <Setter Property="ToolTip" Value="{Binding TargetPath}"/>
+                                                <Setter Property="ToolTip" Value="{Binding OriginalPath}"/>
                                             </Style>
                                         </DataGridTextColumn.ElementStyle>
                                     </DataGridTextColumn>
-                                    <DataGridTextColumn Header="Fichiers" Binding="{Binding FilesScanned, StringFormat=N0}" Width="82"/>
-                                    <DataGridTextColumn Header="Durée" Binding="{Binding DurationDisplay}" Width="100"/>
-                                    <DataGridTextColumn Header="Résultat" Binding="{Binding ThreatsBadge}" Width="160">
-                                        <DataGridTextColumn.ElementStyle>
-                                            <Style TargetType="TextBlock" BasedOn="{StaticResource DgCellTextEllipsis}">
-                                                <Setter Property="ToolTip" Value="{Binding ThreatsBadge}"/>
-                                            </Style>
-                                        </DataGridTextColumn.ElementStyle>
-                                    </DataGridTextColumn>
+                                    <DataGridTextColumn Header="Virus" Binding="{Binding VirusName}" Width="140"/>
+                                    <DataGridTextColumn Header="Taille" Binding="{Binding SizeDisplay}" Width="75"/>
+                                    <DataGridTextColumn Header="Quarantaine" Binding="{Binding QuarantinedAt, StringFormat='dd/MM HH:mm'}" Width="110"/>
+                                    <DataGridTemplateColumn Header="Actions" Width="175">
+                                        <DataGridTemplateColumn.CellTemplate>
+                                            <DataTemplate>
+                                                <StackPanel Orientation="Horizontal" Margin="2,1">
+                                                    <Button Margin="0,0,4,0" Tag="{Binding Id}"
+                                                            Click="BtnRestoreFromQuarantine_Click"
+                                                            Background="{DynamicResource PrimaryBlue}" Foreground="{DynamicResource TextOnPrimary}"
+                                                            FontSize="10" Padding="7,4" Cursor="Hand">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <md:PackIcon Kind="UndoVariant" Width="12" Height="12" Margin="0,0,4,0"/>
+                                                            <TextBlock Text="Restaurer"/>
+                                                        </StackPanel>
+                                                    </Button>
+                                                    <Button Tag="{Binding Id}"
+                                                            Click="BtnDeleteFromQuarantine_Click"
+                                                            Background="{DynamicResource DangerRed}" Foreground="{DynamicResource TextDark}"
+                                                            FontSize="10" Padding="7,4" Cursor="Hand">
+                                                        <StackPanel Orientation="Horizontal">
+                                                            <md:PackIcon Kind="TrashCanOutline" Width="12" Height="12" Margin="0,0,4,0"/>
+                                                            <TextBlock Text="Supprimer"/>
+                                                        </StackPanel>
+                                                    </Button>
+                                                </StackPanel>
+                                            </DataTemplate>
+                                        </DataGridTemplateColumn.CellTemplate>
+                                    </DataGridTemplateColumn>
                                 </DataGrid.Columns>
                             </DataGrid>
-                        </Border>
-                    </TabItem>
-
-                    <TabItem Foreground="{DynamicResource TextSecondary}">
-                        <TabItem.Header>
-                            <StackPanel Orientation="Horizontal">
-                                <md:PackIcon Kind="DatabaseRefresh" Width="14" Height="14"
-                                             Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                <TextBlock Text="Signatures" VerticalAlignment="Center"/>
+                            <StackPanel Grid.Row="1" Orientation="Vertical" Margin="0,8,0,0">
+                                <TextBlock Text="{Binding QuarantinePagingStatus}"
+                                           Foreground="{DynamicResource TextSecondary}"
+                                           FontSize="11" TextWrapping="Wrap" Margin="0,0,0,6"/>
+                                <Button HorizontalAlignment="Left" Padding="12,6"
+                                        Command="{Binding LoadMoreQuarantineCommand}"
+                                        Style="{StaticResource PrimaryButton}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <md:PackIcon Kind="ChevronDown" Width="14" Height="14"
+                                                     Margin="0,0,8,0" VerticalAlignment="Center"/>
+                                        <TextBlock Text="Charger plus d'entrées" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
                             </StackPanel>
-                        </TabItem.Header>
-                        <Border Padding="16" Background="{DynamicResource CardBg}">
-                            <Grid>
-                                <Grid.RowDefinitions>
-                                    <RowDefinition Height="Auto"/>
-                                    <RowDefinition Height="*"/>
-                                </Grid.RowDefinitions>
-
-                                <StackPanel Grid.Row="0">
-                                    <TextBlock Text="Versions installées"
-                                               Foreground="{DynamicResource TextDark}" FontFamily="Segoe UI"
-                                               FontSize="16" FontWeight="SemiBold"
-                                               Margin="0,0,0,10"/>
-
-                                    <Grid Margin="0,0,0,14">
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="*"/>
-                                            <ColumnDefinition Width="Auto"/>
-                                            <ColumnDefinition Width="*"/>
-                                        </Grid.ColumnDefinitions>
-
-                                        <!-- YARA (gauche) -->
-                                        <Border Grid.Column="0" CornerRadius="8" Padding="12,10" Margin="0,0,10,0"
-                                                BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" Background="{DynamicResource SurfaceBg}">
-                                            <StackPanel>
-                                                <TextBlock Text="RÈGLES YARA" Foreground="{DynamicResource TextMuted}"
-                                                           FontSize="10" FontWeight="Bold"/>
-                                                <TextBlock x:Name="sigYaraVersion" Foreground="{DynamicResource PrimaryBlue}"
-                                                           FontSize="20" FontWeight="Bold" Margin="0,4,0,0"/>
-                                                <TextBlock Text="Dernière MAJ" Foreground="{DynamicResource TextMuted}"
-                                                           FontSize="10" FontWeight="SemiBold" Margin="0,8,0,2"/>
-                                                <TextBlock x:Name="sigYaraLastMaj" Foreground="{DynamicResource TextDark}"
-                                                           FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                            </StackPanel>
-                                        </Border>
-
-                                        <Rectangle Grid.Column="1" Width="1" Margin="0,6"
-                                                   Fill="{DynamicResource BorderColor}" VerticalAlignment="Stretch"/>
-
-                                        <!-- ClamAV (droite) -->
-                                        <Border Grid.Column="2" CornerRadius="8" Padding="12,10" Margin="10,0,0,0"
-                                                BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" Background="{DynamicResource SurfaceBg}">
-                                            <StackPanel>
-                                                <TextBlock Text="CLAMAV" Foreground="{DynamicResource TextMuted}"
-                                                           FontSize="10" FontWeight="Bold"/>
-                                                <TextBlock x:Name="sigClamVersion" Foreground="{DynamicResource AlertGold}"
-                                                           FontSize="20" FontWeight="Bold" Margin="0,4,0,0"/>
-                                                <TextBlock Text="Dernière MAJ" Foreground="{DynamicResource TextMuted}"
-                                                           FontSize="10" FontWeight="SemiBold" Margin="0,8,0,2"/>
-                                                <TextBlock x:Name="sigClamLastMaj" Foreground="{DynamicResource TextDark}"
-                                                           FontSize="12" FontWeight="SemiBold" TextWrapping="Wrap"/>
-                                            </StackPanel>
-                                        </Border>
-                                    </Grid>
-
-                                    <!-- Boutons + barre de progression -->
-                                    <Grid Margin="0,0,0,12">
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="Auto"/>
-                                            <RowDefinition Height="Auto"/>
-                                        </Grid.RowDefinitions>
-
-                                        <!-- Ligne de boutons -->
-                                        <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="0,0,0,8">
-                                            <Button x:Name="btnManualUpdateSignatures"
-                                                    Style="{StaticResource SuccessButton}"
-                                                    Click="BtnManualUpdateSignatures_Click"
-                                                    Margin="0,0,8,0">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <md:PackIcon Kind="Refresh" Width="16" Height="16" Margin="0,0,8,0" VerticalAlignment="Center"/>
-                                                    <TextBlock Text="Mettre à jour les signatures" VerticalAlignment="Center"/>
-                                                </StackPanel>
-                                            </Button>
-
-                                            <Button x:Name="btnStopUpdateSignatures"
-                                                    Style="{StaticResource DangerButton}"
-                                                    Click="BtnStopUpdateSignatures_Click"
-                                                    Visibility="Collapsed">
-                                                <StackPanel Orientation="Horizontal">
-                                                    <md:PackIcon Kind="StopCircleOutline" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
-                                                    <TextBlock Text="Arrêter" VerticalAlignment="Center"/>
-                                                </StackPanel>
-                                            </Button>
-                                        </StackPanel>
-
-                                        <!-- Barre de progression intégrée (visible pendant la MAJ) -->
-                                        <ProgressBar x:Name="sigUpdateProgressBar" Grid.Row="1"
-                                                     Height="4" IsIndeterminate="True"
-                                                     Foreground="{DynamicResource SuccessGreen}"
-                                                     Background="{DynamicResource SurfaceBg}"
-                                                     BorderBrush="Transparent"
-                                                     Visibility="Collapsed">
-                                            <ProgressBar.Template>
-                                                <ControlTemplate TargetType="ProgressBar">
-                                                    <Grid>
-                                                        <Border x:Name="PART_Track" CornerRadius="2"
-                                                                Background="{TemplateBinding Background}"/>
-                                                        <Border x:Name="PART_Indicator" CornerRadius="2"
-                                                                Background="{TemplateBinding Foreground}"
-                                                                HorizontalAlignment="Left"/>
-                                                    </Grid>
-                                                </ControlTemplate>
-                                            </ProgressBar.Template>
-                                        </ProgressBar>
-                                    </Grid>
+                            <Button Grid.Row="2" x:Name="btnPurgeQuarantine" Style="{StaticResource DangerButton}"
+                                    Command="{Binding PurgeQuarantineCommand}" HorizontalAlignment="Right" Margin="0,10,0,0">
+                                <StackPanel Orientation="Horizontal">
+                                    <md:PackIcon Kind="TrashCanOutline" Width="14" Height="14"
+                                                 Margin="0,0,7,0" VerticalAlignment="Center"/>
+                                    <TextBlock Text="Vider toute la quarantaine" VerticalAlignment="Center"/>
                                 </StackPanel>
+                            </Button>
+                        </Grid>
+                    </Border>
+                </TabItem>
 
-                                <Border Grid.Row="1" CornerRadius="8" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1"
-                                        Background="{DynamicResource AppBg}">
-                                    <!-- Défilement uniquement dans le TextBox (ScrollViewer externe + ScrollToEnd() = conflit de scroll). -->
-                                    <TextBox x:Name="signatureLog" Margin="2" IsReadOnly="True" Background="Transparent"
-                                             Foreground="{DynamicResource SuccessGreen}" FontFamily="Consolas" FontSize="11"
-                                             TextWrapping="Wrap" BorderThickness="0" Padding="12,8"
-                                             VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"/>
-                                </Border>
-                            </Grid>
-                        </Border>
-                    </TabItem>
-                </TabControl>
-            
-    </Grid>
+                <TabItem Foreground="{DynamicResource TextSecondary}">
+                    <TabItem.Header>
+                        <StackPanel Orientation="Horizontal">
+                            <md:PackIcon Kind="DatabaseRefresh" Width="14" Height="14"
+                                         Margin="0,0,6,0" VerticalAlignment="Center"/>
+                            <TextBlock Text="Signatures" VerticalAlignment="Center"/>
+                        </StackPanel>
+                    </TabItem.Header>
+                    <Border Padding="10,8" Background="{DynamicResource CardBg}">
+                        <Grid>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0">
+                                    <Grid Margin="0,0,0,8">
+                                    <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="0.9*"/>
+                                            <ColumnDefinition Width="0.9*"/>
+                                        <ColumnDefinition Width="Auto"/>
+                                    </Grid.ColumnDefinitions>
+
+                                    <Border Grid.Column="0" CornerRadius="6" Padding="7,5" Margin="0,0,4,0"
+                                            BorderBrush="{DynamicResource BorderColor}" BorderThickness="1"
+                                            Background="{DynamicResource SurfaceBg}">
+                                        <StackPanel>
+                                            <TextBlock Text="YARA" Foreground="{DynamicResource TextMuted}"
+                                                       FontSize="9" FontWeight="Bold"/>
+                                            <TextBlock x:Name="sigYaraVersion" Foreground="{DynamicResource PrimaryBlue}"
+                                                       FontSize="14" FontWeight="Bold" Margin="0,2,0,0"/>
+                                            <TextBlock x:Name="sigYaraLastMaj" Foreground="{DynamicResource TextMuted}"
+                                                       FontSize="9" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <Border Grid.Column="1" CornerRadius="6" Padding="7,5" Margin="4,0,4,0"
+                                            BorderBrush="{DynamicResource BorderColor}" BorderThickness="1"
+                                            Background="{DynamicResource SurfaceBg}">
+                                        <StackPanel>
+                                            <TextBlock Text="CLAMAV" Foreground="{DynamicResource TextMuted}"
+                                                       FontSize="9" FontWeight="Bold"/>
+                                            <TextBlock x:Name="sigClamVersion" Foreground="{DynamicResource AlertGold}"
+                                                       FontSize="14" FontWeight="Bold" Margin="0,2,0,0"/>
+                                            <TextBlock x:Name="sigClamLastMaj" Foreground="{DynamicResource TextMuted}"
+                                                       FontSize="9" Margin="0,2,0,0" TextTrimming="CharacterEllipsis"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <StackPanel Grid.Column="2" VerticalAlignment="Center">
+                                        <Button x:Name="btnManualUpdateSignatures"
+                                                Style="{StaticResource SuccessButton}"
+                                                Click="BtnManualUpdateSignatures_Click"
+                                                Padding="9,6" FontSize="11"
+                                                ToolTip="Mettre à jour les signatures">
+                                            <StackPanel Orientation="Horizontal">
+                                                <md:PackIcon Kind="Refresh" Width="14" Height="14" Margin="0,0,6,0" VerticalAlignment="Center"/>
+                                                <TextBlock Text="Mettre à jour" VerticalAlignment="Center"/>
+                                            </StackPanel>
+                                        </Button>
+                                        <Button x:Name="btnStopUpdateSignatures"
+                                                Style="{StaticResource DangerButton}"
+                                                Click="BtnStopUpdateSignatures_Click"
+                                                Visibility="Collapsed" Margin="0,4,0,0"
+                                                Padding="8,4" FontSize="10">
+                                            <TextBlock Text="Arrêter" VerticalAlignment="Center"/>
+                                        </Button>
+                                    </StackPanel>
+                                </Grid>
+
+                                <Grid Margin="0,0,0,6">
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto"/>
+                                        <RowDefinition Height="Auto"/>
+                                    </Grid.RowDefinitions>
+
+                                    <ProgressBar x:Name="sigUpdateProgressBar" Grid.Row="0"
+                                                 Height="4" IsIndeterminate="True"
+                                                 Foreground="{DynamicResource SuccessGreen}"
+                                                 Background="{DynamicResource SurfaceBg}"
+                                                 BorderBrush="Transparent"
+                                                 Visibility="Collapsed">
+                                        <ProgressBar.Template>
+                                            <ControlTemplate TargetType="ProgressBar">
+                                                <Grid>
+                                                    <Border x:Name="PART_Track" CornerRadius="2"
+                                                            Background="{TemplateBinding Background}"/>
+                                                    <Border x:Name="PART_Indicator" CornerRadius="2"
+                                                            Background="{TemplateBinding Foreground}"
+                                                            HorizontalAlignment="Left"/>
+                                                </Grid>
+                                            </ControlTemplate>
+                                        </ProgressBar.Template>
+                                    </ProgressBar>
+                                </Grid>
+                            </StackPanel>
+
+                            <Border Grid.Row="1" CornerRadius="8" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1"
+                                    Background="{DynamicResource AppBg}">
+                                <TextBox x:Name="signatureLog" Margin="2" IsReadOnly="True" Background="Transparent"
+                                         Foreground="{DynamicResource SuccessGreen}" FontFamily="{DynamicResource AppFontFamily}" FontSize="10"
+                                         TextWrapping="Wrap" BorderThickness="0" Padding="8,6"
+                                         VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled"/>
+                            </Border>
+                        </Grid>
+                    </Border>
+                </TabItem>
+            </TabControl>
+            </Grid>
+        </Grid>
+
+    </DockPanel>
 </UserControl>

@@ -36,10 +36,10 @@ namespace optiSCAN.Services
         {
             if (_activationHooked) return;
             _activationHooked = true;
-            ToastNotificationManagerCompat.OnActivated += OnToastActivatedStatic;
+            ToastNotificationManagerCompat.OnActivated += SurActivationToastStatic;
         }
 
-        private static void OnToastActivatedStatic(ToastNotificationActivatedEventArgsCompat e)
+        private static void SurActivationToastStatic(ToastNotificationActivatedEventArgsCompat e)
         {
             try
             {

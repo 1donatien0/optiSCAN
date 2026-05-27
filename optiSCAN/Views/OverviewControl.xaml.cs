@@ -1,6 +1,7 @@
 using MaterialDesignThemes.Wpf;
 using optiSCAN.Models;
 using optiSCAN.Services;
+using optiSCAN.Strings;
 using System.Globalization;
 using System.Text;
 using System.Windows;
@@ -20,6 +21,19 @@ namespace optiSCAN.Views
         public OverviewControl()
         {
             InitializeComponent();
+            Loaded += (_, _) => optiSCAN.ThemeManager.ThemeChanged += SurChangementTheme;
+            Unloaded += (_, _) => optiSCAN.ThemeManager.ThemeChanged -= SurChangementTheme;
+        }
+
+        private void SurChangementTheme(object? sender, bool isDark)
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                txtProtectionHeadline?.ClearValue(TextBlock.ForegroundProperty);
+                txtProtectionStatus?.ClearValue(TextBlock.ForegroundProperty);
+                txtOverviewClamAvStatus?.ClearValue(TextBlock.ForegroundProperty);
+                txtOverviewYaraCount?.ClearValue(TextBlock.ForegroundProperty);
+            });
         }
 
         /// <summary>Met à jour le bloc « Statistiques de protection » depuis l'historique des scans.</summary>
@@ -164,17 +178,18 @@ namespace optiSCAN.Views
                     txtProtectionHeadline.Text = string.IsNullOrWhiteSpace(headline)
                         ? (isProtected ? "Votre ordinateur est protégé" : "Protection incomplète")
                         : headline!;
+                    txtProtectionHeadline.Foreground =
+                        ThemeUiBrushes.Get("TextDark", txtProtectionHeadline);
                 }
                 txtProtectionStatus.Text = message
                     ?? (isProtected
                         ? "Les définitions sont à jour."
                         : "Vérifiez ClamAV, les règles YARA et les mises à jour des signatures.");
 
-                var okBrush = txtProtectionStatus.TryFindResource("SuccessGreen") as Brush;
-                var warnBrush = txtProtectionStatus.TryFindResource("AlertGold") as Brush;
                 txtProtectionStatus.Foreground = isProtected
-                    ? (okBrush ?? Brushes.ForestGreen)
-                    : (warnBrush ?? Brushes.DarkOrange);
+                    ? ThemeUiBrushes.Get("SuccessGreen", txtProtectionStatus)
+                    : ThemeUiBrushes.Get("AlertGold", txtProtectionStatus)
+                      ?? ThemeUiBrushes.Get("TextMuted", txtProtectionStatus);
             });
         }
 
@@ -187,14 +202,19 @@ namespace optiSCAN.Views
                 {
                     txtOverviewClamAvStatus.Text = clamAvOk ? "Actif" : "Non installé";
                     txtOverviewClamAvStatus.Foreground = clamAvOk
-                        ? System.Windows.Media.Brushes.Green
-                        : System.Windows.Media.Brushes.OrangeRed;
+                        ? ThemeUiBrushes.Get("SuccessGreen", txtOverviewClamAvStatus)
+                        : ThemeUiBrushes.Get("DangerRed", txtOverviewClamAvStatus);
                 }
 
                 if (txtOverviewYaraCount != null)
+                {
                     txtOverviewYaraCount.Text = yaraRulesCount > 0
                         ? $"{yaraRulesCount:N0} règles"
                         : "Non chargé";
+                    txtOverviewYaraCount.Foreground = yaraRulesCount > 0
+                        ? ThemeUiBrushes.Get("TextAccent", txtOverviewYaraCount)
+                        : ThemeUiBrushes.Get("TextMuted", txtOverviewYaraCount);
+                }
             });
         }
 
@@ -214,9 +234,9 @@ namespace optiSCAN.Views
             // la vue reste utilisable en design-time et dans les tests.
             var container = Services.ServiceContainer.Default;
 
-            if (target == "Update")
+            if (target == OptiscanStrings.ActionIds.Update)
             {
-                container.Navigation?.NavigateTo("Antivirus");
+                container.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
                 container.RequestFocusAntivirusSignaturesTab();
                 container.TriggerSignatureUpdate(); // MainWindow écoute cet event
             }

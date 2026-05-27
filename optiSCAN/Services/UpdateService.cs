@@ -1,4 +1,5 @@
 ﻿using System.IO;
+using optiSCAN.Strings;
 
 namespace optiSCAN.Services
 {
@@ -64,7 +65,7 @@ namespace optiSCAN.Services
                         $"Version installée : {release} ({version})\n\n" +
                         "optiSCAN ne télécharge pas encore les mises à jour du programme en arrière-plan.\n\n" +
                         "• Signatures ClamAV et règles YARA : Antivirus → onglet Signatures.\n" +
-                        "• Nouvelle version du programme : https://sourceforge.net/projects/optiscan/\n\n" +
+                        $"• Nouvelle version du programme : {OptiscanStrings.Urls.OptiscanSourceForge}\n\n" +
                         $"Dossier de préparation local : {_localUpdatePath}",
                 });
             }
@@ -81,7 +82,7 @@ namespace optiSCAN.Services
                         $"Version installée : {release} ({version})\n\n" +
                         $"Impossible de préparer le dossier de mises à jour :\n{ex.Message}\n\n" +
                         "Signatures : onglet Antivirus → Signatures.\n" +
-                        "Programme : https://sourceforge.net/projects/optiscan/",
+                        $"Programme : {OptiscanStrings.Urls.OptiscanSourceForge}",
                 });
             }
         }

@@ -14,6 +14,7 @@
     <SolidColorBrush x:Key="ContentBg"      Color="#1A1917"/>
     <SolidColorBrush x:Key="HeaderBg"       Color="#242320"/>
     <SolidColorBrush x:Key="CardBg"         Color="#242320"/>
+    <SolidColorBrush x:Key="CardBgHover"    Color="#2E2C42"/>
     <SolidColorBrush x:Key="CardBrush"      Color="#242320"/>
     <SolidColorBrush x:Key="SurfaceBg"      Color="#2E2D2A"/>
 
@@ -31,6 +32,7 @@
 
     <!-- ── ACCENT PRINCIPAL (violet Donaby) ── -->
     <SolidColorBrush x:Key="PrimaryBlue"        Color="#534AB7"/>
+    <SolidColorBrush x:Key="PrimaryBlueHover"   Color="#6B63C9"/>
     <SolidColorBrush x:Key="AccentBlue"         Color="#9F97F0"/>
     <SolidColorBrush x:Key="DarkBlue"           Color="#26215C"/>
     <SolidColorBrush x:Key="AccentBg"           Color="#26215C"/>
@@ -58,8 +60,14 @@
     <SolidColorBrush x:Key="TextDark"           Color="#F0EDE8"/>
     <SolidColorBrush x:Key="TextMedium"         Color="#B0ADA6"/>
     <SolidColorBrush x:Key="TextLight"          Color="#686660"/>
-    <SolidColorBrush x:Key="TextMuted"          Color="#686660"/>
+    <SolidColorBrush x:Key="TextMuted"          Color="#8A8780"/>
     <SolidColorBrush x:Key="TextSecondary"      Color="#B0ADA6"/>
+    <!-- Texte sur fond accent (boutons violets) -->
+    <SolidColorBrush x:Key="TextOnPrimary"      Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="TextOnPrimaryMuted" Color="#B0ADA6"/>
+    <SolidColorBrush x:Key="TextAccent"         Color="#9F97F0"/>
+    <SolidColorBrush x:Key="HeroButtonBg"       Color="#3C3A36"/>
+    <SolidColorBrush x:Key="HeroButtonBorder"   Color="#4A4844"/>
 
     <!-- ── PALETTE GLOBALE (App.*) ── -->
     <SolidColorBrush x:Key="App.Bg.Deep"        Color="#100F0D"/>
@@ -95,6 +103,15 @@
     <DropShadowEffect x:Key="GlowBlue"
                       Color="#9F97F0" Opacity="0.20"
                       BlurRadius="12" ShadowDepth="0"/>
+
+    <!-- ── EN-TÊTE DE PAGE (Accueil, etc.) — dégradé type Mica, suit le thème ── -->
+    <LinearGradientBrush x:Key="PageHeaderMica" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#2E2D2A" Offset="0"/>
+        <GradientStop Color="#26215C" Offset="0.5"/>
+        <GradientStop Color="#1A1917" Offset="1"/>
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="PageHeaderIconRing"   Color="#26215C"/>
+    <SolidColorBrush x:Key="PageHeaderIconBorder" Color="#3C3489"/>
 
     <!-- ── INDICATEUR TOGGLE (icône lune pour le bouton thème) ── -->
     <SolidColorBrush x:Key="ThemeToggleBg"      Color="#26215C"/>

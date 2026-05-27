@@ -69,6 +69,9 @@ namespace optiSCAN.Services
         /// <summary>Afficher les notifications d'action (toast avec boutons).</summary>
         public bool ActionNotificationsEnabled { get; set; } = true;
 
+        /// <summary>MAJ automatique des signatures ClamAV et des règles YARA (timers freshclam / YARA-Forge).</summary>
+        public bool SignatureAutoUpdateEnabled { get; set; } = true;
+
         // ── Méthodes ──────────────────────────────────────────────────────────────
 
         /// <summary>

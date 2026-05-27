@@ -1,6 +1,7 @@
 using Microsoft.Win32;
 using optiSCAN.Models;
 using optiSCAN.Services;
+using optiSCAN.Strings;
 using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
@@ -84,7 +85,7 @@ namespace optiSCAN.Views
 
                 var c = ServiceContainer.Default;
                 if (chkAutoUpdate != null)
-                    chkAutoUpdate.IsChecked = c.FreshclamUpdater.IsAutoUpdateEnabled && c.RulesUpdater.IsAutoUpdateEnabled;
+                    chkAutoUpdate.IsChecked = prefs.SignatureAutoUpdateEnabled;
 
                 if (chkScheduledScan != null)
                     chkScheduledScan.IsChecked = ScheduledScan.IsTaskExists();
@@ -304,7 +305,7 @@ namespace optiSCAN.Views
             {
                 System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
                 {
-                    FileName = "https://sourceforge.net/projects/optiscan/",
+                    FileName = OptiscanStrings.Urls.OptiscanSourceForge,
                     UseShellExecute = true
                 });
             }

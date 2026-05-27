@@ -186,7 +186,7 @@ namespace optiSCAN.Services
             public bool Truncated;
             private int _capturedChars;
 
-            public void OnLine(string? line, int maxChars)
+            public void SurLigneYara(string? line, int maxChars)
             {
                 if (line == null || Truncated)
                     return;
@@ -289,8 +289,8 @@ namespace optiSCAN.Services
 
             if (HasCompiled)
             {
-                // Scan avec règles compilées : yara64.exe --compiled-rules rules.yarc file
-                // ArgumentList → quoting sûr, pas de concat string.
+                // Scan avec règles compilées : yara64.exe --compiled-rules rules.yarc fichier
+                // ArgumentList → guillemets/échappement sûr, pas de concaténation de chaîne.
                 var results = await RunYaraScanAsync(
                     new[] { "--compiled-rules", _compiledRulesPath, filePath },
                     filePath, ct);
@@ -298,7 +298,7 @@ namespace optiSCAN.Services
             }
             else
             {
-                // Fallback : scan avec chaque .yar individuellement
+                // Solution de repli : scan avec chaque .yar individuellement
                 foreach (var ruleFile in Directory.GetFiles(_rulesDirectory, "*.yar"))
                 {
                     if (ct.IsCancellationRequested) break;
@@ -318,10 +318,10 @@ namespace optiSCAN.Services
         /// <summary>
         /// Scanne un dossier entier en UN SEUL processus yara avec --recursive.
         ///
-        /// L'ancienne approche (un process par fichier dans ScanOrchestrator)
+        /// L'ancienne approche (un processus par fichier dans ScanOrchestrator)
         /// dominait le temps de scan pour les gros dossiers : pour 10 000 fichiers,
-        /// 10 000 spawns de yara64.exe, soit ~10 minutes uniquement de spawn
-        /// overhead. Cette méthode passe le dossier directement à yara qui
+        /// 10 000 lancements de yara64.exe, soit ~10 minutes uniquement de
+        /// surcoût lié aux lancements. Cette méthode passe le dossier directement à yara qui
         /// l'itère lui-même, divisant le temps global par un facteur 10 à 50.
         ///
         /// La sortie de yara conserve le format "RuleName Path" pour chaque match,
@@ -351,7 +351,7 @@ namespace optiSCAN.Services
             else
             {
                 // Sans règles compilées : scan séquentiel par règle, encore N fois
-                // moins de spawn qu'un process par fichier.
+                // moins de lancements qu'un processus par fichier.
                 foreach (var ruleFile in Directory.GetFiles(_rulesDirectory, "*.yar"))
                 {
                     if (ct.IsCancellationRequested) break;
@@ -396,7 +396,7 @@ namespace optiSCAN.Services
 
                 var cap = new YaraStdoutCapture();
                 var stderrLines = new StringBuilder();
-                process.OutputDataReceived += (_, e) => cap.OnLine(e.Data, MaxYaraStdoutCaptureChars);
+                process.OutputDataReceived += (_, e) => cap.SurLigneYara(e.Data, MaxYaraStdoutCaptureChars);
                 process.ErrorDataReceived += (_, e) => { if (e.Data != null) stderrLines.AppendLine(e.Data); };
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
@@ -472,7 +472,7 @@ namespace optiSCAN.Services
 
                 var cap = new YaraStdoutCapture();
                 var stderrLines = new System.Text.StringBuilder();
-                process.OutputDataReceived += (_, e) => cap.OnLine(e.Data, MaxYaraStdoutCaptureChars);
+                process.OutputDataReceived += (_, e) => cap.SurLigneYara(e.Data, MaxYaraStdoutCaptureChars);
                 // CORRECTION : BeginErrorReadLine() sans handler = stderr drainé mais
                 // silencieusement perdu. On ajoute un handler pour logger les erreurs YARA.
                 process.ErrorDataReceived += (_, e) => { if (e.Data != null) stderrLines.AppendLine(e.Data); };

@@ -19,17 +19,6 @@ namespace optiSCAN.Views
         public CleanControl()
         {
             InitializeComponent();
-            Loaded += (_, _) => RefreshCleanHistory();
-            ServiceContainer.Default.ScanHistoryViewsRefreshRequested += (_, _) =>
-                Dispatcher.BeginInvoke(RefreshCleanHistory);
-        }
-
-        /// <summary>Alimente la grille d'historique (octets libérés via <see cref="CleanSession.BytesDisplay"/>).</summary>
-        public void RefreshCleanHistory()
-        {
-            var sessions = ServiceContainer.Default.Logger.GetCleanHistory();
-            if (dgCleanHistory != null)
-                dgCleanHistory.ItemsSource = sessions;
         }
 
         // ── Analyser ─────────────────────────────────────────────────────────
@@ -203,7 +192,6 @@ namespace optiSCAN.Views
                                 TargetsSummary = targets,
                                 BytesFreed = freed
                             });
-                            RefreshCleanHistory();
                             ServiceContainer.Default.RequestScanHistoryViewsRefresh();
                         }
                         catch (Exception ex)

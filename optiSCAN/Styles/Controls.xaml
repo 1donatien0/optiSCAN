@@ -6,22 +6,22 @@
 
     <!-- Style DataGridHeader -->
     <Style x:Key="DgHeader" TargetType="DataGridColumnHeader">
-        <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
-        <Setter Property="Foreground" Value="{DynamicResource TextMedium}"/>
-        <Setter Property="FontFamily" Value="Segoe UI"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="FontSize" Value="11"/>
-        <Setter Property="Padding" Value="10,8"/>
-        <Setter Property="BorderBrush" Value="{DynamicResource BorderColor}"/>
-        <Setter Property="BorderThickness" Value="0,0,0,1"/>
+        <Setter Property="Background"       Value="{DynamicResource SurfaceBg}"/>
+        <Setter Property="Foreground"       Value="{DynamicResource TextMedium}"/>
+        <Setter Property="FontFamily"       Value="{DynamicResource AppFontFamily}"/>
+        <Setter Property="FontWeight"       Value="SemiBold"/>
+        <Setter Property="FontSize"         Value="{DynamicResource FontSize.Small}"/>
+        <Setter Property="Padding"          Value="10,8"/>
+        <Setter Property="BorderBrush"      Value="{DynamicResource BorderColor}"/>
+        <Setter Property="BorderThickness"  Value="0,0,0,1"/>
     </Style>
 
     <!-- Style DataGridRow -->
     <Style x:Key="DgRow" TargetType="DataGridRow">
         <Setter Property="Background" Value="{DynamicResource CardBg}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextDark}"/>
-        <Setter Property="FontFamily" Value="Segoe UI"/>
-        <Setter Property="FontSize" Value="12"/>
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}"/>
+        <Setter Property="FontSize"   Value="{DynamicResource FontSize.Body}"/>
         <Style.Triggers>
             <Trigger Property="IsMouseOver" Value="True">
                 <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
@@ -69,14 +69,14 @@
 
     <!-- Style PrimaryButton -->
     <Style x:Key="PrimaryButton" TargetType="Button">
-        <Setter Property="Background" Value="{DynamicResource PrimaryBlue}"/>
-        <Setter Property="Foreground" Value="White"/>
-        <Setter Property="FontFamily" Value="Segoe UI"/>
-        <Setter Property="FontWeight" Value="SemiBold"/>
-        <Setter Property="FontSize" Value="13"/>
-        <Setter Property="Padding" Value="14,9"/>
+        <Setter Property="Background"    Value="{DynamicResource PrimaryBlue}"/>
+        <Setter Property="Foreground"    Value="{DynamicResource TextOnPrimary}"/>
+        <Setter Property="FontFamily"    Value="{DynamicResource AppFontFamily}"/>
+        <Setter Property="FontWeight"    Value="SemiBold"/>
+        <Setter Property="FontSize"      Value="{DynamicResource FontSize.Title}"/>
+        <Setter Property="Padding"       Value="14,9"/>
         <Setter Property="BorderThickness" Value="0"/>
-        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Cursor"        Value="Hand"/>
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
@@ -137,12 +137,51 @@
         </Setter>
     </Style>
 
-    <!-- Style NavItem -->
+    <!-- Carte hub Antivirus (bouton avec contenu via ContentPresenter) -->
+    <Style x:Key="HubCardButtonStyle" TargetType="Button">
+        <Setter Property="OverridesDefaultStyle" Value="True"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="card"
+                            Background="{DynamicResource CardBg}"
+                            BorderBrush="{DynamicResource BorderColor}"
+                            BorderThickness="1"
+                            CornerRadius="10"
+                            Padding="10,8"
+                            MinHeight="88">
+                        <ContentPresenter HorizontalAlignment="Center"
+                                          VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="card" Property="Background" Value="{DynamicResource CardBgHover}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="card" Property="Opacity" Value="0.55"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Boutons compacts hub Antivirus (dossier / fichier) -->
+    <Style x:Key="AntivirusHubActionButtonStyle" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
+        <Setter Property="Padding"                    Value="8,5"/>
+        <Setter Property="FontSize"                   Value="{DynamicResource FontSize.Small}"/>
+        <Setter Property="HorizontalContentAlignment" Value="Center"/>
+    </Style>
+
+    <!-- Style NavItem — icône + label centrés, sidebar slim 90px -->
     <Style x:Key="NavItem" TargetType="RadioButton">
         <Setter Property="GroupName" Value="Navigation"/>
         <Setter Property="Background" Value="Transparent"/>
         <Setter Property="Foreground" Value="{DynamicResource SidebarText}"/>
-        <Setter Property="Height" Value="52"/>
+        <Setter Property="Height" Value="70"/>
         <Setter Property="Cursor" Value="Hand"/>
         <Setter Property="OverridesDefaultStyle" Value="True"/>
         <Setter Property="Template">
@@ -150,13 +189,15 @@
                 <ControlTemplate TargetType="RadioButton">
                     <Border x:Name="bg" Background="Transparent">
                         <Grid>
+                            <!-- Indicateur gauche actif -->
                             <Rectangle x:Name="bar" Width="3" HorizontalAlignment="Left"
                                        Fill="Transparent" RadiusX="2" RadiusY="2"/>
+                            <!-- Overlay hover -->
                             <Rectangle x:Name="hoverOverlay"
                                        Fill="{DynamicResource AccentBlue}" Opacity="0"/>
-                            <ContentPresenter Margin="28,0,16,0"
-                                              VerticalAlignment="Center"
-                                              HorizontalAlignment="Left"/>
+                            <!-- Contenu : icône + label empilés au centre -->
+                            <ContentPresenter HorizontalAlignment="Center"
+                                              VerticalAlignment="Center"/>
                         </Grid>
                     </Border>
                     <ControlTemplate.Triggers>

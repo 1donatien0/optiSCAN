@@ -3,6 +3,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
 using System.Text.Json.Nodes;
+using optiSCAN.Strings;
 
 namespace optiSCAN.Services
 {
@@ -23,7 +24,7 @@ namespace optiSCAN.Services
     {
         // ── Constantes ────────────────────────────────────────────────────────────
 
-        private const string ApiUrl = "https://api.github.com/repos/YARAHQ/yara-forge/releases/latest";
+        private const string ApiUrl = OptiscanStrings.Urls.YaraForgeApiLatest;
         private const string PackageName = "yara-forge-rules-core.zip";
 
         private readonly string _rulesDirectory;
@@ -329,9 +330,9 @@ namespace optiSCAN.Services
                     entry.ExtractToFile(dest, overwrite: true);
                     installed++;
                 }
-                catch
+                catch (Exception ex)
                 {
-                    // Fichier verrouillé ou accès refusé → ignorer
+                    AppLogger.Warn("YaraForgeUpdater", $"Extraction ignorée : {entry.Name}", ex);
                 }
             }
 
@@ -340,7 +341,10 @@ namespace optiSCAN.Services
                 if (File.Exists(compiledRulesPath))
                     File.Delete(compiledRulesPath);
             }
-            catch { /* Non bloquant */ }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("YaraForgeUpdater", "Suppression du cache .yarc compilé", ex);
+            }
 
             return installed;
         }

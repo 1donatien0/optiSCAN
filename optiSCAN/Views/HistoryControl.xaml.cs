@@ -1,4 +1,5 @@
 using optiSCAN.Models;
+using optiSCAN.Strings;
 using System.Windows;
 
 namespace optiSCAN.Views
@@ -47,7 +48,7 @@ namespace optiSCAN.Views
         private void BtnOpenAntivirus_Click(object sender, RoutedEventArgs e)
         {
             // Navigation via le container (INavigationService), sans référencer MainWindow.
-            Services.ServiceContainer.Default.Navigation?.NavigateTo("Antivirus");
+            Services.ServiceContainer.Default.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
         }
 
         private void BtnExportHtml_Click(object sender, RoutedEventArgs e) =>

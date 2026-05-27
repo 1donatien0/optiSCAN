@@ -2,12 +2,11 @@ using optiSCAN.Models;
 using optiSCAN.Services;
 using optiSCAN.ViewModels;
 using System.Collections.Concurrent;
+using System.Globalization;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
-using System.Windows.Media;
 using System.Windows.Threading;
-using Color = System.Windows.Media.Color;
 using FolderBrowserDialog = System.Windows.Forms.FolderBrowserDialog;
 using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 
@@ -15,20 +14,15 @@ namespace optiSCAN.Views
 {
     /// <summary>
     /// Vue principale de l'onglet Antivirus — scan, historique, signatures et quarantaine.
-    /// Se connecte au <see cref="ViewModels.ScanViewModel"/> via DataContext.
+    /// Se connecte au <see cref="ScanViewModel"/> via DataContext.
     /// </summary>
     public partial class AntivirusView : System.Windows.Controls.UserControl
     {
         private ScanViewModel? _vmScanTabSubscription;
 
-        // Journal MAJ signatures : file d'attente + timer pour ne pas poster une
-        // opération dispatcher par ligne (freshclam peut en cracher des centaines
-        // et geler toute l'UI avec ScrollToEnd à chaque fois).
         private readonly ConcurrentQueue<string> _signatureLogQueue = new();
         private DispatcherTimer? _signatureLogFlushTimer;
         private int _signatureLogArmPosted;
-        /// <summary>ScrollViewer du template TextBox (mis en cache après ApplyTemplate).</summary>
-        private ScrollViewer? _signatureLogScrollHost;
 
         public AntivirusView()
         {
@@ -41,13 +35,14 @@ namespace optiSCAN.Views
         {
             if (_vmScanTabSubscription != null)
             {
-                _vmScanTabSubscription.DisplayScanProgressRequested -= OnVmDisplayScanProgressRequested;
+                _vmScanTabSubscription.DisplayScanProgressRequested -= SurDemandeAffichageProgressionScan;
                 _vmScanTabSubscription = null;
             }
+
             if (DataContext is ScanViewModel vm)
             {
                 _vmScanTabSubscription = vm;
-                vm.DisplayScanProgressRequested += OnVmDisplayScanProgressRequested;
+                vm.DisplayScanProgressRequested += SurDemandeAffichageProgressionScan;
             }
         }
 
@@ -55,7 +50,7 @@ namespace optiSCAN.Views
         {
             if (_vmScanTabSubscription != null)
             {
-                _vmScanTabSubscription.DisplayScanProgressRequested -= OnVmDisplayScanProgressRequested;
+                _vmScanTabSubscription.DisplayScanProgressRequested -= SurDemandeAffichageProgressionScan;
                 _vmScanTabSubscription = null;
             }
 
@@ -63,10 +58,9 @@ namespace optiSCAN.Views
             _signatureLogFlushTimer = null;
             while (_signatureLogQueue.TryDequeue(out _)) { }
             Interlocked.Exchange(ref _signatureLogArmPosted, 0);
-            _signatureLogScrollHost = null;
         }
 
-        private void OnVmDisplayScanProgressRequested(object? sender, EventArgs e)
+        private void SurDemandeAffichageProgressionScan(object? sender, EventArgs e)
         {
             Dispatcher.InvokeAsync(() =>
             {
@@ -80,72 +74,41 @@ namespace optiSCAN.Views
 
         private ScanViewModel? VM => DataContext as ScanViewModel;
         private MainWindow? Win => Window.GetWindow(this) as MainWindow;
+        private static AntivirusActions Actions => ServiceContainer.Default.Actions;
 
-        // ═══════════════════════════════════════════════════════════════════
-        // MÉTHODES PUBLIQUES — appelées par MainWindow pour mettre à jour l'UI
-        // ═══════════════════════════════════════════════════════════════════
-
-        /// <summary>Met à jour l'indicateur de statut YARA dans la colonne gauche.</summary>
-        public void UpdateYaraStatus(bool yaraOk, int rulesCount)
-        {
-            Dispatcher.InvokeAsync(() =>
-            {
-                if (antivirusYaraStatus != null)
-                {
-                    antivirusYaraStatus.Text = yaraOk
-                        ? $"YARA : {rulesCount} règle{(rulesCount > 1 ? "s" : "")} active{(rulesCount > 1 ? "s" : "")}"
-                        : "YARA : non disponible";
-                    antivirusYaraStatus.Foreground = new SolidColorBrush(yaraOk
-                        ? Color.FromRgb(80, 200, 120)
-                        : Color.FromRgb(224, 90, 90));
-                }
-                if (antivirusYaraCount != null)
-                    antivirusYaraCount.Text = rulesCount.ToString();
-            });
-        }
-
-        /// <summary>Affiche la date du dernier enregistrement d’analyse (vue latérale).</summary>
         public void UpdateLastScanDisplay(DateTime? lastScan)
         {
             Dispatcher.InvokeAsync(() =>
             {
-                if (antivirusLastScan == null) return;
-                antivirusLastScan.Text = lastScan.HasValue
-                    ? lastScan.Value.ToString("dd/MM/yyyy HH:mm", System.Globalization.CultureInfo.CurrentCulture)
-                    : "—";
-            });
+                if (antivirusHeroLastScan != null)
+                    antivirusHeroLastScan.Text = FormatHeroLastScan(lastScan);
+
+                if (antivirusLastScan != null)
+                {
+                    antivirusLastScan.Text = lastScan.HasValue
+                        ? lastScan.Value.ToString("dd/MM/yyyy HH:mm", CultureInfo.CurrentCulture)
+                        : "—";
+                }
+            }, DispatcherPriority.Background);
         }
 
-        /// <summary>
-        /// Compatibilité : délègue au ViewModel (liste paginée liée au DataGrid).
-        /// </summary>
         public void UpdateQuarantineList(IEnumerable<QuarantineEntry>? _ = null)
         {
             Dispatcher.InvokeAsync(() => VM?.LoadQuarantine(reset: true));
         }
 
-        /// <summary>Peuple le DataGrid d'historique des scans.</summary>
-        public void UpdateHistory(IEnumerable<ScanSession> historyList)
-        {
-            Dispatcher.InvokeAsync(() =>
-            {
-                if (antivirusHistoryGrid != null)
-                    antivirusHistoryGrid.ItemsSource = historyList;
-            });
-        }
-
-        /// <summary>Ajoute une ligne dans le journal de mise à jour des signatures.</summary>
         public void AppendSignatureLog(string message)
         {
+            if (string.IsNullOrWhiteSpace(message))
+                return;
+
             _signatureLogQueue.Enqueue(message);
             if (Interlocked.CompareExchange(ref _signatureLogArmPosted, 1, 0) != 0)
                 return;
 
-            // Ne pas utiliser this.Dispatcher depuis un thread pool (freshclam OutputDataReceived) :
-            // l'accès au Dispatcher du DO peut lever InvalidOperationException.
             var disp = System.Windows.Application.Current?.Dispatcher;
             if (disp == null) return;
-            disp.BeginInvoke(new Action(ArmSignatureLogFlush), DispatcherPriority.Background);
+            disp.BeginInvoke(ArmSignatureLogFlush, DispatcherPriority.Background);
         }
 
         private void ArmSignatureLogFlush()
@@ -155,23 +118,18 @@ namespace optiSCAN.Views
             _signatureLogFlushTimer ??= new DispatcherTimer(
                 TimeSpan.FromMilliseconds(110),
                 DispatcherPriority.Background,
-                OnSignatureLogFlushTick,
+                SurTickVidageLogSignatures,
                 Dispatcher);
 
             _signatureLogFlushTimer.Stop();
             _signatureLogFlushTimer.Start();
         }
 
-        private void OnSignatureLogFlushTick(object? sender, EventArgs e)
+        private void SurTickVidageLogSignatures(object? sender, EventArgs e)
         {
             _signatureLogFlushTimer?.Stop();
             if (signatureLog == null)
                 return;
-
-            EnsureSignatureLogScrollHost();
-            // Ne forcer le bas que si l'utilisateur y est déjà : sinon ScrollToEnd à chaque tick
-            // empêche de faire défiler le journal pendant la MAJ (effet « qui remonte »).
-            bool pinTail = IsSignatureLogPinnedToTail(_signatureLogScrollHost);
 
             var sb = new StringBuilder(8192);
             for (var i = 0; i < 500 && _signatureLogQueue.TryDequeue(out var line); i++)
@@ -180,139 +138,115 @@ namespace optiSCAN.Views
             if (sb.Length > 0)
             {
                 signatureLog.AppendText(sb.ToString());
-                if (pinTail)
-                    signatureLog.ScrollToEnd();
+                // During signature updates, always keep the latest line visible.
+                signatureLog.ScrollToEnd();
             }
 
             if (!_signatureLogQueue.IsEmpty)
                 _signatureLogFlushTimer?.Start();
         }
 
-        private void EnsureSignatureLogScrollHost()
-        {
-            if (_signatureLogScrollHost != null || signatureLog == null)
-                return;
-            signatureLog.ApplyTemplate();
-            _signatureLogScrollHost = FindChildScrollViewer(signatureLog);
-        }
-
-        private static ScrollViewer? FindChildScrollViewer(DependencyObject root)
-        {
-            var n = VisualTreeHelper.GetChildrenCount(root);
-            for (var i = 0; i < n; i++)
-            {
-                var child = VisualTreeHelper.GetChild(root, i);
-                if (child is ScrollViewer sv)
-                    return sv;
-                var nested = FindChildScrollViewer(child);
-                if (nested != null)
-                    return nested;
-            }
-            return null;
-        }
-
-        private static bool IsSignatureLogPinnedToTail(ScrollViewer? sv)
-        {
-            if (sv == null)
-                return true;
-            if (sv.ExtentHeight <= 0)
-                return true;
-            return sv.VerticalOffset + sv.ViewportHeight >= sv.ExtentHeight - 2.5;
-        }
-
-        /// <summary>Affiche ou masque la barre de progression et les boutons pendant une MAJ.</summary>
         public void SetSignatureUpdating(bool updating)
         {
             Dispatcher.InvokeAsync(() =>
             {
                 if (sigUpdateProgressBar != null)
+                {
                     sigUpdateProgressBar.Visibility = updating ? Visibility.Visible : Visibility.Collapsed;
+                    sigUpdateProgressBar.IsIndeterminate = updating;
+                }
+
                 if (btnManualUpdateSignatures != null)
+                {
                     btnManualUpdateSignatures.IsEnabled = !updating;
+                    btnManualUpdateSignatures.Opacity = updating ? 0.55 : 1.0;
+                }
+
                 if (btnStopUpdateSignatures != null)
                     btnStopUpdateSignatures.Visibility = updating ? Visibility.Visible : Visibility.Collapsed;
             });
         }
 
-        /// <summary>Sélectionne l'onglet « Signatures » (ordre des <c>TabItem</c> dans AntivirusView.xaml).</summary>
-        public void SelectSignaturesTab()
-        {
-            const int signaturesTabIndex = 3;
-            Dispatcher.InvokeAsync(() =>
-            {
-                if (antivirusMainTabs != null)
-                    antivirusMainTabs.SelectedIndex = signaturesTabIndex;
-            });
-        }
+        public void SelectSignaturesTab() => SelectTab(2);
 
-        /// <summary>Sélectionne l'onglet « Quarantaine ».</summary>
-        public void SelectQuarantineTab()
-        {
-            const int quarantineTabIndex = 1;
-            Dispatcher.InvokeAsync(() =>
-            {
-                if (antivirusMainTabs != null)
-                    antivirusMainTabs.SelectedIndex = quarantineTabIndex;
-            });
-        }
+        public void SelectQuarantineTab() => SelectTab(1);
 
-        /// <summary>Met à jour le panneau YARA | ClamAV (versions + dernières MAJ).</summary>
         public void UpdateSignaturesPanel(string yaraVersion, string yaraLastMaj, string clamVersion, string clamLastMaj)
         {
             Dispatcher.InvokeAsync(() =>
             {
-                if (sigYaraVersion != null)
-                    sigYaraVersion.Text = string.IsNullOrWhiteSpace(yaraVersion) ? "—" : yaraVersion;
-                if (sigYaraLastMaj != null)
-                    sigYaraLastMaj.Text = string.IsNullOrWhiteSpace(yaraLastMaj) || yaraLastMaj == "—" ? "—" : yaraLastMaj;
-                if (sigClamVersion != null)
-                    sigClamVersion.Text = string.IsNullOrWhiteSpace(clamVersion) || clamVersion == "Inconnue" ? "—" : clamVersion;
-                if (sigClamLastMaj != null)
-                    sigClamLastMaj.Text = string.IsNullOrWhiteSpace(clamLastMaj) || clamLastMaj == "—" ? "—" : clamLastMaj;
-
-                if (antivirusClamDbVersion != null)
-                {
-                    var display = string.IsNullOrWhiteSpace(clamVersion) || clamVersion == "Inconnue"
-                        ? "—"
-                        : clamVersion;
-                    antivirusClamDbVersion.Text = display;
-                    antivirusClamDbVersion.ToolTip = display == "—"
-                        ? "Base ClamAV non détectée"
-                        : $"Base ClamAV — version {display}";
-                }
+                SetDisplayText(sigYaraVersion, yaraVersion);
+                SetDisplayText(sigYaraLastMaj, yaraLastMaj);
+                SetDisplayText(sigClamVersion, clamVersion);
+                SetDisplayText(sigClamLastMaj, clamLastMaj);
             });
         }
 
-        /// <summary>Compat : mappe sur ClamAV uniquement (YARA « — »).</summary>
         public void UpdateSignatureInfo(string version, string date)
             => UpdateSignaturesPanel("—", "—", version, date);
 
-        /// <summary>Demande à MainWindow de recharger toutes les données antivirus.</summary>
         public void RefreshAllData() => Win?.RefreshAntivirusData();
 
-        // ═══════════════════════════════════════════════════════════════════
-        // DIALOGUES DE NAVIGATION (parcourir dossier / fichier)
-        // ═══════════════════════════════════════════════════════════════════
+        private void SelectTab(int tabIndex)
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                if (antivirusMainTabs != null && tabIndex >= 0 && tabIndex < antivirusMainTabs.Items.Count)
+                    antivirusMainTabs.SelectedIndex = tabIndex;
+            });
+        }
 
-        private async void BrowseFolder_Click(object sender, RoutedEventArgs e)
+        private static string FormatHeroLastScan(DateTime? lastScan)
+        {
+            if (!lastScan.HasValue)
+                return "Aucune analyse enregistrée";
+
+            var diff = DateTime.Now - lastScan.Value;
+            if (diff.TotalMinutes < 1)
+                return "Dernière analyse : à l'instant";
+            if (diff.TotalMinutes < 60)
+                return $"Dernière analyse : il y a {(int)diff.TotalMinutes} min";
+            if (diff.TotalHours < 24)
+                return $"Dernière analyse : il y a {(int)diff.TotalHours} h";
+            if (diff.TotalDays < 7)
+                return $"Dernière analyse : il y a {(int)diff.TotalDays} j";
+
+            return $"Dernière analyse : {lastScan.Value.ToString("dd/MM/yyyy HH:mm", CultureInfo.CurrentCulture)}";
+        }
+
+        private static void SetDisplayText(System.Windows.Controls.TextBlock? block, string value)
+        {
+            if (block == null) return;
+            block.Text = string.IsNullOrWhiteSpace(value) || value is "Inconnue" or "—"
+                ? "—"
+                : value;
+        }
+
+        private void BrowseFolder_Click(object sender, RoutedEventArgs e)
         {
             using var dlg = new FolderBrowserDialog
             {
                 Description = "Sélectionnez le dossier à analyser",
                 UseDescriptionForTitle = true
             };
+
             if (dlg.ShowDialog() == System.Windows.Forms.DialogResult.OK
                 && VM?.ScanFolderCommand is { } cmd
                 && cmd.CanExecute(dlg.SelectedPath))
             {
                 cmd.Execute(dlg.SelectedPath);
             }
-            await System.Threading.Tasks.Task.CompletedTask;
         }
 
         private void BrowseFile_Click(object sender, RoutedEventArgs e)
         {
-            var dlg = new OpenFileDialog();
+            var dlg = new OpenFileDialog
+            {
+                Title = "Sélectionnez un fichier à analyser",
+                CheckFileExists = true,
+                CheckPathExists = true
+            };
+
             if (dlg.ShowDialog() == true
                 && VM?.ScanFileCommand is { } cmd
                 && cmd.CanExecute(dlg.FileName))
@@ -321,17 +255,11 @@ namespace optiSCAN.Views
             }
         }
 
-        // ═══════════════════════════════════════════════════════════════════
-        // HANDLERS — actions via ServiceContainer.AntivirusActions (sans remonter vers MainWindow).
-        // ═══════════════════════════════════════════════════════════════════
-
-        private static Services.AntivirusActions Actions => Services.ServiceContainer.Default.Actions;
-
         private void BtnQuarantineThreat_Click(object sender, RoutedEventArgs e)
         {
             if (sender is System.Windows.Controls.Button btn && btn.Tag is string filePath)
             {
-                var known = Services.ServiceContainer.Default.FindKnownThreat(filePath);
+                var known = ServiceContainer.Default.FindKnownThreat(filePath);
                 if (known != null)
                     Actions.QuarantineThreat(known.Clone());
                 else
@@ -351,11 +279,18 @@ namespace optiSCAN.Views
 
         private void BtnDeleteThreat_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is System.Windows.Controls.Button btn && btn.Tag is string filePath)
-            {
-                Actions.DeleteThreatFile(filePath);
-                RefreshAllData();
-            }
+            if (sender is not System.Windows.Controls.Button btn || btn.Tag is not string filePath)
+                return;
+
+            if (System.Windows.MessageBox.Show(
+                    "Supprimer définitivement ce fichier ?",
+                    "Confirmation",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                return;
+
+            Actions.DeleteThreatFile(filePath);
+            RefreshAllData();
         }
 
         private void BtnRestoreFromQuarantine_Click(object sender, RoutedEventArgs e)
@@ -369,19 +304,23 @@ namespace optiSCAN.Views
 
         private void BtnDeleteFromQuarantine_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is System.Windows.Controls.Button btn && btn.Tag is string quarantineId)
-            {
-                Actions.DeleteFromQuarantine(quarantineId);
-                RefreshAllData();
-            }
+            if (sender is not System.Windows.Controls.Button btn || btn.Tag is not string quarantineId)
+                return;
+
+            if (System.Windows.MessageBox.Show(
+                    "Supprimer définitivement cet élément de la quarantaine ?",
+                    "Confirmation",
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+
+            Actions.DeleteFromQuarantine(quarantineId);
+            RefreshAllData();
         }
 
         private void BtnManualUpdateSignatures_Click(object sender, RoutedEventArgs e)
         {
-            // La logique complète de MAJ (toast progress, log, etc.) reste dans
-            // MainWindow car elle pilote l'UI de cette vue. On notifie via le
-            // container — MainWindow écoute RequestSignatureUpdate.
-            Services.ServiceContainer.Default.TriggerSignatureUpdate();
+            ServiceContainer.Default.TriggerSignatureUpdate();
         }
 
         private void BtnStopUpdateSignatures_Click(object sender, RoutedEventArgs e)
