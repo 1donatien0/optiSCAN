@@ -162,7 +162,7 @@
                     <ColumnDefinition Width="3*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Statistiques de Protection (graphique) -->
+                <!-- Statistiques de protection (synthèse textuelle) -->
                 <Border Grid.Column="0"
                         Background="{DynamicResource CardBg}"
                         CornerRadius="12" Padding="18,16"
@@ -171,7 +171,7 @@
                         <TextBlock Text="Statistiques de protection"
                                    FontSize="13" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextDark}"/>
-                        <TextBlock Text="Synthèse sur les 30 derniers jours"
+                        <TextBlock Text="Synthèse textuelle — 30 derniers jours"
                                    FontSize="11" Foreground="{DynamicResource TextMuted}"
                                    Margin="0,2,0,2"/>
                         <TextBlock x:Name="txtProtectionStatsUpdated"

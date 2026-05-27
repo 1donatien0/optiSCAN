@@ -101,14 +101,14 @@ namespace optiSCAN.Services
             var clamProgress = new Progress<ScanProgress>(p =>
             {
                 var c = p.Clone();
-                c.Message = $"[ClamAV] {p.Message}";
+                c.Message = ScanUserDisplay.ForProgressMessage(p.Message);
                 progress?.Report(c);
             });
 
             var yaraProgress = new Progress<ScanProgress>(p =>
             {
                 var c = p.Clone();
-                c.Message = $"[YARA] {p.Message}";
+                c.Message = ScanUserDisplay.ForProgressMessage(p.Message);
                 progress?.Report(c);
             });
 
@@ -130,7 +130,7 @@ namespace optiSCAN.Services
             MultiTargetScanAggregator.AggregateAsync(
                 type,
                 targets,
-                t => RunPipelineAsync(type, t, true, progress, ct),
+                (t, targetProgress, token) => RunPipelineAsync(type, t, true, targetProgress, token),
                 ct,
                 progress,
                 skipIfDirectoryMissing: true,
@@ -261,7 +261,9 @@ namespace optiSCAN.Services
 
                 progress?.Report(new ScanProgress
                 {
-                    Message = $"YARA — scan récursif de {Path.GetFileName(folderPath)} ({total} fichiers)…",
+                    Message = total > 0
+                        ? $"Analyse de {Path.GetFileName(folderPath)} ({total:N0} fichiers)…"
+                        : $"Analyse de {Path.GetFileName(folderPath)}…",
                     Phase = ScanPhase.Starting,
                     TotalFiles = total,
                     CurrentFilePath = folderPath,

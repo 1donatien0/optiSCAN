@@ -9,8 +9,10 @@ namespace optiSCAN.Services
     /// divergents et abonnements dupliqués.
     /// </summary>
     /// <remarks>
-    /// Pas de conteneur Microsoft.Extensions.DependencyInjection : volontairement simple
-    /// (pas de scopes ni d’injection par constructeur automatique).
+    /// Pas de Microsoft.Extensions.DependencyInjection : choix volontaire pour une app WPF
+    /// desktop à cycle de vie unique (singleton <see cref="Default"/>, construction explicite
+    /// dans le constructeur privé). Un conteneur DI n’apporterait pas de scopes ici ; les tests
+    /// peuvent substituer via <see cref="IScanEngine"/> / instances passées à <see cref="ScanOrchestrator"/>.
     /// </remarks>
     [SupportedOSPlatform("windows")]
     public sealed class ServiceContainer
