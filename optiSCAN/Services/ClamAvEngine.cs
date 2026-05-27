@@ -15,6 +15,7 @@ namespace optiSCAN.Services
     {
         private readonly string _clamavDir;
         private readonly string _clamscanExe;
+        private readonly object _parseLock = new();
 
         // Regex : "C:\path\file.exe: Win.Trojan.Generic-123 FOUND"
         private static readonly Regex InfectedRegex =
@@ -33,37 +34,8 @@ namespace optiSCAN.Services
 
         public ClamAvEngine(string? clamavDir = null)
         {
-            _clamavDir = clamavDir ?? ResolveClamAvDir();
+            _clamavDir = clamavDir ?? ClamAvDatabasePaths.ResolveClamAvBinDir("clamscan.exe");
             _clamscanExe = Path.Combine(_clamavDir, "clamscan.exe");
-        }
-
-        /// <summary>
-        /// Résout le dossier ClamAV en tenant compte de l'architecture (x64/x86)
-        /// et d'une installation système (PATH).
-        /// </summary>
-        private static string ResolveClamAvDir()
-        {
-            var baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            var arch = Environment.Is64BitProcess ? "x64" : "x86";
-
-            // 1) clamav/<arch>/clamscan.exe  (binaires embarqués)
-            var archPath = Path.Combine(baseDir, "clamav", arch);
-            if (File.Exists(Path.Combine(archPath, "clamscan.exe")))
-                return archPath;
-
-            // 2) clamav/clamscan.exe  (flat layout de secours)
-            var flatPath = Path.Combine(baseDir, "clamav");
-            if (File.Exists(Path.Combine(flatPath, "clamscan.exe")))
-                return flatPath;
-
-            // 3) Program Files (installation système)
-            var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
-            var systemPath = Path.Combine(programFiles, "ClamAV");
-            if (File.Exists(Path.Combine(systemPath, "clamscan.exe")))
-                return systemPath;
-
-            // Fallback : retour flat (l'erreur sera levée à l'utilisation)
-            return flatPath;
         }
 
         /// <summary>
@@ -88,7 +60,7 @@ namespace optiSCAN.Services
 
         /// <summary>
         /// Vérifie que clamscan.exe est présent et fonctionnel en exécutant <c>--version</c>.
-        /// Résultat mis en cache 60 s pour limiter les spawns process à chaque navigation.
+        /// Résultat mis en cache 60 s pour limiter les lancements de processus à chaque navigation.
         /// </summary>
         public bool IsClamAvInstalled()
         {
@@ -285,6 +257,15 @@ namespace optiSCAN.Services
         private void ParseScanLine(
             string line, ScanResult result, IProgress<ScanProgress>? progress)
         {
+            lock (_parseLock)
+            {
+                ParseScanLineCore(line, result, progress);
+            }
+        }
+
+        private void ParseScanLineCore(
+            string line, ScanResult result, IProgress<ScanProgress>? progress)
+        {
             var infectedMatch = InfectedRegex.Match(line);
             if (infectedMatch.Success)
             {
@@ -400,15 +381,15 @@ namespace optiSCAN.Services
 
             var dbDir = DatabaseDir;
             if (!string.IsNullOrEmpty(dbDir))
-                args.Add($"--database={dbDir}"); // ArgumentList gère le quoting
+                args.Add($"--database={dbDir}"); // ArgumentList gère l'échappement (quoting)
 
             args.Add(target);
         }
 
         /// <summary>
-        /// Crée un ProcessStartInfo avec les bons flags I/O. Le caller doit
+        /// Crée un ProcessStartInfo avec les bons drapeaux I/O. L'appelant doit
         /// remplir <c>ArgumentList</c> via une surcharge dédiée (BuildScanArgs).
-        /// On ne définit jamais Arguments en string — pour échappement sûr.
+        /// On ne définit jamais Arguments en chaîne — pour un échappement sûr.
         /// </summary>
         private static ProcessStartInfo BuildStartInfo(string exe) =>
             new ProcessStartInfo

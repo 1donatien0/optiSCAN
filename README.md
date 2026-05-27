@@ -20,9 +20,11 @@
 | **6** | Workflow démarrage UI et ligne de commande |
 | **7** | Bonnes pratiques (droits, perfs, faux positifs, Defender) |
 | **8** | Publication et installateur Inno Setup |
-| **9** | Dépendances et licences |
-| **10** | Historique des versions produit |
-| **11** | Crédits |
+| **9** | Langues de l’interface (fr-FR / en-US) |
+| **10** | Dépendances et licences |
+| **11** | Historique des versions produit |
+| **12** | Crédits |
+| — | Voir aussi : [docs/BUILD.md](docs/BUILD.md) · [docs/LOCALIZATION.md](docs/LOCALIZATION.md) |
 
 ---
 
@@ -43,10 +45,18 @@
 
 ```
 (racine du dépôt optiSCAN)
-├── README.md                          ← Ce fichier
+├── README.md                          ← Ce fichier (guide complet)
+├── docs/
+│   ├── BUILD.md                       ← Publish, nettoyage, Inno Setup
+│   └── LOCALIZATION.md                ← Français / English (utilisateur + dev)
+├── scripts/
+│   ├── clean-before-publish.ps1       ← Nettoyage bin/obj avant release
+│   └── verify-runtime-deps.ps1        ← Vérifie clamav + yara + rules
 ├── optiSCAN.sln                       ← Solution Visual Studio
+├── optiSCAN.Tests/                    ← Tests unitaires (xUnit)
 ├── installer/
-│   └── setup.iss                      ← Script Inno Setup
+│   ├── setup.iss                      ← Script Inno Setup (FR + EN)
+│   └── build-release-setup.ps1        ← clean + publish + ISCC
 └── optiSCAN/                          ← Projet C# WPF
     ├── Models/
     │   ├── ThreatInfo.cs              ← Menace détectée
@@ -56,6 +66,16 @@
     │
     ├── ViewModels/                    ← ScanViewModel, RelayCommand
     ├── Views/                         ← Overview, Antivirus, Clean, History, Options
+    │
+    ├── Localization/
+    │   ├── LocalizationService.cs     ← Culture fr-FR / en-US, persistance
+    │   ├── LocExtension.cs            ← {loc:Loc Key=...} en XAML
+    │   └── ShellContextMenuSupport.cs ← Menu « Scanner avec optiSCAN » / EN
+    ├── Resources/
+    │   ├── UiStrings.resx             ← Chaînes UI (français)
+    │   └── UiStrings.en.resx          ← Chaînes UI (anglais)
+    ├── Strings/
+    │   └── OptiscanStrings.cs         ← URLs, confirmations, statuts MAJ
     │
     ├── Converters/
     │   └── ThreatRiskConverters.cs    ← Colonne « Risque » (RiskScoringService → UI)
@@ -70,6 +90,9 @@
     │   ├── YaraForgeUpdater.cs        ← Mise à jour automatique règles de détection
     │   ├── ServiceContainer.cs        ← Singleton partagé (orchestrateur, MAJ, quarantaine, planif…)
     │   ├── ScanOrchestrator.cs        ← Pipeline ClamAV + YARA en parallèle
+    │   ├── ScanProgressRelay.cs       ← Progression monotone (multi-cibles / Clam+YARA)
+    │   ├── ScanUserDisplay.cs         ← Libellés scan localisés
+    │   ├── ScanThreatMerger.cs        ← Fusion menaces ClamAV + YARA
     │   ├── MultiTargetScanAggregator.cs ← Fusion multi-cibles avec déduplication des menaces
     │   ├── AntivirusActions.cs        ← Quarantaine / suppression / MAJ (sans passer par MainWindow)
     │   ├── QuarantineManager.cs       ← Quarantaine AES-GCM, manifeste signé, RestoreTo(chemin)
@@ -231,13 +254,13 @@ Les vues sont empilées dans un seul `Grid` (`MainWindow.xaml`) : une seule est 
 | `Antivirus` | Antivirus | `AntivirusView` | Scans ; onglets **Analyse en cours** / **Quarantaine** / **Historique** / **Signatures** (`ScanViewModel`) |
 | `Clean` | Nettoyer | `CleanControl` | Analyse / nettoyage (caches navigateurs, temp, corbeille) + **historique local** (colonne **Libéré** = `BytesDisplay`) |
 | `History` | Historique | `HistoryControl` | Scans / nettoyages ; onglet **Journal** (`ReadLastLogLines`) ; export **HTML** / **PDF** (dernier ou ligne sélectionnée) |
-| `Options` | Options | `OptionsControl` | Thème / `SyncWindowsTheme`, scan favori, RTP, quarantaine auto, planif. (`ServiceContainer.ScheduledScan`, prochaine exécution, **Lancer maintenant**), exclusions |
+| `Options` | Options | `OptionsControl` | **Langue** (fr/en, redémarrage), thème / `SyncWindowsTheme`, scan favori, RTP, quarantaine auto, planif. (`ServiceContainer.ScheduledScan`, prochaine exécution, **Lancer maintenant**), exclusions |
 
 Raccourcis clavier : `Ctrl+1` … `Ctrl+5` (`KeyboardShortcuts`) — ordre des panneaux : **Vue d’ensemble**, **Antivirus**, **Nettoyer**, **Historique**, **Options**.
 
-### 4.2 Fenêtre principale et icône
+### 4.2 Fenêtre principale, barre système et icône
 
-L'interface v6.0 repose sur la fenêtre principale (`MainWindow`) et la barre latérale de navigation ; il n'y a pas d'icône dédiée dans la zone de notification système dans cette branche. L'icône `optiSCAN.ico` sert à la fenêtre, à la barre des tâches et à l'installateur.
+L'interface repose sur `MainWindow` et la barre latérale (90 px). Une **icône dans la zone de notification** (`NotifyIcon`) permet de rouvrir la fenêtre (double-clic) ou d'utiliser le menu **Ouvrir** / **Quitter** (libellés selon la langue). Réduire la fenêtre laisse optiSCAN actif en arrière-plan. L'icône `optiSCAN.ico` sert aussi à la barre des tâches et à l'installateur.
 
 ### 4.3 Panneau Antivirus (`NavigateTo("Antivirus")`)
 
@@ -403,18 +426,19 @@ Instance unique : **`ServiceContainer.Default.ScheduledScan`** (partagée avec *
 DÉMARRAGE (UI)
     │
     ├─→ Mutex single-instance (2e instance → IPC « afficher » la fenêtre existante)
-    ├─→ `App.OnStartup` → `ThemeManager.Initialize()` (préférence `UserPreferences`)
+    ├─→ `App.OnStartup` → `LocalizationService.Initialize()` (fr-FR / en-US : prefs, registre installateur)
+    ├─→ `ThemeManager.Initialize()` (préférence `UserPreferences`)
     ├─→ `MainWindow` + `ServiceContainer.Default` (ClamAV, YARA, orchestrateur, MAJ, quarantaine, planif., logs, `AntivirusActions`, `ThreatLookup` → VM)
     ├─→ Minuteries MAJ : freshclam **4 h**, règles YARA **24 h** (désactivables via Options)
     ├─→ `ScanViewModel.InitializeAsync` : versions, base, YARA, historique, quarantaine
     ├─→ Protection temps réel : état selon **Options** (`ServiceContainer.RealTimeProtection`)
-    └─→ Fenêtre principale — pas d’icône dédiée dans la zone de notification (réduction = fenêtre masquée)
+    └─→ Fenêtre principale + icône zone de notification (réduction possible sans quitter)
             │
             ├─→ [VUE D'ENSEMBLE] — cartes d’action, statistiques 30 j., recommandations dynamiques, état antivirus / signatures
             ├─→ [NETTOYER] — temporaires, caches navigateurs (Edge, Chrome, Firefox, Brave, **Opera**, **Vivaldi**, **Arc**), corbeille, journaux Windows
             ├─→ [ANTIVIRUS] — scans rapide/complet/dossier/fichier, quarantaine, historique de session, signatures
             ├─→ [HISTORIQUE] — sessions enregistrées ; exports **HTML** / **PDF**
-            └─→ [OPTIONS] — thème clair/sombre, sync thème Windows, scan favori, démarrage auto, MAJ auto, RTP, quarantaine auto, planification, exclusions
+            └─→ [OPTIONS] — langue FR/EN, thème clair/sombre, sync thème Windows, scan favori, démarrage auto, MAJ auto, RTP, quarantaine auto, planification, exclusions
 
 FERMETURE
     └─→ `MainWindow.OnWindowClosing` → `PerformCleanShutdown` → `ServiceContainer.Shutdown()` (RTP, minuteries MAJ, moteurs)
@@ -462,7 +486,15 @@ Add-MpPreference -ExclusionPath "C:\Program Files\optiSCAN\clamav\database"
 
 ## 8. Packaging final (v6.0)
 
+Guide détaillé : **[docs/BUILD.md](docs/BUILD.md)**.
+
 Exécuter depuis la **racine du dépôt** (dossier contenant `optiSCAN.sln`). La sortie du profil **FolderProfile** est `optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\` (chemin attendu par `installer\setup.iss`).
+
+**Étape 0 — nettoyage (recommandé)**
+
+```powershell
+.\scripts\clean-before-publish.ps1 -IncludeObj
+```
 
 **Étape A — publication .NET**
 
@@ -485,7 +517,9 @@ $pub = ".\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64"
 
 Sortie typique : `installer\output\optiSCAN_Setup_v6.0.0.exe` (versions dans `#define` de `setup.iss`).
 
-**Variante** : `dotnet publish ... -c Release -r win-x64 -o <dossier>` avec le même dossier que **`PublishDir`** du profil **FolderProfile**, pour que **`setup.iss`** trouve `optiSCAN.exe`.
+**Variante tout-en-un** : `.\installer\build-release-setup.ps1` (nettoie, publie, lance ISCC).
+
+**Installateur** : assistant **bilingue** (français / English) ; langue choisie → `UiCulture` en registre pour le premier lancement de l’app.
 
 **Contenu de l'installateur (~260 Mo avec signatures initiales) :**
 
@@ -501,7 +535,22 @@ optiSCAN_Setup_v6.0.0.exe
 
 ---
 
-## 9. Dépendances et licences
+## 9. Langues de l’interface (fr-FR / en-US)
+
+Référence complète : **[docs/LOCALIZATION.md](docs/LOCALIZATION.md)**.
+
+| Canal | Comportement |
+|-------|----------------|
+| **Installateur Inno** | Choix FR ou EN → `HKCU\Software\optiSCAN\UiCulture` |
+| **Options → Langue** | Français / English → confirmation → **redémarrage** de l’app |
+| **Ressources** | `UiStrings.resx` + `UiStrings.en.resx` (~170 clés chacune) |
+| **Menu contextuel** | « Scanner avec optiSCAN » ou « Scan with optiSCAN » |
+
+Les deux langues sont **incluses dans le même binaire** (pas de pack de langue séparé). Les rapports PDF/HTML exportés et les journaux techniques ClamAV/YARA peuvent rester partiellement en français ou en anglais technique.
+
+---
+
+## 10. Dépendances et licences
 
 | Composant | Version | Licence | Notes |
 |---|---|---|---|
@@ -518,12 +567,14 @@ optiSCAN_Setup_v6.0.0.exe
 
 ---
 
-## 10. Historique des versions produit
+## 11. Historique des versions produit
 
 ### v6.0 — Version majeure (publication)
 
 - **Versioning unifié** — nom **v6.0** + build **6.0.0** (`Directory.Build.props`, Inno Setup, **LICENSE.txt**, manifeste, rapports PDF/HTML)
-- **Expérience d’analyse** — libellés utilisateur unifiés (`ScanUserDisplay`) ; progression multi-cibles cumulative ; rafraîchissement Vue d’ensemble via navigation et fin de scan
+- **Interface bilingue** — français et anglais embarqués (`LocalizationService`, `UiStrings` / `UiStrings.en`) ; installateur et Options avec redémarrage ; menu contextuel Explorateur localisé
+- **Documentation** — `README.md`, `docs/BUILD.md`, `docs/LOCALIZATION.md` ; scripts `clean-before-publish.ps1` et `build-release-setup.ps1`
+- **Expérience d’analyse** — libellés utilisateur unifiés (`ScanUserDisplay`) ; progression monotone (`ScanProgressRelay`) ; fusion menaces (`ScanThreatMerger`) ; tests unitaires étendus
 - **Antivirus** — analyse par boutons (rapide, complète, fichier, dossier) ; suppression du glisser-déposer
 
 ### v5.0 — Version majeure (publication)
@@ -588,7 +639,7 @@ optiSCAN_Setup_v6.0.0.exe
 
 ---
 
-## 11. Crédits
+## 12. Crédits
 
 Développé par **© 2026 Donatien Byakombe**  
 Design system : **Donaby Design**

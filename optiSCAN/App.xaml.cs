@@ -1,3 +1,4 @@
+using optiSCAN.Localization;
 using optiSCAN.Models;
 using optiSCAN.Services;
 using System.Windows;
@@ -29,6 +30,8 @@ namespace optiSCAN
         /// </summary>
         protected override async void OnStartup(StartupEventArgs e)
         {
+            LocalizationService.Initialize();
+
             // ── Mode headless ────────────────────────────────────────────────
             // Détecté en premier pour éviter d'afficher la fenêtre principale.
             // ScheduledScanService crée la tâche schtasks avec --fullscan --quiet ;

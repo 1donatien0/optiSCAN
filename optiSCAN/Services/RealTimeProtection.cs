@@ -119,10 +119,10 @@ namespace optiSCAN.Services
                     InternalBufferSize = 64 * 1024,
                 };
 
-                watcher.Created += OnFileChanged;
-                watcher.Changed += OnFileChanged;
-                watcher.Renamed += OnFileRenamed;
-                watcher.Error += OnWatcherError;
+                watcher.Created += SurFichierModifie;
+                watcher.Changed += SurFichierModifie;
+                watcher.Renamed += SurFichierRenomme;
+                watcher.Error += SurErreurWatcher;
 
                 watcher.EnableRaisingEvents = true;
                 _watchers.Add(watcher);
@@ -137,7 +137,16 @@ namespace optiSCAN.Services
         // FileSystemEventHandler). Toute exception non gérée crashe le process.
         // Un fichier crafté qui déclenche une exception suffirait à désactiver la
         // protection temps réel. On enrobe donc TOUT le corps en try/catch global.
-        private async void OnFileChanged(object sender, FileSystemEventArgs e)
+        /// <summary>
+        /// Réagit à la création/modification d'un fichier et déclenche un scan si nécessaire.
+        /// </summary>
+        /// <remarks>
+        /// Le corps est en <c>try/catch</c> global : un crash dans un handler <c>async void</c>
+        /// mettrait fin à la protection temps réel.
+        /// On dé-duplique et on attend un bref délai de stabilisation pour éviter de scanner
+        /// un fichier encore en cours d'écriture.
+        /// </remarks>
+        private async void SurFichierModifie(object sender, FileSystemEventArgs e)
         {
             try
             {
@@ -180,11 +189,18 @@ namespace optiSCAN.Services
             catch (Exception ex)
             {
                 // Logger sans propager — protection temps réel ne doit JAMAIS crasher.
-                WriteLog($"[RTP] OnFileChanged exception ({e.FullPath}): {ex.Message}");
+                WriteLog($"[RTP] SurFichierModifie exception ({e.FullPath}): {ex.Message}");
             }
         }
 
-        private async void OnFileRenamed(object sender, RenamedEventArgs e)
+        /// <summary>
+        /// Réagit à un renommage de fichier (scan sur le nouveau chemin si applicable).
+        /// </summary>
+        /// <remarks>
+        /// Même stratégie que SurFichierModifie : déduplication + stabilisation + protection
+        /// contre les exceptions (handler async void).
+        /// </remarks>
+        private async void SurFichierRenomme(object sender, RenamedEventArgs e)
         {
             try
             {
@@ -221,11 +237,18 @@ namespace optiSCAN.Services
             }
             catch (Exception ex)
             {
-                WriteLog($"[RTP] OnFileRenamed exception ({e.FullPath}): {ex.Message}");
+                WriteLog($"[RTP] SurFichierRenomme exception ({e.FullPath}): {ex.Message}");
             }
         }
 
-        private void OnWatcherError(object sender, ErrorEventArgs e)
+        /// <summary>
+        /// Logue les erreurs du <see cref="FileSystemWatcher"/>.
+        /// </summary>
+        /// <remarks>
+        /// Le watcher peut générer des erreurs non critiques ; on se limite à journaliser
+        /// pour conserver la stabilité générale.
+        /// </remarks>
+        private void SurErreurWatcher(object sender, ErrorEventArgs e)
         {
             WriteLog($"Erreur FileSystemWatcher : {e.GetException()?.Message}");
         }

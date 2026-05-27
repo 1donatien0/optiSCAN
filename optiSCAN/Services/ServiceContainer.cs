@@ -72,6 +72,7 @@ namespace optiSCAN.Services
             ExclusionSettings.Current.Save();
             if (enabled) RealTimeProtection.Start();
             else RealTimeProtection.Stop();
+            RequestProtectionStateRefresh();
         }
 
         /// <summary>Persiste la quarantaine automatique (RTP + mode headless).</summary>
@@ -94,6 +95,32 @@ namespace optiSCAN.Services
                 FreshclamUpdater.DisableAutoUpdate();
                 RulesUpdater.DisableAutoUpdate();
             }
+
+            UserPreferences.Current.SignatureAutoUpdateEnabled = enabled;
+            UserPreferences.Current.Save();
+            RequestProtectionStateRefresh();
+        }
+
+        private EventHandler? _protectionStateRefreshHandlers;
+
+        /// <summary>Demande aux vues bindées de recalculer le badge de protection.</summary>
+        public event EventHandler? ProtectionStateRefreshRequested
+        {
+            add => _protectionStateRefreshHandlers += value;
+            remove => _protectionStateRefreshHandlers -= value;
+        }
+
+        public void RequestProtectionStateRefresh() =>
+            _protectionStateRefreshHandlers?.Invoke(this, EventArgs.Empty);
+
+        /// <summary>Restaure RTP et MAJ auto selon les préférences persistées (appel au démarrage UI).</summary>
+        public void ApplyPreferencesOnStartup()
+        {
+            ApplySignatureAutoUpdate(UserPreferences.Current.SignatureAutoUpdateEnabled);
+            if (ExclusionSettings.Current.RealTimeEnabled)
+                RealTimeProtection.Start();
+            else
+                RealTimeProtection.Stop();
         }
 
         // Demandes UI (export, onglet Signatures, etc.) : événements nommés plutôt que des
@@ -173,10 +200,7 @@ namespace optiSCAN.Services
             RealTimeProtection = new RealTimeProtection(Orchestrator, Quarantine, Notifications);
             ScheduledScan = new ScheduledScanService();
 
-            // MAJ silencieuses alignées sur le guide produit (Options peut les couper).
-            FreshclamUpdater.EnableAutoUpdate(TimeSpan.FromHours(4));
-            RulesUpdater.EnableAutoUpdate(TimeSpan.FromHours(24));
-
+            // Timers MAJ signatures : état restauré depuis UserPreferences (ApplyPreferencesOnStartup).
             AppLogger.Info("ServiceContainer", "Services initialisés");
 
             var yara = Yara;
@@ -199,7 +223,7 @@ namespace optiSCAN.Services
 
         /// <summary>
         /// Libère proprement tous les services disposables.
-        /// Appelé depuis App.OnExit.
+/// Appelé depuis App.OnExit.
         /// </summary>
         public void Shutdown()
         {

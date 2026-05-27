@@ -1,6 +1,5 @@
 <ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
-                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- ═══════════════════════════════════════════════════════════════
          THÈME SOMBRE
@@ -14,7 +13,7 @@
     <SolidColorBrush x:Key="ContentBg"      Color="#1A1917"/>
     <SolidColorBrush x:Key="HeaderBg"       Color="#242320"/>
     <SolidColorBrush x:Key="CardBg"         Color="#242320"/>
-    <SolidColorBrush x:Key="CardBrush"      Color="#242320"/>
+    <SolidColorBrush x:Key="CardBgHover"    Color="#2E2C42"/>
     <SolidColorBrush x:Key="SurfaceBg"      Color="#2E2D2A"/>
 
     <!-- ── SIDEBAR ── -->
@@ -32,13 +31,10 @@
     <!-- ── ACCENT PRINCIPAL (violet Donaby) ── -->
     <SolidColorBrush x:Key="PrimaryBlue"        Color="#534AB7"/>
     <SolidColorBrush x:Key="AccentBlue"         Color="#9F97F0"/>
-    <SolidColorBrush x:Key="DarkBlue"           Color="#26215C"/>
     <SolidColorBrush x:Key="AccentBg"           Color="#26215C"/>
-    <SolidColorBrush x:Key="AccentMid"          Color="#3C3489"/>
 
     <!-- ── SUCCÈS / TEAL ── -->
     <SolidColorBrush x:Key="SuccessGreen"       Color="#5DCAA5"/>
-    <SolidColorBrush x:Key="SuccessLight"       Color="#9FE1CB"/>
     <SolidColorBrush x:Key="SuccessBg"          Color="#04342C"/>
 
     <!-- ── ALERTE / AMBRE ── -->
@@ -48,58 +44,40 @@
 
     <!-- ── AVERTISSEMENT / ORANGE ── -->
     <SolidColorBrush x:Key="WarningOrange"      Color="#EF9F27"/>
-    <SolidColorBrush x:Key="WarningBg"          Color="#412402"/>
 
     <!-- ── DANGER / ROUGE ── -->
     <SolidColorBrush x:Key="DangerRed"          Color="#E24B4A"/>
-    <SolidColorBrush x:Key="DangerBg"           Color="#501313"/>
 
     <!-- ── TEXTES ── -->
     <SolidColorBrush x:Key="TextDark"           Color="#F0EDE8"/>
     <SolidColorBrush x:Key="TextMedium"         Color="#B0ADA6"/>
-    <SolidColorBrush x:Key="TextLight"          Color="#686660"/>
-    <SolidColorBrush x:Key="TextMuted"          Color="#686660"/>
+    <SolidColorBrush x:Key="TextMuted"          Color="#8A8780"/>
+    <!-- Alias sémantique de TextMedium (libellés secondaires) -->
     <SolidColorBrush x:Key="TextSecondary"      Color="#B0ADA6"/>
+    <!-- Texte sur fond accent (boutons violets) -->
+    <SolidColorBrush x:Key="TextOnPrimary"      Color="#FFFFFF"/>
+    <SolidColorBrush x:Key="TextOnPrimaryMuted" Color="#B0ADA6"/>
+    <SolidColorBrush x:Key="TextAccent"         Color="#9F97F0"/>
 
-    <!-- ── PALETTE GLOBALE (App.*) ── -->
-    <SolidColorBrush x:Key="App.Bg.Deep"        Color="#100F0D"/>
-    <SolidColorBrush x:Key="App.Bg.Mid"         Color="#1A1917"/>
-    <SolidColorBrush x:Key="App.Card"           Color="#242320"/>
-    <SolidColorBrush x:Key="App.Border"         Color="#3C3A36"/>
-    <SolidColorBrush x:Key="App.Blue.Primary"   Color="#534AB7"/>
-    <SolidColorBrush x:Key="App.Blue.Accent"    Color="#9F97F0"/>
-    <SolidColorBrush x:Key="App.Blue.Dark"      Color="#26215C"/>
-    <SolidColorBrush x:Key="App.Gold"           Color="#EF9F27"/>
-    <SolidColorBrush x:Key="App.Gold.Light"     Color="#FAC775"/>
-    <SolidColorBrush x:Key="App.Green"          Color="#5DCAA5"/>
-    <SolidColorBrush x:Key="App.Green.Light"    Color="#9FE1CB"/>
-    <SolidColorBrush x:Key="App.Red"            Color="#E24B4A"/>
-    <SolidColorBrush x:Key="App.Orange"         Color="#EF9F27"/>
-    <SolidColorBrush x:Key="App.Text.Main"      Color="#F0EDE8"/>
-    <SolidColorBrush x:Key="App.Text.Sub"       Color="#B0ADA6"/>
-    <SolidColorBrush x:Key="App.Text.Muted"     Color="#686660"/>
+    <!-- ── ICÔNE SUR FOND ACCENT — anneau semi-transparent posé sur PrimaryBlue ── -->
+    <SolidColorBrush x:Key="AccentIconRing"     Color="#33FFFFFF"/>
 
     <!-- ── OMBRES (minimalistes, Donaby Design style) ── -->
-    <DropShadowEffect x:Key="App.Shadow.Card"
-                      Color="#000000" Opacity="0.18"
-                      BlurRadius="12" ShadowDepth="2" Direction="270"/>
-    <DropShadowEffect x:Key="App.Shadow.Glow"
-                      Color="#534AB7" Opacity="0.15"
-                      BlurRadius="12" ShadowDepth="0"/>
     <DropShadowEffect x:Key="CardShadow"
                       Color="#000000" Opacity="0.18"
                       BlurRadius="12" ShadowDepth="2" Direction="270"/>
-    <DropShadowEffect x:Key="CardShadowHover"
-                      Color="#534AB7" Opacity="0.12"
-                      BlurRadius="16" ShadowDepth="3" Direction="270"/>
-    <DropShadowEffect x:Key="GlowBlue"
-                      Color="#9F97F0" Opacity="0.20"
-                      BlurRadius="12" ShadowDepth="0"/>
+
+    <!-- ── EN-TÊTE DE PAGE (Accueil, etc.) — dégradé type Mica, suit le thème ── -->
+    <LinearGradientBrush x:Key="PageHeaderMica" StartPoint="0,0" EndPoint="0,1">
+        <GradientStop Color="#2E2D2A" Offset="0"/>
+        <GradientStop Color="#26215C" Offset="0.5"/>
+        <GradientStop Color="#1A1917" Offset="1"/>
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="PageHeaderIconRing"   Color="#26215C"/>
+    <SolidColorBrush x:Key="PageHeaderIconBorder" Color="#3C3489"/>
 
     <!-- ── INDICATEUR TOGGLE (icône lune pour le bouton thème) ── -->
     <SolidColorBrush x:Key="ThemeToggleBg"      Color="#26215C"/>
     <SolidColorBrush x:Key="ThemeToggleFg"      Color="#9F97F0"/>
-    <sys:String x:Key="ThemeToggleIcon">WeatherNight</sys:String>
-    <sys:String x:Key="ThemeToggleLabel">Mode clair</sys:String>
 
 </ResourceDictionary>

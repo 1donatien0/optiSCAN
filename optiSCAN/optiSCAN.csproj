@@ -25,17 +25,15 @@
     <CleanPublishArtifactsBeforePublish Condition="'$(CleanPublishArtifactsBeforePublish)' == ''">true</CleanPublishArtifactsBeforePublish>
   </PropertyGroup>
 
-  <!-- Inno Setup lit bin\...\publish\ ou publish\win-x64\ : sans ce nettoyage,
-       des fichiers d'une compilation antérieure peuvent rester et se retrouver
-       dans l'installateur si le dossier publish n'a pas été vidé. -->
+  <!-- Inno Setup lit bin\...\publish\win-x64\ : sans ce nettoyage, des binaires
+       ClamAV/YARA ou une base freshclam obsolète dans bin\...\clamav\x64 peuvent
+       être recopiés (PreserveNewest) dans publish et finir dans l'installateur. -->
   <Target Name="CleanStalePublishOutput" BeforeTargets="BeforePublish" Condition="'$(CleanPublishArtifactsBeforePublish)' == 'true'">
     <PropertyGroup>
       <_PublishParent>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)</_PublishParent>
     </PropertyGroup>
-    <Message Importance="high" Text="optiSCAN : suppression des anciennes sorties publish ($(_PublishParent)\win-x64, publish, win-x86)..." />
-    <RemoveDir Directories="$(_PublishParent)\win-x64" ContinueOnError="true" />
-    <RemoveDir Directories="$(_PublishParent)\win-x86" ContinueOnError="true" />
-    <RemoveDir Directories="$(_PublishParent)\publish" ContinueOnError="true" />
+    <Message Importance="high" Text="optiSCAN : nettoyage complet bin\Release (publish, clamav, exe) avant publication..." />
+    <RemoveDir Directories="$(_PublishParent)" ContinueOnError="true" />
   </Target>
 
   <ItemGroup>

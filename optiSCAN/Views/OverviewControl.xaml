@@ -1,16 +1,26 @@
 <UserControl x:Class="optiSCAN.Views.OverviewControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
+             xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:strings="clr-namespace:optiSCAN.Strings"
+             xmlns:loc="clr-namespace:optiSCAN.Localization">
 
-    <ScrollViewer VerticalScrollBarVisibility="Auto" Background="{DynamicResource ContentBg}">
-        <StackPanel Margin="24,20,24,24">
+    <!-- Grid racine (pas de ScrollViewer qui laisse du vide gris sous les cartes). -->
+    <Grid Background="{DynamicResource ContentBg}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="Auto"/>
+            <RowDefinition Height="*"/>
+        </Grid.RowDefinitions>
 
-            <!-- ── Bannière de protection ─────────────────────────────────── -->
-            <Border Background="{DynamicResource CardBg}"
-                    CornerRadius="12" Padding="20,16"
-                    Margin="0,0,0,16"
-                    Effect="{DynamicResource CardShadow}">
+            <Border Grid.Row="0"
+                    Margin="24,16,24,0"
+                    CornerRadius="12"
+                    BorderBrush="{DynamicResource BorderSubtle}"
+                    BorderThickness="1"
+                    Background="{DynamicResource PageHeaderMica}"
+                    Effect="{DynamicResource CardShadow}"
+                    Padding="18,14">
                 <Grid>
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto"/>
@@ -18,189 +28,191 @@
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Icône verte -->
                     <Border Grid.Column="0" Width="44" Height="44" CornerRadius="22"
-                            Background="{DynamicResource SuccessBg}" Margin="0,0,16,0">
-                        <md:PackIcon Kind="CheckCircle" Width="26" Height="26"
-                                     Foreground="{DynamicResource SuccessGreen}"
+                            Background="{DynamicResource PageHeaderIconRing}"
+                            BorderBrush="{DynamicResource PageHeaderIconBorder}"
+                            BorderThickness="1"
+                            Margin="0,0,14,0">
+                        <md:PackIcon Kind="ShieldCheck" Width="24" Height="24"
+                                     Foreground="{DynamicResource TextAccent}"
                                      HorizontalAlignment="Center" VerticalAlignment="Center"/>
                     </Border>
 
-                    <!-- Texte -->
                     <StackPanel Grid.Column="1" VerticalAlignment="Center">
                         <TextBlock x:Name="txtProtectionHeadline"
-                                   Text="Votre ordinateur est protégé"
-                                   FontSize="16" FontWeight="SemiBold"
+                                   Text="{loc:Loc Key=Overview_Protected}"
+                                   FontSize="{DynamicResource FontSize.Hero}" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextDark}"/>
                         <TextBlock x:Name="txtProtectionStatus"
-                                   Text="Les définitions sont à jour."
-                                   FontSize="12"
+                                   Text="{loc:Loc Key=Overview_DefsUpToDate}"
+                                   FontSize="{DynamicResource FontSize.Body}"
                                    Foreground="{DynamicResource SuccessGreen}"
                                    Margin="0,3,0,0"/>
                     </StackPanel>
 
-                    <!-- Icône tendance -->
                     <md:PackIcon Grid.Column="2" Kind="TrendingUp"
-                                 Width="28" Height="28"
+                                 Width="24" Height="24"
                                  Foreground="{DynamicResource AlertGoldLight}"
-                                 VerticalAlignment="Center"/>
+                                 VerticalAlignment="Center"
+                                 Opacity="0.85"/>
                 </Grid>
             </Border>
 
-            <!-- ── 4 Cartes d'action ──────────────────────────────────────── -->
-            <UniformGrid Columns="4" Margin="0,0,0,16">
+            <UniformGrid Grid.Row="1"
+                         Columns="4"
+                         Margin="24,12,24,8">
 
-                <!-- NETTOYER -->
-                <Border Margin="0,0,8,0" CornerRadius="12"
+                <Border Margin="0,0,6,0" CornerRadius="12"
                         Background="{DynamicResource CardBg}"
                         Effect="{DynamicResource CardShadow}"
-                        Cursor="Hand" Tag="Clean"
+                        Cursor="Hand" Tag="{x:Static strings:OptiscanStrings+PanelIds.Clean}"
                         MouseLeftButtonUp="ActionCard_Click">
-                    <StackPanel HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                Margin="20,18">
-                        <Border Width="52" Height="52" CornerRadius="26"
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="16,14">
+                        <Border Width="48" Height="48" CornerRadius="24"
                                 Background="{DynamicResource SurfaceBg}"
-                                HorizontalAlignment="Center" Margin="0,0,0,12">
-                            <md:PackIcon Kind="Broom" Width="28" Height="28"
+                                HorizontalAlignment="Center" Margin="0,0,0,10">
+                            <md:PackIcon Kind="Broom" Width="26" Height="26"
                                          Foreground="{DynamicResource AlertGoldLight}"
                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="NETTOYER" FontSize="13" FontWeight="Bold"
+                        <TextBlock Text="{loc:Loc Key=Overview_CleanTitle}" FontSize="{DynamicResource FontSize.Title}" FontWeight="Bold"
                                    Foreground="{DynamicResource TextDark}"
                                    HorizontalAlignment="Center"/>
-                        <TextBlock Text="Fichiers temporaires" FontSize="11"
+                        <TextBlock Text="{loc:Loc Key=Overview_CleanSub}" FontSize="{DynamicResource FontSize.Small}"
                                    Foreground="{DynamicResource TextMuted}"
-                                   HorizontalAlignment="Center" Margin="0,3,0,0"/>
+                                   HorizontalAlignment="Center" Margin="0,2,0,0"/>
                     </StackPanel>
                 </Border>
 
-                <!-- ANTIVIRUS -->
-                <Border Margin="4,0,4,0" CornerRadius="12"
+                <Border Margin="3,0,3,0" CornerRadius="12"
                         Background="{DynamicResource CardBg}"
                         Effect="{DynamicResource CardShadow}"
-                        Cursor="Hand" Tag="Antivirus"
+                        Cursor="Hand" Tag="{x:Static strings:OptiscanStrings+PanelIds.Antivirus}"
                         MouseLeftButtonUp="ActionCard_Click">
-                    <StackPanel HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                Margin="20,18">
-                        <Border Width="52" Height="52" CornerRadius="26"
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="16,14">
+                        <Border Width="48" Height="48" CornerRadius="24"
                                 Background="{DynamicResource SurfaceBg}"
-                                HorizontalAlignment="Center" Margin="0,0,0,12">
-                            <md:PackIcon Kind="ShieldCheck" Width="28" Height="28"
+                                HorizontalAlignment="Center" Margin="0,0,0,10">
+                            <md:PackIcon Kind="ShieldCheck" Width="26" Height="26"
                                          Foreground="{DynamicResource SuccessGreen}"
                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="ANTIVIRUS" FontSize="13" FontWeight="Bold"
+                        <TextBlock Text="{loc:Loc Key=Overview_ScanTitle}" FontSize="{DynamicResource FontSize.Title}" FontWeight="Bold"
                                    Foreground="{DynamicResource TextDark}"
                                    HorizontalAlignment="Center"/>
-                        <TextBlock Text="Lancer une analyse" FontSize="11"
+                        <TextBlock Text="{loc:Loc Key=Overview_ScanSub}" FontSize="{DynamicResource FontSize.Small}"
                                    Foreground="{DynamicResource TextMuted}"
-                                   HorizontalAlignment="Center" Margin="0,3,0,0"/>
+                                   HorizontalAlignment="Center" Margin="0,2,0,0"/>
                     </StackPanel>
                 </Border>
 
-                <!-- HISTORIQUE -->
-                <Border Margin="4,0,4,0" CornerRadius="12"
+                <Border Margin="3,0,3,0" CornerRadius="12"
                         Background="{DynamicResource CardBg}"
                         Effect="{DynamicResource CardShadow}"
-                        Cursor="Hand" Tag="History"
+                        Cursor="Hand" Tag="{x:Static strings:OptiscanStrings+PanelIds.History}"
                         MouseLeftButtonUp="ActionCard_Click">
-                    <StackPanel HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                Margin="20,18">
-                        <Border Width="52" Height="52" CornerRadius="26"
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="16,14">
+                        <Border Width="48" Height="48" CornerRadius="24"
                                 Background="{DynamicResource SurfaceBg}"
-                                HorizontalAlignment="Center" Margin="0,0,0,12">
-                            <md:PackIcon Kind="History" Width="28" Height="28"
-                                         Foreground="{DynamicResource PrimaryBlue}"
+                                HorizontalAlignment="Center" Margin="0,0,0,10">
+                            <md:PackIcon Kind="History" Width="26" Height="26"
+                                         Foreground="{DynamicResource TextAccent}"
                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="HISTORIQUE" FontSize="13" FontWeight="Bold"
+                        <TextBlock Text="{loc:Loc Key=Overview_HistoryTitle}" FontSize="{DynamicResource FontSize.Title}" FontWeight="Bold"
                                    Foreground="{DynamicResource TextDark}"
                                    HorizontalAlignment="Center"/>
-                        <TextBlock Text="Voir l’historique" FontSize="11"
+                        <TextBlock Text="{loc:Loc Key=Overview_HistorySub}" FontSize="{DynamicResource FontSize.Small}"
                                    Foreground="{DynamicResource TextMuted}"
-                                   HorizontalAlignment="Center" Margin="0,3,0,0"/>
+                                   HorizontalAlignment="Center" Margin="0,2,0,0"/>
                     </StackPanel>
                 </Border>
 
-                <!-- MISE À JOUR -->
-                <Border Margin="8,0,0,0" CornerRadius="12"
+                <Border Margin="6,0,0,0" CornerRadius="12"
                         Background="{DynamicResource CardBg}"
                         Effect="{DynamicResource CardShadow}"
-                        Cursor="Hand" Tag="Update"
+                        Cursor="Hand" Tag="{x:Static strings:OptiscanStrings+ActionIds.Update}"
                         MouseLeftButtonUp="ActionCard_Click">
-                    <StackPanel HorizontalAlignment="Center"
-                                VerticalAlignment="Center"
-                                Margin="20,18">
-                        <Border Width="52" Height="52" CornerRadius="26"
+                    <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center" Margin="16,14">
+                        <Border Width="48" Height="48" CornerRadius="24"
                                 Background="{DynamicResource SurfaceBg}"
-                                HorizontalAlignment="Center" Margin="0,0,0,12">
-                            <md:PackIcon Kind="Refresh" Width="28" Height="28"
-                                         Foreground="{DynamicResource PrimaryBlue}"
+                                HorizontalAlignment="Center" Margin="0,0,0,10">
+                            <md:PackIcon Kind="Refresh" Width="26" Height="26"
+                                         Foreground="{DynamicResource TextAccent}"
                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>
-                        <TextBlock Text="MISE À JOUR" FontSize="13" FontWeight="Bold"
+                        <TextBlock Text="{loc:Loc Key=Overview_UpdateTitle}" FontSize="{DynamicResource FontSize.Title}" FontWeight="Bold"
                                    Foreground="{DynamicResource TextDark}"
                                    HorizontalAlignment="Center"/>
-                        <TextBlock Text="ClamAV + règles YARA" FontSize="11"
+                        <TextBlock Text="{loc:Loc Key=Overview_UpdateSub}" FontSize="{DynamicResource FontSize.Small}"
                                    Foreground="{DynamicResource TextMuted}"
-                                   HorizontalAlignment="Center" Margin="0,3,0,0"/>
+                                   HorizontalAlignment="Center" Margin="0,2,0,0"/>
                     </StackPanel>
                 </Border>
 
             </UniformGrid>
 
-            <!-- ── Ligne inférieure : Statistiques | Recommandations | Info ─ -->
-            <Grid>
+            <!-- Ligne du bas : s'étire jusqu'au bas de la zone Accueil (plus de bande grise vide) -->
+            <Grid Grid.Row="2" Margin="24,0,24,12" VerticalAlignment="Stretch">
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="5*"/>
-                    <ColumnDefinition Width="8" />
+                    <ColumnDefinition Width="8"/>
                     <ColumnDefinition Width="4*"/>
-                    <ColumnDefinition Width="8" />
+                    <ColumnDefinition Width="8"/>
                     <ColumnDefinition Width="3*"/>
                 </Grid.ColumnDefinitions>
 
-                <!-- Statistiques de protection (synthèse textuelle) -->
                 <Border Grid.Column="0"
+                        VerticalAlignment="Stretch"
                         Background="{DynamicResource CardBg}"
-                        CornerRadius="12" Padding="18,16"
+                        CornerRadius="12" Padding="16,14"
                         Effect="{DynamicResource CardShadow}">
-                    <StackPanel>
-                        <TextBlock Text="Statistiques de protection"
-                                   FontSize="13" FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextDark}"/>
-                        <TextBlock Text="Synthèse textuelle — 30 derniers jours"
-                                   FontSize="11" Foreground="{DynamicResource TextMuted}"
-                                   Margin="0,2,0,2"/>
-                        <TextBlock x:Name="txtProtectionStatsUpdated"
-                                   FontSize="10" Foreground="{DynamicResource TextMuted}"
-                                   Margin="0,0,0,10"/>
-
-                        <Border MinHeight="128" CornerRadius="8"
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0">
+                            <TextBlock Text="{loc:Loc Key=Overview_StatsTitle}"
+                                       FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextDark}"/>
+                            <TextBlock Text="{loc:Loc Key=Overview_StatsSub}"
+                                       FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                       Margin="0,2,0,2"/>
+                            <TextBlock x:Name="txtProtectionStatsUpdated"
+                                       FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextMuted}"
+                                       Margin="0,0,0,8"/>
+                        </StackPanel>
+                        <Border Grid.Row="1"
+                                CornerRadius="8"
                                 Background="{DynamicResource SurfaceBg}"
-                                Padding="14,12">
+                                Padding="12,10"
+                                MinHeight="72">
                             <TextBlock x:Name="txtProtectionStatsBody"
                                        TextWrapping="Wrap"
-                                       FontSize="12"
+                                       FontSize="{DynamicResource FontSize.Body}"
                                        Foreground="{DynamicResource TextDark}"
                                        VerticalAlignment="Top"
                                        LineHeight="20"
-                                       Text="Chargement des statistiques…"/>
+                                       Text="{loc:Loc Key=Overview_StatsLoading}"/>
                         </Border>
-                    </StackPanel>
+                    </Grid>
                 </Border>
 
-                <!-- Recommandations d'Action -->
                 <Border Grid.Column="2"
+                        VerticalAlignment="Stretch"
                         Background="{DynamicResource CardBg}"
-                        CornerRadius="12" Padding="18,16"
+                        CornerRadius="12" Padding="16,14"
                         Effect="{DynamicResource CardShadow}">
-                    <StackPanel>
-                        <TextBlock Text="Recommandations"
-                                   FontSize="13" FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextDark}" Margin="0,0,0,12"/>
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0">
+                        <TextBlock Text="{loc:Loc Key=Overview_Recommendations}"
+                                   FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextDark}" Margin="0,0,0,10"/>
 
                         <Border x:Name="brRecSignatures" Background="{DynamicResource SuccessBg}"
                                 CornerRadius="8" Padding="12,10" Margin="0,0,0,8">
@@ -208,8 +220,8 @@
                                 <md:PackIcon x:Name="icRecSignatures" Kind="CheckCircle" Width="16" Height="16"
                                              Foreground="{DynamicResource SuccessGreen}"
                                              VerticalAlignment="Center"/>
-                                <TextBlock x:Name="txtRecSignatures" Text="Moteurs antivirus"
-                                           FontSize="12" Foreground="{DynamicResource SuccessGreen}"
+                                <TextBlock x:Name="txtRecSignatures" Text="{loc:Loc Key=Overview_RecEngines}"
+                                           FontSize="{DynamicResource FontSize.Body}" Foreground="{DynamicResource SuccessGreen}"
                                            VerticalAlignment="Center" TextWrapping="Wrap" Margin="6,0,0,0"/>
                             </StackPanel>
                         </Border>
@@ -220,8 +232,8 @@
                                 <md:PackIcon x:Name="icRecHygiene" Kind="Broom" Width="16" Height="16"
                                              Foreground="{DynamicResource AlertGoldLight}"
                                              VerticalAlignment="Center"/>
-                                <TextBlock x:Name="txtRecHygiene" Text="Nettoyage disque"
-                                           FontSize="12" Foreground="{DynamicResource AlertGold}"
+                                <TextBlock x:Name="txtRecHygiene" Text="{loc:Loc Key=Overview_RecHygiene}"
+                                           FontSize="{DynamicResource FontSize.Body}" Foreground="{DynamicResource AlertGold}"
                                            VerticalAlignment="Center" TextWrapping="Wrap" Margin="6,0,0,0"/>
                             </StackPanel>
                         </Border>
@@ -232,146 +244,126 @@
                                 <md:PackIcon x:Name="icRecActivity" Kind="History" Width="16" Height="16"
                                              Foreground="{DynamicResource SuccessGreen}"
                                              VerticalAlignment="Center"/>
-                                <TextBlock x:Name="txtRecActivity" Text="Analyses"
-                                           FontSize="12" Foreground="{DynamicResource TextMedium}"
+                                <TextBlock x:Name="txtRecActivity" Text="{loc:Loc Key=Overview_RecScans}"
+                                           FontSize="{DynamicResource FontSize.Body}" Foreground="{DynamicResource TextMedium}"
                                            VerticalAlignment="Center" TextWrapping="Wrap" Margin="6,0,0,0"/>
                             </StackPanel>
                         </Border>
-                    </StackPanel>
+                        </StackPanel>
+                    </Grid>
                 </Border>
 
-                <!-- 3 Cartes info rapides -->
-                <StackPanel Grid.Column="4" >
+                <Border Grid.Column="4"
+                        VerticalAlignment="Stretch"
+                        Background="{DynamicResource CardBg}"
+                        CornerRadius="12" Padding="16,14"
+                        Effect="{DynamicResource CardShadow}">
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+                        <StackPanel Grid.Row="0">
+                        <TextBlock Text="{loc:Loc Key=Overview_ProtectionState}"
+                                   FontSize="{DynamicResource FontSize.Body}" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextDark}"
+                                   Margin="0,0,0,10"/>
 
-                    <!-- État Antivirus (ClamAV + YARA) -->
-                    <Border Background="{DynamicResource CardBg}"
-                            CornerRadius="12" Padding="16,14"
-                            Effect="{DynamicResource CardShadow}"
-                            Margin="0,0,0,8">
-                        <StackPanel>
-                            <TextBlock Text="État Antivirus"
-                                       FontSize="12" FontWeight="SemiBold"
+                        <Grid Margin="0,0,0,6">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <md:PackIcon Kind="ShieldCheck" Width="14" Height="14"
+                                         Foreground="{DynamicResource SuccessGreen}"
+                                         VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Grid.Column="1" Text="ClamAV"
+                                       FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock x:Name="txtOverviewClamAvStatus" Grid.Column="2"
+                                       Text="{loc:Loc Key=Overview_ClamActive}" FontSize="{DynamicResource FontSize.Small}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource SuccessGreen}"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <Grid Margin="0,0,0,10">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <md:PackIcon Kind="Dna" Width="14" Height="14"
+                                         Foreground="{DynamicResource AccentBlue}"
+                                         VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Grid.Column="1" Text="{loc:Loc Key=Overview_YaraRulesLabel}"
+                                       FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                       VerticalAlignment="Center"/>
+                            <TextBlock x:Name="txtOverviewYaraCount" Grid.Column="2"
+                                       Text="—" FontSize="{DynamicResource FontSize.Small}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource AccentBlue}"
+                                       VerticalAlignment="Center"/>
+                        </Grid>
+
+                        <Rectangle Height="1" Fill="{DynamicResource BorderColor}" Margin="0,0,0,10"/>
+
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
+                            <md:PackIcon Kind="ClockOutline" Width="16" Height="16"
+                                         Foreground="{DynamicResource TextMuted}"
+                                         VerticalAlignment="Center" Margin="0,0,8,0"/>
+                            <TextBlock Text="{loc:Loc Key=Overview_LastScan}"
+                                       FontSize="{DynamicResource FontSize.Small}" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextDark}"
-                                       Margin="0,0,0,10"/>
-
-                            <!-- ClamAV row -->
-                            <Grid Margin="0,0,0,6">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <md:PackIcon Kind="ShieldCheck" Width="14" Height="14"
-                                             Foreground="{DynamicResource SuccessGreen}"
-                                             VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <TextBlock Grid.Column="1" Text="ClamAV"
-                                           FontSize="11" Foreground="{DynamicResource TextMuted}"
-                                           VerticalAlignment="Center"/>
-                                <TextBlock x:Name="txtOverviewClamAvStatus" Grid.Column="2"
-                                           Text="Actif" FontSize="11" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource SuccessGreen}"
-                                           VerticalAlignment="Center"/>
-                            </Grid>
-
-                            <!-- YARA row -->
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                </Grid.ColumnDefinitions>
-                                <md:PackIcon Kind="Dna" Width="14" Height="14"
-                                             Foreground="{DynamicResource PrimaryBlue}"
-                                             VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <TextBlock Grid.Column="1" Text="Règles YARA"
-                                           FontSize="11" Foreground="{DynamicResource TextMuted}"
-                                           VerticalAlignment="Center"/>
-                                <TextBlock x:Name="txtOverviewYaraCount" Grid.Column="2"
-                                           Text="—" FontSize="11" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource PrimaryBlue}"
-                                           VerticalAlignment="Center"/>
-                            </Grid>
+                                       VerticalAlignment="Center"/>
                         </StackPanel>
-                    </Border>
+                        <TextBlock x:Name="txtLastScan"
+                                   Text="{loc:Loc Key=Common_Never}"
+                                   FontSize="{DynamicResource FontSize.Title}" FontWeight="Bold"
+                                   Foreground="{DynamicResource TextMedium}"
+                                   Margin="24,0,0,12"/>
 
-                    <!-- Dernière analyse -->
-                    <Border Background="{DynamicResource CardBg}"
-                            CornerRadius="12" Padding="16,12"
-                            Effect="{DynamicResource CardShadow}"
-                            Margin="0,0,0,8">
-                        <StackPanel>
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,4">
-                                <md:PackIcon Kind="ClockOutline" Width="18" Height="18"
-                                             Foreground="{DynamicResource TextMuted}"
-                                             VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <TextBlock Text="Dernière analyse"
-                                           FontSize="12" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextDark}"
-                                           VerticalAlignment="Center"/>
-                            </StackPanel>
-                            <TextBlock x:Name="txtLastScan"
-                                       Text="Jamais"
-                                       FontSize="13" FontWeight="Bold"
-                                       Foreground="{DynamicResource TextMedium}"
-                                       Margin="26,0,0,0"/>
-                        </StackPanel>
-                    </Border>
+                        <TextBlock Text="{loc:Loc Key=Overview_SignaturesSection}"
+                                   FontSize="{DynamicResource FontSize.Small}" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextDark}"
+                                   Margin="0,0,0,8"/>
 
-                    <!-- Signatures : YARA | ClamAV -->
-                    <Border Background="{DynamicResource CardBg}"
-                            CornerRadius="12" Padding="16,12"
-                            Effect="{DynamicResource CardShadow}">
-                        <StackPanel>
-                            <StackPanel Orientation="Horizontal" Margin="0,0,0,8">
-                                <md:PackIcon Kind="DatabaseCheck" Width="18" Height="18"
-                                             Foreground="{DynamicResource TextMuted}"
-                                             VerticalAlignment="Center" Margin="0,0,8,0"/>
-                                <TextBlock Text="Signatures et règles"
-                                           FontSize="12" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextDark}"
-                                           VerticalAlignment="Center"/>
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                                <ColumnDefinition Width="*"/>
+                            </Grid.ColumnDefinitions>
+
+                            <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                <TextBlock Text="YARA" FontSize="{DynamicResource FontSize.Caption}" FontWeight="Bold"
+                                           Foreground="{DynamicResource TextMuted}"/>
+                                <TextBlock x:Name="txtOverviewYaraPackVer" Text="—"
+                                           FontSize="{DynamicResource FontSize.Large}" FontWeight="Bold"
+                                           Foreground="{DynamicResource AccentBlue}" Margin="0,2,0,0"/>
+                                <TextBlock Text="{loc:Loc Key=Overview_LastUpdateShort}" FontSize="{DynamicResource FontSize.Micro}"
+                                           Foreground="{DynamicResource TextMuted}" Margin="0,6,0,0"/>
+                                <TextBlock x:Name="txtOverviewYaraPackMaj" Text="—"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextDark}"/>
                             </StackPanel>
 
-                            <Grid Margin="4,0,0,0">
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="*"/>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
+                            <Rectangle Grid.Column="1" Width="1" Margin="4,0"
+                                       Fill="{DynamicResource BorderColor}" VerticalAlignment="Stretch"/>
 
-                                <StackPanel Grid.Column="0" Margin="0,0,8,0">
-                                    <TextBlock Text="YARA" FontSize="10" FontWeight="Bold"
-                                               Foreground="{DynamicResource TextMuted}"/>
-                                    <TextBlock x:Name="txtOverviewYaraPackVer" Text="—"
-                                               FontSize="15" FontWeight="Bold"
-                                               Foreground="{DynamicResource PrimaryBlue}" Margin="0,2,0,0"/>
-                                    <TextBlock Text="Dernière MAJ" FontSize="9"
-                                               Foreground="{DynamicResource TextMuted}" Margin="0,6,0,0"/>
-                                    <TextBlock x:Name="txtOverviewYaraPackMaj" Text="—"
-                                               FontSize="11" Foreground="{DynamicResource TextDark}"/>
-                                </StackPanel>
-
-                                <Rectangle Grid.Column="1" Width="1" Margin="4,0"
-                                           Fill="{DynamicResource BorderColor}" VerticalAlignment="Stretch"/>
-
-                                <StackPanel Grid.Column="2" Margin="8,0,0,0">
-                                    <TextBlock Text="ClamAV" FontSize="10" FontWeight="Bold"
-                                               Foreground="{DynamicResource TextMuted}"/>
-                                    <TextBlock x:Name="txtOverviewClamDbVer" Text="—"
-                                               FontSize="15" FontWeight="Bold"
-                                               Foreground="{DynamicResource AlertGold}" Margin="0,2,0,0"/>
-                                    <TextBlock Text="Dernière MAJ" FontSize="9"
-                                               Foreground="{DynamicResource TextMuted}" Margin="0,6,0,0"/>
-                                    <TextBlock x:Name="txtOverviewClamDbMaj" Text="—"
-                                               FontSize="11" Foreground="{DynamicResource TextDark}"/>
-                                </StackPanel>
-                            </Grid>
+                            <StackPanel Grid.Column="2" Margin="8,0,0,0">
+                                <TextBlock Text="ClamAV" FontSize="{DynamicResource FontSize.Caption}" FontWeight="Bold"
+                                           Foreground="{DynamicResource TextMuted}"/>
+                                <TextBlock x:Name="txtOverviewClamDbVer" Text="—"
+                                           FontSize="{DynamicResource FontSize.Large}" FontWeight="Bold"
+                                           Foreground="{DynamicResource AlertGold}" Margin="0,2,0,0"/>
+                                <TextBlock Text="{loc:Loc Key=Overview_LastUpdateShort}" FontSize="{DynamicResource FontSize.Micro}"
+                                           Foreground="{DynamicResource TextMuted}" Margin="0,6,0,0"/>
+                                <TextBlock x:Name="txtOverviewClamDbMaj" Text="—"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextDark}"/>
+                            </StackPanel>
+                        </Grid>
                         </StackPanel>
-                    </Border>
-
-                </StackPanel>
+                    </Grid>
+                </Border>
             </Grid>
-
-        </StackPanel>
-    </ScrollViewer>
+    </Grid>
 </UserControl>
