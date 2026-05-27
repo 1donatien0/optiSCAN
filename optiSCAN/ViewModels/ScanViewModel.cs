@@ -1,5 +1,7 @@
+using optiSCAN.Localization;
 using optiSCAN.Models;
 using optiSCAN.Services;
+using optiSCAN.Strings;
 using System.Collections.ObjectModel;
 using System.ComponentModel;
 using System.Runtime.CompilerServices;
@@ -28,6 +30,7 @@ namespace optiSCAN.ViewModels
         private readonly YaraEngine _yara;
 
         private CancellationTokenSource? _cts;
+        private long _scanEpoch;
 
         // ── Propriétés bindées ───────────────────────────────────────────────────
 
@@ -49,7 +52,7 @@ namespace optiSCAN.ViewModels
             set { _isUpdating = value; OnPropertyChanged(); }
         }
 
-        private string _statusMessage = "Prêt à analyser.";
+        private string _statusMessage = LocalizationService.GetString("Scan_Ready");
         public string StatusMessage
         {
             get => _statusMessage;
@@ -199,15 +202,44 @@ namespace optiSCAN.ViewModels
         public int YaraRulesCount
         {
             get => _yaraRulesCount;
-            set { _yaraRulesCount = value; OnPropertyChanged(); }
+            set
+            {
+                if (_yaraRulesCount == value) return;
+                _yaraRulesCount = value;
+                OnPropertyChanged();
+                RefreshProtectionStatus();
+            }
         }
 
         private bool _isClamAvAvailable;
         public bool IsClamAvAvailable
         {
             get => _isClamAvAvailable;
-            set { _isClamAvAvailable = value; OnPropertyChanged(); }
+            set
+            {
+                if (_isClamAvAvailable == value) return;
+                _isClamAvAvailable = value;
+                OnPropertyChanged();
+                RefreshProtectionStatus();
+            }
         }
+
+        private ProtectionBadgeLevel _protectionBadgeLevel = ProtectionBadgeLevel.Inactive;
+        /// <summary>Niveau global : ClamAV + YARA + protection temps réel.</summary>
+        public ProtectionBadgeLevel ProtectionBadgeLevel
+        {
+            get => _protectionBadgeLevel;
+            private set
+            {
+                if (_protectionBadgeLevel == value) return;
+                _protectionBadgeLevel = value;
+                OnPropertyChanged();
+                OnPropertyChanged(nameof(ProtectionBadgeText));
+            }
+        }
+
+        public string ProtectionBadgeText =>
+            ProtectionStatusEvaluator.GetBadgeText(ProtectionBadgeLevel);
 
         // ── Collections ──────────────────────────────────────────────────────────
 
@@ -284,10 +316,11 @@ namespace optiSCAN.ViewModels
             _quarantine = container.Quarantine;
             _logger = container.Logger;
 
-            _updater.UpdateOutput += OnUpdateOutput;
-            _updater.UpdateCompleted += OnUpdateCompleted;
-            _rulesUpdater.UpdateOutput += (_, msg) => OnUpdateOutput(_, msg);
-            _rulesUpdater.UpdateCompleted += OnRulesUpdateCompleted;
+            _updater.UpdateOutput += SurAjoutSortieMiseAJour;
+            _updater.UpdateCompleted += SurTermineeMiseAJourSignatures;
+            _rulesUpdater.UpdateOutput += SurAjoutSortieMiseAJour;
+            _rulesUpdater.UpdateCompleted += SurTermineeMiseAJourRegles;
+            container.ProtectionStateRefreshRequested += SurDemandeRafraichissementProtection;
 
             QuickScanCommand = new AsyncRelayCommand(async _ => await StartScanAsync(ScanType.QuickScan));
             FullScanCommand = new AsyncRelayCommand(async _ => await StartScanAsync(ScanType.FullScan));
@@ -304,7 +337,8 @@ namespace optiSCAN.ViewModels
                 }
             });
             StopScanCommand = new RelayCommand(_ => _cts?.Cancel(), _ => IsScanning);
-            UpdateDbCommand = new AsyncRelayCommand(async _ => await UpdateDatabaseAsync());
+            // Délègue au flux MainWindow → SignatureUpdateCoordinator (source unique de vérité).
+            UpdateDbCommand = new RelayCommand(_ => ServiceContainer.Default.TriggerSignatureUpdate(), _ => !IsUpdating);
             QuarantineAllCommand = new RelayCommand(_ => QuarantineAllThreats(), _ => Threats.Count > 0);
             RestoreFileCommand = new RelayCommand(p => RestoreFromQuarantine(p as string));
             DeleteFileCommand = new RelayCommand(p => DeleteFromQuarantine(p as string));
@@ -315,6 +349,16 @@ namespace optiSCAN.ViewModels
         }
 
         // ── Initialisation ────────────────────────────────────────────────────────
+        /// <summary>
+        /// Initialise les services et prépare l'état initial de la vue de scan.
+        /// Récupère les versions ClamAV/YARA, charge l'historique, la quarantaine
+        /// et met l'UI en état cohérent (incluant les dégradations).
+        /// </summary>
+        /// <remarks>
+        /// L'initialisation est tolérante aux pannes : chaque étape peut échouer
+        /// sans empêcher les suivantes, et toute erreur est journalisée.
+        /// L'objectif est d'éviter l'UI bloquée sur des libellés d'état génériques.
+        /// </remarks>
 
         private async Task InitializeAsync()
         {
@@ -344,13 +388,15 @@ namespace optiSCAN.ViewModels
                     bool yaraOk = _yara.IsAvailable;
                     YaraRulesCount = _yara.RulesCount;
                     YaraStatus = yaraOk
-                        ? $"YARA opérationnel — {_yara.RulesCount} règle(s)"
-                        : "YARA non disponible (yara64.exe manquant ou aucune règle)";
+                        ? LocalizationService.Format("Vm_YaraOperational", _yara.RulesCount)
+                        : LocalizationService.GetString("Vm_YaraUnavailable");
+                    RefreshProtectionStatus();
                 });
 
                 TryStep("Statut ClamAV", () =>
                 {
                     IsClamAvAvailable = _clamAv.IsClamAvInstalled();
+                    RefreshProtectionStatus();
                 });
 
                 TryStep("Chargement historique", () => { LoadHistory(); RefreshRecentTargets(); });
@@ -376,7 +422,27 @@ namespace optiSCAN.ViewModels
             finally
             {
                 IsInitializing = false;
+                RefreshProtectionStatus();
             }
+        }
+
+        /// <summary>Recalcule le badge de protection (en-tête Antivirus).</summary>
+        public void RefreshProtectionStatus()
+        {
+            var c = ServiceContainer.Default;
+            ProtectionBadgeLevel = ProtectionStatusEvaluator.Evaluate(
+                IsClamAvAvailable,
+                _yara.IsAvailable,
+                YaraRulesCount,
+                ExclusionSettings.Current.RealTimeEnabled,
+                c.RealTimeProtection.IsEnabled);
+        }
+
+        private void SurDemandeRafraichissementProtection(object? sender, EventArgs e)
+        {
+            var d = WpfApp.Current?.Dispatcher;
+            if (d == null) return;
+            _ = d.InvokeAsync(RefreshProtectionStatus);
         }
 
         /// <summary>Exécute une étape d'init synchrone avec capture d'exception isolée.</summary>
@@ -405,6 +471,14 @@ namespace optiSCAN.ViewModels
 
         // ── Scans ─────────────────────────────────────────────────────────────────
 
+        /// <summary>
+        /// Démarre un scan (rapide, complet, dossier, fichier) et met à jour l'état exposé à l'UI.
+        /// </summary>
+        /// <remarks>
+        /// La progression est injectée via <c>IProgress&lt;ScanProgress&gt;</c> afin d’éviter
+        /// les blocages inter-thread, et les erreurs sont converties en message utilisateur
+        /// dans <see cref="StatusMessage"/>.
+        /// </remarks>
         private async Task StartScanAsync(ScanType type, string? path = null)
         {
             if (IsScanning) return;
@@ -421,14 +495,15 @@ namespace optiSCAN.ViewModels
 
             if (type is ScanType.QuickScan or ScanType.FullScan)
             {
-                ServiceContainer.Default.Navigation?.NavigateTo("Antivirus");
+                ServiceContainer.Default.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
                 DisplayScanProgressRequested?.Invoke(this, EventArgs.Empty);
             }
 
             StatusMessage = ScanUserDisplay.ScanStarting(type, path);
 
             _cts = new CancellationTokenSource();
-            var progress = new Progress<ScanProgress>(OnScanProgress);
+            var epoch = Interlocked.Increment(ref _scanEpoch);
+            var progress = new Progress<ScanProgress>(p => SurChangementProgressionScan(p, epoch));
 
             try
             {
@@ -482,7 +557,7 @@ namespace optiSCAN.ViewModels
             }
             catch (OperationCanceledException)
             {
-                StatusMessage = "Analyse interrompue sur demande.";
+                StatusMessage = OptiscanStrings.UiMessages.AnalyseInterrompueSurDemande;
             }
             catch (Exception ex)
             {
@@ -490,6 +565,7 @@ namespace optiSCAN.ViewModels
             }
             finally
             {
+                Interlocked.Increment(ref _scanEpoch);
                 IsScanning = false;
                 IsIndeterminate = false;
                 ProgressValue = 0;
@@ -502,7 +578,17 @@ namespace optiSCAN.ViewModels
 
         // ── Progression ───────────────────────────────────────────────────────────
 
-        private void OnScanProgress(ScanProgress p)
+        /// <summary>
+        /// Reçoit les mises à jour de progression d’un scan et met à jour l’état bindé.
+        /// </summary>
+        /// <remarks>
+        /// Cette méthode s’exécute via <c>IProgress&lt;ScanProgress&gt;</c> : on effectue
+        /// un marshalling vers le thread UI via <c>Dispatcher.BeginInvoke</c> pour éviter
+        /// les blocages sur les scans courts (fréquence élevée des événements de progression).
+        /// Les compteurs (fichiers/menaces) ne reculent jamais pour refléter la stratégie
+        /// multi-moteurs (ClamAV/YARA) et multi-cibles.
+        /// </remarks>
+        private void SurChangementProgressionScan(ScanProgress p, long epoch)
         {
             // BeginInvoke (asynchrone) plutôt que Invoke : le thread de scan
             // ne bloque pas en attente du Dispatcher UI. Sur un scan rapide
@@ -510,23 +596,13 @@ namespace optiSCAN.ViewModels
             // le scan derrière le rendu WPF.
             WpfApp.Current?.Dispatcher.BeginInvoke(new Action(() =>
             {
-                if (p.Phase != ScanPhase.ThreatFound)
-                    StatusMessage = ScanUserDisplay.ForProgressMessage(p.Message);
-                // Ne jamais faire reculer le compteur : ClamAV et YARA publient des
-                // totaux locaux (par dossier) ; YARA peut envoyer TotalFiles=12 alors
-                // que ClamAV en est à 12 000 sur la cible précédente.
-                if (IsScanning)
-                {
-                    if (p.FilesScanned > 0)
-                        FilesScanned = Math.Max(FilesScanned, p.FilesScanned);
-                    if (p.ThreatsFound > 0)
-                        ThreatsFound = Math.Max(ThreatsFound, p.ThreatsFound);
-                }
-                else
-                {
-                    FilesScanned = p.FilesScanned;
-                    ThreatsFound = p.ThreatsFound;
-                }
+                if (epoch != _scanEpoch)
+                    return;
+
+                if (p.FilesScanned > 0)
+                    FilesScanned = Math.Max(FilesScanned, p.FilesScanned);
+                if (p.ThreatsFound > 0)
+                    ThreatsFound = Math.Max(ThreatsFound, p.ThreatsFound);
 
                 if (!string.IsNullOrWhiteSpace(p.CurrentFilePath))
                     CurrentScanItem = p.CurrentFilePath;
@@ -534,34 +610,40 @@ namespace optiSCAN.ViewModels
                     && !string.IsNullOrWhiteSpace(p.ThreatInfo.FilePath))
                     CurrentScanItem = p.ThreatInfo.FilePath;
 
-                // Affichage : FilesScanned porte le cumul max pendant le scan (Clam + YARA / multi-cibles).
-                int displayedFiles = IsScanning ? FilesScanned : p.FilesScanned;
+                int displayedFiles = FilesScanned;
 
-                if (p.TotalFiles > 0)
+                if (p.Phase != ScanPhase.ThreatFound)
                 {
-                    if (displayedFiles <= 0)
-                        ScanProgressDetail = $"Environ {p.TotalFiles:N0} fichier(s) à parcourir — analyse en cours…";
-                    else
-                    {
-                        var pctVal = Math.Min(100.0, displayedFiles * 100.0 / p.TotalFiles);
-                        ScanProgressDetail = $"{displayedFiles:N0} / {p.TotalFiles:N0} fichiers — {(int)pctVal} %";
-                    }
+                    StatusMessage = ScanUserDisplay.SyncFileCountInMessage(
+                        ScanUserDisplay.ForProgressMessage(p.Message),
+                        displayedFiles);
+                }
+
+                if (p.TotalFiles > 0 && displayedFiles > 0 && displayedFiles <= p.TotalFiles)
+                {
+                    var pctVal = Math.Min(100.0, displayedFiles * 100.0 / p.TotalFiles);
+                    ScanProgressDetail = $"{displayedFiles:N0} / {p.TotalFiles:N0} fichiers — {(int)pctVal} %";
+                }
+                else if (displayedFiles > 0)
+                {
+                    ScanProgressDetail = $"{displayedFiles:N0} fichier(s) parcourus — analyse en cours…";
+                }
+                else if (p.TotalFiles > 0)
+                {
+                    ScanProgressDetail = $"Environ {p.TotalFiles:N0} fichier(s) à parcourir — analyse en cours…";
                 }
                 else
                 {
-                    ScanProgressDetail = displayedFiles > 0
-                        ? $"{displayedFiles:N0} fichier(s) parcourus — total inconnu"
-                        : "Analyse en cours…";
+                    ScanProgressDetail = "Analyse en cours…";
                 }
 
-                // ProgressBar : ne pas repasser à 0 % quand YARA annonce un TotalFiles local sans compteur.
-                double pctForBar = p.TotalFiles > 0 && displayedFiles > 0
+                double pctForBar = p.TotalFiles > 0 && displayedFiles > 0 && displayedFiles <= p.TotalFiles
                     ? Math.Min(100.0, displayedFiles * 100.0 / p.TotalFiles)
                     : p.PercentComplete;
                 if (pctForBar >= 0)
                 {
                     IsIndeterminate = false;
-                    ProgressValue = IsScanning ? Math.Max(ProgressValue, pctForBar) : pctForBar;
+                    ProgressValue = Math.Max(ProgressValue, pctForBar);
                 }
 
                 if (p.Phase == ScanPhase.ThreatFound && p.ThreatInfo != null)
@@ -575,66 +657,15 @@ namespace optiSCAN.ViewModels
         }
 
         // ── Mise à jour base de signatures ────────────────────────────────────────
+        // Le flux de mise à jour est piloté par MainWindow → SignatureUpdateCoordinator.
+        // ScanViewModel réagit aux événements UpdateCompleted des updaters pour
+        // synchroniser ses propriétés bindées (DbVersion, YaraStatus, etc.).
 
-        private async Task UpdateDatabaseAsync()
-        {
-            if (IsUpdating) return;
-            IsUpdating = true;
-            // Reset du journal : on vide la collection sur le thread UI pour
-            // ne pas violer le contrat WPF (collection-changed cross-thread).
-            WpfApp.Current?.Dispatcher.Invoke(() => UpdateLogLines.Clear());
-            OnPropertyChanged(nameof(UpdateLog));
-            StatusMessage = "Mise à jour des signatures en cours…";
-
-            // ── 1. Mise à jour des signatures ClamAV (hors thread UI) ───────────
-            var clamResult = await Task.Run(() => _updater.UpdateAsync()).ConfigureAwait(true);
-
-            DbVersion = _updater.GetLocalDatabaseVersion();
-            var clamWhenStr = _updater.GetLastSignatureChangeDisplay();
-            LastUpdateDisplay = _updater.LastUpdateTime?.ToString("dd/MM/yyyy HH:mm")
-                ?? (clamWhenStr != "—" ? clamWhenStr : "Jamais");
-
-            // ── 2. Mise à jour des règles de détection comportementale ─────────
-            StatusMessage = "Mise à jour des règles de détection en cours…";
-
-            var rulesProgress = new Progress<string>(msg =>
-            {
-                AppendUpdateLog(msg);
-                WpfApp.Current?.Dispatcher.BeginInvoke(new Action(() => StatusMessage = msg));
-            });
-
-            var rulesResult = await Task.Run(() => _rulesUpdater.UpdateAsync(rulesProgress)).ConfigureAwait(true);
-
-            RulesPackVersion = _rulesUpdater.GetRulesPackVersionDisplay();
-            RulesLastUpdateDisplay = _rulesUpdater.GetRulesLastUpdateDisplay();
-
-            // Rafraîchir le statut du moteur de détection
-            YaraRulesCount = _yara.RulesCount;
-            YaraStatus = _yara.IsAvailable
-                ? $"Moteur de détection actif — {_yara.RulesCount} règle(s)"
-                : "Moteur de détection non disponible";
-
-            // ── 3. Résumé final ───────────────────────────────────────────────
-            var summary = clamResult.Success
-                ? $"Signatures : {clamResult.Message}"
-                : $"Signatures : attention — {clamResult.Message}";
-            summary += "\n" + (rulesResult.Success
-                ? $"Règles : {rulesResult.Message}"
-                : $"Règles : attention — {rulesResult.Message}");
-
-            StatusMessage = clamResult.Success && rulesResult.Success
-                ? "Mise à jour terminée avec succès."
-                : "Mise à jour partielle — consultez le journal.";
-
-            AppendUpdateLog("");
-            AppendUpdateLog(summary);
-            IsUpdating = false;
-        }
-
-        private void OnUpdateOutput(object? sender, string line)
+        private void SurAjoutSortieMiseAJour(object? sender, string line)
             => AppendUpdateLog(line);
 
-        private void OnUpdateCompleted(object? sender, UpdateResult result)
+        /// <summary>Appelé par <see cref="FreshclamUpdater.UpdateCompleted"/> après une MAJ ClamAV.</summary>
+        private void SurTermineeMiseAJourSignatures(object? sender, UpdateResult result)
         {
             var d = WpfApp.Current?.Dispatcher;
             if (d == null) return;
@@ -642,12 +673,18 @@ namespace optiSCAN.ViewModels
             {
                 StatusMessage = result.Message;
                 DbVersion = _updater.GetLocalDatabaseVersion();
+                LastUpdateDisplay = _updater.LastUpdateTime?.ToString("dd/MM/yyyy HH:mm") ?? "Jamais";
                 RulesPackVersion = _rulesUpdater.GetRulesPackVersionDisplay();
                 RulesLastUpdateDisplay = _rulesUpdater.GetRulesLastUpdateDisplay();
             });
         }
 
-        private void OnRulesUpdateCompleted(object? sender, RulesUpdateResult result)
+        /// <summary>
+        /// Appelé par <see cref="YaraForgeUpdater.UpdateCompleted"/> après une MAJ des règles.
+        /// Rafraîchit toujours YaraRulesCount et YaraStatus, même si déjà à jour,
+        /// pour garantir la cohérence du VM quel que soit l’état de départ.
+        /// </summary>
+        private void SurTermineeMiseAJourRegles(object? sender, RulesUpdateResult result)
         {
             var d = WpfApp.Current?.Dispatcher;
             if (d == null) return;
@@ -655,13 +692,14 @@ namespace optiSCAN.ViewModels
             {
                 RulesPackVersion = _rulesUpdater.GetRulesPackVersionDisplay();
                 RulesLastUpdateDisplay = _rulesUpdater.GetRulesLastUpdateDisplay();
-                if (!result.AlreadyUpToDate && result.Success)
-                {
-                    YaraRulesCount = _yara.RulesCount;
-                    YaraStatus = _yara.IsAvailable
-                        ? $"Moteur de détection actif — {_yara.RulesCount} règle(s)"
-                        : "Moteur de détection : règles mises à jour (rechargement au prochain scan)";
-                }
+                // Toujours rafraîchir : un rechargement peut avoir eu lieu même sans nouvelle version.
+                YaraRulesCount = _yara.RulesCount;
+                YaraStatus = _yara.IsAvailable
+                    ? $"Moteur de détection actif — {_yara.RulesCount} règle(s)"
+                    : result.Success
+                        ? LocalizationService.GetString("Vm_SigEngineReloaded")
+                        : LocalizationService.GetString("Vm_SigEngineUnavailable");
+                RefreshProtectionStatus();
             });
         }
 
@@ -669,12 +707,20 @@ namespace optiSCAN.ViewModels
 
         private void QuarantineAllThreats()
         {
+            if (Threats.Count == 0) return;
+            if (System.Windows.MessageBox.Show(
+                    OptiscanStrings.Confirmations.QuarantineAll(Threats.Count),
+                    OptiscanStrings.Confirmations.Title,
+                    System.Windows.MessageBoxButton.YesNo,
+                    System.Windows.MessageBoxImage.Warning) != System.Windows.MessageBoxResult.Yes)
+                return;
+
             int count = _quarantine.QuarantineAll(Threats);
             LoadQuarantine();
             // Mettre à jour le statut des menaces
             foreach (var threat in Threats)
                 threat.Status = ThreatStatus.Quarantined;
-            StatusMessage = $"{count} fichier(s) placé(s) en quarantaine.";
+            StatusMessage = LocalizationService.Format("Vm_QuarantineBatch", count);
         }
 
         private void RestoreFromQuarantine(string? id)
@@ -682,7 +728,7 @@ namespace optiSCAN.ViewModels
             if (string.IsNullOrEmpty(id)) return;
             bool ok = _quarantine.Restore(id);
             LoadQuarantine();
-            StatusMessage = ok ? "Fichier restauré." : "Impossible de restaurer le fichier.";
+            StatusMessage = ok ? LocalizationService.GetString("Vm_RestoreOk") : LocalizationService.GetString("Vm_RestoreFail");
         }
 
         private void DeleteFromQuarantine(string? id)
@@ -690,14 +736,23 @@ namespace optiSCAN.ViewModels
             if (string.IsNullOrEmpty(id)) return;
             bool ok = _quarantine.DeletePermanently(id);
             LoadQuarantine();
-            StatusMessage = ok ? "Fichier supprimé définitivement." : "Erreur lors de la suppression.";
+            StatusMessage = ok ? LocalizationService.GetString("Vm_DeleteOk") : LocalizationService.GetString("Vm_DeleteFail");
         }
 
         private void PurgeAll()
         {
+            int total = _quarantine.Count;
+            if (total == 0) return;
+            if (System.Windows.MessageBox.Show(
+                    OptiscanStrings.Confirmations.PurgeQuarantine(total),
+                    OptiscanStrings.Confirmations.Title,
+                    System.Windows.MessageBoxButton.YesNo,
+                    System.Windows.MessageBoxImage.Warning) != System.Windows.MessageBoxResult.Yes)
+                return;
+
             int count = _quarantine.PurgeAll();
             LoadQuarantine();
-            StatusMessage = $"{count} fichier(s) supprimé(s) de la quarantaine.";
+            StatusMessage = LocalizationService.Format("Vm_PurgeCount", count);
         }
 
         /// <summary>Recharge la première page de quarantaine (réinitialise la liste affichée).</summary>
@@ -802,9 +857,10 @@ namespace optiSCAN.ViewModels
 
             try
             {
-                _updater.UpdateOutput -= OnUpdateOutput;
-                _updater.UpdateCompleted -= OnUpdateCompleted;
-                _rulesUpdater.UpdateCompleted -= OnRulesUpdateCompleted;
+                _updater.UpdateOutput -= SurAjoutSortieMiseAJour;
+                _updater.UpdateCompleted -= SurTermineeMiseAJourSignatures;
+                _rulesUpdater.UpdateOutput -= SurAjoutSortieMiseAJour;
+                _rulesUpdater.UpdateCompleted -= SurTermineeMiseAJourRegles;
                 _updater.DisableAutoUpdate();
                 _rulesUpdater.DisableAutoUpdate();
             }

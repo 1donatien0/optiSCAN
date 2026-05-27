@@ -11,6 +11,50 @@ namespace optiSCAN.Services
     {
         private const string SeedMarker = ".optiscan-db-seeded";
 
+        /// <summary>
+        /// Résout le dossier contenant les binaires ClamAV (<c>clamscan.exe</c> /
+        /// <c>freshclam.exe</c>) en cherchant dans cet ordre :
+        /// <list type="number">
+        ///   <item><c>&lt;baseDir&gt;\clamav\&lt;arch&gt;\</c> (binaires embarqués x64/x86)</item>
+        ///   <item><c>&lt;baseDir&gt;\clamav\</c> (layout plat)</item>
+        ///   <item><c>%ProgramFiles%\ClamAV\</c></item>
+        ///   <item><c>%ProgramFiles(x86)%\ClamAV\</c></item>
+        /// </list>
+        /// Retourne le layout plat comme repli si aucun n'est trouvé (l'erreur
+        /// sera levée à l'utilisation par le moteur concerné).
+        /// </summary>
+        /// <param name="executableName">
+        /// Nom de l'exécutable à chercher dans chaque candidat
+        /// (ex. <c>"clamscan.exe"</c> ou <c>"freshclam.exe"</c>).
+        /// </param>
+        /// <param name="baseDir">
+        /// Répertoire racine de recherche. <c>null</c> (valeur par défaut) utilise
+        /// <see cref="AppDomain.CurrentDomain.BaseDirectory"/> — comportement de production.
+        /// Passer une valeur explicite en test pour isoler la logique de découverte.
+        /// </param>
+        public static string ResolveClamAvBinDir(
+            string executableName = "clamscan.exe",
+            string? baseDir = null)
+        {
+            baseDir ??= AppDomain.CurrentDomain.BaseDirectory;
+            var arch = Environment.Is64BitProcess ? "x64" : "x86";
+
+            var candidates = new[]
+            {
+                Path.Combine(baseDir, "clamav", arch),
+                Path.Combine(baseDir, "clamav"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "ClamAV"),
+                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "ClamAV"),
+            };
+
+            foreach (var candidate in candidates)
+                if (File.Exists(Path.Combine(candidate, executableName)))
+                    return candidate;
+
+            // Repli : layout plat (l'erreur sera levée à l'utilisation)
+            return Path.Combine(baseDir, "clamav");
+        }
+
         /// <summary>Résout le dossier <c>database</c> à côté des binaires (ou parent).</summary>
         public static string ResolvePreferredDatabaseDir(string clamavBinDir)
         {

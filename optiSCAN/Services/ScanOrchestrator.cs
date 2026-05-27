@@ -98,31 +98,20 @@ namespace optiSCAN.Services
                 };
             }
 
-            var clamProgress = new Progress<ScanProgress>(p =>
-            {
-                var c = p.Clone();
-                c.Message = ScanUserDisplay.ForProgressMessage(p.Message);
-                progress?.Report(c);
-            });
-
-            var yaraProgress = new Progress<ScanProgress>(p =>
-            {
-                var c = p.Clone();
-                c.Message = ScanUserDisplay.ForProgressMessage(p.Message);
-                progress?.Report(c);
-            });
+            // Un seul relais pour ClamAV + YARA : le compteur et les messages restent monotones.
+            var engineProgress = new ScanProgressRelay().ToParent(progress);
 
             Task<ScanResult> clamTask = recursive
-                ? _clamAv.ScanFolderAsync(target, clamProgress, ct)
-                : _clamAv.ScanFileAsync(target, clamProgress, ct);
+                ? _clamAv.ScanFolderAsync(target, engineProgress, ct)
+                : _clamAv.ScanFileAsync(target, engineProgress, ct);
 
             Task<ScanResult> yaraTask = recursive
-                ? RunYaraOnFolderAsync(target, yaraProgress, ct)
-                : RunYaraOnFileAsync(target, yaraProgress, ct);
+                ? RunYaraOnFolderAsync(target, engineProgress, ct)
+                : RunYaraOnFileAsync(target, engineProgress, ct);
 
             await Task.WhenAll(clamTask, yaraTask);
 
-            return MergeResults(type, target, await clamTask, await yaraTask);
+            return ScanThreatMerger.Merge(type, target, await clamTask, await yaraTask);
         }
 
         /// <summary>Délègue l'agrégation multi-cibles à <see cref="MultiTargetScanAggregator"/>.</summary>
@@ -343,74 +332,6 @@ namespace optiSCAN.Services
             }
 
             return result;
-        }
-
-        // ── Fusion ClamAV + YARA ─────────────────────────────────────────────────
-
-        /// <summary>
-        /// Fusionne les résultats ClamAV et YARA en un <see cref="ScanResult"/> unique.
-        /// Les menaces détectées par les deux moteurs sont agrégées sous <c>DetectedBy = "ClamAV+YARA"</c>
-        /// avec déduplication par chemin + nom de règle.
-        /// </summary>
-        private static ScanResult MergeResults(ScanType type, string target, ScanResult clamResult, ScanResult yaraResult)
-        {
-            var merged = new ScanResult
-            {
-                Type = type,
-                TargetPath = target,
-                StartedAt = clamResult.StartedAt < yaraResult.StartedAt ? clamResult.StartedAt : yaraResult.StartedAt,
-                FinishedAt = DateTime.Now,
-                FilesScanned = Math.Max(clamResult.FilesScanned, yaraResult.FilesScanned),
-                FilesSkipped = clamResult.FilesSkipped,
-                TotalBytesScanned = clamResult.TotalBytesScanned,
-                Status = (clamResult.Status == ScanStatus.Cancelled || yaraResult.Status == ScanStatus.Cancelled)
-                    ? ScanStatus.Cancelled : ScanStatus.Completed
-            };
-
-            var excl = ExclusionSettings.Current;
-            var clamThreats = clamResult.Threats.Where(t => !excl.IsFileExcluded(t.FilePath)).ToList();
-            var yaraThreats = yaraResult.Threats.Where(t => !excl.IsFileExcluded(t.FilePath)).ToList();
-
-            var clamByPath = new Dictionary<string, ThreatInfo>(StringComparer.OrdinalIgnoreCase);
-            foreach (var t in clamThreats)
-                clamByPath[t.FilePath] = t;
-
-            merged.Threats.AddRange(clamThreats);
-
-            // Pour chaque match YARA on agrège proprement les noms de règles
-            // dans un set (HashSet) afin d'éviter les VirusName en accumulation
-            // type "X / YARA:Y / YARA:Y / YARA:Y" si plusieurs règles matchent.
-            var yaraNamesByPath = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-            var seenYaraTriples = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var yaraT in yaraThreats)
-            {
-                var triple = $"{yaraT.FilePath}|{yaraT.VirusName}";
-                if (!seenYaraTriples.Add(triple)) continue; // déjà compté
-
-                if (clamByPath.TryGetValue(yaraT.FilePath, out var existing))
-                {
-                    if (!yaraNamesByPath.TryGetValue(yaraT.FilePath, out var names))
-                        yaraNamesByPath[yaraT.FilePath] = names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    names.Add(yaraT.VirusName);
-                    existing.DetectedBy = "ClamAV+YARA";
-                }
-                else
-                {
-                    merged.Threats.Add(yaraT);
-                }
-            }
-
-            // Composition finale du VirusName pour les détections fusionnées.
-            foreach (var kv in yaraNamesByPath)
-            {
-                var t = clamByPath[kv.Key];
-                var sortedRules = string.Join(",", kv.Value.OrderBy(s => s, StringComparer.Ordinal));
-                if (!t.VirusName.Contains(sortedRules))
-                    t.VirusName += $" / YARA:{sortedRules}";
-            }
-
-            return merged;
         }
 
         // GetQuickScanTargets retiré : la source unique est désormais

@@ -11,14 +11,22 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 $csproj = Join-Path $root 'optiSCAN\optiSCAN.csproj'
 $iss = Join-Path $PSScriptRoot 'setup.iss'
+$publishDir = Join-Path $root 'optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64'
+$cleanScript = Join-Path $root 'scripts\clean-before-publish.ps1'
 
 if (-not (Test-Path -LiteralPath $csproj)) { throw "Introuvable : $csproj" }
 if (-not (Test-Path -LiteralPath $iss)) { throw "Introuvable : $iss" }
 
 if (-not $SkipPublish) {
-    Write-Host 'dotnet publish (Release, win-x64, framework-dependent)...' -ForegroundColor Cyan
-    dotnet publish $csproj -c Release -r win-x64 --self-contained false
+  if (-not (Test-Path -LiteralPath $cleanScript)) { throw "Introuvable : $cleanScript" }
+  & $cleanScript
+  Write-Host 'dotnet publish (Release, FolderProfile -> publish\win-x64)...' -ForegroundColor Cyan
+    dotnet publish $csproj -c Release /p:PublishProfile=FolderProfile
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish a échoué (code $LASTEXITCODE)." }
+
+    if (-not (Test-Path -LiteralPath (Join-Path $publishDir 'optiSCAN.exe'))) {
+        throw "Publication introuvable : $publishDir\optiSCAN.exe"
+    }
 }
 
 $iscc = @(

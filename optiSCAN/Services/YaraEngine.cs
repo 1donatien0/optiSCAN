@@ -32,7 +32,8 @@ namespace optiSCAN.Services
         /// <c>true</c> si <c>_compiled.yarc</c> existe ET correspond à l'état actuel des fichiers .yar.
         /// Un <c>false</c> ici déclenche automatiquement une recompilation au prochain scan.
         /// </summary>
-        public bool HasCompiled => IsCompiledUpToDate();
+        public bool HasCompiled => YaraRulesCacheSupport.IsCompiledUpToDate(
+            _rulesDirectory, _compiledRulesPath, _compiledStampPath);
 
         // ── Constructeur ─────────────────────────────────────────────────────────
 
@@ -73,25 +74,6 @@ namespace optiSCAN.Services
         /// est absent, si <c>_compiled.stamp</c> est absent ou périmé (modification
         /// manuelle d'une règle, ajout/suppression d'un .yar).
         /// </summary>
-        private bool IsCompiledUpToDate()
-        {
-            if (!File.Exists(_compiledRulesPath)) return false;
-            if (!File.Exists(_compiledStampPath)) return false;
-            try
-            {
-                var files = Directory.GetFiles(_rulesDirectory, "*.yar");
-                if (files.Length == 0) return false;
-                Array.Sort(files, StringComparer.OrdinalIgnoreCase);
-                var currentStamp = ComputeRulesDirectoryFingerprint(files);
-                var savedStamp = File.ReadAllText(_compiledStampPath, Encoding.UTF8).Trim();
-                return string.Equals(currentStamp, savedStamp, StringComparison.Ordinal);
-            }
-            catch
-            {
-                return false; // En cas de doute → recompilation
-            }
-        }
-
         // L2 fix : regex multiline plutôt que StartsWith("rule ") ligne par ligne.
         // StartsWith manquait les règles précédées d'indentation, de commentaires,
         // ou définies sans espace supplémentaire ; la regex matche "rule <ident>"
@@ -109,7 +91,7 @@ namespace optiSCAN.Services
                     return 0;
 
                 Array.Sort(files, StringComparer.OrdinalIgnoreCase);
-                var stamp = ComputeRulesDirectoryFingerprint(files);
+                var stamp = YaraRulesCacheSupport.ComputeRulesDirectoryFingerprint(files);
                 if (TryReadRulesCountCache(stamp, out var cached))
                     return cached;
 
@@ -127,24 +109,6 @@ namespace optiSCAN.Services
                 AppLogger.Warn("YaraEngine", "CountRules", ex);
                 return 0;
             }
-        }
-
-        /// <summary>Empreinte du dossier de règles : invalide le cache si un .yar change.</summary>
-        private static string ComputeRulesDirectoryFingerprint(string[] sortedAbsolutePaths)
-        {
-            using var ms = new MemoryStream();
-            foreach (var p in sortedAbsolutePaths)
-            {
-                if (!File.Exists(p))
-                    continue;
-                var fi = new FileInfo(p);
-                var line = $"{p}|{fi.Length}|{fi.LastWriteTimeUtc.Ticks}\n";
-                var b = Encoding.UTF8.GetBytes(line);
-                ms.Write(b, 0, b.Length);
-            }
-            return ms.Length == 0
-                ? "EMPTY"
-                : Convert.ToHexString(SHA256.HashData(ms.ToArray()));
         }
 
         private bool TryReadRulesCountCache(string stamp, out int count)
@@ -186,7 +150,7 @@ namespace optiSCAN.Services
             public bool Truncated;
             private int _capturedChars;
 
-            public void OnLine(string? line, int maxChars)
+            public void SurLigneYara(string? line, int maxChars)
             {
                 if (line == null || Truncated)
                     return;
@@ -253,8 +217,7 @@ namespace optiSCAN.Services
                     try
                     {
                         Array.Sort(ruleFiles, StringComparer.OrdinalIgnoreCase);
-                        var stamp = ComputeRulesDirectoryFingerprint(ruleFiles);
-                        File.WriteAllText(_compiledStampPath, stamp, Encoding.UTF8);
+                        YaraRulesCacheSupport.WriteCompiledStamp(_compiledStampPath, ruleFiles);
                     }
                     catch (Exception stampEx)
                     {
@@ -289,8 +252,8 @@ namespace optiSCAN.Services
 
             if (HasCompiled)
             {
-                // Scan avec règles compilées : yara64.exe --compiled-rules rules.yarc file
-                // ArgumentList → quoting sûr, pas de concat string.
+                // Scan avec règles compilées : yara64.exe --compiled-rules rules.yarc fichier
+                // ArgumentList → guillemets/échappement sûr, pas de concaténation de chaîne.
                 var results = await RunYaraScanAsync(
                     new[] { "--compiled-rules", _compiledRulesPath, filePath },
                     filePath, ct);
@@ -298,7 +261,7 @@ namespace optiSCAN.Services
             }
             else
             {
-                // Fallback : scan avec chaque .yar individuellement
+                // Solution de repli : scan avec chaque .yar individuellement
                 foreach (var ruleFile in Directory.GetFiles(_rulesDirectory, "*.yar"))
                 {
                     if (ct.IsCancellationRequested) break;
@@ -318,10 +281,10 @@ namespace optiSCAN.Services
         /// <summary>
         /// Scanne un dossier entier en UN SEUL processus yara avec --recursive.
         ///
-        /// L'ancienne approche (un process par fichier dans ScanOrchestrator)
+        /// L'ancienne approche (un processus par fichier dans ScanOrchestrator)
         /// dominait le temps de scan pour les gros dossiers : pour 10 000 fichiers,
-        /// 10 000 spawns de yara64.exe, soit ~10 minutes uniquement de spawn
-        /// overhead. Cette méthode passe le dossier directement à yara qui
+        /// 10 000 lancements de yara64.exe, soit ~10 minutes uniquement de
+        /// surcoût lié aux lancements. Cette méthode passe le dossier directement à yara qui
         /// l'itère lui-même, divisant le temps global par un facteur 10 à 50.
         ///
         /// La sortie de yara conserve le format "RuleName Path" pour chaque match,
@@ -351,7 +314,7 @@ namespace optiSCAN.Services
             else
             {
                 // Sans règles compilées : scan séquentiel par règle, encore N fois
-                // moins de spawn qu'un process par fichier.
+                // moins de lancements qu'un processus par fichier.
                 foreach (var ruleFile in Directory.GetFiles(_rulesDirectory, "*.yar"))
                 {
                     if (ct.IsCancellationRequested) break;
@@ -396,7 +359,7 @@ namespace optiSCAN.Services
 
                 var cap = new YaraStdoutCapture();
                 var stderrLines = new StringBuilder();
-                process.OutputDataReceived += (_, e) => cap.OnLine(e.Data, MaxYaraStdoutCaptureChars);
+                process.OutputDataReceived += (_, e) => cap.SurLigneYara(e.Data, MaxYaraStdoutCaptureChars);
                 process.ErrorDataReceived += (_, e) => { if (e.Data != null) stderrLines.AppendLine(e.Data); };
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
@@ -472,7 +435,7 @@ namespace optiSCAN.Services
 
                 var cap = new YaraStdoutCapture();
                 var stderrLines = new System.Text.StringBuilder();
-                process.OutputDataReceived += (_, e) => cap.OnLine(e.Data, MaxYaraStdoutCaptureChars);
+                process.OutputDataReceived += (_, e) => cap.SurLigneYara(e.Data, MaxYaraStdoutCaptureChars);
                 // CORRECTION : BeginErrorReadLine() sans handler = stderr drainé mais
                 // silencieusement perdu. On ajoute un handler pour logger les erreurs YARA.
                 process.ErrorDataReceived += (_, e) => { if (e.Data != null) stderrLines.AppendLine(e.Data); };
