@@ -1,0 +1,377 @@
+<?xml version="1.0" encoding="utf-8"?>
+<root>
+  <xsd:schema id="root" xmlns="" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:msdata="urn:schemas-microsoft-com:xml-msdata">
+    <xsd:import namespace="http://www.w3.org/XML/1998/namespace" />
+    <xsd:element name="root" msdata:IsDataSet="true">
+      <xsd:complexType>
+        <xsd:choice maxOccurs="unbounded">
+          <xsd:element name="metadata">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" />
+              </xsd:sequence>
+              <xsd:attribute name="name" use="required" type="xsd:string" />
+              <xsd:attribute name="type" type="xsd:string" />
+              <xsd:attribute name="mimetype" type="xsd:string" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="assembly">
+            <xsd:complexType>
+              <xsd:attribute name="alias" type="xsd:string" />
+              <xsd:attribute name="name" type="xsd:string" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="data">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+                <xsd:element name="comment" type="xsd:string" minOccurs="0" msdata:Ordinal="2" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" msdata:Ordinal="1" />
+              <xsd:attribute name="type" type="xsd:string" msdata:Ordinal="3" />
+              <xsd:attribute name="mimetype" type="xsd:string" msdata:Ordinal="4" />
+              <xsd:attribute ref="xml:space" />
+            </xsd:complexType>
+          </xsd:element>
+          <xsd:element name="resheader">
+            <xsd:complexType>
+              <xsd:sequence>
+                <xsd:element name="value" type="xsd:string" minOccurs="0" msdata:Ordinal="1" />
+              </xsd:sequence>
+              <xsd:attribute name="name" type="xsd:string" use="required" />
+            </xsd:complexType>
+          </xsd:element>
+        </xsd:choice>
+      </xsd:complexType>
+    </xsd:element>
+  </xsd:schema>
+  <resheader name="resmimetype">
+    <value>text/microsoft-resx</value>
+  </resheader>
+  <resheader name="version">
+    <value>2.0</value>
+  </resheader>
+  <resheader name="reader">
+    <value>System.Resources.ResXResourceReader, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <resheader name="writer">
+    <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
+  </resheader>
+  <data name="Nav_Home" xml:space="preserve"><value>Home</value></data>
+  <data name="Nav_Clean" xml:space="preserve"><value>Clean</value></data>
+  <data name="Nav_Antivirus" xml:space="preserve"><value>Antivirus</value></data>
+  <data name="Nav_History" xml:space="preserve"><value>History</value></data>
+  <data name="Nav_Options" xml:space="preserve"><value>Options</value></data>
+  <data name="Nav_Theme" xml:space="preserve"><value>Dark mode</value></data>
+  <data name="Nav_Website" xml:space="preserve"><value>Website</value></data>
+  <data name="Nav_About" xml:space="preserve"><value>About</value></data>
+  <data name="App_Title" xml:space="preserve"><value>optiSCAN — Optimizer &amp; Antivirus</value></data>
+  <data name="App_TitleShort" xml:space="preserve"><value>optiSCAN</value></data>
+  <data name="Common_Unknown" xml:space="preserve"><value>Unknown</value></data>
+  <data name="Common_Confirmation" xml:space="preserve"><value>Confirmation</value></data>
+  <data name="Common_Never" xml:space="preserve"><value>Never</value></data>
+  <data name="Common_Yes" xml:space="preserve"><value>Yes</value></data>
+  <data name="Common_No" xml:space="preserve"><value>No</value></data>
+  <data name="ScanType_File" xml:space="preserve"><value>File</value></data>
+  <data name="ScanType_Folder" xml:space="preserve"><value>Folder</value></data>
+  <data name="ScanType_Full" xml:space="preserve"><value>Full scan</value></data>
+  <data name="ScanType_Quick" xml:space="preserve"><value>Quick scan</value></data>
+  <data name="ScanType_Default" xml:space="preserve"><value>Scan</value></data>
+  <data name="ScanSummary_Running" xml:space="preserve"><value>Scan in progress… ({0:N0} file(s) scanned so far)</value></data>
+  <data name="ScanSummary_Clean" xml:space="preserve"><value>No threats — {0:N0} file(s) in {1}</value></data>
+  <data name="ScanSummary_Threats" xml:space="preserve"><value>Warning: {0} threat(s) found in {1:N0} file(s)</value></data>
+  <data name="ScanSummary_Cancelled" xml:space="preserve"><value>Scan stopped ({0:N0} file(s) scanned)</value></data>
+  <data name="ScanSummary_Error" xml:space="preserve"><value>Error: {0}</value></data>
+  <data name="ScanSummary_Unknown" xml:space="preserve"><value>Unknown status</value></data>
+  <data name="Recent_QuickScan" xml:space="preserve"><value>Quick scan</value></data>
+  <data name="Recent_FullScan" xml:space="preserve"><value>Full scan</value></data>
+  <data name="Recent_Folder" xml:space="preserve"><value>Folder: {0}</value></data>
+  <data name="Recent_File" xml:space="preserve"><value>File: {0}</value></data>
+  <data name="Scan_QuickStarting" xml:space="preserve"><value>Quick scan in progress…</value></data>
+  <data name="Scan_FullStarting" xml:space="preserve"><value>Full scan in progress…</value></data>
+  <data name="Scan_FolderStarting" xml:space="preserve"><value>Scanning folder: {0}</value></data>
+  <data name="Scan_FileStarting" xml:space="preserve"><value>Scanning file: {0}</value></data>
+  <data name="Scan_DefaultStarting" xml:space="preserve"><value>Scan in progress…</value></data>
+  <data name="Scan_Preparation" xml:space="preserve"><value>Preparing scan…</value></data>
+  <data name="Scan_Ready" xml:space="preserve"><value>Ready to scan.</value></data>
+  <data name="Scan_ReadyDegraded" xml:space="preserve"><value>Limited scan — check signatures in Antivirus.</value></data>
+  <data name="Scan_InProgress" xml:space="preserve"><value>Scan in progress…</value></data>
+  <data name="Scan_FilesProgress" xml:space="preserve"><value>{0:N0} file(s) scanned…</value></data>
+  <data name="Scan_ZonePrefix" xml:space="preserve"><value>Zone </value></data>
+  <data name="Scan_LastScanNone" xml:space="preserve"><value>Never</value></data>
+  <data name="Scan_LastScanFormat" xml:space="preserve"><value>{0}</value></data>
+  <data name="Ui_ProtectionActive" xml:space="preserve"><value>Protection active.</value></data>
+  <data name="Ui_ProtectionTray" xml:space="preserve"><value>optiSCAN minimized to the system tray</value></data>
+  <data name="Ui_ScanInterrupted" xml:space="preserve"><value>Scan stopped on request.</value></data>
+  <data name="Ui_RestoreOk" xml:space="preserve"><value>File restored from quarantine</value></data>
+  <data name="Ui_RestoreError" xml:space="preserve"><value>Error while restoring file</value></data>
+  <data name="Ui_DeleteOk" xml:space="preserve"><value>File permanently deleted from quarantine</value></data>
+  <data name="Ui_DeleteError" xml:space="preserve"><value>Error while deleting file</value></data>
+  <data name="Status_SigUpdateRunning" xml:space="preserve"><value>A signature update is already in progress.</value></data>
+  <data name="Status_SigUpdateProgress" xml:space="preserve"><value>Updating signatures…</value></data>
+  <data name="Status_RulesUpdateProgress" xml:space="preserve"><value>Updating detection rules…</value></data>
+  <data name="Status_FullUpdateStart" xml:space="preserve"><value>Full signature and rules update…</value></data>
+  <data name="Status_SigUpdateOk" xml:space="preserve"><value>Update completed successfully.</value></data>
+  <data name="Status_SigUpdateFail" xml:space="preserve"><value>Signature update failed.</value></data>
+  <data name="Status_FullUpdateDone" xml:space="preserve"><value>Signatures and rules update completed.</value></data>
+  <data name="Status_FullUpdatePartial" xml:space="preserve"><value>Update completed with errors.</value></data>
+  <data name="Status_SigUpdateStop" xml:space="preserve"><value>Stopping update…</value></data>
+  <data name="Confirm_QuarantineAll" xml:space="preserve"><value>Quarantine {0} detected file(s)?</value></data>
+  <data name="Confirm_PurgeQuarantine" xml:space="preserve"><value>Permanently delete {0} quarantine item(s)? This cannot be undone.</value></data>
+  <data name="Notif_ThreatTitle" xml:space="preserve"><value>Threat detected</value></data>
+  <data name="Notif_QuarantineBtn" xml:space="preserve"><value>Quarantine</value></data>
+  <data name="Notif_IgnoreBtn" xml:space="preserve"><value>Ignore</value></data>
+  <data name="Notif_OpenApp" xml:space="preserve"><value>Open optiSCAN</value></data>
+  <data name="Notif_QuarantinedTitle" xml:space="preserve"><value>File quarantined</value></data>
+  <data name="Notif_ViewQuarantine" xml:space="preserve"><value>View quarantine</value></data>
+  <data name="Notif_ScanOkTitle" xml:space="preserve"><value>Scan complete</value></data>
+  <data name="Notif_ScanOkBody" xml:space="preserve"><value>{0:N0} files scanned, no threats found</value></data>
+  <data name="Notif_ScanThreatsTitle" xml:space="preserve"><value>Scan complete — {0} threat(s)</value></data>
+  <data name="Notif_ScanThreatsBody" xml:space="preserve"><value>See History for details</value></data>
+  <data name="Notif_HistoryBtn" xml:space="preserve"><value>Open history</value></data>
+  <data name="Notif_RtpStartedTitle" xml:space="preserve"><value>Real-time protection enabled</value></data>
+  <data name="Notif_RtpStartedBody" xml:space="preserve"><value>optiSCAN is monitoring files in the background</value></data>
+  <data name="Notif_UpdateTitle" xml:space="preserve"><value>Updates available</value></data>
+  <data name="Notif_UpdateBody" xml:space="preserve"><value>New ClamAV signatures v{0}</value></data>
+  <data name="Notif_UpdateBtn" xml:space="preserve"><value>Update</value></data>
+  <data name="Overview_Protected" xml:space="preserve"><value>Your PC is protected</value></data>
+  <data name="Overview_ProtectionIncomplete" xml:space="preserve"><value>Protection incomplete</value></data>
+  <data name="Overview_DefsUpToDate" xml:space="preserve"><value>Definitions are up to date.</value></data>
+  <data name="Overview_CheckSignatures" xml:space="preserve"><value>Check ClamAV, YARA rules, and signature updates.</value></data>
+  <data name="Overview_CleanTitle" xml:space="preserve"><value>CLEAN</value></data>
+  <data name="Overview_CleanSub" xml:space="preserve"><value>Temporary files</value></data>
+  <data name="Overview_ScanTitle" xml:space="preserve"><value>ANTIVIRUS</value></data>
+  <data name="Overview_ScanSub" xml:space="preserve"><value>Run a scan</value></data>
+  <data name="Overview_HistoryTitle" xml:space="preserve"><value>HISTORY</value></data>
+  <data name="Overview_HistorySub" xml:space="preserve"><value>View history</value></data>
+  <data name="Overview_UpdateTitle" xml:space="preserve"><value>UPDATE</value></data>
+  <data name="Overview_UpdateSub" xml:space="preserve"><value>ClamAV + YARA rules</value></data>
+  <data name="Overview_StatsNone30" xml:space="preserve"><value>• No scans recorded in the last 30 days.</value></data>
+  <data name="Overview_StatsScans" xml:space="preserve"><value>• Scans recorded: {0}</value></data>
+  <data name="Overview_StatsFiles" xml:space="preserve"><value>• Files scanned (total): {0}</value></data>
+  <data name="Overview_StatsThreats" xml:space="preserve"><value>• Threats detected (total): {0}</value></data>
+  <data name="Overview_StatsLifetime" xml:space="preserve"><value>Since installing this copy of optiSCAN: {0} scan(s) counted in preferences.</value></data>
+  <data name="Overview_StatsHistoryHint" xml:space="preserve"><value>Per-session details are available on the History tab.</value></data>
+  <data name="Overview_UpdatedAt" xml:space="preserve"><value>Updated: {0}</value></data>
+  <data name="Overview_ClamActive" xml:space="preserve"><value>Active</value></data>
+  <data name="Overview_ClamMissing" xml:space="preserve"><value>Not installed</value></data>
+  <data name="Overview_YaraLoaded" xml:space="preserve"><value>{0:N0} rules</value></data>
+  <data name="Overview_YaraMissing" xml:space="preserve"><value>Not loaded</value></data>
+  <data name="Overview_LastScan" xml:space="preserve"><value>Last scan</value></data>
+  <data name="Protection_BadgeActive" xml:space="preserve"><value>Active</value></data>
+  <data name="Protection_BadgeDegraded" xml:space="preserve"><value>Degraded</value></data>
+  <data name="Protection_BadgeInactive" xml:space="preserve"><value>Inactive</value></data>
+  <data name="Av_LastScanLabel" xml:space="preserve"><value>Last scan: {0}</value></data>
+  <data name="Av_LastScanNone" xml:space="preserve"><value>No scan recorded</value></data>
+  <data name="Av_LastScanInstant" xml:space="preserve"><value>Last scan: just now</value></data>
+  <data name="Av_LastScanMinutes" xml:space="preserve"><value>Last scan: {0} min ago</value></data>
+  <data name="Av_LastScanHours" xml:space="preserve"><value>Last scan: {0} h ago</value></data>
+  <data name="Av_LastScanDays" xml:space="preserve"><value>Last scan: {0} d ago</value></data>
+  <data name="Av_Title" xml:space="preserve"><value>Antivirus</value></data>
+  <data name="Av_NoScanYet" xml:space="preserve"><value>No scans recorded yet</value></data>
+  <data name="Av_Init" xml:space="preserve"><value>Initializing…</value></data>
+  <data name="Av_Quick" xml:space="preserve"><value>Quick</value></data>
+  <data name="Av_Full" xml:space="preserve"><value>Full</value></data>
+  <data name="Av_Targeted" xml:space="preserve"><value>Custom</value></data>
+  <data name="Av_Folder" xml:space="preserve"><value>Folder</value></data>
+  <data name="Av_File" xml:space="preserve"><value>File</value></data>
+  <data name="Av_Tools" xml:space="preserve"><value>TOOLS</value></data>
+  <data name="Av_Recent" xml:space="preserve"><value>Recent</value></data>
+  <data name="Av_Stop" xml:space="preserve"><value>Stop</value></data>
+  <data name="Av_Stats" xml:space="preserve"><value>STATS</value></data>
+  <data name="Av_Analyzed" xml:space="preserve"><value>Scanned</value></data>
+  <data name="Av_Threats" xml:space="preserve"><value>Threats</value></data>
+  <data name="Av_Quarantine" xml:space="preserve"><value>Quar.</value></data>
+  <data name="Av_TabScan" xml:space="preserve"><value>Scan</value></data>
+  <data name="Av_ScanInProgress" xml:space="preserve"><value>Antivirus scan in progress</value></data>
+  <data name="Av_ScanHint" xml:space="preserve"><value>Your files are being scanned in depth. You can stop at any time.</value></data>
+  <data name="Av_Location" xml:space="preserve"><value>Location (scan or detection):</value></data>
+  <data name="Av_FilesScanned" xml:space="preserve"><value>Files scanned:</value></data>
+  <data name="Av_ThreatsCount" xml:space="preserve"><value>Threats:</value></data>
+  <data name="Av_ColRisk" xml:space="preserve"><value>Risk</value></data>
+  <data name="Av_ColPath" xml:space="preserve"><value>Location</value></data>
+  <data name="Av_ColThreat" xml:space="preserve"><value>Threat</value></data>
+  <data name="Av_ColTime" xml:space="preserve"><value>Time</value></data>
+  <data name="Av_ColStatus" xml:space="preserve"><value>Status</value></data>
+  <data name="Av_ColClean" xml:space="preserve"><value>Actions</value></data>
+  <data name="Av_QuarantineBtn" xml:space="preserve"><value>Quarantine</value></data>
+  <data name="Av_IgnoreBtn" xml:space="preserve"><value>Ignore</value></data>
+  <data name="Av_DeleteBtn" xml:space="preserve"><value>Delete</value></data>
+  <data name="Av_QuarantineAll" xml:space="preserve"><value>Quarantine all</value></data>
+  <data name="Av_TabQuarantine" xml:space="preserve"><value>Quarantine</value></data>
+  <data name="Av_ColOrigPath" xml:space="preserve"><value>Original location</value></data>
+  <data name="Av_ColVirus" xml:space="preserve"><value>Threat name</value></data>
+  <data name="Av_ColSize" xml:space="preserve"><value>Size</value></data>
+  <data name="Av_ColQuarDate" xml:space="preserve"><value>Quarantined</value></data>
+  <data name="Av_ColActions" xml:space="preserve"><value>Actions</value></data>
+  <data name="Av_Restore" xml:space="preserve"><value>Restore</value></data>
+  <data name="Av_Delete" xml:space="preserve"><value>Delete</value></data>
+  <data name="Av_LoadMore" xml:space="preserve"><value>Load more entries</value></data>
+  <data name="Av_EmptyQuarantine" xml:space="preserve"><value>Empty entire quarantine</value></data>
+  <data name="Av_TabSignatures" xml:space="preserve"><value>Signatures</value></data>
+  <data name="Av_Update" xml:space="preserve"><value>Update</value></data>
+  <data name="Av_StopUpdate" xml:space="preserve"><value>Stop</value></data>
+  <data name="Clean_Title" xml:space="preserve"><value>System cleanup</value></data>
+  <data name="Clean_Sub" xml:space="preserve"><value>Free up space by removing unnecessary files.</value></data>
+  <data name="Clean_TempWin" xml:space="preserve"><value>Windows temp</value></data>
+  <data name="Clean_Browsers" xml:space="preserve"><value>Browsers</value></data>
+  <data name="Clean_Total" xml:space="preserve"><value>Total recoverable</value></data>
+  <data name="Clean_TempSub" xml:space="preserve"><value>Windows + user temp folders</value></data>
+  <data name="Clean_BrowserSub" xml:space="preserve"><value>Selected browser caches</value></data>
+  <data name="Clean_TotalSub" xml:space="preserve"><value>Selected targets</value></data>
+  <data name="Clean_Analyze" xml:space="preserve"><value>Analyze</value></data>
+  <data name="Clean_Run" xml:space="preserve"><value>Clean now</value></data>
+  <data name="Clean_ItemsTitle" xml:space="preserve"><value>Items to clean</value></data>
+  <data name="Clean_System" xml:space="preserve"><value>SYSTEM</value></data>
+  <data name="Clean_TempWinCb" xml:space="preserve"><value>Windows temp</value></data>
+  <data name="Clean_TempUserCb" xml:space="preserve"><value>User temp</value></data>
+  <data name="Clean_RecycleCb" xml:space="preserve"><value>Recycle Bin</value></data>
+  <data name="Clean_LogsCb" xml:space="preserve"><value>System logs</value></data>
+  <data name="Clean_BrowsersSection" xml:space="preserve"><value>BROWSERS</value></data>
+  <data name="Clean_Edge" xml:space="preserve"><value>Microsoft Edge</value></data>
+  <data name="Clean_Chrome" xml:space="preserve"><value>Google Chrome</value></data>
+  <data name="Clean_Firefox" xml:space="preserve"><value>Mozilla Firefox</value></data>
+  <data name="Clean_Brave" xml:space="preserve"><value>Brave</value></data>
+  <data name="Clean_Opera" xml:space="preserve"><value>Opera</value></data>
+  <data name="Clean_Vivaldi" xml:space="preserve"><value>Vivaldi</value></data>
+  <data name="Clean_Arc" xml:space="preserve"><value>Arc</value></data>
+  <data name="Clean_LogTitle" xml:space="preserve"><value>Operation log</value></data>
+  <data name="Clean_LogHint" xml:space="preserve"><value>Click Analyze to estimate recoverable space&#x0a;(temporary files and selected browser caches).</value></data>
+  <data name="Hist_Title" xml:space="preserve"><value>History</value></data>
+  <data name="Hist_Sub" xml:space="preserve"><value>View and export your scan and cleanup reports.</value></data>
+  <data name="Hist_ExportHtml" xml:space="preserve"><value>Export HTML</value></data>
+  <data name="Hist_ExportPdf" xml:space="preserve"><value>Export PDF (selection)</value></data>
+  <data name="Hist_OpenAv" xml:space="preserve"><value>Open antivirus</value></data>
+  <data name="Hist_TabScans" xml:space="preserve"><value>Antivirus scans</value></data>
+  <data name="Hist_TabCleans" xml:space="preserve"><value>System cleanups</value></data>
+  <data name="Opt_Title" xml:space="preserve"><value>Options</value></data>
+  <data name="Opt_Sub" xml:space="preserve"><value>Customize how optiSCAN behaves.</value></data>
+  <data name="Opt_General" xml:space="preserve"><value>GENERAL</value></data>
+  <data name="Opt_Startup" xml:space="preserve"><value>Start optiSCAN when Windows starts</value></data>
+  <data name="Opt_StartupSub" xml:space="preserve"><value>Adds optiSCAN to Windows startup</value></data>
+  <data name="Opt_Notifications" xml:space="preserve"><value>Windows notifications</value></data>
+  <data name="Opt_NotifSub" xml:space="preserve"><value>Alerts when a threat is detected or an update is available</value></data>
+  <data name="Opt_DarkTheme" xml:space="preserve"><value>Dark theme</value></data>
+  <data name="Opt_DarkSub" xml:space="preserve"><value>Same setting as the Mode button in the sidebar</value></data>
+  <data name="Opt_SyncWin" xml:space="preserve"><value>Follow Windows theme</value></data>
+  <data name="Opt_SyncSub" xml:space="preserve"><value>Automatically matches Windows light/dark mode</value></data>
+  <data name="Opt_FavScan" xml:space="preserve"><value>Preferred scan type</value></data>
+  <data name="Opt_FavQuick" xml:space="preserve"><value>Quick scan</value></data>
+  <data name="Opt_FavFull" xml:space="preserve"><value>Full scan</value></data>
+  <data name="Opt_FavFolder" xml:space="preserve"><value>Folder</value></data>
+  <data name="Opt_FavFile" xml:space="preserve"><value>File</value></data>
+  <data name="Opt_FavHint" xml:space="preserve"><value>Updated after each completed scan</value></data>
+  <data name="Opt_Language" xml:space="preserve"><value>Interface language</value></data>
+  <data name="Opt_LanguageSub" xml:space="preserve"><value>French or English — restart required to apply everywhere</value></data>
+  <data name="Opt_LangFrench" xml:space="preserve"><value>Français</value></data>
+  <data name="Opt_LangEnglish" xml:space="preserve"><value>English</value></data>
+  <data name="Opt_LangRestartTitle" xml:space="preserve"><value>Change language</value></data>
+  <data name="Opt_LangRestartMessage" xml:space="preserve"><value>optiSCAN will restart to display the interface in the selected language.</value></data>
+  <data name="Opt_Antivirus" xml:space="preserve"><value>ANTIVIRUS</value></data>
+  <data name="Opt_Rtp" xml:space="preserve"><value>Real-time protection</value></data>
+  <data name="Opt_RtpSub" xml:space="preserve"><value>Continuously monitors downloads, desktop, and system folders</value></data>
+  <data name="Opt_AutoQuarantine" xml:space="preserve"><value>Automatic quarantine</value></data>
+  <data name="Opt_AutoQuarSub" xml:space="preserve"><value>Any detected threat (manual scan, real-time, or scheduled) is quarantined — never deleted automatically</value></data>
+  <data name="Opt_AutoSig" xml:space="preserve"><value>Automatic signature updates (every 4 hours)</value></data>
+  <data name="Opt_AutoSigSub" xml:space="preserve"><value>freshclam.exe runs periodically in the background</value></data>
+  <data name="Opt_Scheduled" xml:space="preserve"><value>Scheduled full scan (daily)</value></data>
+  <data name="Opt_ScheduledSub" xml:space="preserve"><value>Windows task « optiSCAN_DailyScan » (--fullscan --quiet)</value></data>
+  <data name="Opt_ScheduleTime" xml:space="preserve"><value>Time:</value></data>
+  <data name="Opt_RunNow" xml:space="preserve"><value>Run now</value></data>
+  <data name="Opt_App" xml:space="preserve"><value>APPLICATION</value></data>
+  <data name="Opt_UpdateHint" xml:space="preserve"><value>Antivirus signatures are updated on the Antivirus tab. For a new app version:</value></data>
+  <data name="Opt_AboutUpdates" xml:space="preserve"><value>About updates…</value></data>
+  <data name="Opt_SourceForge" xml:space="preserve"><value>SourceForge page</value></data>
+  <data name="Opt_Exclusions" xml:space="preserve"><value>EXCLUSIONS</value></data>
+  <data name="Opt_ExclHint" xml:space="preserve"><value>Folders skipped during scans</value></data>
+  <data name="Opt_Add" xml:space="preserve"><value>Add</value></data>
+  <data name="Opt_Browse" xml:space="preserve"><value>Browse…</value></data>
+  <data name="Opt_ExclNote" xml:space="preserve"><value>Excluded paths are not scanned by ClamAV or YARA.</value></data>
+  <data name="DotNet_MissingTitle" xml:space="preserve"><value>.NET 8 Desktop Runtime required</value></data>
+  <data name="DotNet_MissingBody" xml:space="preserve"><value>.NET 8 Desktop Runtime is not installed on this computer.&#x0D;&#x0A;&#x0D;&#x0A;optiSCAN needs it to run.&#x0D;&#x0A;Open the download page?</value></data>
+  <data name="Overview_StatsTitle" xml:space="preserve"><value>Protection statistics</value></data>
+  <data name="Overview_StatsSub" xml:space="preserve"><value>Text summary — last 30 days</value></data>
+  <data name="Overview_StatsLoading" xml:space="preserve"><value>Loading statistics…</value></data>
+  <data name="Overview_Recommendations" xml:space="preserve"><value>Recommendations</value></data>
+  <data name="Overview_RecEngines" xml:space="preserve"><value>Antivirus engines</value></data>
+  <data name="Overview_RecHygiene" xml:space="preserve"><value>Disk cleanup</value></data>
+  <data name="Overview_RecScans" xml:space="preserve"><value>Scans</value></data>
+  <data name="Overview_ProtectionState" xml:space="preserve"><value>Protection status</value></data>
+  <data name="Overview_YaraRulesLabel" xml:space="preserve"><value>YARA rules</value></data>
+  <data name="Overview_SignaturesSection" xml:space="preserve"><value>Signatures and rules</value></data>
+  <data name="Overview_LastUpdateShort" xml:space="preserve"><value>Last update</value></data>
+  <data name="Main_StatusReady" xml:space="preserve"><value>Ready — protection is active.</value></data>
+  <data name="Main_FooterFree" xml:space="preserve"><value>optiSCAN is free software — Vanier, Canada.</value></data>
+  <data name="Main_FooterVersion" xml:space="preserve"><value>optiSCAN {0} — Provided by Dona By</value></data>
+  <data name="Main_SidebarActive" xml:space="preserve"><value>active</value></data>
+  <data name="Main_ClamBadgeActive" xml:space="preserve"><value>ClamAV active</value></data>
+  <data name="Main_ClamBadgeMissing" xml:space="preserve"><value>ClamAV missing</value></data>
+  <data name="Main_ClamOperational" xml:space="preserve"><value>ClamAV is operational.</value></data>
+  <data name="Main_ClamNotFound" xml:space="preserve"><value>ClamAV was not found on this computer.</value></data>
+  <data name="Main_RuntimeHint" xml:space="preserve"><value> — see README § 3 or scripts\verify-runtime-deps.ps1</value></data>
+  <data name="Rec_StatusClamOk" xml:space="preserve"><value>ClamAV — database {0} (updated {1})</value></data>
+  <data name="Rec_StatusClamMissing" xml:space="preserve"><value>ClamAV — not detected (expected folder clamav/x64 next to the executable).</value></data>
+  <data name="Rec_StatusYara" xml:space="preserve"><value>YARA — {0} rule(s), pack {1} (updated {2})</value></data>
+  <data name="Rec_SigClamMissing" xml:space="preserve"><value>ClamAV is missing: copy the ClamAV binaries or reinstall optiSCAN with the clamav folder.</value></data>
+  <data name="Rec_SigNoYara" xml:space="preserve"><value>YARA: no rules loaded — open Antivirus → Signatures tab to update.</value></data>
+  <data name="Rec_SigReady" xml:space="preserve"><value>Engines ready — {0} active YARA rule(s) with ClamAV.</value></data>
+  <data name="Rec_CleanSuggest" xml:space="preserve"><value>Consider cleaning temporary files and caches (Clean menu) if you have not done so recently.</value></data>
+  <data name="Rec_CleanRecent" xml:space="preserve"><value>Last cleanup recorded on {0} — low priority.</value></data>
+  <data name="Rec_ActNone" xml:space="preserve"><value>No scans in history — run a quick scan (Antivirus).</value></data>
+  <data name="Rec_ActThreats" xml:space="preserve"><value>Last 30 days: {0} threat(s) reported — see History / Scan tab.</value></data>
+  <data name="Rec_ActOk" xml:space="preserve"><value>Scan history available — open the History tab for details.</value></data>
+  <data name="Hist_ColDate" xml:space="preserve"><value>Date</value></data>
+  <data name="Hist_ColType" xml:space="preserve"><value>Type</value></data>
+  <data name="Hist_ColTarget" xml:space="preserve"><value>Target</value></data>
+  <data name="Hist_ColFiles" xml:space="preserve"><value>Files</value></data>
+  <data name="Hist_ColDuration" xml:space="preserve"><value>Duration</value></data>
+  <data name="Hist_ColResult" xml:space="preserve"><value>Result</value></data>
+  <data name="Hist_ColTargets" xml:space="preserve"><value>Targets</value></data>
+  <data name="Hist_ColFreed" xml:space="preserve"><value>Freed</value></data>
+  <data name="Hist_TabLog" xml:space="preserve"><value>Log</value></data>
+  <data name="Hist_ExportPdfSelect" xml:space="preserve"><value>Select a row on the Antivirus scans tab, then click Export PDF (selection).</value></data>
+  <data name="Hist_ExportPdfTitle" xml:space="preserve"><value>Export PDF</value></data>
+  <data name="Tray_Open" xml:space="preserve"><value>Open</value></data>
+  <data name="Tray_Exit" xml:space="preserve"><value>Exit</value></data>
+  <data name="Status_Error" xml:space="preserve"><value>Error: {0}</value></data>
+  <data name="Status_HtmlSaved" xml:space="preserve"><value>HTML report saved: {0}</value></data>
+  <data name="Status_HtmlFailed" xml:space="preserve"><value>HTML export failed: {0}</value></data>
+  <data name="Status_PdfSaved" xml:space="preserve"><value>PDF report saved: {0}</value></data>
+  <data name="Status_PdfFailed" xml:space="preserve"><value>PDF export failed: {0}</value></data>
+  <data name="Status_ExportNoHistory" xml:space="preserve"><value>No scan is recorded in history. Run a scan from the Antivirus tab first.</value></data>
+  <data name="Status_FileIgnored" xml:space="preserve"><value>File ignored: {0}</value></data>
+  <data name="Status_FileDeleted" xml:space="preserve"><value>File deleted: {0}</value></data>
+  <data name="Status_DeleteFailed" xml:space="preserve"><value>Delete failed: {0}</value></data>
+  <data name="Status_UpdateError" xml:space="preserve"><value>Update: {0}</value></data>
+  <data name="Status_SigLogRules" xml:space="preserve"><value>[Rules]</value></data>
+  <data name="Status_SigInterrupted" xml:space="preserve"><value>Update stopped by user</value></data>
+  <data name="Opt_SchedTaskFailed" xml:space="preserve"><value>Could not create the Windows scheduled task (schtasks). Check permissions or the user account name.</value></data>
+  <data name="Opt_SchedTaskTitle" xml:space="preserve"><value>optiSCAN — Scheduling</value></data>
+  <data name="Opt_SchedEnableFirst" xml:space="preserve"><value>Enable scheduled scanning first.</value></data>
+  <data name="Opt_SchedRunFailed" xml:space="preserve"><value>Could not start the task now (schtasks /Run).</value></data>
+  <data name="Opt_SchedRunOk" xml:space="preserve"><value>Task « optiSCAN_DailyScan » was triggered. The scan runs in the background (--fullscan --quiet).</value></data>
+  <data name="Opt_SchedNone" xml:space="preserve"><value>No scheduled task.</value></data>
+  <data name="Opt_SchedNextRun" xml:space="preserve"><value>Next run: {0}</value></data>
+  <data name="Opt_SchedActiveUnknown" xml:space="preserve"><value>Task active — next run time unavailable (schtasks).</value></data>
+  <data name="Opt_ExclNeedFolder" xml:space="preserve"><value>Enter an existing folder or use Browse…</value></data>
+  <data name="Opt_AppUpdateTitle" xml:space="preserve"><value>Application update</value></data>
+  <data name="Opt_AppUpdateCheckError" xml:space="preserve"><value>Check failed: {0}</value></data>
+  <data name="Upd_NotConfigured" xml:space="preserve"><value>Installed version: {0} ({1})&#x0D;&#x0A;&#x0D;&#x0A;optiSCAN does not download program updates in the background yet.&#x0D;&#x0A;&#x0D;&#x0A;• ClamAV signatures and YARA rules: Antivirus → Signatures tab.&#x0D;&#x0A;• New program version: {2}&#x0D;&#x0A;&#x0D;&#x0A;Local staging folder: {3}</value></data>
+  <data name="Upd_StagingError" xml:space="preserve"><value>Installed version: {0} ({1})&#x0D;&#x0A;&#x0D;&#x0A;Could not prepare the update folder:&#x0D;&#x0A;{2}&#x0D;&#x0A;&#x0D;&#x0A;Signatures: Antivirus → Signatures tab.&#x0D;&#x0A;Program: {3}</value></data>
+  <data name="Vm_QuarantineBatch" xml:space="preserve"><value>{0} file(s) moved to quarantine.</value></data>
+  <data name="Vm_RestoreOk" xml:space="preserve"><value>File restored.</value></data>
+  <data name="Vm_RestoreFail" xml:space="preserve"><value>Could not restore the file.</value></data>
+  <data name="Vm_DeleteOk" xml:space="preserve"><value>File permanently deleted.</value></data>
+  <data name="Vm_DeleteFail" xml:space="preserve"><value>Delete failed.</value></data>
+  <data name="Vm_PurgeCount" xml:space="preserve"><value>{0} file(s) removed from quarantine.</value></data>
+  <data name="Vm_YaraOperational" xml:space="preserve"><value>YARA operational — {0} rule(s)</value></data>
+  <data name="Vm_YaraUnavailable" xml:space="preserve"><value>YARA unavailable (missing yara64.exe or no rules)</value></data>
+  <data name="Vm_SigEngineReloaded" xml:space="preserve"><value>Detection engine: rules updated (reload on next scan)</value></data>
+  <data name="Vm_SigEngineUnavailable" xml:space="preserve"><value>Detection engine unavailable</value></data>
+  <data name="Av_ConfirmDeleteFile" xml:space="preserve"><value>Permanently delete this file?</value></data>
+  <data name="Av_ConfirmDeleteQuarantine" xml:space="preserve"><value>Permanently delete this quarantine item?</value></data>
+  <data name="Av_PickFolder" xml:space="preserve"><value>Select the folder to scan</value></data>
+  <data name="Av_PickFile" xml:space="preserve"><value>Select the file to scan</value></data>
+  <data name="Shell_ScanWith" xml:space="preserve"><value>Scan with optiSCAN</value></data>
+</root>

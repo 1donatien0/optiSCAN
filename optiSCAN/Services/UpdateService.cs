@@ -1,4 +1,6 @@
 ﻿using System.IO;
+using optiSCAN.Localization;
+using optiSCAN.Strings;
 
 namespace optiSCAN.Services
 {
@@ -60,12 +62,12 @@ namespace optiSCAN.Services
                     CurrentVersion = version,
                     ReleaseLabel = release,
                     StagingDirectory = _localUpdatePath,
-                    UserMessage =
-                        $"Version installée : {release} ({version})\n\n" +
-                        "optiSCAN ne télécharge pas encore les mises à jour du programme en arrière-plan.\n\n" +
-                        "• Signatures ClamAV et règles YARA : Antivirus → onglet Signatures.\n" +
-                        "• Nouvelle version du programme : https://sourceforge.net/projects/optiscan/\n\n" +
-                        $"Dossier de préparation local : {_localUpdatePath}",
+                    UserMessage = LocalizationService.Format(
+                        "Upd_NotConfigured",
+                        release,
+                        version,
+                        OptiscanStrings.Urls.OptiscanSourceForge,
+                        _localUpdatePath),
                 });
             }
             catch (Exception ex)
@@ -77,11 +79,12 @@ namespace optiSCAN.Services
                     CurrentVersion = version,
                     ReleaseLabel = release,
                     StagingDirectory = _localUpdatePath,
-                    UserMessage =
-                        $"Version installée : {release} ({version})\n\n" +
-                        $"Impossible de préparer le dossier de mises à jour :\n{ex.Message}\n\n" +
-                        "Signatures : onglet Antivirus → Signatures.\n" +
-                        "Programme : https://sourceforge.net/projects/optiscan/",
+                    UserMessage = LocalizationService.Format(
+                        "Upd_StagingError",
+                        release,
+                        version,
+                        ex.Message,
+                        OptiscanStrings.Urls.OptiscanSourceForge),
                 });
             }
         }
