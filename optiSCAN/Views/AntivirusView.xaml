@@ -6,23 +6,24 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:c="clr-namespace:optiSCAN.Converters"
              mc:Ignorable="d"
-             d:DesignHeight="600" d:DesignWidth="920"
-             AllowDrop="True"
-             DragOver="AntivirusPanel_DragOver"
-             Drop="AntivirusPanel_Drop">
+             d:DesignHeight="600" d:DesignWidth="920">
     <Grid>
         <Grid.Resources>
             <BooleanToVisibilityConverter x:Key="BoolToVis"/>
             <c:PositiveIntToVisibilityConverter x:Key="PosIntVis"/>
             <c:ThreatRiskSeverityConverter x:Key="ThreatRiskSeverity"/>
             <c:ThreatRiskColorConverter x:Key="ThreatRiskColor"/>
+            <c:ThreatRiskIconConverter x:Key="ThreatRiskIcon"/>
         </Grid.Resources>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="240"/>
                     <ColumnDefinition Width="*"/>
                 </Grid.ColumnDefinitions>
 
-                <StackPanel Grid.Column="0" Margin="0,0,6,0">
+                <ScrollViewer Grid.Column="0"
+                              VerticalScrollBarVisibility="Auto"
+                              HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Margin="0,0,6,0">
                     <Border CornerRadius="10" Padding="14" Margin="5"
                             BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" Background="{DynamicResource CardBg}">
                         <StackPanel>
@@ -50,8 +51,6 @@
                                     <TextBlock Text="Analyse rapide  (F5)" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
-                            <TextBlock Text="Démarrage, dossiers Windows et profil utilisateur (équivalent d’une analyse rapide courante)" Foreground="{DynamicResource TextSecondary}"
-                                       FontFamily="Segoe UI" FontSize="10" Margin="2,0,0,10" TextWrapping="Wrap"/>
 
                             <Button x:Name="btnFullScan" Style="{StaticResource PrimaryButton}"
                                     Command="{Binding FullScanCommand}" HorizontalAlignment="Stretch" Margin="0,0,0,2">
@@ -61,8 +60,6 @@
                                     <TextBlock Text="Analyse complète" VerticalAlignment="Center"/>
                                 </StackPanel>
                             </Button>
-                            <TextBlock Text="Tous les disques fixes (peut être long)" Foreground="{DynamicResource TextSecondary}"
-                                       FontFamily="Segoe UI" FontSize="10" Margin="2,0,0,10"/>
 
                             <Button x:Name="btnBrowseFolder" Style="{StaticResource PrimaryButton}"
                                     Click="BrowseFolder_Click" HorizontalAlignment="Stretch" Margin="0,0,0,4">
@@ -82,27 +79,7 @@
                                 </StackPanel>
                             </Button>
 
-                            <!-- Zone Drag & Drop -->
-                            <Grid Margin="0,8,0,8" Height="62">
-                                <Rectangle RadiusX="8" RadiusY="8"
-                                           Stroke="{DynamicResource BorderStrong}"
-                                           StrokeDashArray="4,3"
-                                           StrokeThickness="1.5"
-                                           Fill="{DynamicResource SurfaceBg}"/>
-                                <StackPanel HorizontalAlignment="Center"
-                                            VerticalAlignment="Center">
-                                    <md:PackIcon Kind="TrayArrowDown" Width="20" Height="20"
-                                                 Foreground="{DynamicResource TextMuted}"
-                                                 HorizontalAlignment="Center"/>
-                                    <TextBlock Text="Glisser-déposer ici"
-                                               FontFamily="Segoe UI" FontSize="10"
-                                               Foreground="{DynamicResource TextMuted}"
-                                               HorizontalAlignment="Center"
-                                               Margin="0,5,0,0"/>
-                                </StackPanel>
-                            </Grid>
-
-                            <Separator Background="{DynamicResource BorderColor}" Margin="0,6"/>
+                            <Separator Background="{DynamicResource BorderColor}" Margin="0,10,0,6"/>
 
                             <TextBlock Text="CIBLES RÉCENTES" Foreground="{DynamicResource AlertGold}"
                                        FontFamily="Segoe UI" FontSize="10"
@@ -144,7 +121,11 @@
                         <StackPanel>
                             <TextBlock Text="STATISTIQUES" Foreground="{DynamicResource AlertGold}"
                                        FontFamily="Segoe UI" FontSize="10"
-                                       FontWeight="Bold" Margin="0,0,0,12"/>
+                                       FontWeight="Bold" Margin="0,0,0,4"/>
+                            <TextBlock Text="Résultats et moteurs actifs"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       FontFamily="Segoe UI" FontSize="10"
+                                       Margin="0,0,0,12"/>
 
                             <Grid Margin="0,0,0,10">
                                 <Grid.ColumnDefinitions>
@@ -192,7 +173,27 @@
                                            VerticalAlignment="Center"/>
                             </Grid>
 
-                            <Grid>
+                            <TextBlock Text="MOTEURS" Foreground="{DynamicResource TextMuted}"
+                                       FontFamily="Segoe UI" FontSize="10"
+                                       FontWeight="SemiBold" Margin="0,2,0,8"/>
+
+                            <Grid Margin="0,0,0,10">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition/>
+                                    <ColumnDefinition Width="Auto"/>
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                                    <md:PackIcon Kind="ShieldCheck" Width="13" Height="13"
+                                                 Foreground="{DynamicResource AlertGold}" Margin="0,0,6,0"/>
+                                    <TextBlock Text="Base ClamAV" Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
+                                </StackPanel>
+                                <TextBlock x:Name="antivirusClamDbVersion" Grid.Column="1" Text="—"
+                                           Foreground="{DynamicResource AlertGold}" FontWeight="Bold" FontSize="14"
+                                           VerticalAlignment="Center" TextTrimming="CharacterEllipsis"
+                                           MaxWidth="72"/>
+                            </Grid>
+
+                            <Grid Margin="0,0,0,10">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition/>
                                     <ColumnDefinition Width="Auto"/>
@@ -207,9 +208,13 @@
                                            VerticalAlignment="Center"/>
                             </Grid>
 
-                            <Separator Background="{DynamicResource BorderColor}" Margin="0,10"/>
+                            <Separator Background="{DynamicResource BorderColor}" Margin="0,2,0,10"/>
 
-                            <Grid Margin="0,4,0,0">
+                            <TextBlock Text="ACTIVITÉ" Foreground="{DynamicResource TextMuted}"
+                                       FontFamily="Segoe UI" FontSize="10"
+                                       FontWeight="SemiBold" Margin="0,0,0,8"/>
+
+                            <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition/>
                                     <ColumnDefinition Width="Auto"/>
@@ -225,6 +230,7 @@
                         </StackPanel>
                     </Border>
                 </StackPanel>
+                </ScrollViewer>
 
                 <TabControl x:Name="antivirusMainTabs" Grid.Column="1" BorderBrush="{DynamicResource BorderColor}" BorderThickness="1" Background="{DynamicResource CardBg}">
                     <TabItem Foreground="{DynamicResource TextSecondary}">
@@ -258,7 +264,7 @@
                                                 <TextBlock Text="Analyse antivirus en cours"
                                                            FontSize="16" FontWeight="SemiBold"
                                                            Foreground="{DynamicResource TextDark}"/>
-                                                <TextBlock Text="Les moteurs ClamAV et YARA parcourent vos fichiers. Vous pouvez interrompre à tout moment."
+                                                <TextBlock Text="Vos fichiers sont analysés en profondeur. Vous pouvez interrompre à tout moment."
                                                            FontSize="11" Foreground="{DynamicResource TextMuted}"
                                                            TextWrapping="Wrap" Margin="0,4,0,0"/>
                                             </StackPanel>
@@ -366,9 +372,16 @@
                                                 <DataTemplate>
                                                     <Border CornerRadius="4" Padding="6,2" Margin="2,0"
                                                             Background="{Binding Converter={StaticResource ThreatRiskColor}}">
-                                                        <TextBlock Text="{Binding Converter={StaticResource ThreatRiskSeverity}}"
-                                                                   FontSize="10" FontWeight="Bold"
-                                                                   Foreground="White" HorizontalAlignment="Center"/>
+                                                        <StackPanel Orientation="Horizontal"
+                                                                    HorizontalAlignment="Center"
+                                                                    VerticalAlignment="Center">
+                                                            <md:PackIcon Width="12" Height="12" Foreground="White"
+                                                                         VerticalAlignment="Center" Margin="0,0,4,0"
+                                                                         Kind="{Binding Converter={StaticResource ThreatRiskIcon}}"/>
+                                                            <TextBlock Text="{Binding Converter={StaticResource ThreatRiskSeverity}}"
+                                                                       FontSize="10" FontWeight="Bold"
+                                                                       Foreground="White" VerticalAlignment="Center"/>
+                                                        </StackPanel>
                                                     </Border>
                                                 </DataTemplate>
                                             </DataGridTemplateColumn.CellTemplate>

@@ -8,10 +8,6 @@ using System.Windows.Controls;
 using System.Windows.Media;
 using System.Windows.Threading;
 using Color = System.Windows.Media.Color;
-using DataFormats = System.Windows.DataFormats;
-using DragDropEffects = System.Windows.DragDropEffects;
-// Résoudre toutes les ambiguïtés
-using DragEventArgs = System.Windows.DragEventArgs;
 using FolderBrowserDialog = System.Windows.Forms.FolderBrowserDialog;
 using OpenFileDialog = Microsoft.Win32.OpenFileDialog;
 
@@ -249,6 +245,17 @@ namespace optiSCAN.Views
             });
         }
 
+        /// <summary>Sélectionne l'onglet « Quarantaine ».</summary>
+        public void SelectQuarantineTab()
+        {
+            const int quarantineTabIndex = 1;
+            Dispatcher.InvokeAsync(() =>
+            {
+                if (antivirusMainTabs != null)
+                    antivirusMainTabs.SelectedIndex = quarantineTabIndex;
+            });
+        }
+
         /// <summary>Met à jour le panneau YARA | ClamAV (versions + dernières MAJ).</summary>
         public void UpdateSignaturesPanel(string yaraVersion, string yaraLastMaj, string clamVersion, string clamLastMaj)
         {
@@ -262,6 +269,17 @@ namespace optiSCAN.Views
                     sigClamVersion.Text = string.IsNullOrWhiteSpace(clamVersion) || clamVersion == "Inconnue" ? "—" : clamVersion;
                 if (sigClamLastMaj != null)
                     sigClamLastMaj.Text = string.IsNullOrWhiteSpace(clamLastMaj) || clamLastMaj == "—" ? "—" : clamLastMaj;
+
+                if (antivirusClamDbVersion != null)
+                {
+                    var display = string.IsNullOrWhiteSpace(clamVersion) || clamVersion == "Inconnue"
+                        ? "—"
+                        : clamVersion;
+                    antivirusClamDbVersion.Text = display;
+                    antivirusClamDbVersion.ToolTip = display == "—"
+                        ? "Base ClamAV non détectée"
+                        : $"Base ClamAV — version {display}";
+                }
             });
         }
 
@@ -304,33 +322,6 @@ namespace optiSCAN.Views
         }
 
         // ═══════════════════════════════════════════════════════════════════
-        // DRAG & DROP
-        // ═══════════════════════════════════════════════════════════════════
-
-        private void AntivirusPanel_DragOver(object sender, DragEventArgs e)
-        {
-            e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop)
-                ? DragDropEffects.Copy
-                : DragDropEffects.None;
-            e.Handled = true;
-        }
-
-        private void AntivirusPanel_Drop(object sender, DragEventArgs e)
-        {
-            if (!e.Data.GetDataPresent(DataFormats.FileDrop)) return;
-            var paths = (string[])e.Data.GetData(DataFormats.FileDrop);
-            if (paths == null || paths.Length == 0) return;
-
-            string target = paths[0];
-            if (VM == null) return;
-
-            if (System.IO.Directory.Exists(target) && VM.ScanFolderCommand.CanExecute(target))
-                VM.ScanFolderCommand.Execute(target);
-            else if (System.IO.File.Exists(target) && VM.ScanFileCommand.CanExecute(target))
-                VM.ScanFileCommand.Execute(target);
-        }
-
-        // ═══════════════════════════════════════════════════════════════════
         // HANDLERS — actions via ServiceContainer.AntivirusActions (sans remonter vers MainWindow).
         // ═══════════════════════════════════════════════════════════════════
 
@@ -352,7 +343,10 @@ namespace optiSCAN.Views
         private void BtnIgnoreThreat_Click(object sender, RoutedEventArgs e)
         {
             if (sender is System.Windows.Controls.Button btn && btn.Tag is string filePath)
+            {
                 Actions.IgnoreThreat(filePath);
+                RefreshAllData();
+            }
         }
 
         private void BtnDeleteThreat_Click(object sender, RoutedEventArgs e)
