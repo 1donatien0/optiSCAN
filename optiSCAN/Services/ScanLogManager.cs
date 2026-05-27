@@ -86,16 +86,22 @@ namespace optiSCAN.Services
         // ── Journal texte ───────────────────────────────────────────────────────
 
         /// <summary>
-        /// Écrit une ligne horodatée dans le journal texte.
+        /// Écrit une ligne horodatée dans le journal texte (append-only, non atomique).
+        /// En cas de crash brutal, seule la dernière écriture peut être tronquée ;
+        /// les lignes précédentes restent intactes.
         /// </summary>
         public void WriteToLog(string message)
         {
             try
             {
+                EnsureDirectory(_logDir);
                 var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}";
                 File.AppendAllText(_textLogPath, line + Environment.NewLine, Encoding.UTF8);
             }
-            catch { /* Jamais lever d'exception dans les logs */ }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ScanLogManager", "WriteToLog", ex);
+            }
         }
 
         /// <summary>

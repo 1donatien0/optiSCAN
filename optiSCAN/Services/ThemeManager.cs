@@ -1,6 +1,7 @@
 using MaterialDesignThemes.Wpf;
 using Microsoft.Win32;
 using optiSCAN.Services;
+using System.Windows.Threading;
 
 namespace optiSCAN
 {
@@ -11,7 +12,9 @@ namespace optiSCAN
     /// </summary>
     public static class ThemeManager
     {
-        private static bool _isDarkTheme = false; // Light par défaut
+        private static bool _isDarkTheme = false; // Clair par défaut
+        private static DispatcherTimer? _windowsThemeWatchTimer;
+        private static bool? _lastWindowsDarkTheme;
 
         public static event EventHandler<bool>? ThemeChanged;
 
@@ -43,11 +46,13 @@ namespace optiSCAN
                 ApplyTheme(dark);
                 prefs.DarkTheme = dark;
                 prefs.Save();
+                StartWindowsThemeWatcher();
             }
             else
             {
                 _isDarkTheme = prefs.DarkTheme;
                 ApplyTheme(prefs.DarkTheme);
+                StopWindowsThemeWatcher();
             }
         }
 
@@ -74,6 +79,7 @@ namespace optiSCAN
         {
             var prefs = UserPreferences.Current;
             prefs.SyncWindowsTheme = false;
+            StopWindowsThemeWatcher();
             Apply(!IsDarkTheme);
         }
 
@@ -97,7 +103,67 @@ namespace optiSCAN
                 _isDarkTheme = dark;
                 ApplyTheme(dark);
                 prefs.DarkTheme = dark;
+                _lastWindowsDarkTheme = dark;
+                StartWindowsThemeWatcher();
             }
+            else
+            {
+                StopWindowsThemeWatcher();
+            }
+            prefs.Save();
+        }
+
+        private static void StartWindowsThemeWatcher()
+        {
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher == null)
+                return;
+
+            if (!dispatcher.CheckAccess())
+            {
+                _ = dispatcher.InvokeAsync(StartWindowsThemeWatcher);
+                return;
+            }
+
+            _windowsThemeWatchTimer ??= new DispatcherTimer(
+                TimeSpan.FromSeconds(2),
+                DispatcherPriority.Background,
+                (_, _) => SyncWithWindowsIfChanged(),
+                dispatcher);
+
+            if (!_windowsThemeWatchTimer.IsEnabled)
+                _windowsThemeWatchTimer.Start();
+        }
+
+        private static void StopWindowsThemeWatcher()
+        {
+            var dispatcher = System.Windows.Application.Current?.Dispatcher;
+            if (dispatcher == null)
+                return;
+
+            if (!dispatcher.CheckAccess())
+            {
+                _ = dispatcher.InvokeAsync(StopWindowsThemeWatcher);
+                return;
+            }
+
+            _windowsThemeWatchTimer?.Stop();
+            _lastWindowsDarkTheme = null;
+        }
+
+        private static void SyncWithWindowsIfChanged()
+        {
+            var prefs = UserPreferences.Current;
+            if (!prefs.SyncWindowsTheme)
+                return;
+
+            bool dark = IsWindowsAppsDarkTheme();
+            if (_lastWindowsDarkTheme.HasValue && _lastWindowsDarkTheme.Value == dark)
+                return;
+
+            _lastWindowsDarkTheme = dark;
+            IsDarkTheme = dark;
+            prefs.DarkTheme = dark;
             prefs.Save();
         }
 

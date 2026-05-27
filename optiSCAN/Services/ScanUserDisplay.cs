@@ -1,4 +1,6 @@
 using System.IO;
+using System.Text.RegularExpressions;
+using optiSCAN.Localization;
 using optiSCAN.Models;
 
 namespace optiSCAN.Services
@@ -9,37 +11,61 @@ namespace optiSCAN.Services
     /// </summary>
     internal static class ScanUserDisplay
     {
+        private static readonly Regex FileCountInMessageRegex = new(
+            @"(\d[\d\s]*\s*fichiers?\s*analys|\d[\d\s]*\s*files?\s*scann)",
+            RegexOptions.IgnoreCase | RegexOptions.Compiled | RegexOptions.CultureInvariant);
+
         public static string ScanStarting(ScanType type, string? path = null) => type switch
         {
-            ScanType.QuickScan => "Analyse rapide en cours…",
-            ScanType.FullScan => "Analyse complète en cours…",
-            ScanType.Folder => $"Analyse du dossier : {path}",
-            ScanType.File => $"Analyse du fichier : {Path.GetFileName(path ?? "")}",
-            _ => "Analyse en cours…"
+            ScanType.QuickScan => LocalizationService.GetString("Scan_QuickStarting"),
+            ScanType.FullScan => LocalizationService.GetString("Scan_FullStarting"),
+            ScanType.Folder => LocalizationService.Format("Scan_FolderStarting", path ?? ""),
+            ScanType.File => LocalizationService.Format("Scan_FileStarting", Path.GetFileName(path ?? "")),
+            _ => LocalizationService.GetString("Scan_DefaultStarting"),
         };
 
-        public static string Preparation => "Préparation de l'analyse…";
-        public static string Ready => "Prêt — analyse disponible.";
-        public static string ReadyDegraded => "Analyse limitée — vérifiez les signatures dans Antivirus.";
+        public static string Preparation => LocalizationService.GetString("Scan_Preparation");
+        public static string Ready => LocalizationService.GetString("Scan_Ready");
+        public static string ReadyDegraded => LocalizationService.GetString("Scan_ReadyDegraded");
 
         /// <summary>Convertit un message technique de progression en libellé utilisateur.</summary>
         public static string ForProgressMessage(string? raw)
         {
             if (string.IsNullOrWhiteSpace(raw))
-                return "Analyse en cours…";
+                return LocalizationService.GetString("Scan_InProgress");
 
             var m = StripEnginePrefixes(raw.Trim());
 
             if (m.StartsWith("Cible ", StringComparison.OrdinalIgnoreCase))
-                m = "Zone " + m["Cible ".Length..];
+                m = LocalizationService.GetString("Scan_ZonePrefix") + m["Cible ".Length..];
+            else if (m.StartsWith("Target ", StringComparison.OrdinalIgnoreCase))
+                m = LocalizationService.GetString("Scan_ZonePrefix") + m["Target ".Length..];
 
             if (m.StartsWith("scan récursif de", StringComparison.OrdinalIgnoreCase)
                 || m.StartsWith("démarrage", StringComparison.OrdinalIgnoreCase)
-                || m.StartsWith("règle ", StringComparison.OrdinalIgnoreCase))
-                return "Analyse en cours…";
+                || m.StartsWith("règle ", StringComparison.OrdinalIgnoreCase)
+                || m.StartsWith("recursive scan", StringComparison.OrdinalIgnoreCase)
+                || m.StartsWith("starting", StringComparison.OrdinalIgnoreCase)
+                || m.StartsWith("rule ", StringComparison.OrdinalIgnoreCase))
+                return LocalizationService.GetString("Scan_InProgress");
 
-            if (m.Contains("fichiers analysés", StringComparison.OrdinalIgnoreCase))
+            if (FileCountInMessageRegex.IsMatch(m))
                 return m;
+
+            return m;
+        }
+
+        /// <summary>
+        /// Remplace un compteur local dans le message (ex. fin de zone ClamAV) par le cumul session.
+        /// </summary>
+        public static string SyncFileCountInMessage(string? raw, int cumulativeFilesScanned)
+        {
+            var m = ForProgressMessage(raw);
+            if (cumulativeFilesScanned <= 0)
+                return m;
+
+            if (FileCountInMessageRegex.IsMatch(m))
+                return LocalizationService.Format("Scan_FilesProgress", cumulativeFilesScanned);
 
             return m;
         }

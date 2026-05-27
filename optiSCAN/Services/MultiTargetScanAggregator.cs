@@ -50,10 +50,10 @@ namespace optiSCAN.Services
                     });
                 }
 
-                var targetProgress = CreateBaselineProgress(progress, filesBaseline);
-                var sub = await scanOneAsync(target, targetProgress, ct).ConfigureAwait(false);
+                var relay = new ScanProgressRelay(filesBaseline);
+                var sub = await scanOneAsync(target, relay.ToParent(progress), ct).ConfigureAwait(false);
 
-                filesBaseline += Math.Max(0, sub.FilesScanned);
+                filesBaseline = Math.Max(filesBaseline, Math.Max(relay.FilesScannedHigh, sub.FilesScanned));
                 merged.FilesScanned = filesBaseline;
                 merged.FilesSkipped += sub.FilesSkipped;
                 merged.TotalBytesScanned += sub.TotalBytesScanned;
@@ -79,40 +79,6 @@ namespace optiSCAN.Services
             merged.FinishedAt = DateTime.Now;
             merged.Status = ct.IsCancellationRequested ? ScanStatus.Cancelled : ScanStatus.Completed;
             return merged;
-        }
-
-        /// <summary>
-        /// Ajoute le cumul des cibles déjà terminées pour éviter que l'UI repasse de 12 000 à 12
-        /// au début d'un petit dossier (Startup, etc.) ou lors des messages YARA locaux.
-        /// </summary>
-        private static IProgress<ScanProgress>? CreateBaselineProgress(
-            IProgress<ScanProgress>? parent,
-            int filesBaseline)
-        {
-            if (parent == null || filesBaseline <= 0)
-                return parent;
-
-            return new Progress<ScanProgress>(p =>
-            {
-                var r = p.Clone();
-                r.FilesScanned = AdjustFilesScannedForBaseline(p, filesBaseline);
-
-                // Barre % : TotalFiles ne concerne que la cible courante ; si le cumul dépasse
-                // ce total (autre moteur / autre dossier), on masque le pourcentage trompeur.
-                if (r.TotalFiles > 0 && r.FilesScanned > r.TotalFiles)
-                    r.TotalFiles = 0;
-
-                parent.Report(r);
-            });
-        }
-
-        private static int AdjustFilesScannedForBaseline(ScanProgress p, int baseline)
-        {
-            if (p.FilesScanned > 0)
-                return baseline + p.FilesScanned;
-
-            // Messages YARA sans compteur ou phase démarrage : conserver le cumul affiché.
-            return baseline;
         }
 
         private static bool ThreatsMatch(ThreatInfo a, ThreatInfo b) =>

@@ -3,6 +3,7 @@ using System.IO;
 using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Text.RegularExpressions;
+using optiSCAN.Strings;
 
 namespace optiSCAN.Services
 {
@@ -32,7 +33,7 @@ namespace optiSCAN.Services
         private string _effectiveCvdCertsDir;
 
         private static readonly Uri ClamAvRootCertUri =
-            new("https://raw.githubusercontent.com/Cisco-Talos/clamav/main/certs/clamav.crt", UriKind.Absolute);
+            new(OptiscanStrings.Urls.ClamAvRootCertRaw, UriKind.Absolute);
 
         private System.Threading.Timer? _autoUpdateTimer;
         private CancellationTokenSource? _currentCts;
@@ -54,33 +55,13 @@ namespace optiSCAN.Services
 
         public FreshclamUpdater(string? clamavDir = null)
         {
-            var dir = clamavDir ?? ResolveClamAvDir();
+            var dir = clamavDir ?? ClamAvDatabasePaths.ResolveClamAvBinDir("freshclam.exe");
 
             _freshclamExe = Path.Combine(dir, "freshclam.exe");
             _databaseDir = ClamAvDatabasePaths.ResolveWritableDatabaseDir(dir);
             _freshclamConf = Path.Combine(dir, "freshclam.conf");
             _certsDir = Path.Combine(dir, "certs");
             _effectiveCvdCertsDir = _certsDir;
-        }
-
-        private static string ResolveClamAvDir()
-        {
-            var baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            var arch = Environment.Is64BitProcess ? "x64" : "x86";
-
-            var candidates = new[]
-            {
-                Path.Combine(baseDir, "clamav", arch),
-                Path.Combine(baseDir, "clamav"),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "ClamAV"),
-                Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86), "ClamAV"),
-            };
-
-            foreach (var candidate in candidates)
-                if (File.Exists(Path.Combine(candidate, "freshclam.exe")))
-                    return candidate;
-
-            return Path.Combine(baseDir, "clamav");
         }
 
         // ── Mise à jour automatique ───────────────────────────────────────────────
@@ -159,7 +140,7 @@ namespace optiSCAN.Services
                     result.Success = true;
                     result.Message = "freshclam.exe non trouvé — signatures locales utilisées.";
                     result.AlreadyUpToDate = true;
-                    OnOutput("freshclam.exe introuvable — mise à jour ignorée.");
+                    SurSortieFreshclam("freshclam.exe introuvable — mise à jour ignorée.");
                     return result;
                 }
 
@@ -168,7 +149,7 @@ namespace optiSCAN.Services
                 {
                     result.Success = false;
                     result.Message = "Pas de connexion réseau — mise à jour reportée.";
-                    OnOutput("[NET] Aucune connexion réseau détectée.");
+                    SurSortieFreshclam("[NET] Aucune connexion réseau détectée.");
                     return result;
                 }
 
@@ -209,14 +190,14 @@ namespace optiSCAN.Services
                 proc.OutputDataReceived += (_, e) =>
                 {
                     if (e.Data == null) return;
-                    OnOutput(e.Data);
+                    SurSortieFreshclam(e.Data);
                     if (e.Data.Contains("up-to-date", StringComparison.OrdinalIgnoreCase) ||
                         e.Data.Contains("up to date", StringComparison.OrdinalIgnoreCase))
                         result.AlreadyUpToDate = true;
                 };
                 proc.ErrorDataReceived += (_, e) =>
                 {
-                    if (e.Data != null) OnOutput($"[ERR] {e.Data}");
+                    if (e.Data != null) SurSortieFreshclam($"[ERR] {e.Data}");
                 };
 
                 using (token.Register(() =>
@@ -225,7 +206,7 @@ namespace optiSCAN.Services
                     {
                         if (!proc.HasExited)
                         {
-                            OnOutput(UiLogText.Info("Annulation : arrêt du process freshclam…"));
+                            SurSortieFreshclam(UiLogText.Info("Annulation : arrêt du process freshclam…"));
                             proc.Kill(entireProcessTree: true);
                         }
                     }
@@ -413,7 +394,7 @@ namespace optiSCAN.Services
                         if (age > StaleLockAge)
                         {
                             File.Delete(lockPath);
-                            OnOutput(UiLogText.Info($"Verrou orphelin supprimé : {Path.GetFileName(lockPath)}"));
+                            SurSortieFreshclam(UiLogText.Info($"Verrou orphelin supprimé : {Path.GetFileName(lockPath)}"));
                         }
                     }
                     catch (Exception ex)
@@ -482,227 +463,47 @@ namespace optiSCAN.Services
         /// </summary>
         private string? EnsureConfExists()
         {
-            // 1. Cible préférée : LocalAppData\optiSCAN\clamav\freshclam.conf
             var fallbackDir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "optiSCAN", "clamav");
             var fallbackConf = Path.Combine(fallbackDir, "freshclam.conf");
 
-            // Si un conf existant a une directive CVDCertsDirectory cassée
-            // (héritée d'une ancienne version d'optiSCAN), on le supprime
-            // pour forcer la régénération propre. Sinon freshclam plante
-            // avec exit code 2 et "Invalid certs directory".
-            InvalidateConfIfBroken(fallbackConf);
-            InvalidateConfIfBroken(_freshclamConf);
-
-            var primary = TryWriteConf(fallbackConf);
-            if (primary != null)
-            {
-                // 2. Best effort : si un conf corrompu (BOM) traîne dans le
-                //    dossier ClamAV d'origine, on tente de le réparer pour
-                //    éviter toute confusion future.
-                TryRepairLegacyConf();
-                return primary;
-            }
-
-            // 3. Dernier recours : conf à côté de freshclam.exe
-            return TryWriteConf(_freshclamConf);
+            return FreshclamConfSupport.EnsureWritableConf(
+                fallbackConf,
+                _freshclamConf,
+                _ => BuildConfBytes(),
+                path => SurSortieFreshclam(UiLogText.Info($"freshclam.conf réparé (BOM retiré) : {path}")));
         }
 
-        /// <summary>
-        /// Détecte les freshclam.conf générés par les anciennes versions
-        /// d'optiSCAN qui contenaient une ligne CVDCertsDirectory pointant
-        /// vers un dossier vide. Ces conf font crasher freshclam à l'init.
-        /// On les renomme en .bak pour forcer la régénération sans la
-        /// directive problématique.
-        /// </summary>
-        private void InvalidateConfIfBroken(string confPath)
+        private byte[]? BuildConfBytes()
         {
             try
             {
-                if (!File.Exists(confPath)) return;
-
-                var content = File.ReadAllText(confPath);
-
-                // Marque de version : si le conf n'a pas "generated by optiSCAN v"
-                // c'est un conf legacy potentiellement cassé.
-                if (IsOurManagedConf(content))
-                    return;
-
-                // Conf legacy : on le renomme pour forcer la régénération.
-                var bak = confPath + ".v1.bak";
-                try
-                {
-                    if (File.Exists(bak)) File.Delete(bak);
-                    File.Move(confPath, bak);
-                    AppLogger.Info("FreshclamUpdater",
-                        $"Conf legacy renommé en {Path.GetFileName(bak)} — régénération à venir");
-                }
-                catch (Exception ex)
-                {
-                    // Si on ne peut pas le renommer (droits), on tente une suppression
-                    // directe — sinon on laisse le conf en place avec un warning.
-                    try { File.Delete(confPath); AppLogger.Info("FreshclamUpdater", "Conf legacy supprimé"); }
-                    catch { AppLogger.Warn("FreshclamUpdater", $"Conf legacy non remplaçable: {confPath}", ex); }
-                }
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Warn("FreshclamUpdater", $"InvalidateConfIfBroken {confPath}", ex);
-            }
-        }
-
-        /// <summary>
-        /// Tente de réparer (réécrire sans BOM) ou supprimer le freshclam.conf
-        /// historique situé à côté de freshclam.exe s'il est corrompu.
-        /// Best effort uniquement — un échec ici n'empêche pas la mise à jour
-        /// puisque --config-file pointe vers la copie LocalAppData.
-        /// </summary>
-        private void TryRepairLegacyConf()
-        {
-            try
-            {
-                if (!File.Exists(_freshclamConf)) return;
-                if (!HasUtf8Bom(_freshclamConf)) return;
-
-                // 1. Tentative de réécriture sans BOM
-                if (TryWriteConf(_freshclamConf) != null)
-                {
-                    OnOutput(UiLogText.Info($"freshclam.conf réparé (BOM retiré) : {_freshclamConf}"));
-                    return;
-                }
-
-                // 2. Sinon on tente de le renommer pour qu'il ne soit plus chargé
-                //    par défaut (au cas où --config-file serait ignoré).
-                var bak = _freshclamConf + ".bom-corrupt.bak";
-                try
-                {
-                    if (File.Exists(bak)) File.Delete(bak);
-                    File.Move(_freshclamConf, bak);
-                    OnOutput(UiLogText.Info($"freshclam.conf corrompu déplacé vers {Path.GetFileName(bak)}"));
-                }
-                catch (Exception ex)
-                {
-                    AppLogger.Warn("FreshclamUpdater", "TryRepairLegacyConf rename", ex);
-                    OnOutput(UiLogText.Warn("freshclam.conf corrompu détecté dans Program Files — exécutez fix-freshclam-conf.ps1 en admin pour le réparer."));
-                }
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Warn("FreshclamUpdater", "TryRepairLegacyConf", ex);
-            }
-        }
-
-        /// <summary>
-        /// Tente d'écrire un freshclam.conf valide au chemin donné. Retourne le chemin
-        /// si succès, null si l'écriture a échoué.
-        ///
-        /// Utilise <see cref="File.WriteAllBytes(string, byte[])"/> avec un buffer
-        /// ASCII manuel : ainsi on garantit l'absence absolue de BOM, indépendamment
-        /// du comportement de l'API <c>StreamWriter</c> / encoding par défaut.
-        /// </summary>
-        private string? TryWriteConf(string targetPath)
-        {
-            try
-            {
-                var dir = Path.GetDirectoryName(targetPath);
-                if (!string.IsNullOrEmpty(dir))
-                    Directory.CreateDirectory(dir);
-
                 Directory.CreateDirectory(_databaseDir);
+                var dbDirForConf = FreshclamConfSupport.NormalizePathForConf(_databaseDir);
+                var logForConf = FreshclamConfSupport.NormalizePathForConf(ResolveWritableLogPath());
+                var includeCerts = HasUsableRootCert();
+                var certsDir = includeCerts
+                    ? FreshclamConfSupport.NormalizePathForConf(_effectiveCvdCertsDir)
+                    : null;
 
-                // freshclam parse les chemins de manière sensible aux backslashes.
-                // Sur Windows on normalise en forward slashes pour éviter toute
-                // ambiguïté avec les séquences d'échappement.
-                var dbDirForConf = NormalizePathForConf(_databaseDir);
-                var logPath = ResolveWritableLogPath();
-                var logForConf = NormalizePathForConf(logPath);
-
-                // Marque de version : permet à EnsureConfExists de détecter
-                // un conf généré par une ancienne version d'optiSCAN qui contenait
-                // une directive CVDCertsDirectory cassée, et de le régénérer.
-                var lines = new List<string>
-                {
-                    $"# freshclam.conf generated by optiSCAN v{ProductVersionInfo.ConfMarkerMajor}",
-                    $"DatabaseDirectory \"{dbDirForConf}\"",
-                };
-
-                if (HasUsableRootCert())
-                {
-                    lines.Add($"CVDCertsDirectory \"{NormalizePathForConf(_effectiveCvdCertsDir)}\"");
-                }
-
-                lines.AddRange(new[]
-                {
-                    $"UpdateLogFile \"{logForConf}\"",
-                    "LogTime yes",
-                    "LogVerbose no",
-                    "DatabaseMirror database.clamav.net",
-                    "MaxAttempts 3",
-                    "ConnectTimeout 30",
-                    "ReceiveTimeout 30",
-                });
-
-                // ClamAV 1.5+ : vérification des signatures CVD — exige clamav.crt
-                // dans CVDCertsDirectory (ou CVD_CERTS_DIR). On déploie le fichier
-                // depuis clamav/certs de l'app ou %LocalAppData% si Program Files
-                // est en lecture seule (cf. EnsureCodeSigningCertificatesPresentAsync).
-
-                // Construction binaire pour garantir 0 BOM, peu importe l'API .NET utilisée.
-                // freshclam.conf ne contient que de l'ASCII (paths Windows + mots-clés),
-                // donc UTF8 == ASCII ici. Si un path contenait un caractère non-ASCII,
-                // l'encodage UTF-8 sans BOM s'applique automatiquement.
-                var content = string.Join("\n", lines) + "\n";
-                var bytes = new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false)
-                    .GetBytes(content);
-
-                // Sanity check : on n'écrit que si on est sûr qu'il n'y a pas de BOM
-                // dans notre buffer.
-                if (bytes.Length >= 3 && bytes[0] == 0xEF && bytes[1] == 0xBB && bytes[2] == 0xBF)
-                {
-                    AppLogger.Error("FreshclamUpdater", "BOM détecté dans le buffer — abandon");
-                    return null;
-                }
-
-                // Suppression préalable pour éviter toute fusion bizarre / ACL
-                // héritée d'une version antérieure.
-                try { if (File.Exists(targetPath)) File.Delete(targetPath); }
-                catch (UnauthorizedAccessException) { /* on tentera l'écriture quand même */ }
-                catch (IOException) { /* idem */ }
-
-                File.WriteAllBytes(targetPath, bytes);
-
-                // Vérification post-écriture — si jamais le système a injecté un BOM
-                // (cas très rare avec Defender / outils tiers), on échoue proprement.
-                if (HasUtf8Bom(targetPath))
-                {
-                    AppLogger.Error("FreshclamUpdater", $"BOM détecté APRÈS écriture: {targetPath}");
-                    try { File.Delete(targetPath); }
-                    catch (Exception delEx)
-                    {
-                        AppLogger.Warn("FreshclamUpdater", $"Suppression conf invalide : {targetPath}", delEx);
-                    }
-                    return null;
-                }
-
-                AppLogger.Info("FreshclamUpdater", $"Conf généré : {targetPath}");
-                return targetPath;
-            }
-            catch (UnauthorizedAccessException ex)
-            {
-                AppLogger.Warn("FreshclamUpdater", $"TryWriteConf {targetPath}: accès refusé", ex);
-                return null;
+                return FreshclamConfSupport.BuildConfBytes(
+                    ProductVersionInfo.ConfMarkerMajor,
+                    dbDirForConf,
+                    logForConf,
+                    includeCerts,
+                    certsDir);
             }
             catch (Exception ex)
             {
-                AppLogger.Error("FreshclamUpdater", $"TryWriteConf {targetPath}", ex);
+                AppLogger.Error("FreshclamUpdater", "BuildConfBytes", ex);
                 return null;
             }
         }
 
         /// <summary>
-        /// Détermine un chemin de log writable. Retourne le chemin dans le dossier
-        /// database s'il est accessible en écriture, sinon un fallback dans
+        /// Détermine un chemin de log inscriptible. Retourne le chemin dans le dossier
+        /// base de données s'il est accessible en écriture, sinon une solution de repli dans
         /// LocalAppData (évite les échecs sur Program Files sans admin).
         /// </summary>
         private string ResolveWritableLogPath()
@@ -719,31 +520,9 @@ namespace optiSCAN.Services
                 var fallbackDir = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     "optiSCAN", "logs");
-                try { Directory.CreateDirectory(fallbackDir); } catch { /* best effort */ }
+                try { Directory.CreateDirectory(fallbackDir); } catch { /* approche prudente */ }
                 return Path.Combine(fallbackDir, "freshclam.log");
             }
-        }
-
-        /// <summary>
-        /// Normalise un chemin Windows pour le fichier de configuration freshclam :
-        /// les backslashes deviennent des forward slashes (acceptés par freshclam
-        /// sur Windows et plus sûrs vis-à-vis du parser).
-        /// </summary>
-        private static string NormalizePathForConf(string path)
-            => path.Replace('\\', '/');
-
-        /// <summary>Détecte la présence du BOM UTF-8 (0xEF 0xBB 0xBF) en début de fichier.</summary>
-        private static bool HasUtf8Bom(string path)
-        {
-            try
-            {
-                using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-                if (fs.Length < 3) return false;
-                var bom = new byte[3];
-                _ = fs.Read(bom, 0, 3);
-                return bom[0] == 0xEF && bom[1] == 0xBB && bom[2] == 0xBF;
-            }
-            catch { return false; }
         }
 
         private static string ReadFileHeader(string path, int maxBytes)
@@ -779,9 +558,6 @@ namespace optiSCAN.Services
             catch { return "Inconnue"; }
         }
 
-        private static bool IsOurManagedConf(string content) =>
-            Regex.IsMatch(content, @"generated\s+by\s+optiSCAN\s+v\d+", RegexOptions.IgnoreCase);
-
         private bool HasUsableRootCert()
         {
             try
@@ -813,7 +589,7 @@ namespace optiSCAN.Services
                     if (File.Exists(bundled))
                     {
                         File.Copy(bundled, dest, overwrite: true);
-                        OnOutput($"Certificat CVD (clamav.crt) : {dest}");
+                        SurSortieFreshclam($"Certificat CVD (clamav.crt) : {dest}");
                     }
                     return File.Exists(dest) && new FileInfo(dest).Length >= 256;
                 }
@@ -839,11 +615,11 @@ namespace optiSCAN.Services
             {
                 _effectiveCvdCertsDir = fallback;
                 if (!string.Equals(_effectiveCvdCertsDir, _certsDir, StringComparison.OrdinalIgnoreCase))
-                    OnOutput($"Certificats CVD (hors Program Files) : {_effectiveCvdCertsDir}");
+                    SurSortieFreshclam($"Certificats CVD (hors Program Files) : {_effectiveCvdCertsDir}");
                 return;
             }
 
-            OnOutput(UiLogText.Warn("clamav.crt introuvable — vérifiez l'installation ou la connexion réseau."));
+            SurSortieFreshclam(UiLogText.Warn("clamav.crt introuvable — vérifiez l'installation ou la connexion réseau."));
         }
 
         private static async Task TryDownloadClamAvRootCertAsync(string destDir, CancellationToken ct)
@@ -864,7 +640,7 @@ namespace optiSCAN.Services
             }
         }
 
-        private void OnOutput(string line)
+        private void SurSortieFreshclam(string line)
             => UpdateOutput?.Invoke(this, line);
     }
 
