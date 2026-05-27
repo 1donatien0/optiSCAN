@@ -142,7 +142,11 @@ namespace optiSCAN.Services
 </head>
 <body>
 <header>
-  <div class=""logo"">🛡</div>
+  <div class=""logo"" aria-hidden=""true"">
+    <svg xmlns=""http://www.w3.org/2000/svg"" width=""28"" height=""28"" viewBox=""0 0 24 24"" fill=""currentColor"">
+      <path d=""M12 1 3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z""/>
+    </svg>
+  </div>
   <div>
     <h1>Rapport optiSCAN</h1>
     <div class=""meta"">Généré le {now:dddd dd MMMM yyyy à HH:mm} · optiSCAN {ProductVersionInfo.ReleaseLabel} ({ProductVersionInfo.SemVer})</div>
@@ -188,8 +192,8 @@ namespace optiSCAN.Services
             foreach (var s in scanList)
             {
                 string badge = s.ThreatsFound == 0
-                    ? "<span class=\"badge badge-ok\">✓ Propre</span>"
-                    : $"<span class=\"badge badge-err\">⚠ {s.ThreatsFound} menace(s)</span>";
+                    ? "<span class=\"badge badge-ok\">Propre</span>"
+                    : $"<span class=\"badge badge-err\">{s.ThreatsFound} menace(s)</span>";
 
                 sb.AppendLine($@"      <tr>
         <td>{s.StartedAt:dd/MM/yyyy HH:mm}</td>

@@ -108,7 +108,7 @@ namespace optiSCAN.Services
                                         riskCol.Item().Row(row =>
                                         {
                                             row.AutoItem()
-                                                .Text($"{riskAssessment.Icon}  {riskAssessment.Severity}")
+                                                .Text(riskAssessment.Severity)
                                                 .FontSize(16).Bold();
                                             row.Spacing(20);
                                             row.AutoItem()
@@ -170,7 +170,7 @@ namespace optiSCAN.Services
                                     .Background(Colors.Green.Lighten3)
                                     .Padding(10)
                                     .AlignCenter()
-                                    .Text("✅ Aucune menace détectée")
+                                    .Text("Aucune menace détectée")
                                     .FontSize(12)
                                     .FontColor(Colors.Green.Darken2);
                             }

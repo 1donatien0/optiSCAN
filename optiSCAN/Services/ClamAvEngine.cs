@@ -203,7 +203,7 @@ namespace optiSCAN.Services
 
             progress?.Report(new ScanProgress
             {
-                Message = $"ClamAV — démarrage : {Path.GetFileName(targetPath)}",
+                Message = $"Analyse de {Path.GetFileName(targetPath)}…",
                 Phase = ScanPhase.Starting,
                 CurrentFilePath = targetPath,
             });
@@ -274,7 +274,7 @@ namespace optiSCAN.Services
             MultiTargetScanAggregator.AggregateAsync(
                 type,
                 targets,
-                t => RunScanAsync(type, t, recursive: true, progress, ct),
+                (t, targetProgress, token) => RunScanAsync(type, t, recursive: true, targetProgress, token),
                 ct,
                 progress,
                 skipIfDirectoryMissing: false,
@@ -295,7 +295,11 @@ namespace optiSCAN.Services
                     return;
 
                 long fileSize = -1;
-                try { fileSize = new FileInfo(filePath).Length; } catch { }
+                try { fileSize = new FileInfo(filePath).Length; }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn("ClamAvEngine", $"Taille fichier indisponible : {filePath}", ex);
+                }
 
                 var threat = new ThreatInfo
                 {
@@ -327,7 +331,7 @@ namespace optiSCAN.Services
                 // clamscan (autorité absolue) — remplace l'estimation incrémentale.
                 progress?.Report(new ScanProgress
                 {
-                    Message = $"ClamAV : {result.FilesScanned} fichiers analysés.",
+                    Message = $"{result.FilesScanned:N0} fichiers analysés.",
                     Phase = ScanPhase.Scanning,
                     FilesScanned = result.FilesScanned,
                     ThreatsFound = result.ThreatsFound,
@@ -350,7 +354,7 @@ namespace optiSCAN.Services
                 {
                     progress?.Report(new ScanProgress
                     {
-                        Message = $"ClamAV : {result.FilesScanned} fichiers analysés…",
+                        Message = $"{result.FilesScanned:N0} fichiers analysés…",
                         Phase = ScanPhase.Scanning,
                         FilesScanned = result.FilesScanned,
                         ThreatsFound = result.ThreatsFound,
@@ -434,7 +438,10 @@ namespace optiSCAN.Services
             using (ct.Register(() =>
             {
                 try { if (!proc.HasExited) proc.Kill(entireProcessTree: true); }
-                catch { }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn("ClamAvEngine", "Annulation — arrêt clamscan", ex);
+                }
                 tcs.TrySetCanceled();
             }))
             {

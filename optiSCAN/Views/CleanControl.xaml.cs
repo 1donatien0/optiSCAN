@@ -274,7 +274,11 @@ namespace optiSCAN.Views
                 long total = 0;
                 foreach (var f in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
                 {
-                    try { total += new FileInfo(f).Length; } catch { }
+                    try { total += new FileInfo(f).Length; }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Warn("CleanControl", $"Mesure ignorée : {f}", ex);
+                    }
                 }
                 return total;
             }
@@ -293,7 +297,16 @@ namespace optiSCAN.Views
             {
                 foreach (var f in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
                 {
-                    try { long s = new FileInfo(f).Length; File.Delete(f); freed += s; } catch { }
+                    try
+                    {
+                        long s = new FileInfo(f).Length;
+                        File.Delete(f);
+                        freed += s;
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Warn("CleanControl", $"Fichier non supprimé : {f}", ex);
+                    }
                 }
             }
             catch (Exception ex)
