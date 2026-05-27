@@ -106,7 +106,7 @@ namespace optiSCAN.Services
                 Level = finalLevel,
                 Severity = GetSeverityString(finalLevel),
                 Color = GetSeverityColor(finalLevel),
-                Icon = GetSeverityIcon(finalLevel),
+                IconKind = GetSeverityIconKind(finalLevel),
                 Recommendation = GetRecommendation(finalLevel, threat),
                 Reasons = reasons
             };
@@ -129,7 +129,7 @@ namespace optiSCAN.Services
             {
                 Severity = "AUCUNE MENACE",
                 Color = "#27AE60",
-                Icon = "✅",
+                IconKind = UiIconKinds.Success,
                 Recommendation = "Système sain."
             };
         }
@@ -246,13 +246,7 @@ namespace optiSCAN.Services
             _ => "#27AE60"
         };
 
-        private static string GetSeverityIcon(RiskLevel level) => level switch
-        {
-            RiskLevel.Critical => "⚠️⚠️",
-            RiskLevel.Major => "⚠️",
-            RiskLevel.Minor => "📌",
-            _ => "ℹ️"
-        };
+        private static string GetSeverityIconKind(RiskLevel level) => UiIconKinds.ForRiskLevel(level);
 
         private static string GetRecommendation(RiskLevel level, ThreatInfo threat) => level switch
         {
@@ -283,7 +277,8 @@ namespace optiSCAN.Services
         public RiskLevel Level { get; set; }
         public string Severity { get; set; } = string.Empty;
         public string Color { get; set; } = string.Empty;
-        public string Icon { get; set; } = string.Empty;
+        /// <summary>Nom <see cref="MaterialDesignThemes.Wpf.PackIconKind"/> (ex. Alert, CheckCircle).</summary>
+        public string IconKind { get; set; } = string.Empty;
         public string Recommendation { get; set; } = string.Empty;
         public List<string> Reasons { get; set; } = new();
     }

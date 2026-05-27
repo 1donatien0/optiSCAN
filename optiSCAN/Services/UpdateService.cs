@@ -2,15 +2,35 @@
 
 namespace optiSCAN.Services
 {
+    /// <summary>État du contrôle de mise à jour du binaire optiSCAN (pas des signatures).</summary>
+    public enum AppUpdateChannelStatus
+    {
+        /// <summary>Dossier de staging prêt ; aucun flux OTA distant configuré.</summary>
+        NotConfigured,
+
+        /// <summary>Erreur d'accès au dossier local de préparation.</summary>
+        StagingError,
+    }
+
+    /// <summary>Résultat explicite — évite les MessageBox codés en dur dans l'UI.</summary>
+    public sealed class AppUpdateCheckResult
+    {
+        public AppUpdateChannelStatus Status { get; init; }
+        public string CurrentVersion { get; init; } = string.Empty;
+        public string ReleaseLabel { get; init; } = string.Empty;
+        public string StagingDirectory { get; init; } = string.Empty;
+        public string UserMessage { get; init; } = string.Empty;
+        public bool Success => Status == AppUpdateChannelStatus.NotConfigured;
+    }
+
     /// <summary>
-    /// Mises à jour du binaire optiSCAN (OTA / delta). Les signatures antivirus sont
-    /// gérées par <see cref="FreshclamUpdater"/> et les règles par <see cref="YaraForgeUpdater"/>.
+    /// Mises à jour du binaire optiSCAN. Les signatures sont gérées par
+    /// <see cref="FreshclamUpdater"/> et <see cref="YaraForgeUpdater"/>.
     /// </summary>
     /// <remarks>
-    /// Aucun canal de téléchargement du binaire applicatif n'est encore relié ici.
-    /// <see cref="optiSCAN.MainWindow"/> n'appelle plus cette API au démarrage tant que l'OTA
-    /// n'est pas implémentée (manifest signé + téléchargement vérifié). Réactiver
-    /// l'appel depuis l'UI uniquement lorsque le flux complet sera branché ici.
+    /// OTA non implémenté volontairement : pas de téléchargement ni de signature de manifeste
+    /// tant qu'un canal de distribution n'est pas défini. Cette classe prépare le staging
+    /// local et retourne un message utilisateur cohérent.
     /// </remarks>
     public class UpdateService
     {
@@ -19,28 +39,51 @@ namespace optiSCAN.Services
             "optiSCAN", "Updates");
 
         /// <summary>
-        /// Vérifie la présence du dossier de staging et journalise l'état.
-        /// Pas de téléchargement distant tant qu'aucun canal de distribution n'est branché.
+        /// Prépare le dossier de staging et décrit l'état du canal applicatif.
         /// </summary>
-        public Task CheckAndPrepareUpdatesAsync()
+        public Task<AppUpdateCheckResult> CheckForUpdatesAsync()
         {
+            var version = ProductVersionInfo.SemVer;
+            var release = ProductVersionInfo.ReleaseLabel;
+
             try
             {
                 if (!Directory.Exists(_localUpdatePath))
                     Directory.CreateDirectory(_localUpdatePath);
 
                 AppLogger.Info("UpdateService",
-                    "Contrôle applicatif : aucune mise à jour OTA configurée (dossier staging prêt). " +
-                    "Utilisez les mises à jour signatures dans l'onglet Antivirus.");
+                    $"Canal OTA applicatif non configuré — version locale {release} ({version}), staging : {_localUpdatePath}");
+
+                return Task.FromResult(new AppUpdateCheckResult
+                {
+                    Status = AppUpdateChannelStatus.NotConfigured,
+                    CurrentVersion = version,
+                    ReleaseLabel = release,
+                    StagingDirectory = _localUpdatePath,
+                    UserMessage =
+                        $"Version installée : {release} ({version})\n\n" +
+                        "optiSCAN ne télécharge pas encore les mises à jour du programme en arrière-plan.\n\n" +
+                        "• Signatures ClamAV et règles YARA : Antivirus → onglet Signatures.\n" +
+                        "• Nouvelle version du programme : https://sourceforge.net/projects/optiscan/\n\n" +
+                        $"Dossier de préparation local : {_localUpdatePath}",
+                });
             }
             catch (Exception ex)
             {
-                AppLogger.Warn("UpdateService", "Préparation dossier mises à jour", ex);
+                AppLogger.Error("UpdateService", "Préparation dossier mises à jour", ex);
+                return Task.FromResult(new AppUpdateCheckResult
+                {
+                    Status = AppUpdateChannelStatus.StagingError,
+                    CurrentVersion = version,
+                    ReleaseLabel = release,
+                    StagingDirectory = _localUpdatePath,
+                    UserMessage =
+                        $"Version installée : {release} ({version})\n\n" +
+                        $"Impossible de préparer le dossier de mises à jour :\n{ex.Message}\n\n" +
+                        "Signatures : onglet Antivirus → Signatures.\n" +
+                        "Programme : https://sourceforge.net/projects/optiscan/",
+                });
             }
-
-            return Task.CompletedTask;
         }
-
-        public Task CheckForUpdatesAsync() => CheckAndPrepareUpdatesAsync();
     }
 }

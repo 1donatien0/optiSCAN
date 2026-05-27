@@ -142,20 +142,6 @@
                            Background="{DynamicResource BorderSubtle}"
                            Margin="0,6,0,6"/>
 
-                <!-- Statut ClamAV -->
-                <Border DockPanel.Dock="Bottom"
-                        Background="{DynamicResource SurfaceBg}"
-                        CornerRadius="8" Margin="10,0,10,4" Padding="12,8">
-                    <StackPanel>
-                        <TextBlock Text="ClamAV" FontSize="10" Foreground="{DynamicResource TextMuted}"/>
-                        <TextBlock x:Name="txtSidebarAntivirusStatus"
-                                   Text="Vérification..."
-                                   FontSize="12" FontWeight="SemiBold"
-                                   Margin="0,2,0,0"
-                                   Foreground="{DynamicResource SuccessGreen}"/>
-                    </StackPanel>
-                </Border>
-
                 <!-- Navigation RadioButtons -->
                 <StackPanel DockPanel.Dock="Top">
 
@@ -173,7 +159,8 @@
                     </RadioButton>
 
                     <!-- Nettoyer -->
-                    <RadioButton Style="{StaticResource NavItem}"
+                    <RadioButton x:Name="navClean"
+                                 Style="{StaticResource NavItem}"
                                  Tag="Clean"
                                  Checked="NavItem_Checked">
                         <StackPanel Orientation="Horizontal">
@@ -184,7 +171,8 @@
                     </RadioButton>
 
                     <!-- Antivirus -->
-                    <RadioButton Style="{StaticResource NavItem}"
+                    <RadioButton x:Name="navAntivirus"
+                                 Style="{StaticResource NavItem}"
                                  Tag="Antivirus"
                                  Checked="NavItem_Checked">
                         <StackPanel Orientation="Horizontal">
@@ -192,16 +180,23 @@
                                          VerticalAlignment="Center" Margin="0,0,12,0"/>
                             <StackPanel VerticalAlignment="Center">
                                 <TextBlock Text="Antivirus" FontSize="13"/>
-                                <TextBlock x:Name="txtSidebarClamAvBadge"
-                                           Text="ClamAV ✅"
-                                           FontSize="10"
-                                           Foreground="{DynamicResource SuccessGreen}"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,1,0,0">
+                                    <md:PackIcon x:Name="icoSidebarClamAv"
+                                                 Kind="ShieldCheck" Width="10" Height="10"
+                                                 VerticalAlignment="Center" Margin="0,0,4,0"
+                                                 Foreground="{DynamicResource SuccessGreen}"/>
+                                    <TextBlock x:Name="txtSidebarClamAvBadge"
+                                               Text="ClamAV actif"
+                                               FontSize="10"
+                                               Foreground="{DynamicResource SuccessGreen}"/>
+                                </StackPanel>
                             </StackPanel>
                         </StackPanel>
                     </RadioButton>
 
                     <!-- Historique -->
-                    <RadioButton Style="{StaticResource NavItem}"
+                    <RadioButton x:Name="navHistory"
+                                 Style="{StaticResource NavItem}"
                                  Tag="History"
                                  Checked="NavItem_Checked">
                         <StackPanel Orientation="Horizontal">
@@ -212,7 +207,8 @@
                     </RadioButton>
 
                     <!-- Options -->
-                    <RadioButton Style="{StaticResource NavItem}"
+                    <RadioButton x:Name="navOptions"
+                                 Style="{StaticResource NavItem}"
                                  Tag="Options"
                                  Checked="NavItem_Checked">
                         <StackPanel Orientation="Horizontal">
@@ -260,7 +256,7 @@
 
                     <!-- Gauche : statut + icône -->
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
-                        <md:PackIcon Kind="CheckboxMarked" Width="14" Height="14"
+                        <md:PackIcon x:Name="statusFooterIcon" Kind="CheckboxMarked" Width="14" Height="14"
                                      Foreground="{DynamicResource SuccessGreen}"
                                      VerticalAlignment="Center" Margin="0,0,6,0"/>
                         <TextBlock x:Name="lblStatus"

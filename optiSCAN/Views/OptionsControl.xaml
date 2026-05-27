@@ -162,9 +162,9 @@
                             <TextBlock Text="Quarantaine automatique"
                                        FontSize="13" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextDark}"/>
-                            <TextBlock Text="Les menaces détectées sont immédiatement isolées"
+                            <TextBlock Text="Toute menace détectée (analyse manuelle, temps réel ou planifiée) est mise en quarantaine — jamais supprimée automatiquement"
                                        FontSize="11" Foreground="{DynamicResource TextMuted}"
-                                       Margin="0,3,0,0"/>
+                                       Margin="0,3,0,0" TextWrapping="Wrap"/>
                         </StackPanel>
                     </StackPanel>
 

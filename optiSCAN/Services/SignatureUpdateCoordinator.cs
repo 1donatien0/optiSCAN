@@ -25,8 +25,8 @@ namespace optiSCAN.Services
             {
                 var clam = await freshclam.UpdateAsync(cancellationToken).ConfigureAwait(false);
                 appendLog(clam.Success
-                    ? $"✅ ClamAV : {clam.Message}"
-                    : $"❌ ClamAV : {clam.Message}");
+                    ? UiLogText.Ok($"ClamAV : {clam.Message}")
+                    : UiLogText.Error($"ClamAV : {clam.Message}"));
                 if (!clam.Success)
                     ok = false;
             }
@@ -39,8 +39,8 @@ namespace optiSCAN.Services
                 var progress = new Progress<string>(appendLog);
                 var rulesResult = await rules.UpdateAsync(progress, cancellationToken).ConfigureAwait(false);
                 appendLog(rulesResult.Success
-                    ? $"✅ Règles : {rulesResult.Message}"
-                    : $"❌ Règles : {rulesResult.Message}");
+                    ? UiLogText.Ok($"Règles : {rulesResult.Message}")
+                    : UiLogText.Error($"Règles : {rulesResult.Message}"));
                 if (!rulesResult.Success)
                     ok = false;
             }
