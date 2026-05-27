@@ -4,18 +4,20 @@ using optiSCAN.Models;
 namespace optiSCAN.Services
 {
     /// <summary>
-    /// Gère les notifications toast Windows natives.
-    /// Nécessite le package Microsoft.Toolkit.Uwp.Notifications.
+    /// Notifications toast Windows natives.
+    /// Les actions (quarantaine, ignorer, navigation…) sont traitées via <see cref="ToastActivated"/>.
     /// </summary>
     public class NotificationService
     {
         private bool _toastsEnabled = true;
+        private static bool _activationHooked;
+
+        /// <summary>Émis sur le thread du callback toolkit — le handler doit marshaler vers l'UI WPF.</summary>
+        public event EventHandler<ToastActivationEventArgs>? ToastActivated;
 
         public NotificationService()
         {
-            // Callback d'activation des toasts — corps vide, nécessaire pour que
-            // le Compat manager s'initialise correctement en WPF .NET 8.
-            ToastNotificationManagerCompat.OnActivated += _ => { };
+            EnsureActivationHook();
         }
 
         public bool IsEnabled
@@ -24,9 +26,40 @@ namespace optiSCAN.Services
             set => _toastsEnabled = value;
         }
 
-        /// <summary>
-        /// Affiche une notification de menace détectée
-        /// </summary>
+        /// <summary>Aligne l'état sur <see cref="UserPreferences.ActionNotificationsEnabled"/>.</summary>
+        public void SyncFromUserPreferences()
+        {
+            _toastsEnabled = UserPreferences.Current.ActionNotificationsEnabled;
+        }
+
+        private static void EnsureActivationHook()
+        {
+            if (_activationHooked) return;
+            _activationHooked = true;
+            ToastNotificationManagerCompat.OnActivated += OnToastActivatedStatic;
+        }
+
+        private static void OnToastActivatedStatic(ToastNotificationActivatedEventArgsCompat e)
+        {
+            try
+            {
+                var parsed = ToastArguments.Parse(e.Argument);
+                var action = parsed.Get("action") ?? string.Empty;
+                var file = parsed.Get("file");
+                var virus = parsed.Get("virus");
+
+                var args = new ToastActivationEventArgs(action, file, virus);
+                ServiceContainer.Default.Notifications.DispatchActivation(args);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("NotificationService", "OnActivated", ex);
+            }
+        }
+
+        internal void DispatchActivation(ToastActivationEventArgs args) =>
+            ToastActivated?.Invoke(this, args);
+
         public void ShowThreatDetected(ThreatInfo threat)
         {
             if (!_toastsEnabled) return;
@@ -39,15 +72,18 @@ namespace optiSCAN.Services
                     .AddArgument("action", "threat")
                     .AddArgument("file", threat.FilePath)
                     .AddArgument("virus", threat.VirusName)
-                    .AddText("⚠️ Menace détectée !")
+                    .AddText("Menace détectée")
                     .AddText(threat.VirusName)
                     .AddText($"{threat.FileName} • {severity}")
                     .AddButton(new ToastButton()
                         .SetContent("Mettre en quarantaine")
-                        .AddArgument("action", "quarantine"))
+                        .AddArgument("action", "quarantine")
+                        .AddArgument("file", threat.FilePath)
+                        .AddArgument("virus", threat.VirusName))
                     .AddButton(new ToastButton()
                         .SetContent("Ignorer")
-                        .AddArgument("action", "ignore"))
+                        .AddArgument("action", "ignore")
+                        .AddArgument("file", threat.FilePath))
                     .AddButton(new ToastButton()
                         .SetContent("Ouvrir optiSCAN")
                         .AddArgument("action", "open"))
@@ -60,9 +96,6 @@ namespace optiSCAN.Services
             }
         }
 
-        /// <summary>
-        /// Affiche une notification de mise en quarantaine
-        /// </summary>
         public void ShowQuarantined(ThreatInfo threat)
         {
             if (!_toastsEnabled) return;
@@ -71,7 +104,7 @@ namespace optiSCAN.Services
             {
                 new ToastContentBuilder()
                     .AddArgument("action", "quarantined")
-                    .AddText("🔒 Fichier mis en quarantaine")
+                    .AddText("Fichier mis en quarantaine")
                     .AddText($"{threat.FileName} → {threat.VirusName}")
                     .AddButton(new ToastButton()
                         .SetContent("Voir quarantaine")
@@ -84,9 +117,6 @@ namespace optiSCAN.Services
             }
         }
 
-        /// <summary>
-        /// Affiche une notification de scan terminé
-        /// </summary>
         public void ShowScanCompleted(int threatsFound, int filesScanned)
         {
             if (!_toastsEnabled) return;
@@ -96,18 +126,24 @@ namespace optiSCAN.Services
                 if (threatsFound == 0)
                 {
                     new ToastContentBuilder()
-                        .AddText("✅ Scan terminé")
+                        .AddArgument("action", "scanok")
+                        .AddText("Scan terminé")
                         .AddText($"{filesScanned} fichiers analysés, aucune menace")
                         .Show();
                 }
                 else
                 {
                     new ToastContentBuilder()
-                        .AddText($"⚠️ Scan terminé — {threatsFound} menace(s)")
+                        .AddArgument("action", "scanthreats")
+                        .AddArgument("threats", threatsFound.ToString())
+                        .AddText($"Scan terminé — {threatsFound} menace(s)")
                         .AddText("Consultez l'historique pour plus de détails")
                         .AddButton(new ToastButton()
                             .SetContent("Ouvrir l'historique")
                             .AddArgument("action", "history"))
+                        .AddButton(new ToastButton()
+                            .SetContent("Ouvrir optiSCAN")
+                            .AddArgument("action", "open"))
                         .Show();
                 }
             }
@@ -117,9 +153,6 @@ namespace optiSCAN.Services
             }
         }
 
-        /// <summary>
-        /// Affiche une notification de mise à jour disponible
-        /// </summary>
         public void ShowUpdateAvailable(string version)
         {
             if (!_toastsEnabled) return;
@@ -127,7 +160,8 @@ namespace optiSCAN.Services
             try
             {
                 new ToastContentBuilder()
-                    .AddText("🔄 Mises à jour disponibles")
+                    .AddArgument("action", "update")
+                    .AddText("Mises à jour disponibles")
                     .AddText($"Nouvelles signatures ClamAV v{version}")
                     .AddButton(new ToastButton()
                         .SetContent("Mettre à jour")
@@ -140,9 +174,6 @@ namespace optiSCAN.Services
             }
         }
 
-        /// <summary>
-        /// Affiche une notification de démarrage de la protection temps réel
-        /// </summary>
         public void ShowRealTimeProtectionStarted()
         {
             if (!_toastsEnabled) return;
@@ -150,7 +181,8 @@ namespace optiSCAN.Services
             try
             {
                 new ToastContentBuilder()
-                    .AddText("🛡️ Protection temps réel activée")
+                    .AddArgument("action", "rtpstarted")
+                    .AddText("Protection temps réel activée")
                     .AddText("optiSCAN surveille les fichiers en arrière-plan")
                     .SetToastDuration(ToastDuration.Short)
                     .Show();
@@ -160,6 +192,20 @@ namespace optiSCAN.Services
                 AppLogger.Error("NotificationService", "ShowRealTimeProtectionStarted", ex);
             }
         }
+    }
 
+    /// <summary>Action demandée depuis un toast Windows.</summary>
+    public sealed class ToastActivationEventArgs : EventArgs
+    {
+        public ToastActivationEventArgs(string action, string? filePath, string? virusName)
+        {
+            Action = action ?? string.Empty;
+            FilePath = filePath;
+            VirusName = virusName;
+        }
+
+        public string Action { get; }
+        public string? FilePath { get; }
+        public string? VirusName { get; }
     }
 }

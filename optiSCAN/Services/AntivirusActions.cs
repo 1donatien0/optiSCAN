@@ -51,8 +51,8 @@ namespace optiSCAN.Services
 
             bool ok = _quarantine.Quarantine(threat);
             return Complete(ok,
-                ok ? $"✅ Fichier mis en quarantaine : {Path.GetFileName(threat.FilePath)}"
-                   : $"❌ Échec quarantaine : {Path.GetFileName(threat.FilePath)}");
+                ok ? UiLogText.Ok($"Fichier mis en quarantaine : {Path.GetFileName(threat.FilePath)}")
+                   : UiLogText.Error($"Échec quarantaine : {Path.GetFileName(threat.FilePath)}"));
         }
 
         private static ThreatInfo ResolveThreatForPath(string filePath)
@@ -73,11 +73,21 @@ namespace optiSCAN.Services
 
         public ActionResult IgnoreThreat(string filePath)
         {
-            // « Ignorer » = ne fait rien sur le filesystem, juste un signal UI.
-            // Le fichier reste mais l'utilisateur a explicitement déclaré qu'il
-            // n'est pas malveillant. On loggue pour traçabilité.
-            AppLogger.Info("AntivirusActions", $"Menace ignorée par l'utilisateur : {filePath}");
-            return Complete(true, $"⚠️ Fichier ignoré : {Path.GetFileName(filePath)}", isWarning: true);
+            if (string.IsNullOrWhiteSpace(filePath))
+                return Complete(false, "Chemin de fichier invalide.", isError: true);
+
+            if (!ExclusionSettings.Current.AddFile(filePath))
+            {
+                if (ExclusionSettings.Current.IsFileExcluded(filePath))
+                    return Complete(true, $"Déjà exclu des analyses : {Path.GetFileName(filePath)}", isWarning: true);
+
+                return Complete(false, $"Impossible d'exclure : {Path.GetFileName(filePath)}", isError: true);
+            }
+
+            AppLogger.Info("AntivirusActions", $"Fichier exclu des analyses : {filePath}");
+            return Complete(true,
+                UiLogText.Warn($"Fichier exclu des analyses : {Path.GetFileName(filePath)}"),
+                isWarning: true);
         }
 
         public ActionResult DeleteThreatFile(string filePath)
@@ -87,14 +97,14 @@ namespace optiSCAN.Services
                 if (File.Exists(filePath))
                 {
                     File.Delete(filePath);
-                    return Complete(true, $"🗑️ Fichier supprimé : {Path.GetFileName(filePath)}");
+                    return Complete(true, UiLogText.Ok($"Fichier supprimé : {Path.GetFileName(filePath)}"));
                 }
                 return Complete(false, $"Fichier déjà absent : {Path.GetFileName(filePath)}");
             }
             catch (Exception ex)
             {
                 AppLogger.Error("AntivirusActions", $"DeleteThreatFile {filePath}", ex);
-                return Complete(false, $"❌ Erreur suppression : {ex.Message}", isError: true);
+                return Complete(false, UiLogText.Error($"Erreur suppression : {ex.Message}"), isError: true);
             }
         }
 
@@ -104,8 +114,8 @@ namespace optiSCAN.Services
         {
             bool ok = _quarantine.Restore(quarantineId);
             return Complete(ok,
-                ok ? "✅ Fichier restauré depuis la quarantaine"
-                   : "❌ Restauration impossible (chemin sensible, manifest invalide ou disque)",
+                ok ? UiLogText.Ok("Fichier restauré depuis la quarantaine")
+                   : UiLogText.Error("Restauration impossible (chemin sensible, manifest invalide ou disque)"),
                 isError: !ok);
         }
 
@@ -113,8 +123,8 @@ namespace optiSCAN.Services
         {
             bool ok = _quarantine.DeletePermanently(quarantineId);
             return Complete(ok,
-                ok ? "🗑️ Fichier supprimé définitivement de la quarantaine"
-                   : "❌ Suppression impossible",
+                ok ? UiLogText.Ok("Fichier supprimé définitivement de la quarantaine")
+                   : UiLogText.Error("Suppression impossible"),
                 isError: !ok);
         }
 
@@ -128,7 +138,7 @@ namespace optiSCAN.Services
             try { _rules.CancelUpdate(); }
             catch (Exception ex) { AppLogger.Warn("AntivirusActions", "Cancel rules", ex); }
 
-            Complete(true, "⏹️ Mise à jour interrompue par l'utilisateur");
+            Complete(true, UiLogText.Info("Mise à jour interrompue par l'utilisateur"));
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────────

@@ -225,7 +225,7 @@ namespace optiSCAN.Services
                     {
                         if (!proc.HasExited)
                         {
-                            OnOutput("⏹️ Annulation : arrêt du process freshclam...");
+                            OnOutput(UiLogText.Info("Annulation : arrêt du process freshclam…"));
                             proc.Kill(entireProcessTree: true);
                         }
                     }
@@ -413,7 +413,7 @@ namespace optiSCAN.Services
                         if (age > StaleLockAge)
                         {
                             File.Delete(lockPath);
-                            OnOutput($"🧹 Verrou orphelin supprimé : {Path.GetFileName(lockPath)}");
+                            OnOutput(UiLogText.Info($"Verrou orphelin supprimé : {Path.GetFileName(lockPath)}"));
                         }
                     }
                     catch (Exception ex)
@@ -568,7 +568,7 @@ namespace optiSCAN.Services
                 // 1. Tentative de réécriture sans BOM
                 if (TryWriteConf(_freshclamConf) != null)
                 {
-                    OnOutput($"🔧 freshclam.conf réparé (BOM retiré) : {_freshclamConf}");
+                    OnOutput(UiLogText.Info($"freshclam.conf réparé (BOM retiré) : {_freshclamConf}"));
                     return;
                 }
 
@@ -579,12 +579,12 @@ namespace optiSCAN.Services
                 {
                     if (File.Exists(bak)) File.Delete(bak);
                     File.Move(_freshclamConf, bak);
-                    OnOutput($"🔧 freshclam.conf corrompu déplacé vers {Path.GetFileName(bak)}");
+                    OnOutput(UiLogText.Info($"freshclam.conf corrompu déplacé vers {Path.GetFileName(bak)}"));
                 }
                 catch (Exception ex)
                 {
                     AppLogger.Warn("FreshclamUpdater", "TryRepairLegacyConf rename", ex);
-                    OnOutput("⚠️ freshclam.conf corrompu détecté dans Program Files — exécutez fix-freshclam-conf.ps1 en admin pour le réparer.");
+                    OnOutput(UiLogText.Warn("freshclam.conf corrompu détecté dans Program Files — exécutez fix-freshclam-conf.ps1 en admin pour le réparer."));
                 }
             }
             catch (Exception ex)
@@ -677,7 +677,11 @@ namespace optiSCAN.Services
                 if (HasUtf8Bom(targetPath))
                 {
                     AppLogger.Error("FreshclamUpdater", $"BOM détecté APRÈS écriture: {targetPath}");
-                    try { File.Delete(targetPath); } catch { }
+                    try { File.Delete(targetPath); }
+                    catch (Exception delEx)
+                    {
+                        AppLogger.Warn("FreshclamUpdater", $"Suppression conf invalide : {targetPath}", delEx);
+                    }
                     return null;
                 }
 
@@ -839,7 +843,7 @@ namespace optiSCAN.Services
                 return;
             }
 
-            OnOutput("⚠️ clamav.crt introuvable — vérifiez l'installation ou la connexion réseau.");
+            OnOutput(UiLogText.Warn("clamav.crt introuvable — vérifiez l'installation ou la connexion réseau."));
         }
 
         private static async Task TryDownloadClamAvRootCertAsync(string destDir, CancellationToken ct)

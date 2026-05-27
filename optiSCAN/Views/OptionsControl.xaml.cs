@@ -145,6 +145,7 @@ namespace optiSCAN.Views
                 case "Notifications":
                     prefs.ActionNotificationsEnabled = isOn;
                     prefs.Save();
+                    c.Notifications.IsEnabled = isOn;
                     break;
 
                 case "AutoStart":
@@ -271,26 +272,30 @@ namespace optiSCAN.Views
             if (txtNewExclusion != null) txtNewExclusion.Text = string.Empty;
         }
 
-        private void BtnCheckAppUpdate_Click(object sender, RoutedEventArgs e)
+        private async void BtnCheckAppUpdate_Click(object sender, RoutedEventArgs e)
         {
-            _ = Task.Run(async () =>
+            AppUpdateCheckResult result;
+            try
             {
-                try
+                result = await new UpdateService().CheckForUpdatesAsync().ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("OptionsControl", "CheckForUpdatesAsync", ex);
+                result = new AppUpdateCheckResult
                 {
-                    var svc = new UpdateService();
-                    await svc.CheckForUpdatesAsync().ConfigureAwait(false);
-                }
-                catch { /* ignoré */ }
-            });
+                    Status = AppUpdateChannelStatus.StagingError,
+                    CurrentVersion = ProductVersionInfo.SemVer,
+                    ReleaseLabel = ProductVersionInfo.ReleaseLabel,
+                    UserMessage = $"Erreur lors du contrôle : {ex.Message}",
+                };
+            }
 
             System.Windows.MessageBox.Show(
-                "optiSCAN ne télécharge pas encore les mises à jour de l’application en arrière-plan.\n\n" +
-                "• Signatures ClamAV + règles YARA : onglet Antivirus → Signatures.\n" +
-                "• Nouvelle version du programme : https://sourceforge.net/projects/optiscan/\n\n" +
-                "Un dossier local de préparation des mises à jour a été vérifié / créé.",
+                result.UserMessage,
                 "Mise à jour applicative",
                 MessageBoxButton.OK,
-                MessageBoxImage.Information);
+                result.Success ? MessageBoxImage.Information : MessageBoxImage.Warning);
         }
 
         private async void BtnOpenSourceForge_Click(object sender, RoutedEventArgs e)

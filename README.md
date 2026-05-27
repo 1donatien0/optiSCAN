@@ -1,9 +1,9 @@
-# Guide Complet — optiSCAN v5.0
+# Guide Complet — optiSCAN v6.0
 
 > **Version de référence.** Ce guide décrit l'architecture, les modules et les procédures
-> de la version **v5.0** du produit (build **5.0.0**, édition ClamAV). Architecture mono-fenêtre avec services avancés + Donaby Design System.
+> de la version **v6.0** du produit (build **6.0.0**, édition ClamAV). Architecture mono-fenêtre avec services avancés + Donaby Design System.
 >
-> **Nomenclature (comme v1.0 … v4.0)** — **v5.0** : nom de release (documentation, CLUF). **5.0.0** : identifiant d’assembly et d’installateur (`Directory.Build.props`, Inno Setup).
+> **Nomenclature (comme v1.0 … v5.0)** — **v6.0** : nom de release (documentation, CLUF). **6.0.0** : identifiant d’assembly et d’installateur (`Directory.Build.props`, Inno Setup).
 >
 > **Design system : Donaby Design** — thème sombre/clair dynamique, tokens DynamicResource WPF.
 > Développé par **© 2026 Donatien Byakombe (Dona By)**.
@@ -32,10 +32,10 @@
 
 | Critère | WPF | MAUI | C++ natif |
 |---|---|---|---|
-| Compatibilité Windows | ✅ Natif | ⚠ Multi-plateforme (overhead) | ✅ Natif |
-| Intégration ClamAV | ✅ Process.Start / TCP clamd | ✅ Process.Start | ✅ libclamav directe |
-| MVVM + Binding UI | ✅ Excellent | ⚠ Différent | ❌ Manuel |
-| **Verdict** | **✅ Retenu** | Non nécessaire | Non nécessaire |
+| Compatibilité Windows | Oui — natif | Partiel — multi-plateforme (overhead) | Oui — natif |
+| Intégration ClamAV | Oui — Process.Start / TCP clamd | Oui — Process.Start | Oui — libclamav directe |
+| MVVM + Binding UI | Oui — excellent | Partiel — différent | Non — manuel |
+| **Verdict** | **Retenu** | Non nécessaire | Non nécessaire |
 
 ---
 
@@ -159,9 +159,17 @@ https://www.clamav.net/downloads#otherversions
 → Windows → clamav-X.Y.Z.win.x64.zip   ← ZIP, pas MSI, pas ARM64
 ```
 
-> ⚠ La version `win.arm64` cause l'erreur `0xc000007b` sur les machines Intel/AMD.
+> **Attention :** la version `win.arm64` cause l'erreur `0xc000007b` sur les machines Intel/AMD.
 
 ### 3.2 Placer les binaires dans le projet
+
+> **Clone git seul** — les binaires ClamAV et YARA ne sont pas versionnés (`bin/` est ignoré). Sans eux, l’application démarre mais ne peut pas analyser. Vérification :
+>
+> ```powershell
+> .\scripts\verify-runtime-deps.ps1
+> ```
+>
+> Au démarrage, optiSCAN journalise aussi l’état via `RuntimeDependencies` (`optiscan-*.log`).
 
 ```
 <racine du dépôt>/optiSCAN/clamav/x64/
@@ -170,6 +178,14 @@ https://www.clamav.net/downloads#otherversions
     ├── freshclam.exe
     ...
 ```
+
+Dossiers attendus à côté de `optiSCAN.exe` (publish ou debug) :
+
+| Dossier | Contenu minimal |
+|---|---|
+| `clamav/x64/` (ou `x86/`) | `clamscan.exe`, `freshclam.exe` recommandé |
+| `yara/` | `yara64.exe`, `yarac64.exe` (ou `32` en processus x86) |
+| `rules/` | Au moins un fichier `.yar` (paquet initial ou MAJ YARA-Forge) |
 
 ### 3.3 Première mise à jour des signatures
 
@@ -201,7 +217,7 @@ après la date textuelle (le premier champ est une date lisible, pas un entier).
 
 ---
 
-## 4. Architecture mono-fenêtre (v5.0)
+## 4. Architecture mono-fenêtre (v6.0)
 
 Les sous-sections **4.1** à **4.11** suivent une lecture « produit » : navigation et panneaux, détail du panneau Antivirus, menaces et pipeline, options techniques (MAJ, exclusions, quarantaine, logs), exports, puis contenu de la vue d’ensemble.
 
@@ -221,7 +237,7 @@ Raccourcis clavier : `Ctrl+1` … `Ctrl+5` (`KeyboardShortcuts`) — ordre des p
 
 ### 4.2 Fenêtre principale et icône
 
-L'interface v5.0 repose sur la fenêtre principale (`MainWindow`) et la barre latérale de navigation ; il n'y a pas d'icône dédiée dans la zone de notification système dans cette branche. L'icône `optiSCAN.ico` sert à la fenêtre, à la barre des tâches et à l'installateur.
+L'interface v6.0 repose sur la fenêtre principale (`MainWindow`) et la barre latérale de navigation ; il n'y a pas d'icône dédiée dans la zone de notification système dans cette branche. L'icône `optiSCAN.ico` sert à la fenêtre, à la barre des tâches et à l'installateur.
 
 ### 4.3 Panneau Antivirus (`NavigateTo("Antivirus")`)
 
@@ -248,7 +264,7 @@ Chaque ligne du tableau des menaces (`antivirusThreatsGrid`) propose deux action
 
 En bas du tableau, le bouton **Tout mettre en quarantaine** (`BtnQuarantineAll_Click`) traite toutes les menaces listées en une seule opération.
 
-> ⚠ Toujours préférer la quarantaine à la suppression directe — elle permet de restaurer le fichier en cas de faux positif.
+> **Attention :** toujours préférer la quarantaine à la suppression directe — elle permet de restaurer le fichier en cas de faux positif.
 
 ### 4.5 Pipeline de détection en parallèle
 
@@ -381,7 +397,7 @@ Instance unique : **`ServiceContainer.Default.ScheduledScan`** (partagée avec *
 
 ---
 
-## 6. Workflow utilisateur optiSCAN v5.0
+## 6. Workflow utilisateur optiSCAN v6.0
 
 ```
 DÉMARRAGE (UI)
@@ -419,15 +435,15 @@ L’application est publiée en **`asInvoker`** (`app.manifest`) : exécution av
 
 | Technique | Impact |
 |---|---|
-| `IsClamAvInstalled()` cache 60 s | ✅ Évite un `clamscan --version` à chaque changement d’onglet |
-| Pipeline parallèle (Task.WhenAll) | ✅ ClamAV + YARA simultanés sur chaque cible |
-| `MultiTargetScanAggregator` dédup | ✅ Pas de doublons si cibles qui se chevauchent |
-| Règles pré-compilées (_compiled.yarc) | ✅ Scan comportemental accéléré |
-| SemaphoreSlim(3) RTP | ✅ `RealTimeProtection` (activable depuis Options) |
-| Scan rapide limité aux dossiers critiques | ✅ `ScanTargets.QuickScanTargets()` |
-| ExclusionSettings.Current (singleton lazy) | ✅ Pas de rechargement JSON par fichier |
-| ServiceContainer (singleton services) | ✅ Une instance ClamAV/YARA/orchestrateur pour toute l’app |
-| ThemeManager + UserPreferences | ✅ Bascule de thème sans redémarrage |
+| `IsClamAvInstalled()` cache 60 s | Évite un `clamscan --version` à chaque changement d’onglet |
+| Pipeline parallèle (Task.WhenAll) | ClamAV + YARA simultanés sur chaque cible |
+| `MultiTargetScanAggregator` dédup | Pas de doublons si cibles qui se chevauchent |
+| Règles pré-compilées (_compiled.yarc) | Scan comportemental accéléré |
+| SemaphoreSlim(3) RTP | `RealTimeProtection` (activable depuis Options) |
+| Scan rapide limité aux dossiers critiques | `ScanTargets.QuickScanTargets()` |
+| ExclusionSettings.Current (singleton lazy) | Pas de rechargement JSON par fichier |
+| ServiceContainer (singleton services) | Une instance ClamAV/YARA/orchestrateur pour toute l’app |
+| ThemeManager + UserPreferences | Bascule de thème sans redémarrage |
 
 ### Faux positifs
 
@@ -444,7 +460,7 @@ Add-MpPreference -ExclusionPath "C:\Program Files\optiSCAN\clamav\database"
 
 ---
 
-## 8. Packaging final (v5.0)
+## 8. Packaging final (v6.0)
 
 Exécuter depuis la **racine du dépôt** (dossier contenant `optiSCAN.sln`). La sortie du profil **FolderProfile** est `optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\` (chemin attendu par `installer\setup.iss`).
 
@@ -467,14 +483,14 @@ $pub = ".\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64"
 & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" .\installer\setup.iss
 ```
 
-Sortie typique : `installer\output\optiSCAN_Setup_v5.0.0.exe` (versions dans `#define` de `setup.iss`).
+Sortie typique : `installer\output\optiSCAN_Setup_v6.0.0.exe` (versions dans `#define` de `setup.iss`).
 
 **Variante** : `dotnet publish ... -c Release -r win-x64 -o <dossier>` avec le même dossier que **`PublishDir`** du profil **FolderProfile**, pour que **`setup.iss`** trouve `optiSCAN.exe`.
 
 **Contenu de l'installateur (~260 Mo avec signatures initiales) :**
 
 ```
-optiSCAN_Setup_v5.0.0.exe
+optiSCAN_Setup_v6.0.0.exe
     ├── optiSCAN.exe
     ├── optiSCAN.ico
     ├── *.dll (runtime .NET 8)
@@ -493,6 +509,7 @@ optiSCAN_Setup_v5.0.0.exe
 | .NET 8 WPF | 8.x | MIT | Inclus dans le runtime Windows |
 | MaterialDesignThemes | 5.3.1 | MIT | Bibliothèque UI (PackIcon, styles) |
 | QuestPDF | 2024.12.2 | Community | Rapport PDF — licence gratuite projets open-source |
+| Mise à jour binaire optiSCAN (`UpdateService`) | — | — | Canal OTA non configuré ; staging `%LocalAppData%\optiSCAN\Updates` ; signatures via Antivirus |
 | Planificateur de tâches (`schtasks.exe`) | — | — | Natif Windows — voir `ScheduledScanService` |
 | Microsoft.Toolkit.Uwp.Notifications | 7.1.3 | MIT | Toasts Windows natifs |
 | Inno Setup | 6.x | Freeware | Gratuit pour projets commerciaux |
@@ -502,6 +519,12 @@ optiSCAN_Setup_v5.0.0.exe
 ---
 
 ## 10. Historique des versions produit
+
+### v6.0 — Version majeure (publication)
+
+- **Versioning unifié** — nom **v6.0** + build **6.0.0** (`Directory.Build.props`, Inno Setup, **LICENSE.txt**, manifeste, rapports PDF/HTML)
+- **Expérience d’analyse** — libellés utilisateur unifiés (`ScanUserDisplay`) ; progression multi-cibles cumulative ; rafraîchissement Vue d’ensemble via navigation et fin de scan
+- **Antivirus** — analyse par boutons (rapide, complète, fichier, dossier) ; suppression du glisser-déposer
 
 ### v5.0 — Version majeure (publication)
 
@@ -532,12 +555,12 @@ optiSCAN_Setup_v5.0.0.exe
 
 - **Donaby Design System complet** — refonte UI vers le thème clair Donaby Light par défaut
 - **OverviewControl** — 4 cartes d'action cliquables (Border + `MouseLeftButtonUp`, sans ControlTemplate) ; cercles d'icônes neutres (`SurfaceBg`) ; carte "État Antivirus" enrichie (ClamAV + YARA en temps réel)
-- **AntivirusView** — zone drag & drop redessinée ; liste **cibles récentes** reliée à `UserPreferences`
+- **AntivirusView** — boutons d’analyse (rapide, complète, fichier, dossier) ; liste **cibles récentes** reliée à `UserPreferences`
 - **CleanControl** — Brave, **Opera**, **Vivaldi**, **Arc**, journaux Windows
 - **FreshclamUpdater** — `EnsureConfExists()` : résolution automatique du conf manquant (`x64\` → parent → `x86` → génération) ; `ResolveDbDir()` : résolution intelligente du dossier de base de données selon la hiérarchie clamav
-- ✅ Correction CS0104 `CheckBox`/`Button` ambiguous — aliases `WpfCheckBox`/`WpfButton` dans `OptionsControl.xaml.cs`
-- ✅ **README aligné code** — navigation, quarantaine AES-GCM, pipeline clamscan + YARA, RTP / planificateur / packaging
-- ✅ **MAJ auto** — `ServiceContainer` arme freshclam (4 h) + YARA-Forge (24 h) ; Options coupe/réactive les deux
+- Correction CS0104 `CheckBox`/`Button` ambiguous — aliases `WpfCheckBox`/`WpfButton` dans `OptionsControl.xaml.cs`
+- **README aligné code** — navigation, quarantaine AES-GCM, pipeline clamscan + YARA, RTP / planificateur / packaging
+- **MAJ auto** — `ServiceContainer` arme freshclam (4 h) + YARA-Forge (24 h) ; Options coupe/réactive les deux
 
 ### v2.0 — Phase 2 : Services Avancés + Donaby Design
 

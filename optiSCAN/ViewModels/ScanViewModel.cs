@@ -358,9 +358,9 @@ namespace optiSCAN.ViewModels
                 TryStep("Chargement quarantaine", () => LoadQuarantine());
 
                 if (!IsClamAvAvailable)
-                    StatusMessage = "Attention : ClamAV est introuvable. Vérifiez le dossier « clamav/x64/ » à côté de l’application.";
+                    StatusMessage = ScanUserDisplay.ReadyDegraded;
                 else
-                    StatusMessage = "Prêt — analyse ClamAV et YARA disponible.";
+                    StatusMessage = ScanUserDisplay.Ready;
 
                 AppLogger.Info("ScanViewModel", "Initialisation terminée");
                 ServiceContainer.Default.RequestScanHistoryViewsRefresh();
@@ -414,8 +414,8 @@ namespace optiSCAN.ViewModels
             ProgressValue = 0;
             FilesScanned = 0;
             ThreatsFound = 0;
-            CurrentScanItem = "Préparation des moteurs ClamAV et YARA…";
-            ScanProgressDetail = "Initialisation de l’analyse…";
+            CurrentScanItem = ScanUserDisplay.Preparation;
+            ScanProgressDetail = ScanUserDisplay.Preparation;
 
             WpfApp.Current?.Dispatcher.Invoke(() => Threats.Clear());
 
@@ -425,14 +425,7 @@ namespace optiSCAN.ViewModels
                 DisplayScanProgressRequested?.Invoke(this, EventArgs.Empty);
             }
 
-            StatusMessage = type switch
-            {
-                ScanType.QuickScan => "Analyse rapide en cours (ClamAV et YARA)…",
-                ScanType.FullScan => "Analyse complète en cours (ClamAV et YARA)…",
-                ScanType.Folder => $"Analyse du dossier : {path}",
-                ScanType.File => $"Analyse du fichier : {System.IO.Path.GetFileName(path ?? "")}",
-                _ => "Analyse en cours…"
-            };
+            StatusMessage = ScanUserDisplay.ScanStarting(type, path);
 
             _cts = new CancellationTokenSource();
             var progress = new Progress<ScanProgress>(OnScanProgress);
@@ -467,9 +460,25 @@ namespace optiSCAN.ViewModels
                         Threats.Add(t);
                 });
 
-                StatusMessage = result.SummaryDisplay;
+                int autoQuarantined = 0;
+                if (ExclusionSettings.Current.AutoQuarantineEnabled && result.Threats.Count > 0)
+                {
+                    autoQuarantined = _quarantine.QuarantineAll(result.Threats);
+                    WpfApp.Current?.Dispatcher.Invoke(LoadQuarantine);
+                }
+
+                StatusMessage = autoQuarantined > 0
+                    ? $"{result.SummaryDisplay} — {autoQuarantined} fichier(s) mis en quarantaine automatiquement."
+                    : result.SummaryDisplay;
                 FilesScanned = result.FilesScanned;
                 ThreatsFound = result.Threats.Count;
+
+                if (UserPreferences.Current.ActionNotificationsEnabled)
+                {
+                    ServiceContainer.Default.Notifications.ShowScanCompleted(
+                        result.Threats.Count,
+                        result.FilesScanned);
+                }
             }
             catch (OperationCanceledException)
             {
@@ -501,9 +510,23 @@ namespace optiSCAN.ViewModels
             // le scan derrière le rendu WPF.
             WpfApp.Current?.Dispatcher.BeginInvoke(new Action(() =>
             {
-                StatusMessage = p.Message;
-                FilesScanned = p.FilesScanned;
-                ThreatsFound = p.ThreatsFound;
+                if (p.Phase != ScanPhase.ThreatFound)
+                    StatusMessage = ScanUserDisplay.ForProgressMessage(p.Message);
+                // Ne jamais faire reculer le compteur : ClamAV et YARA publient des
+                // totaux locaux (par dossier) ; YARA peut envoyer TotalFiles=12 alors
+                // que ClamAV en est à 12 000 sur la cible précédente.
+                if (IsScanning)
+                {
+                    if (p.FilesScanned > 0)
+                        FilesScanned = Math.Max(FilesScanned, p.FilesScanned);
+                    if (p.ThreatsFound > 0)
+                        ThreatsFound = Math.Max(ThreatsFound, p.ThreatsFound);
+                }
+                else
+                {
+                    FilesScanned = p.FilesScanned;
+                    ThreatsFound = p.ThreatsFound;
+                }
 
                 if (!string.IsNullOrWhiteSpace(p.CurrentFilePath))
                     CurrentScanItem = p.CurrentFilePath;
@@ -511,31 +534,34 @@ namespace optiSCAN.ViewModels
                     && !string.IsNullOrWhiteSpace(p.ThreatInfo.FilePath))
                     CurrentScanItem = p.ThreatInfo.FilePath;
 
+                // Affichage : FilesScanned porte le cumul max pendant le scan (Clam + YARA / multi-cibles).
+                int displayedFiles = IsScanning ? FilesScanned : p.FilesScanned;
+
                 if (p.TotalFiles > 0)
                 {
-                    if (p.FilesScanned <= 0)
+                    if (displayedFiles <= 0)
                         ScanProgressDetail = $"Environ {p.TotalFiles:N0} fichier(s) à parcourir — analyse en cours…";
                     else
                     {
-                        var pctVal = Math.Min(100.0, p.PercentComplete);
-                        ScanProgressDetail = $"{p.FilesScanned:N0} / {p.TotalFiles:N0} fichiers — {(int)pctVal} %";
+                        var pctVal = Math.Min(100.0, displayedFiles * 100.0 / p.TotalFiles);
+                        ScanProgressDetail = $"{displayedFiles:N0} / {p.TotalFiles:N0} fichiers — {(int)pctVal} %";
                     }
                 }
                 else
                 {
-                    var pctComplete = p.PercentComplete;
-                    ScanProgressDetail = pctComplete >= 0
-                        ? $"{(int)Math.Min(100, pctComplete)} %"
-                        : $"{p.FilesScanned:N0} fichier(s) parcourus — total inconnu";
+                    ScanProgressDetail = displayedFiles > 0
+                        ? $"{displayedFiles:N0} fichier(s) parcourus — total inconnu"
+                        : "Analyse en cours…";
                 }
 
-                // ProgressBar : déterminée si on connaît le total, indéterminée
-                // sinon (cas ClamAV en début de scan, avant le premier --summary).
-                var pctForBar = p.PercentComplete;
+                // ProgressBar : ne pas repasser à 0 % quand YARA annonce un TotalFiles local sans compteur.
+                double pctForBar = p.TotalFiles > 0 && displayedFiles > 0
+                    ? Math.Min(100.0, displayedFiles * 100.0 / p.TotalFiles)
+                    : p.PercentComplete;
                 if (pctForBar >= 0)
                 {
                     IsIndeterminate = false;
-                    ProgressValue = pctForBar;
+                    ProgressValue = IsScanning ? Math.Max(ProgressValue, pctForBar) : pctForBar;
                 }
 
                 if (p.Phase == ScanPhase.ThreatFound && p.ThreatInfo != null)
