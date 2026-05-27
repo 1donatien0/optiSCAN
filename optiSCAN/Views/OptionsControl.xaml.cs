@@ -1,4 +1,5 @@
 using Microsoft.Win32;
+using optiSCAN.Localization;
 using optiSCAN.Models;
 using optiSCAN.Services;
 using optiSCAN.Strings;
@@ -6,9 +7,12 @@ using System.Collections.ObjectModel;
 using System.Globalization;
 using System.IO;
 using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Input;
 using WinForms = System.Windows.Forms;
 using WpfButton = System.Windows.Controls.Button;
 using WpfCheckBox = System.Windows.Controls.CheckBox;
+using WpfComboBox = System.Windows.Controls.ComboBox;
 
 namespace optiSCAN.Views
 {
@@ -20,6 +24,8 @@ namespace optiSCAN.Views
         private readonly ObservableCollection<string> _exclusions = new();
         private ScheduledScanService ScheduledScan => ServiceContainer.Default.ScheduledScan;
         private bool _suppressPreferenceEvents;
+        private string? _languageTagBeforeDropDown;
+        private int _favoriteScanIndexBeforeDropDown;
 
         public OptionsControl()
         {
@@ -66,6 +72,9 @@ namespace optiSCAN.Views
                 if (chkDarkTheme != null)
                     chkDarkTheme.IsEnabled = prefs.SyncWindowsTheme != true;
 
+                if (cmbUiLanguage != null)
+                    SelectUiLanguageCombo(prefs.UiCulture);
+
                 if (cmbFavoriteScan != null)
                 {
                     cmbFavoriteScan.SelectedIndex = prefs.FavoriteScanType switch
@@ -107,7 +116,7 @@ namespace optiSCAN.Views
             if (txtScheduledNextRun == null) return;
             if (!ScheduledScan.IsTaskExists())
             {
-                txtScheduledNextRun.Text = "Aucune tâche planifiée.";
+                txtScheduledNextRun.Text = LocalizationService.GetString("Opt_SchedNone");
                 if (btnScheduledRunNow != null) btnScheduledRunNow.IsEnabled = false;
                 if (pnlScheduleTime != null) pnlScheduleTime.IsEnabled = true;
                 return;
@@ -117,8 +126,8 @@ namespace optiSCAN.Views
             if (pnlScheduleTime != null) pnlScheduleTime.IsEnabled = false;
             var next = ScheduledScan.GetNextRunTime();
             txtScheduledNextRun.Text = next.HasValue
-                ? $"Prochaine exécution : {next.Value:dddd dd/MM/yyyy à HH:mm}"
-                : "Tâche active — prochaine exécution non lue (schtasks).";
+                ? LocalizationService.Format("Opt_SchedNextRun", next.Value.ToString("f", LocalizationService.CurrentCulture))
+                : LocalizationService.GetString("Opt_SchedActiveUnknown");
         }
 
         private static bool IsAutoStartRegistered()
@@ -185,8 +194,8 @@ namespace optiSCAN.Views
                     {
                         if (!ScheduledScan.CreateDailyScan(GetSelectedScheduleTime()))
                             System.Windows.MessageBox.Show(
-                                "Impossible de créer la tâche planifiée Windows (schtasks). Vérifiez les droits ou l’orthographe du nom d’utilisateur.",
-                                "optiSCAN — Planification",
+                                LocalizationService.GetString("Opt_SchedTaskFailed"),
+                                LocalizationService.GetString("Opt_SchedTaskTitle"),
                                 MessageBoxButton.OK,
                                 MessageBoxImage.Warning);
                     }
@@ -206,9 +215,85 @@ namespace optiSCAN.Views
             }
         }
 
-        private void CmbFavoriteScan_SelectionChanged(object sender, System.Windows.Controls.SelectionChangedEventArgs e)
+        private void SelectUiLanguageCombo(string? culture)
         {
-            if (_suppressPreferenceEvents || cmbFavoriteScan == null) return;
+            if (cmbUiLanguage == null) return;
+            var normalized = string.IsNullOrWhiteSpace(culture)
+                ? LocalizationService.CurrentCulture.Name
+                : culture;
+            var wantEn = normalized.StartsWith("en", StringComparison.OrdinalIgnoreCase);
+            cmbUiLanguage.SelectedIndex = wantEn ? 1 : 0;
+        }
+
+        /// <summary>
+        /// Premier clic dans un ScrollViewer : donne le focus à la ComboBox pour ouvrir la liste de façon fiable.
+        /// </summary>
+        private void ComboBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (sender is not WpfComboBox cb || cb.IsDropDownOpen)
+                return;
+            cb.Focus();
+        }
+
+        private void ComboBox_DropDownOpened(object sender, EventArgs e)
+        {
+            if (sender == cmbUiLanguage)
+                _languageTagBeforeDropDown = GetSelectedLanguageTag();
+            else if (sender == cmbFavoriteScan)
+                _favoriteScanIndexBeforeDropDown = cmbFavoriteScan?.SelectedIndex ?? -1;
+        }
+
+        private string? GetSelectedLanguageTag()
+        {
+            if (cmbUiLanguage?.SelectedItem is ComboBoxItem item)
+                return item.Tag as string;
+            return null;
+        }
+
+        private void CmbUiLanguage_DropDownClosed(object sender, EventArgs e)
+        {
+            if (_suppressPreferenceEvents)
+                return;
+
+            var tag = GetSelectedLanguageTag();
+            if (string.IsNullOrWhiteSpace(tag))
+                return;
+
+            if (string.Equals(tag, _languageTagBeforeDropDown, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            var selected = tag.StartsWith("en", StringComparison.OrdinalIgnoreCase) ? "en-US" : "fr-FR";
+            var currentNormalized = LocalizationService.IsEnglish ? "en-US" : "fr-FR";
+
+            if (string.Equals(selected, currentNormalized, StringComparison.OrdinalIgnoreCase))
+                return;
+
+            var confirm = System.Windows.MessageBox.Show(
+                LocalizationService.GetString("Opt_LangRestartMessage"),
+                LocalizationService.GetString("Opt_LangRestartTitle"),
+                MessageBoxButton.OKCancel,
+                MessageBoxImage.Information);
+
+            if (confirm != MessageBoxResult.OK)
+            {
+                _suppressPreferenceEvents = true;
+                try { SelectUiLanguageCombo(currentNormalized); }
+                finally { _suppressPreferenceEvents = false; }
+                return;
+            }
+
+            LocalizationService.SetUserCulture(selected);
+            LocalizationService.RestartApplication();
+        }
+
+        private void CmbFavoriteScan_DropDownClosed(object sender, EventArgs e)
+        {
+            if (_suppressPreferenceEvents || cmbFavoriteScan == null)
+                return;
+
+            if (cmbFavoriteScan.SelectedIndex == _favoriteScanIndexBeforeDropDown)
+                return;
+
             var prefs = UserPreferences.Current;
             prefs.FavoriteScanType = cmbFavoriteScan.SelectedIndex switch
             {
@@ -224,18 +309,18 @@ namespace optiSCAN.Views
         {
             if (!ScheduledScan.IsTaskExists())
             {
-                System.Windows.MessageBox.Show("Activez d’abord l’analyse planifiée.", "optiSCAN", MessageBoxButton.OK, MessageBoxImage.Information);
+                System.Windows.MessageBox.Show(LocalizationService.GetString("Opt_SchedEnableFirst"), LocalizationService.GetString("App_TitleShort"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
             if (!ScheduledScan.RunNow())
             {
-                System.Windows.MessageBox.Show("Impossible de lancer la tâche maintenant (schtasks /Run).", "optiSCAN",
+                System.Windows.MessageBox.Show(LocalizationService.GetString("Opt_SchedRunFailed"), LocalizationService.GetString("App_TitleShort"),
                     MessageBoxButton.OK, MessageBoxImage.Warning);
                 return;
             }
             System.Windows.MessageBox.Show(
-                "La tâche « optiSCAN_DailyScan » a été déclenchée. L’analyse s’exécute en arrière-plan (--fullscan --quiet).",
-                "optiSCAN",
+                LocalizationService.GetString("Opt_SchedRunOk"),
+                LocalizationService.GetString("App_TitleShort"),
                 MessageBoxButton.OK,
                 MessageBoxImage.Information);
             RefreshScheduledStatus();
@@ -265,7 +350,7 @@ namespace optiSCAN.Views
             var path = txtNewExclusion?.Text?.Trim() ?? string.Empty;
             if (string.IsNullOrEmpty(path) || !Directory.Exists(path))
             {
-                System.Windows.MessageBox.Show("Entrez un dossier existant ou utilisez « Parcourir… ».", "optiSCAN", MessageBoxButton.OK, MessageBoxImage.Information);
+                System.Windows.MessageBox.Show(LocalizationService.GetString("Opt_ExclNeedFolder"), LocalizationService.GetString("App_TitleShort"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
             if (ExclusionSettings.Current.AddFolder(path) && !_exclusions.Contains(path))
@@ -288,13 +373,13 @@ namespace optiSCAN.Views
                     Status = AppUpdateChannelStatus.StagingError,
                     CurrentVersion = ProductVersionInfo.SemVer,
                     ReleaseLabel = ProductVersionInfo.ReleaseLabel,
-                    UserMessage = $"Erreur lors du contrôle : {ex.Message}",
+                    UserMessage = LocalizationService.Format("Opt_AppUpdateCheckError", ex.Message),
                 };
             }
 
             System.Windows.MessageBox.Show(
                 result.UserMessage,
-                "Mise à jour applicative",
+                LocalizationService.GetString("Opt_AppUpdateTitle"),
                 MessageBoxButton.OK,
                 result.Success ? MessageBoxImage.Information : MessageBoxImage.Warning);
         }

@@ -1,7 +1,8 @@
 <UserControl x:Class="optiSCAN.Views.OptionsControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
+             xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:loc="clr-namespace:optiSCAN.Localization">
 
     <DockPanel Background="{DynamicResource ContentBg}">
 
@@ -21,11 +22,11 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                    <TextBlock Text="Options"
-                               FontSize="17" FontWeight="SemiBold"
+                    <TextBlock Text="{loc:Loc Key=Opt_Title}"
+                               FontSize="{DynamicResource FontSize.Hero}" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextDark}"/>
-                    <TextBlock Text="Personnalisez le comportement d'optiSCAN."
-                               FontSize="11" Foreground="{DynamicResource TextMuted}"
+                    <TextBlock Text="{loc:Loc Key=Opt_Sub}"
+                               FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
                                Margin="0,4,0,0"/>
                 </StackPanel>
 
@@ -45,7 +46,7 @@
         </Border>
 
         <!-- ══ CONTENU DÉFILABLE ════════════════════════════════════════════ -->
-        <ScrollViewer VerticalScrollBarVisibility="Auto">
+        <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
             <StackPanel Margin="24,20,24,24">
 
                 <!-- ── GÉNÉRAL ────────────────────────────────────────────────── -->
@@ -55,8 +56,8 @@
                         Margin="0,0,0,14">
                     <StackPanel>
 
-                        <TextBlock Text="GÉNÉRAL"
-                                   FontSize="11" FontWeight="Bold"
+                        <TextBlock Text="{loc:Loc Key=Opt_General}"
+                                   FontSize="{DynamicResource FontSize.Small}" FontWeight="Bold"
                                    Foreground="{DynamicResource AlertGoldLight}"
                                    Margin="0,0,0,16"/>
 
@@ -69,11 +70,11 @@
                                       Unchecked="CheckOption_Changed"
                                       Tag="AutoStart"/>
                             <StackPanel>
-                                <TextBlock Text="Lancer optiSCAN au démarrage de Windows"
-                                           FontSize="13" FontWeight="SemiBold"
+                                <TextBlock Text="{loc:Loc Key=Opt_Startup}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextDark}"/>
-                                <TextBlock Text="Ajoute optiSCAN au démarrage automatique"
-                                           FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                <TextBlock Text="{loc:Loc Key=Opt_StartupSub}"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
                                            Margin="0,3,0,0"/>
                             </StackPanel>
                         </StackPanel>
@@ -88,11 +89,11 @@
                                       Unchecked="CheckOption_Changed"
                                       Tag="Notifications"/>
                             <StackPanel>
-                                <TextBlock Text="Notifications Windows"
-                                           FontSize="13" FontWeight="SemiBold"
+                                <TextBlock Text="{loc:Loc Key=Opt_Notifications}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextDark}"/>
-                                <TextBlock Text="Alertes si menace détectée ou mise à jour disponible"
-                                           FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                <TextBlock Text="{loc:Loc Key=Opt_NotifSub}"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
                                            Margin="0,3,0,0"/>
                             </StackPanel>
                         </StackPanel>
@@ -106,11 +107,11 @@
                                       Unchecked="CheckOption_Changed"
                                       Tag="DarkTheme"/>
                             <StackPanel>
-                                <TextBlock Text="Thème sombre"
-                                           FontSize="13" FontWeight="SemiBold"
+                                <TextBlock Text="{loc:Loc Key=Opt_DarkTheme}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextDark}"/>
-                                <TextBlock Text="Même réglage que le bouton Mode dans la barre latérale"
-                                           FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                <TextBlock Text="{loc:Loc Key=Opt_DarkSub}"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
                                            Margin="0,3,0,0"/>
                             </StackPanel>
                         </StackPanel>
@@ -124,31 +125,56 @@
                                       Unchecked="CheckOption_Changed"
                                       Tag="SyncWindowsTheme"/>
                             <StackPanel>
-                                <TextBlock Text="Suivre le thème Windows"
-                                           FontSize="13" FontWeight="SemiBold"
+                                <TextBlock Text="{loc:Loc Key=Opt_SyncWin}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextDark}"/>
-                                <TextBlock Text="S'adapte automatiquement au mode clair/sombre de Windows"
-                                           FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                <TextBlock Text="{loc:Loc Key=Opt_SyncSub}"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
                                            Margin="0,3,0,0"/>
                             </StackPanel>
                         </StackPanel>
 
+                        <!-- Langue de l'interface -->
+                        <StackPanel Margin="0,0,0,20">
+                            <TextBlock Text="{loc:Loc Key=Opt_Language}"
+                                       FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextDark}"
+                                       Margin="0,0,0,6"/>
+                            <ComboBox x:Name="cmbUiLanguage"
+                                      Style="{StaticResource DonabyComboBox}"
+                                      DisplayMemberPath="Content"
+                                      DropDownOpened="ComboBox_DropDownOpened"
+                                      DropDownClosed="CmbUiLanguage_DropDownClosed"
+                                      PreviewMouseLeftButtonDown="ComboBox_PreviewMouseLeftButtonDown"
+                                      Height="36" Width="240" HorizontalAlignment="Left">
+                                <ComboBoxItem Tag="fr-FR" Content="{loc:Loc Key=Opt_LangFrench}"/>
+                                <ComboBoxItem Tag="en-US" Content="{loc:Loc Key=Opt_LangEnglish}"/>
+                            </ComboBox>
+                            <TextBlock Text="{loc:Loc Key=Opt_LanguageSub}"
+                                       FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                       Margin="0,4,0,0"/>
+                        </StackPanel>
+
                         <!-- Type de scan favori -->
                         <StackPanel Margin="0,0,0,4">
-                            <TextBlock Text="Type d'analyse favori"
-                                       FontSize="13" FontWeight="SemiBold"
+                            <TextBlock Text="{loc:Loc Key=Opt_FavScan}"
+                                       FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextDark}"
                                        Margin="0,0,0,6"/>
                             <ComboBox x:Name="cmbFavoriteScan"
-                                      SelectionChanged="CmbFavoriteScan_SelectionChanged"
-                                      Height="32" Width="220" HorizontalAlignment="Left">
-                                <ComboBoxItem Content="Analyse rapide"/>
-                                <ComboBoxItem Content="Analyse complète"/>
-                                <ComboBoxItem Content="Dossier"/>
-                                <ComboBoxItem Content="Fichier"/>
+                                      Style="{StaticResource DonabyComboBox}"
+                                      DisplayMemberPath="Content"
+                                      DropDownOpened="ComboBox_DropDownOpened"
+                                      DropDownClosed="CmbFavoriteScan_DropDownClosed"
+                                      PreviewMouseLeftButtonDown="ComboBox_PreviewMouseLeftButtonDown"
+                                      Height="36" Width="240" HorizontalAlignment="Left">
+                                <ComboBoxItem Content="{loc:Loc Key=Opt_FavQuick}"/>
+                                <ComboBoxItem Content="{loc:Loc Key=Opt_FavFull}"/>
+                                <ComboBoxItem Content="{loc:Loc Key=Opt_FavFolder}"/>
+                                <ComboBoxItem Content="{loc:Loc Key=Opt_FavFile}"/>
                             </ComboBox>
-                            <TextBlock Text="Mis à jour après chaque analyse terminée"
-                                       FontSize="11" Foreground="{DynamicResource TextMuted}"
+                            <TextBlock Text="{loc:Loc Key=Opt_FavHint}"
+                                       FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
                                        Margin="0,4,0,0"/>
                         </StackPanel>
 
@@ -162,8 +188,8 @@
                         Margin="0,0,0,14">
                     <StackPanel>
 
-                        <TextBlock Text="ANTIVIRUS"
-                                   FontSize="11" FontWeight="Bold"
+                        <TextBlock Text="{loc:Loc Key=Opt_Antivirus}"
+                                   FontSize="{DynamicResource FontSize.Small}" FontWeight="Bold"
                                    Foreground="{DynamicResource AlertGoldLight}"
                                    Margin="0,0,0,16"/>
 
@@ -177,11 +203,11 @@
                                       Unchecked="CheckOption_Changed"
                                       Tag="RealtimeProtection"/>
                             <StackPanel>
-                                <TextBlock Text="Protection temps réel"
-                                           FontSize="13" FontWeight="SemiBold"
+                                <TextBlock Text="{loc:Loc Key=Opt_Rtp}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextDark}"/>
-                                <TextBlock Text="Surveille téléchargements, bureau et dossiers système en continu"
-                                           FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                <TextBlock Text="{loc:Loc Key=Opt_RtpSub}"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
                                            Margin="0,3,0,0"/>
                             </StackPanel>
                         </StackPanel>
@@ -196,11 +222,11 @@
                                       Unchecked="CheckOption_Changed"
                                       Tag="AutoQuarantine"/>
                             <StackPanel>
-                                <TextBlock Text="Quarantaine automatique"
-                                           FontSize="13" FontWeight="SemiBold"
+                                <TextBlock Text="{loc:Loc Key=Opt_AutoQuarantine}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextDark}"/>
-                                <TextBlock Text="Toute menace détectée (analyse manuelle, temps réel ou planifiée) est mise en quarantaine — jamais supprimée automatiquement"
-                                           FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                <TextBlock Text="{loc:Loc Key=Opt_AutoQuarSub}"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
                                            Margin="0,3,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                         </StackPanel>
@@ -215,11 +241,11 @@
                                       Unchecked="CheckOption_Changed"
                                       Tag="AutoUpdate"/>
                             <StackPanel>
-                                <TextBlock Text="Mise à jour automatique des signatures (toutes les 4h)"
-                                           FontSize="13" FontWeight="SemiBold"
+                                <TextBlock Text="{loc:Loc Key=Opt_AutoSig}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextDark}"/>
-                                <TextBlock Text="freshclam.exe est lancé en arrière-plan périodiquement"
-                                           FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                <TextBlock Text="{loc:Loc Key=Opt_AutoSigSub}"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
                                            Margin="0,3,0,0"/>
                             </StackPanel>
                         </StackPanel>
@@ -234,26 +260,32 @@
                                           Unchecked="CheckOption_Changed"
                                           Tag="ScheduledScan"/>
                                 <StackPanel>
-                                    <TextBlock Text="Analyse complète planifiée (quotidienne)"
-                                               FontSize="13" FontWeight="SemiBold"
+                                    <TextBlock Text="{loc:Loc Key=Opt_Scheduled}"
+                                               FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
                                                Foreground="{DynamicResource TextDark}"/>
-                                    <TextBlock Text="Tâche Windows « optiSCAN_DailyScan » (--fullscan --quiet)"
-                                               FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                    <TextBlock Text="{loc:Loc Key=Opt_ScheduledSub}"
+                                               FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
                                                Margin="0,3,0,0" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </StackPanel>
                             <StackPanel x:Name="pnlScheduleTime" Orientation="Horizontal" Margin="32,10,0,6">
-                                <TextBlock Text="Heure :" VerticalAlignment="Center" Margin="0,0,8,0"
-                                           Foreground="{DynamicResource TextSecondary}" FontSize="12"/>
-                                <ComboBox x:Name="cmbScheduleHour" Width="56" Height="28" Margin="0,0,6,0"/>
+                                <TextBlock Text="{loc:Loc Key=Opt_ScheduleTime}" VerticalAlignment="Center" Margin="0,0,8,0"
+                                           Foreground="{DynamicResource TextSecondary}" FontSize="{DynamicResource FontSize.Body}"/>
+                                <ComboBox x:Name="cmbScheduleHour"
+                                          Style="{StaticResource DonabyComboBox}"
+                                          PreviewMouseLeftButtonDown="ComboBox_PreviewMouseLeftButtonDown"
+                                          Width="56" Height="32" Margin="0,0,6,0"/>
                                 <TextBlock Text=":" VerticalAlignment="Center" Margin="0,0,6,0"/>
-                                <ComboBox x:Name="cmbScheduleMinute" Width="56" Height="28"/>
+                                <ComboBox x:Name="cmbScheduleMinute"
+                                          Style="{StaticResource DonabyComboBox}"
+                                          PreviewMouseLeftButtonDown="ComboBox_PreviewMouseLeftButtonDown"
+                                          Width="56" Height="32"/>
                             </StackPanel>
                             <TextBlock x:Name="txtScheduledNextRun"
-                                       FontSize="11" Foreground="{DynamicResource TextMuted}"
+                                       FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
                                        Margin="32,4,0,8" TextWrapping="Wrap"/>
                             <Button x:Name="btnScheduledRunNow"
-                                    Content="Lancer maintenant"
+                                    Content="{loc:Loc Key=Opt_RunNow}"
                                     Click="BtnScheduledRunNow_Click"
                                     Style="{StaticResource SecondaryButton}"
                                     Height="32" Padding="12,4" Margin="32,0,0,0" HorizontalAlignment="Left"/>
@@ -268,19 +300,19 @@
                         Effect="{DynamicResource CardShadow}"
                         Margin="0,0,0,14">
                     <StackPanel>
-                        <TextBlock Text="APPLICATION"
-                                   FontSize="11" FontWeight="Bold"
+                        <TextBlock Text="{loc:Loc Key=Opt_App}"
+                                   FontSize="{DynamicResource FontSize.Small}" FontWeight="Bold"
                                    Foreground="{DynamicResource AlertGoldLight}"
                                    Margin="0,0,0,12"/>
-                        <TextBlock TextWrapping="Wrap" FontSize="12" Foreground="{DynamicResource TextMuted}"
+                        <TextBlock TextWrapping="Wrap" FontSize="{DynamicResource FontSize.Body}" Foreground="{DynamicResource TextMuted}"
                                    Margin="0,0,0,12"
-                                   Text="Les signatures antivirus se mettent à jour dans l'onglet Antivirus. Pour une nouvelle version du programme :"/>
+                                   Text="{loc:Loc Key=Opt_UpdateHint}"/>
                         <StackPanel Orientation="Horizontal">
-                            <Button Content="À propos des mises à jour…"
+                            <Button Content="{loc:Loc Key=Opt_AboutUpdates}"
                                     Click="BtnCheckAppUpdate_Click"
                                     Style="{StaticResource SecondaryButton}"
                                     Height="34" Padding="14,6" Margin="0,0,10,0"/>
-                            <Button Content="Page SourceForge"
+                            <Button Content="{loc:Loc Key=Opt_SourceForge}"
                                     Click="BtnOpenSourceForge_Click"
                                     Style="{StaticResource SecondaryButton}"
                                     Height="34" Padding="14,6"/>
@@ -294,13 +326,13 @@
                         Effect="{DynamicResource CardShadow}">
                     <StackPanel>
 
-                        <TextBlock Text="EXCLUSIONS"
-                                   FontSize="11" FontWeight="Bold"
+                        <TextBlock Text="{loc:Loc Key=Opt_Exclusions}"
+                                   FontSize="{DynamicResource FontSize.Small}" FontWeight="Bold"
                                    Foreground="{DynamicResource AlertGoldLight}"
                                    Margin="0,0,0,16"/>
 
-                        <TextBlock Text="Dossiers ignorés lors de l'analyse"
-                                   FontSize="13" FontWeight="SemiBold"
+                        <TextBlock Text="{loc:Loc Key=Opt_ExclHint}"
+                                   FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextDark}"
                                    Margin="0,0,0,10"/>
 
@@ -318,18 +350,18 @@
                                          Background="Transparent"
                                          BorderThickness="0"
                                          Foreground="{DynamicResource TextMedium}"
-                                         FontSize="12" Padding="10,8"
+                                         FontSize="{DynamicResource FontSize.Body}" Padding="10,8"
                                          md:HintAssist.Hint="C:\Chemin\vers\dossier..."
                                          md:HintAssist.Foreground="{DynamicResource TextMuted}"
                                          VerticalAlignment="Center"/>
                             </Border>
                             <Border Grid.Column="2">
                                 <StackPanel Orientation="Horizontal">
-                                    <Button Content="Ajouter"
+                                    <Button Content="{loc:Loc Key=Opt_Add}"
                                             Click="BtnAddTypedExclusion_Click"
                                             Style="{StaticResource SecondaryButton}"
                                             Height="34" Padding="12,6" Margin="0,0,8,0"/>
-                                    <Button Content="Parcourir…"
+                                    <Button Content="{loc:Loc Key=Opt_Browse}"
                                             Click="BtnAddExclusion_Click"
                                             Style="{StaticResource SecondaryButton}"
                                             Height="34" Padding="14,6"/>
@@ -356,7 +388,7 @@
                                                          VerticalAlignment="Center" Margin="0,0,8,0"/>
                                             <TextBlock Grid.Column="1"
                                                        Text="{Binding}"
-                                                       FontSize="12"
+                                                       FontSize="{DynamicResource FontSize.Body}"
                                                        Foreground="{DynamicResource TextMedium}"
                                                        VerticalAlignment="Center"
                                                        TextTrimming="CharacterEllipsis"/>
@@ -366,7 +398,7 @@
                                                     Background="Transparent"
                                                     BorderThickness="0"
                                                     Foreground="{DynamicResource DangerRed}"
-                                                    Cursor="Hand" FontSize="14"
+                                                    Cursor="Hand" FontSize="{DynamicResource FontSize.Large}"
                                                     Padding="6,0"
                                                     Content="✕"/>
                                         </Grid>
@@ -375,8 +407,8 @@
                             </ItemsControl.ItemTemplate>
                         </ItemsControl>
 
-                        <TextBlock Text="Les chemins exclus ne sont analysés ni par ClamAV ni par YARA."
-                                   FontSize="11" Foreground="{DynamicResource TextMuted}"
+                        <TextBlock Text="{loc:Loc Key=Opt_ExclNote}"
+                                   FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
                                    Margin="0,10,0,0" FontStyle="Italic"/>
 
                     </StackPanel>

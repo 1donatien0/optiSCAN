@@ -1,3 +1,5 @@
+using optiSCAN.Localization;
+
 namespace optiSCAN.Services
 {
     /// <summary>Niveau de protection affiché dans l'UI (badge Antivirus, etc.).</summary>
@@ -36,9 +38,9 @@ namespace optiSCAN.Services
 
         public static string GetBadgeText(ProtectionBadgeLevel level) => level switch
         {
-            ProtectionBadgeLevel.Active => "Actif",
-            ProtectionBadgeLevel.Degraded => "Dégradé",
-            _ => "Inactif",
+            ProtectionBadgeLevel.Active => LocalizationService.GetString("Protection_BadgeActive"),
+            ProtectionBadgeLevel.Degraded => LocalizationService.GetString("Protection_BadgeDegraded"),
+            _ => LocalizationService.GetString("Protection_BadgeInactive"),
         };
     }
 }

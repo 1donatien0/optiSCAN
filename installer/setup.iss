@@ -64,8 +64,11 @@ VersionInfoProductName={#AppName}
 VersionInfoProductVersion={#AppVersion}
 VersionInfoCopyright=Copyright 2026 Dona By
 
+; Langue de l'installateur = langue de l'application (UiCulture en Registre).
+ShowLanguageDialog=auto
+
 [Languages]
-Name: "french";  MessagesFile: "compiler:Languages\French.isl"
+Name: "french"; MessagesFile: "compiler:Languages\French.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
@@ -101,11 +104,10 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: deskto
 Name: "{userstartup}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: startupicon
 
 [Registry]
-Root: HKCR; Subkey: "*\shell\Scanner avec optiSCAN"; ValueType: string; ValueData: ""; Flags: uninsdeletekey
-Root: HKCR; Subkey: "*\shell\Scanner avec optiSCAN\command"; ValueType: string; ValueData: """{app}\{#AppExeName}"" --scan ""%1"""; Flags: uninsdeletekey
-Root: HKCR; Subkey: "*\shell\Scanner avec optiSCAN"; ValueName: "Icon"; ValueType: string; ValueData: "{app}\{#AppExeName},0"
+; Menu contextuel Explorateur : enregistré en [Code] selon la langue de l'installateur (HKCU\Software\Classes).
 Root: HKCU; Subkey: "Software\optiSCAN"; ValueName: "AutoUpdateSignatures"; ValueType: dword; ValueData: "1"; Tasks: autoUpdateSig
 Root: HKCU; Subkey: "Software\optiSCAN"; ValueName: "Version"; ValueType: string; ValueData: "{#AppVersion}"; Flags: uninsdeletekey
+; UiCulture est réécrit à chaque install / mise à jour (fr-FR ou en-US selon la langue Inno).
 
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "Lancer {#AppName} maintenant"; Flags: nowait postinstall skipifsilent runascurrentuser
@@ -189,6 +191,16 @@ begin
 
   if not IsDotNet8Installed() then
   begin
+    if ActiveLanguage = 'english' then
+    begin
+      if MsgBox(
+        '.NET 8 Desktop Runtime is not installed on this computer.' + #13#10 + #13#10 +
+        'optiSCAN requires it to run.' + #13#10 +
+        'Would you like to open the download page?',
+        mbConfirmation, MB_YESNO) = IDYES then
+        ShellExec('open', 'https://dotnet.microsoft.com/en-us/download/dotnet/8.0', '', '', SW_SHOW, ewNoWait, ResultCode);
+    end
+    else
     if MsgBox(
       '.NET 8 Desktop Runtime n''est pas installé sur cet ordinateur.' + #13#10 + #13#10 +
       'optiSCAN en a besoin pour fonctionner.' + #13#10 +
@@ -211,6 +223,10 @@ begin
   begin
     // 1. Toujours : suppression de la branche Registre HKCU\Software\optiSCAN
     RegDeleteKeyIncludingSubkeys(HKCU, 'Software\optiSCAN');
+    RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\*\shell\Scanner avec optiSCAN');
+    RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\*\shell\Scan with optiSCAN');
+    RegDeleteKeyIncludingSubkeys(HKCR, '*\shell\Scanner avec optiSCAN');
+    RegDeleteKeyIncludingSubkeys(HKCR, '*\shell\Scan with optiSCAN');
 
     // 2. Proposition : suppression des données utilisateur (quarantaine,
     //    historique, préférences, logs). On demande explicitement car
@@ -248,12 +264,48 @@ end;
 // (avec un freshclam.conf cassé en LocalAppData), on propose de wiper le
 // dossier de conf pour repartir sur des bases saines. La quarantaine et
 // l'historique sont conservés.
+procedure WriteInstallerUiCulture();
+begin
+  if ActiveLanguage = 'english' then
+    RegWriteStringValue(HKCU, 'Software\optiSCAN', 'UiCulture', 'en-US')
+  else
+    RegWriteStringValue(HKCU, 'Software\optiSCAN', 'UiCulture', 'fr-FR');
+end;
+
+procedure RegisterExplorerContextMenu();
+var
+  MenuName, ExePath, Cmd: string;
+begin
+  if ActiveLanguage = 'english' then
+    MenuName := 'Scan with optiSCAN'
+  else
+    MenuName := 'Scanner avec optiSCAN';
+
+  ExePath := ExpandConstant('{app}\{#AppExeName}');
+  Cmd := '"' + ExePath + '" --scan "%1"';
+
+  RegDeleteKeyIncludingSubkeys(HKCR, '*\shell\Scanner avec optiSCAN');
+  RegDeleteKeyIncludingSubkeys(HKCR, '*\shell\Scan with optiSCAN');
+  RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\*\shell\Scanner avec optiSCAN');
+  RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\*\shell\Scan with optiSCAN');
+
+  RegWriteStringValue(HKCU, 'Software\Classes\*\shell\' + MenuName, '', MenuName);
+  RegWriteStringValue(HKCU, 'Software\Classes\*\shell\' + MenuName, 'Icon', ExePath + ',0');
+  RegWriteStringValue(HKCU, 'Software\Classes\*\shell\' + MenuName + '\command', '', Cmd);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ConfPath: string;
   Content: AnsiString;
   ShouldReset: Boolean;
 begin
+  if CurStep = ssPostInstall then
+  begin
+    WriteInstallerUiCulture();
+    RegisterExplorerContextMenu();
+  end;
+
   if CurStep = ssInstall then
   begin
     ConfPath := ExpandConstant('{localappdata}\optiSCAN\clamav\freshclam.conf');

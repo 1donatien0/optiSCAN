@@ -1,3 +1,4 @@
+using optiSCAN.Localization;
 using optiSCAN.Models;
 using optiSCAN.Services;
 using optiSCAN.Strings;
@@ -29,6 +30,7 @@ namespace optiSCAN.ViewModels
         private readonly YaraEngine _yara;
 
         private CancellationTokenSource? _cts;
+        private long _scanEpoch;
 
         // ── Propriétés bindées ───────────────────────────────────────────────────
 
@@ -50,7 +52,7 @@ namespace optiSCAN.ViewModels
             set { _isUpdating = value; OnPropertyChanged(); }
         }
 
-        private string _statusMessage = "Prêt à analyser.";
+        private string _statusMessage = LocalizationService.GetString("Scan_Ready");
         public string StatusMessage
         {
             get => _statusMessage;
@@ -386,8 +388,8 @@ namespace optiSCAN.ViewModels
                     bool yaraOk = _yara.IsAvailable;
                     YaraRulesCount = _yara.RulesCount;
                     YaraStatus = yaraOk
-                        ? $"YARA opérationnel — {_yara.RulesCount} règle(s)"
-                        : "YARA non disponible (yara64.exe manquant ou aucune règle)";
+                        ? LocalizationService.Format("Vm_YaraOperational", _yara.RulesCount)
+                        : LocalizationService.GetString("Vm_YaraUnavailable");
                     RefreshProtectionStatus();
                 });
 
@@ -500,7 +502,8 @@ namespace optiSCAN.ViewModels
             StatusMessage = ScanUserDisplay.ScanStarting(type, path);
 
             _cts = new CancellationTokenSource();
-            var progress = new Progress<ScanProgress>(SurChangementProgressionScan);
+            var epoch = Interlocked.Increment(ref _scanEpoch);
+            var progress = new Progress<ScanProgress>(p => SurChangementProgressionScan(p, epoch));
 
             try
             {
@@ -562,6 +565,7 @@ namespace optiSCAN.ViewModels
             }
             finally
             {
+                Interlocked.Increment(ref _scanEpoch);
                 IsScanning = false;
                 IsIndeterminate = false;
                 ProgressValue = 0;
@@ -584,7 +588,7 @@ namespace optiSCAN.ViewModels
         /// Les compteurs (fichiers/menaces) ne reculent jamais pour refléter la stratégie
         /// multi-moteurs (ClamAV/YARA) et multi-cibles.
         /// </remarks>
-        private void SurChangementProgressionScan(ScanProgress p)
+        private void SurChangementProgressionScan(ScanProgress p, long epoch)
         {
             // BeginInvoke (asynchrone) plutôt que Invoke : le thread de scan
             // ne bloque pas en attente du Dispatcher UI. Sur un scan rapide
@@ -592,23 +596,13 @@ namespace optiSCAN.ViewModels
             // le scan derrière le rendu WPF.
             WpfApp.Current?.Dispatcher.BeginInvoke(new Action(() =>
             {
-                if (p.Phase != ScanPhase.ThreatFound)
-                    StatusMessage = ScanUserDisplay.ForProgressMessage(p.Message);
-                // Ne jamais faire reculer le compteur : ClamAV et YARA publient des
-                // totaux locaux (par dossier) ; YARA peut envoyer TotalFiles=12 alors
-                // que ClamAV en est à 12 000 sur la cible précédente.
-                if (IsScanning)
-                {
-                    if (p.FilesScanned > 0)
-                        FilesScanned = Math.Max(FilesScanned, p.FilesScanned);
-                    if (p.ThreatsFound > 0)
-                        ThreatsFound = Math.Max(ThreatsFound, p.ThreatsFound);
-                }
-                else
-                {
-                    FilesScanned = p.FilesScanned;
-                    ThreatsFound = p.ThreatsFound;
-                }
+                if (epoch != _scanEpoch)
+                    return;
+
+                if (p.FilesScanned > 0)
+                    FilesScanned = Math.Max(FilesScanned, p.FilesScanned);
+                if (p.ThreatsFound > 0)
+                    ThreatsFound = Math.Max(ThreatsFound, p.ThreatsFound);
 
                 if (!string.IsNullOrWhiteSpace(p.CurrentFilePath))
                     CurrentScanItem = p.CurrentFilePath;
@@ -616,34 +610,40 @@ namespace optiSCAN.ViewModels
                     && !string.IsNullOrWhiteSpace(p.ThreatInfo.FilePath))
                     CurrentScanItem = p.ThreatInfo.FilePath;
 
-                // Affichage : FilesScanned porte le cumul max pendant le scan (Clam + YARA / multi-cibles).
-                int displayedFiles = IsScanning ? FilesScanned : p.FilesScanned;
+                int displayedFiles = FilesScanned;
 
-                if (p.TotalFiles > 0)
+                if (p.Phase != ScanPhase.ThreatFound)
                 {
-                    if (displayedFiles <= 0)
-                        ScanProgressDetail = $"Environ {p.TotalFiles:N0} fichier(s) à parcourir — analyse en cours…";
-                    else
-                    {
-                        var pctVal = Math.Min(100.0, displayedFiles * 100.0 / p.TotalFiles);
-                        ScanProgressDetail = $"{displayedFiles:N0} / {p.TotalFiles:N0} fichiers — {(int)pctVal} %";
-                    }
+                    StatusMessage = ScanUserDisplay.SyncFileCountInMessage(
+                        ScanUserDisplay.ForProgressMessage(p.Message),
+                        displayedFiles);
+                }
+
+                if (p.TotalFiles > 0 && displayedFiles > 0 && displayedFiles <= p.TotalFiles)
+                {
+                    var pctVal = Math.Min(100.0, displayedFiles * 100.0 / p.TotalFiles);
+                    ScanProgressDetail = $"{displayedFiles:N0} / {p.TotalFiles:N0} fichiers — {(int)pctVal} %";
+                }
+                else if (displayedFiles > 0)
+                {
+                    ScanProgressDetail = $"{displayedFiles:N0} fichier(s) parcourus — analyse en cours…";
+                }
+                else if (p.TotalFiles > 0)
+                {
+                    ScanProgressDetail = $"Environ {p.TotalFiles:N0} fichier(s) à parcourir — analyse en cours…";
                 }
                 else
                 {
-                    ScanProgressDetail = displayedFiles > 0
-                        ? $"{displayedFiles:N0} fichier(s) parcourus — total inconnu"
-                        : "Analyse en cours…";
+                    ScanProgressDetail = "Analyse en cours…";
                 }
 
-                // ProgressBar : ne pas repasser à 0 % quand YARA annonce un TotalFiles local sans compteur.
-                double pctForBar = p.TotalFiles > 0 && displayedFiles > 0
+                double pctForBar = p.TotalFiles > 0 && displayedFiles > 0 && displayedFiles <= p.TotalFiles
                     ? Math.Min(100.0, displayedFiles * 100.0 / p.TotalFiles)
                     : p.PercentComplete;
                 if (pctForBar >= 0)
                 {
                     IsIndeterminate = false;
-                    ProgressValue = IsScanning ? Math.Max(ProgressValue, pctForBar) : pctForBar;
+                    ProgressValue = Math.Max(ProgressValue, pctForBar);
                 }
 
                 if (p.Phase == ScanPhase.ThreatFound && p.ThreatInfo != null)
@@ -697,8 +697,8 @@ namespace optiSCAN.ViewModels
                 YaraStatus = _yara.IsAvailable
                     ? $"Moteur de détection actif — {_yara.RulesCount} règle(s)"
                     : result.Success
-                        ? "Moteur de détection : règles mises à jour (rechargement au prochain scan)"
-                        : "Moteur de détection non disponible";
+                        ? LocalizationService.GetString("Vm_SigEngineReloaded")
+                        : LocalizationService.GetString("Vm_SigEngineUnavailable");
                 RefreshProtectionStatus();
             });
         }
@@ -720,7 +720,7 @@ namespace optiSCAN.ViewModels
             // Mettre à jour le statut des menaces
             foreach (var threat in Threats)
                 threat.Status = ThreatStatus.Quarantined;
-            StatusMessage = $"{count} fichier(s) placé(s) en quarantaine.";
+            StatusMessage = LocalizationService.Format("Vm_QuarantineBatch", count);
         }
 
         private void RestoreFromQuarantine(string? id)
@@ -728,7 +728,7 @@ namespace optiSCAN.ViewModels
             if (string.IsNullOrEmpty(id)) return;
             bool ok = _quarantine.Restore(id);
             LoadQuarantine();
-            StatusMessage = ok ? "Fichier restauré." : "Impossible de restaurer le fichier.";
+            StatusMessage = ok ? LocalizationService.GetString("Vm_RestoreOk") : LocalizationService.GetString("Vm_RestoreFail");
         }
 
         private void DeleteFromQuarantine(string? id)
@@ -736,7 +736,7 @@ namespace optiSCAN.ViewModels
             if (string.IsNullOrEmpty(id)) return;
             bool ok = _quarantine.DeletePermanently(id);
             LoadQuarantine();
-            StatusMessage = ok ? "Fichier supprimé définitivement." : "Erreur lors de la suppression.";
+            StatusMessage = ok ? LocalizationService.GetString("Vm_DeleteOk") : LocalizationService.GetString("Vm_DeleteFail");
         }
 
         private void PurgeAll()
@@ -752,7 +752,7 @@ namespace optiSCAN.ViewModels
 
             int count = _quarantine.PurgeAll();
             LoadQuarantine();
-            StatusMessage = $"{count} fichier(s) supprimé(s) de la quarantaine.";
+            StatusMessage = LocalizationService.Format("Vm_PurgeCount", count);
         }
 
         /// <summary>Recharge la première page de quarantaine (réinitialise la liste affichée).</summary>

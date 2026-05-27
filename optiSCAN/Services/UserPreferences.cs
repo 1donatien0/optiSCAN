@@ -1,3 +1,4 @@
+using optiSCAN.Localization;
 using optiSCAN.Models;
 using System.IO;
 using System.Runtime.Versioning;
@@ -72,6 +73,9 @@ namespace optiSCAN.Services
         /// <summary>MAJ automatique des signatures ClamAV et des règles YARA (timers freshclam / YARA-Forge).</summary>
         public bool SignatureAutoUpdateEnabled { get; set; } = true;
 
+        /// <summary>Culture UI (fr-FR ou en-US). Vide = langue de l'installateur au premier lancement.</summary>
+        public string UiCulture { get; set; } = string.Empty;
+
         // ── Méthodes ──────────────────────────────────────────────────────────────
 
         /// <summary>
@@ -132,18 +136,37 @@ namespace optiSCAN.Services
         /// Charge les préférences depuis le fichier sécurisé. Migre depuis le
         /// fichier JSON en clair si présent (anciennes versions optiSCAN).
         /// </summary>
-        private static UserPreferences Load()
+        private static UserPreferences Load() => LoadFromStorage(FilePath, LegacyPath);
+
+        /// <summary>Charge ou migre depuis des chemins explicites (tests, outils).</summary>
+        internal static UserPreferences LoadFromStorage(string securePath, string legacyPlaintextPath)
         {
-            // 1. Format nouveau (DPAPI + HMAC)
-            var loaded = SecureStore.Load<UserPreferences>(FilePath);
+            var loaded = SecureStore.Load<UserPreferences>(securePath);
             if (loaded != null) return loaded;
 
-            // 2. Migration depuis l'ancien JSON en clair, si présent
-            var migrated = SecureStore.MigrateFromPlaintext<UserPreferences>(LegacyPath, FilePath);
+            var migrated = SecureStore.MigrateFromPlaintext<UserPreferences>(legacyPlaintextPath, securePath);
             if (migrated != null) return migrated;
 
-            // 3. Premier lancement ou fichier inutilisable → valeurs par défaut
             return new UserPreferences();
+        }
+
+        /// <summary>Sauvegarde vers un chemin explicite (tests).</summary>
+        internal static void SaveToStorage(string securePath, UserPreferences prefs)
+        {
+            lock (_saveLock)
+            {
+                try
+                {
+                    var dir = Path.GetDirectoryName(securePath)!;
+                    if (!Directory.Exists(dir))
+                        Directory.CreateDirectory(dir);
+                    SecureStore.Save(securePath, prefs);
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn("UserPreferences", "SaveToStorage", ex);
+                }
+            }
         }
     }
 
@@ -162,13 +185,7 @@ namespace optiSCAN.Services
 
         /// <summary>Ligne pour la liste des cibles récentes (panneau Antivirus).</summary>
         [JsonIgnore]
-        public string ListLabel => ScanType switch
-        {
-            ScanType.QuickScan => "Analyse rapide",
-            ScanType.FullScan => "Analyse complète",
-            ScanType.Folder => $"Dossier : {DisplayName}",
-            ScanType.File => $"Fichier : {DisplayName}",
-            _ => DisplayName
-        };
+        public string ListLabel =>
+            LocalizationService.RecentTargetLabel(ScanType, DisplayName);
     }
 }

@@ -1,7 +1,8 @@
 ﻿<UserControl x:Class="optiSCAN.Views.CleanControl"
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
-             xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes">
+             xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
+             xmlns:loc="clr-namespace:optiSCAN.Localization">
 
     <DockPanel Background="{DynamicResource ContentBg}">
 
@@ -20,11 +21,11 @@
                 </Grid.ColumnDefinitions>
 
                 <StackPanel Grid.Column="0" VerticalAlignment="Center">
-                    <TextBlock Text="Nettoyage du système"
-                               FontSize="17" FontWeight="SemiBold"
+                    <TextBlock Text="{loc:Loc Key=Clean_Title}"
+                               FontSize="{DynamicResource FontSize.Hero}" FontWeight="SemiBold"
                                Foreground="{DynamicResource TextDark}"/>
-                    <TextBlock Text="Libérez de l'espace en supprimant les fichiers inutiles."
-                               FontSize="11" Foreground="{DynamicResource TextMuted}"
+                    <TextBlock Text="{loc:Loc Key=Clean_Sub}"
+                               FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
                                Margin="0,4,0,0"/>
                 </StackPanel>
 
@@ -70,16 +71,16 @@
                                              Foreground="{DynamicResource AlertGoldLight}"
                                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
-                            <TextBlock Text="Temp Windows"
-                                       FontSize="13" FontWeight="SemiBold"
+                            <TextBlock Text="{loc:Loc Key=Clean_TempWin}"
+                                       FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextDark}"
                                        VerticalAlignment="Center" Margin="10,0,0,0"/>
                         </StackPanel>
                         <TextBlock x:Name="txtTempSize" Text="0 Mo"
-                                   FontSize="22" FontWeight="Bold"
+                                   FontSize="{DynamicResource FontSize.Metric}" FontWeight="Bold"
                                    Foreground="{DynamicResource AlertGoldLight}"/>
-                        <TextBlock Text="Windows Temp + utilisateur"
-                                   FontSize="10" Foreground="{DynamicResource TextMuted}"
+                        <TextBlock Text="{loc:Loc Key=Clean_TempSub}"
+                                   FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextMuted}"
                                    Margin="0,2,0,0"/>
                     </StackPanel>
                 </Border>
@@ -95,16 +96,16 @@
                                              Foreground="{DynamicResource AlertGoldLight}"
                                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
-                            <TextBlock Text="Navigateurs"
-                                       FontSize="13" FontWeight="SemiBold"
+                            <TextBlock Text="{loc:Loc Key=Clean_Browsers}"
+                                       FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextDark}"
                                        VerticalAlignment="Center" Margin="10,0,0,0"/>
                         </StackPanel>
                         <TextBlock x:Name="txtBrowserSize" Text="0 Mo"
-                                   FontSize="22" FontWeight="Bold"
+                                   FontSize="{DynamicResource FontSize.Metric}" FontWeight="Bold"
                                    Foreground="{DynamicResource AlertGoldLight}"/>
-                        <TextBlock Text="Caches navigateurs cochés"
-                                   FontSize="10" Foreground="{DynamicResource TextMuted}"
+                        <TextBlock Text="{loc:Loc Key=Clean_BrowserSub}"
+                                   FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextMuted}"
                                    Margin="0,2,0,0"/>
                     </StackPanel>
                 </Border>
@@ -115,21 +116,21 @@
                     <StackPanel>
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
                             <Border Width="32" Height="32" CornerRadius="8"
-                                    Background="#33FFFFFF">
+                                    Background="{DynamicResource AccentIconRing}">
                                 <md:PackIcon Kind="ChartBar" Width="18" Height="18"
                                              Foreground="{DynamicResource TextOnPrimary}"
                                              HorizontalAlignment="Center" VerticalAlignment="Center"/>
                             </Border>
-                            <TextBlock Text="Total libérable"
-                                       FontSize="13" FontWeight="SemiBold"
+                            <TextBlock Text="{loc:Loc Key=Clean_Total}"
+                                       FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextOnPrimary}"
                                        VerticalAlignment="Center" Margin="10,0,0,0"/>
                         </StackPanel>
                         <TextBlock x:Name="txtTotalSize" Text="0 Mo"
-                                   FontSize="22" FontWeight="Bold"
+                                   FontSize="{DynamicResource FontSize.Metric}" FontWeight="Bold"
                                    Foreground="{DynamicResource TextOnPrimary}"/>
-                        <TextBlock Text="Cibles cochées"
-                                   FontSize="10" Foreground="{DynamicResource TextOnPrimaryMuted}"
+                        <TextBlock Text="{loc:Loc Key=Clean_TotalSub}"
+                                   FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextOnPrimaryMuted}"
                                    Margin="0,2,0,0"/>
                     </StackPanel>
                 </Border>
@@ -148,7 +149,7 @@
                         <StackPanel Orientation="Horizontal">
                             <md:PackIcon Kind="Magnify" Width="15" Height="15"
                                          VerticalAlignment="Center"/>
-                            <TextBlock Text="  Analyser" FontSize="12"
+                            <TextBlock Text="{loc:Loc Key=Clean_Analyze}" FontSize="{DynamicResource FontSize.Body}"
                                        VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
@@ -160,7 +161,7 @@
                         <StackPanel Orientation="Horizontal">
                             <md:PackIcon Kind="Broom" Width="15" Height="15"
                                          VerticalAlignment="Center"/>
-                            <TextBlock Text="  Nettoyer maintenant" FontSize="12"
+                            <TextBlock Text="{loc:Loc Key=Clean_Run}" FontSize="{DynamicResource FontSize.Body}"
                                        VerticalAlignment="Center"/>
                         </StackPanel>
                     </Button>
@@ -179,61 +180,61 @@
                         Effect="{DynamicResource CardShadow}"
                         Padding="14,12">
                     <StackPanel>
-                        <TextBlock Text="Éléments à nettoyer"
-                                   FontSize="13" FontWeight="SemiBold"
+                        <TextBlock Text="{loc:Loc Key=Clean_ItemsTitle}"
+                                   FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextDark}"
                                    Margin="0,0,0,8"/>
 
-                        <TextBlock Text="SYSTÈME"
-                                   FontSize="10" FontWeight="Bold"
+                        <TextBlock Text="{loc:Loc Key=Clean_System}"
+                                   FontSize="{DynamicResource FontSize.Caption}" FontWeight="Bold"
                                    Foreground="{DynamicResource PrimaryBlue}"
                                    Margin="0,0,0,4"/>
                         <Border Background="{DynamicResource SurfaceBg}"
                                 CornerRadius="8" Padding="10,6" Margin="0,0,0,8">
                             <UniformGrid Columns="2">
                                 <CheckBox x:Name="chkTempWin"
-                                          Content="Temp Windows" IsChecked="True"
-                                          Margin="2,2" FontSize="11"/>
+                                          Content="{loc:Loc Key=Clean_TempWinCb}" IsChecked="True"
+                                          Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
                                 <CheckBox x:Name="chkTempUser"
-                                          Content="Temp utilisateur" IsChecked="True"
-                                          Margin="2,2" FontSize="11"/>
+                                          Content="{loc:Loc Key=Clean_TempUserCb}" IsChecked="True"
+                                          Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
                                 <CheckBox x:Name="chkRecycleBin"
-                                          Content="Corbeille" IsChecked="True"
-                                          Margin="2,2" FontSize="11"/>
+                                          Content="{loc:Loc Key=Clean_RecycleCb}" IsChecked="True"
+                                          Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
                                 <CheckBox x:Name="chkLogs"
-                                          Content="Journaux système" IsChecked="False"
-                                          Margin="2,2" FontSize="11"/>
+                                          Content="{loc:Loc Key=Clean_LogsCb}" IsChecked="False"
+                                          Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
                             </UniformGrid>
                         </Border>
 
-                        <TextBlock Text="NAVIGATEURS"
-                                   FontSize="10" FontWeight="Bold"
+                        <TextBlock Text="{loc:Loc Key=Clean_BrowsersSection}"
+                                   FontSize="{DynamicResource FontSize.Caption}" FontWeight="Bold"
                                    Foreground="{DynamicResource PrimaryBlue}"
                                    Margin="0,0,0,4"/>
                         <Border Background="{DynamicResource SurfaceBg}"
                                 CornerRadius="8" Padding="10,6">
                             <UniformGrid Columns="2">
                                 <CheckBox x:Name="chkEdge"
-                                          Content="Microsoft Edge" IsChecked="True"
-                                          Margin="2,2" FontSize="11"/>
+                                          Content="{loc:Loc Key=Clean_Edge}" IsChecked="True"
+                                          Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
                                 <CheckBox x:Name="chkChrome"
-                                          Content="Google Chrome" IsChecked="True"
-                                          Margin="2,2" FontSize="11"/>
+                                          Content="{loc:Loc Key=Clean_Chrome}" IsChecked="True"
+                                          Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
                                 <CheckBox x:Name="chkFirefox"
-                                          Content="Mozilla Firefox" IsChecked="True"
-                                          Margin="2,2" FontSize="11"/>
+                                          Content="{loc:Loc Key=Clean_Firefox}" IsChecked="True"
+                                          Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
                                 <CheckBox x:Name="chkBrave"
-                                          Content="Brave" IsChecked="False"
-                                          Margin="2,2" FontSize="11"/>
+                                          Content="{loc:Loc Key=Clean_Brave}" IsChecked="False"
+                                          Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
                                 <CheckBox x:Name="chkOpera"
-                                          Content="Opera" IsChecked="False"
-                                          Margin="2,2" FontSize="11"/>
+                                          Content="{loc:Loc Key=Clean_Opera}" IsChecked="False"
+                                          Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
                                 <CheckBox x:Name="chkVivaldi"
-                                          Content="Vivaldi" IsChecked="False"
-                                          Margin="2,2" FontSize="11"/>
+                                          Content="{loc:Loc Key=Clean_Vivaldi}" IsChecked="False"
+                                          Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
                                 <CheckBox x:Name="chkArc"
-                                          Content="Arc" IsChecked="False"
-                                          Margin="2,2" FontSize="11"/>
+                                          Content="{loc:Loc Key=Clean_Arc}" IsChecked="False"
+                                          Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
                             </UniformGrid>
                         </Border>
                     </StackPanel>
@@ -249,8 +250,8 @@
                             <RowDefinition Height="*"/>
                         </Grid.RowDefinitions>
                         <TextBlock Grid.Row="0"
-                                   Text="Journal d'opérations"
-                                   FontSize="13" FontWeight="SemiBold"
+                                   Text="{loc:Loc Key=Clean_LogTitle}"
+                                   FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextDark}"
                                    Margin="0,0,0,6"/>
                         <TextBox Grid.Row="1"
@@ -259,13 +260,13 @@
                                  Background="Transparent"
                                  BorderThickness="0"
                                  Foreground="{DynamicResource TextMedium}"
-                                         FontFamily="{DynamicResource AppFontFamily}" FontSize="10"
+                                         FontFamily="{DynamicResource AppFontFamily}" FontSize="{DynamicResource FontSize.Caption}"
                                  TextWrapping="Wrap"
                                  AcceptsReturn="True"
                                  VerticalScrollBarVisibility="Hidden"
                                  HorizontalScrollBarVisibility="Disabled"
                                  VerticalAlignment="Stretch"
-                                 Text="Cliquez sur Analyser pour estimer l'espace récupérable&#x0a;(fichiers temporaires et caches des navigateurs cochés)."/>
+                                 Text="{loc:Loc Key=Clean_LogHint}"/>
                     </Grid>
                 </Border>
             </Grid>

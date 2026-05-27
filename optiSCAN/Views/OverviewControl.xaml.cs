@@ -1,4 +1,5 @@
 using MaterialDesignThemes.Wpf;
+using optiSCAN.Localization;
 using optiSCAN.Models;
 using optiSCAN.Services;
 using optiSCAN.Strings;
@@ -21,7 +22,11 @@ namespace optiSCAN.Views
         public OverviewControl()
         {
             InitializeComponent();
-            Loaded += (_, _) => optiSCAN.ThemeManager.ThemeChanged += SurChangementTheme;
+            Loaded += (_, _) =>
+            {
+                ApplyStaticLocalizedTexts();
+                optiSCAN.ThemeManager.ThemeChanged += SurChangementTheme;
+            };
             Unloaded += (_, _) => optiSCAN.ThemeManager.ThemeChanged -= SurChangementTheme;
         }
 
@@ -62,24 +67,24 @@ namespace optiSCAN.Views
 
                 var sb = new StringBuilder();
                 if (sessions30 == 0)
-                    sb.AppendLine("• Aucune analyse enregistrée sur les 30 derniers jours.");
+                    sb.AppendLine(LocalizationService.GetString("Overview_StatsNone30"));
                 else
                 {
-                    sb.AppendLine($"• Analyses enregistrées : {sessions30.ToString("N0", cult)}");
-                    sb.AppendLine($"• Fichiers parcourus (cumul) : {files30.ToString("N0", cult)}");
-                    sb.AppendLine($"• Menaces détectées (cumul) : {threats30.ToString("N0", cult)}");
+                    sb.AppendLine(LocalizationService.Format("Overview_StatsScans", sessions30.ToString("N0", cult)));
+                    sb.AppendLine(LocalizationService.Format("Overview_StatsFiles", files30.ToString("N0", cult)));
+                    sb.AppendLine(LocalizationService.Format("Overview_StatsThreats", threats30.ToString("N0", cult)));
                 }
 
                 sb.AppendLine();
-                sb.Append($"Depuis l’installation de cette copie d’optiSCAN : {totalLifetime.ToString("N0", cult)} analyse(s) comptabilisée(s) dans les préférences.");
+                sb.Append(LocalizationService.Format("Overview_StatsLifetime", totalLifetime.ToString("N0", cult)));
                 sb.AppendLine();
-                sb.Append("Le détail par session reste disponible dans l’onglet Historique.");
+                sb.Append(LocalizationService.GetString("Overview_StatsHistoryHint"));
 
                 txtProtectionStatsBody.Text = sb.ToString().TrimEnd();
 
                 if (txtProtectionStatsUpdated != null)
                     txtProtectionStatsUpdated.Text =
-                        $"Actualisé : {now.ToString("dd/MM/yyyy HH:mm:ss", cult)}";
+                        LocalizationService.Format("Overview_UpdatedAt", now.ToString("G", cult));
             });
         }
 
@@ -110,8 +115,8 @@ namespace optiSCAN.Views
             {
                 if (txtLastScan == null) return;
                 txtLastScan.Text = lastScan.HasValue
-                    ? lastScan.Value.ToString("dd/MM/yyyy HH:mm")
-                    : "Jamais";
+                    ? lastScan.Value.ToString("G", CultureInfo.CurrentCulture)
+                    : LocalizationService.GetString("Common_Never");
             });
         }
 
@@ -176,15 +181,17 @@ namespace optiSCAN.Views
                 if (txtProtectionHeadline != null)
                 {
                     txtProtectionHeadline.Text = string.IsNullOrWhiteSpace(headline)
-                        ? (isProtected ? "Votre ordinateur est protégé" : "Protection incomplète")
+                        ? (isProtected
+                            ? LocalizationService.GetString("Overview_Protected")
+                            : LocalizationService.GetString("Overview_ProtectionIncomplete"))
                         : headline!;
                     txtProtectionHeadline.Foreground =
                         ThemeUiBrushes.Get("TextDark", txtProtectionHeadline);
                 }
                 txtProtectionStatus.Text = message
                     ?? (isProtected
-                        ? "Les définitions sont à jour."
-                        : "Vérifiez ClamAV, les règles YARA et les mises à jour des signatures.");
+                        ? LocalizationService.GetString("Overview_DefsUpToDate")
+                        : LocalizationService.GetString("Overview_CheckSignatures"));
 
                 txtProtectionStatus.Foreground = isProtected
                     ? ThemeUiBrushes.Get("SuccessGreen", txtProtectionStatus)
@@ -200,7 +207,9 @@ namespace optiSCAN.Views
             {
                 if (txtOverviewClamAvStatus != null)
                 {
-                    txtOverviewClamAvStatus.Text = clamAvOk ? "Actif" : "Non installé";
+                    txtOverviewClamAvStatus.Text = clamAvOk
+                        ? LocalizationService.GetString("Overview_ClamActive")
+                        : LocalizationService.GetString("Overview_ClamMissing");
                     txtOverviewClamAvStatus.Foreground = clamAvOk
                         ? ThemeUiBrushes.Get("SuccessGreen", txtOverviewClamAvStatus)
                         : ThemeUiBrushes.Get("DangerRed", txtOverviewClamAvStatus);
@@ -209,13 +218,19 @@ namespace optiSCAN.Views
                 if (txtOverviewYaraCount != null)
                 {
                     txtOverviewYaraCount.Text = yaraRulesCount > 0
-                        ? $"{yaraRulesCount:N0} règles"
-                        : "Non chargé";
+                        ? LocalizationService.Format("Overview_YaraLoaded", yaraRulesCount)
+                        : LocalizationService.GetString("Overview_YaraMissing");
                     txtOverviewYaraCount.Foreground = yaraRulesCount > 0
                         ? ThemeUiBrushes.Get("TextAccent", txtOverviewYaraCount)
                         : ThemeUiBrushes.Get("TextMuted", txtOverviewYaraCount);
                 }
             });
+        }
+
+        private void ApplyStaticLocalizedTexts()
+        {
+            if (txtProtectionHeadline != null && string.IsNullOrWhiteSpace(txtProtectionHeadline.Text))
+                txtProtectionHeadline.Text = LocalizationService.GetString("Overview_Protected");
         }
 
         // ── Cartes d'action → navigation ────────────────────────────────────

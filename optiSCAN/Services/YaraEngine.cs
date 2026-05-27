@@ -32,7 +32,8 @@ namespace optiSCAN.Services
         /// <c>true</c> si <c>_compiled.yarc</c> existe ET correspond à l'état actuel des fichiers .yar.
         /// Un <c>false</c> ici déclenche automatiquement une recompilation au prochain scan.
         /// </summary>
-        public bool HasCompiled => IsCompiledUpToDate();
+        public bool HasCompiled => YaraRulesCacheSupport.IsCompiledUpToDate(
+            _rulesDirectory, _compiledRulesPath, _compiledStampPath);
 
         // ── Constructeur ─────────────────────────────────────────────────────────
 
@@ -73,25 +74,6 @@ namespace optiSCAN.Services
         /// est absent, si <c>_compiled.stamp</c> est absent ou périmé (modification
         /// manuelle d'une règle, ajout/suppression d'un .yar).
         /// </summary>
-        private bool IsCompiledUpToDate()
-        {
-            if (!File.Exists(_compiledRulesPath)) return false;
-            if (!File.Exists(_compiledStampPath)) return false;
-            try
-            {
-                var files = Directory.GetFiles(_rulesDirectory, "*.yar");
-                if (files.Length == 0) return false;
-                Array.Sort(files, StringComparer.OrdinalIgnoreCase);
-                var currentStamp = ComputeRulesDirectoryFingerprint(files);
-                var savedStamp = File.ReadAllText(_compiledStampPath, Encoding.UTF8).Trim();
-                return string.Equals(currentStamp, savedStamp, StringComparison.Ordinal);
-            }
-            catch
-            {
-                return false; // En cas de doute → recompilation
-            }
-        }
-
         // L2 fix : regex multiline plutôt que StartsWith("rule ") ligne par ligne.
         // StartsWith manquait les règles précédées d'indentation, de commentaires,
         // ou définies sans espace supplémentaire ; la regex matche "rule <ident>"
@@ -109,7 +91,7 @@ namespace optiSCAN.Services
                     return 0;
 
                 Array.Sort(files, StringComparer.OrdinalIgnoreCase);
-                var stamp = ComputeRulesDirectoryFingerprint(files);
+                var stamp = YaraRulesCacheSupport.ComputeRulesDirectoryFingerprint(files);
                 if (TryReadRulesCountCache(stamp, out var cached))
                     return cached;
 
@@ -127,24 +109,6 @@ namespace optiSCAN.Services
                 AppLogger.Warn("YaraEngine", "CountRules", ex);
                 return 0;
             }
-        }
-
-        /// <summary>Empreinte du dossier de règles : invalide le cache si un .yar change.</summary>
-        private static string ComputeRulesDirectoryFingerprint(string[] sortedAbsolutePaths)
-        {
-            using var ms = new MemoryStream();
-            foreach (var p in sortedAbsolutePaths)
-            {
-                if (!File.Exists(p))
-                    continue;
-                var fi = new FileInfo(p);
-                var line = $"{p}|{fi.Length}|{fi.LastWriteTimeUtc.Ticks}\n";
-                var b = Encoding.UTF8.GetBytes(line);
-                ms.Write(b, 0, b.Length);
-            }
-            return ms.Length == 0
-                ? "EMPTY"
-                : Convert.ToHexString(SHA256.HashData(ms.ToArray()));
         }
 
         private bool TryReadRulesCountCache(string stamp, out int count)
@@ -253,8 +217,7 @@ namespace optiSCAN.Services
                     try
                     {
                         Array.Sort(ruleFiles, StringComparer.OrdinalIgnoreCase);
-                        var stamp = ComputeRulesDirectoryFingerprint(ruleFiles);
-                        File.WriteAllText(_compiledStampPath, stamp, Encoding.UTF8);
+                        YaraRulesCacheSupport.WriteCompiledStamp(_compiledStampPath, ruleFiles);
                     }
                     catch (Exception stampEx)
                     {

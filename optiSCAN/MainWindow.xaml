@@ -6,8 +6,9 @@
         xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
         xmlns:views="clr-namespace:optiSCAN.Views"
         xmlns:strings="clr-namespace:optiSCAN.Strings"
+        xmlns:loc="clr-namespace:optiSCAN.Localization"
         mc:Ignorable="d"
-        Title="optiSCAN — Optimiseur &amp; Antivirus"
+        Title="{loc:Loc Key=App_Title}"
         Height="720" Width="1280"
         MinHeight="600" MinWidth="1024"
         WindowStartupLocation="CenterScreen"
@@ -32,7 +33,7 @@
                 <!-- Logo (icône seule) -->
                 <StackPanel DockPanel.Dock="Top" Margin="0,18,0,10"
                             HorizontalAlignment="Center">
-                    <Border Width="42" Height="42" CornerRadius="11"
+                    <Border Width="42" Height="42" CornerRadius="12"
                             Background="{DynamicResource AccentBg}"
                             HorizontalAlignment="Center">
                         <md:PackIcon Kind="Shield" Width="24" Height="24"
@@ -51,7 +52,7 @@
                     <!-- Version -->
                     <TextBlock x:Name="txtSidebarVersion"
                                Text="…"
-                               FontSize="9" Foreground="{DynamicResource TextMuted}"
+                               FontSize="{DynamicResource FontSize.Micro}" Foreground="{DynamicResource TextMuted}"
                                HorizontalAlignment="Center" Margin="0,6,0,0"
                                TextWrapping="Wrap" TextAlignment="Center" Width="80"/>
                 </StackPanel>
@@ -132,7 +133,7 @@
                             <md:PackIcon Kind="Monitor" Width="22" Height="22"
                                          HorizontalAlignment="Center"
                                          VerticalAlignment="Center"/>
-                            <TextBlock Text="Accueil" FontSize="9" TextAlignment="Center"
+                            <TextBlock Text="{loc:Loc Key=Nav_Home}" FontSize="{DynamicResource FontSize.Micro}" TextAlignment="Center"
                                        Margin="0,4,0,0"/>
                         </StackPanel>
                     </RadioButton>
@@ -146,7 +147,7 @@
                             <md:PackIcon Kind="Broom" Width="22" Height="22"
                                          HorizontalAlignment="Center"
                                          VerticalAlignment="Center"/>
-                            <TextBlock Text="Nettoyer" FontSize="9" TextAlignment="Center"
+                            <TextBlock Text="{loc:Loc Key=Nav_Clean}" FontSize="{DynamicResource FontSize.Micro}" TextAlignment="Center"
                                        Margin="0,4,0,0"/>
                         </StackPanel>
                     </RadioButton>
@@ -167,11 +168,11 @@
                                              HorizontalAlignment="Right" VerticalAlignment="Bottom"
                                              Foreground="{DynamicResource SuccessGreen}"/>
                             </Grid>
-                            <TextBlock Text="Antivirus" FontSize="9" TextAlignment="Center"
+                            <TextBlock Text="{loc:Loc Key=Nav_Antivirus}" FontSize="{DynamicResource FontSize.Micro}" TextAlignment="Center"
                                        Margin="0,4,0,0"/>
                             <TextBlock x:Name="txtSidebarClamAvBadge"
-                                       Text="actif"
-                                       FontSize="8" TextAlignment="Center"
+                                       Text="{loc:Loc Key=Main_SidebarActive}"
+                                       FontSize="{DynamicResource FontSize.Micro}" TextAlignment="Center"
                                        Foreground="{DynamicResource SuccessGreen}"
                                        Margin="0,1,0,0"/>
                         </StackPanel>
@@ -186,7 +187,7 @@
                             <md:PackIcon Kind="History" Width="22" Height="22"
                                          HorizontalAlignment="Center"
                                          VerticalAlignment="Center"/>
-                            <TextBlock Text="Historique" FontSize="9" TextAlignment="Center"
+                            <TextBlock Text="{loc:Loc Key=Nav_History}" FontSize="{DynamicResource FontSize.Micro}" TextAlignment="Center"
                                        Margin="0,4,0,0"/>
                         </StackPanel>
                     </RadioButton>
@@ -200,7 +201,7 @@
                             <md:PackIcon Kind="Cog" Width="22" Height="22"
                                          HorizontalAlignment="Center"
                                          VerticalAlignment="Center"/>
-                            <TextBlock Text="Options" FontSize="9" TextAlignment="Center"
+                            <TextBlock Text="{loc:Loc Key=Nav_Options}" FontSize="{DynamicResource FontSize.Micro}" TextAlignment="Center"
                                        Margin="0,4,0,0"/>
                         </StackPanel>
                     </RadioButton>
@@ -247,16 +248,16 @@
                                      Foreground="{DynamicResource SuccessGreen}"
                                      VerticalAlignment="Center" Margin="0,0,6,0"/>
                         <TextBlock x:Name="lblStatus"
-                                   Text="Prêt — protection active."
+                                   Text="{loc:Loc Key=Main_StatusReady}"
                                    Foreground="{DynamicResource TextMedium}"
-                                   FontSize="12" VerticalAlignment="Center"/>
+                                   FontSize="{DynamicResource FontSize.Body}" VerticalAlignment="Center"/>
                     </StackPanel>
 
                     <!-- Centre : mention légale -->
                     <TextBlock Grid.Column="1"
-                               Text="optiSCAN est un logiciel gratuit — Vanier, Canada."
+                               Text="{loc:Loc Key=Main_FooterFree}"
                                Foreground="{DynamicResource TextMuted}"
-                               FontSize="11" VerticalAlignment="Center"
+                               FontSize="{DynamicResource FontSize.Small}" VerticalAlignment="Center"
                                Margin="0,0,24,0"
                                FontStyle="Italic"/>
 
@@ -266,8 +267,8 @@
                                      Foreground="{DynamicResource TextMuted}"
                                      VerticalAlignment="Center" Margin="0,0,4,0"/>
                         <TextBlock x:Name="txtFooterVersion"
-                                   FontSize="11" Foreground="{DynamicResource TextMuted}"
-                                   Text="optiSCAN — Fourni par Dona By"/>
+                                   FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                   Text="{loc:Loc Key=Main_FooterVersion}"/>
                     </StackPanel>
                 </Grid>
             </Border>

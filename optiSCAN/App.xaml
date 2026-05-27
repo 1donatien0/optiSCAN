@@ -108,16 +108,9 @@
             </Style>
 
             <!-- ═══════════════════════════════════════════════════════
-                 STYLE TABITEM
+                 STYLE TABITEM (défaut — vues sans style local)
             ═══════════════════════════════════════════════════════ -->
-            <Style TargetType="TabItem">
-                <Setter Property="Foreground"      Value="{DynamicResource TextSecondary}"/>
-                <Setter Property="Background"      Value="Transparent"/>
-                <Setter Property="FontFamily"      Value="{DynamicResource AppFontFamily}"/>
-                <Setter Property="FontSize"        Value="{DynamicResource FontSize.Body}"/>
-                <Setter Property="Padding"         Value="12,6"/>
-                <Setter Property="BorderThickness" Value="0"/>
-            </Style>
+            <Style TargetType="TabItem" BasedOn="{StaticResource DonabyTabItem}"/>
 
             <!-- ═══════════════════════════════════════════════════════
                  STYLE TEXTBOX
@@ -133,6 +126,10 @@
                 <Setter Property="Padding"         Value="8,6"/>
                 <Setter Property="SelectionBrush"  Value="{DynamicResource AccentBg}"/>
             </Style>
+
+            <!-- ComboBox / ComboBoxItem — template Donaby (voir Controls.xaml) -->
+            <Style TargetType="ComboBox" BasedOn="{StaticResource DonabyComboBox}"/>
+            <Style TargetType="ComboBoxItem" BasedOn="{StaticResource DonabyComboBoxItem}"/>
 
             <!-- ═══════════════════════════════════════════════════════
                  STYLE LISTBOX

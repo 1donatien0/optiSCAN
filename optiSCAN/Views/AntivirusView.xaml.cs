@@ -1,5 +1,7 @@
+using optiSCAN.Localization;
 using optiSCAN.Models;
 using optiSCAN.Services;
+using optiSCAN.Strings;
 using optiSCAN.ViewModels;
 using System.Collections.Concurrent;
 using System.Globalization;
@@ -199,19 +201,21 @@ namespace optiSCAN.Views
         private static string FormatHeroLastScan(DateTime? lastScan)
         {
             if (!lastScan.HasValue)
-                return "Aucune analyse enregistrée";
+                return Localization.LocalizationService.GetString("Av_LastScanNone");
 
             var diff = DateTime.Now - lastScan.Value;
             if (diff.TotalMinutes < 1)
-                return "Dernière analyse : à l'instant";
+                return Localization.LocalizationService.GetString("Av_LastScanInstant");
             if (diff.TotalMinutes < 60)
-                return $"Dernière analyse : il y a {(int)diff.TotalMinutes} min";
+                return Localization.LocalizationService.Format("Av_LastScanMinutes", (int)diff.TotalMinutes);
             if (diff.TotalHours < 24)
-                return $"Dernière analyse : il y a {(int)diff.TotalHours} h";
+                return Localization.LocalizationService.Format("Av_LastScanHours", (int)diff.TotalHours);
             if (diff.TotalDays < 7)
-                return $"Dernière analyse : il y a {(int)diff.TotalDays} j";
+                return Localization.LocalizationService.Format("Av_LastScanDays", (int)diff.TotalDays);
 
-            return $"Dernière analyse : {lastScan.Value.ToString("dd/MM/yyyy HH:mm", CultureInfo.CurrentCulture)}";
+            return Localization.LocalizationService.Format(
+                "Av_LastScanLabel",
+                lastScan.Value.ToString("G", CultureInfo.CurrentCulture));
         }
 
         private static void SetDisplayText(System.Windows.Controls.TextBlock? block, string value)
@@ -226,7 +230,7 @@ namespace optiSCAN.Views
         {
             using var dlg = new FolderBrowserDialog
             {
-                Description = "Sélectionnez le dossier à analyser",
+                Description = LocalizationService.GetString("Av_PickFolder"),
                 UseDescriptionForTitle = true
             };
 
@@ -242,7 +246,7 @@ namespace optiSCAN.Views
         {
             var dlg = new OpenFileDialog
             {
-                Title = "Sélectionnez un fichier à analyser",
+                Title = LocalizationService.GetString("Av_PickFile"),
                 CheckFileExists = true,
                 CheckPathExists = true
             };
@@ -283,8 +287,8 @@ namespace optiSCAN.Views
                 return;
 
             if (System.Windows.MessageBox.Show(
-                    "Supprimer définitivement ce fichier ?",
-                    "Confirmation",
+                    LocalizationService.GetString("Av_ConfirmDeleteFile"),
+                    OptiscanStrings.Confirmations.Title,
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 return;
@@ -308,8 +312,8 @@ namespace optiSCAN.Views
                 return;
 
             if (System.Windows.MessageBox.Show(
-                    "Supprimer définitivement cet élément de la quarantaine ?",
-                    "Confirmation",
+                    LocalizationService.GetString("Av_ConfirmDeleteQuarantine"),
+                    OptiscanStrings.Confirmations.Title,
                     MessageBoxButton.YesNo,
                     MessageBoxImage.Question) != MessageBoxResult.Yes)
                 return;
@@ -327,7 +331,7 @@ namespace optiSCAN.Views
         {
             Actions.StopAllUpdates();
             SetSignatureUpdating(false);
-            AppendSignatureLog("Mise à jour interrompue par l'utilisateur");
+            AppendSignatureLog(LocalizationService.GetString("Status_SigInterrupted"));
         }
     }
 }

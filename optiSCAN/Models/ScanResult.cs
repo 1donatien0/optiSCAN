@@ -1,3 +1,5 @@
+using optiSCAN.Localization;
+
 namespace optiSCAN.Models
 {
     /// <summary>
@@ -60,26 +62,11 @@ namespace optiSCAN.Models
 
         /// <summary>Résumé d'une ligne adapté à l'état courant du scan.</summary>
         public string SummaryDisplay =>
-            Status switch
-            {
-                ScanStatus.Running => $"Analyse en cours… ({FilesScanned:N0} fichier(s) déjà parcourus)",
-                ScanStatus.Completed => ThreatsFound == 0
-                    ? $"Aucune menace — {FilesScanned:N0} fichier(s) en {ScanDisplayFormatter.FormatDuration(Duration)}"
-                    : $"Attention : {ThreatsFound} menace(s) sur {FilesScanned:N0} fichier(s)",
-                ScanStatus.Cancelled => $"Analyse interrompue ({FilesScanned:N0} fichier(s) parcourus)",
-                ScanStatus.Error => $"Erreur : {ErrorMessage}",
-                _ => "État inconnu"
-            };
+            LocalizationService.ScanSummaryDisplay(
+                Status, FilesScanned, ThreatsFound, Duration, ErrorMessage);
 
         /// <summary>Libellé lisible du type de scan (ex. « Analyse rapide »).</summary>
-        public string TypeDisplay => Type switch
-        {
-            ScanType.File => "Fichier",
-            ScanType.Folder => "Dossier",
-            ScanType.FullScan => "Analyse complète",
-            ScanType.QuickScan => "Analyse rapide",
-            _ => "Analyse"
-        };
+        public string TypeDisplay => LocalizationService.ScanTypeDisplay(Type);
 
         /// <summary>Durée formatée en français (ex. « 2 min 34 s »).</summary>
         public string DurationDisplay => ScanDisplayFormatter.FormatDuration(Duration);

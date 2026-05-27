@@ -2,6 +2,7 @@ using optiSCAN.Models;
 using optiSCAN.Services;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 using System.Runtime.InteropServices;
 using System.Windows;
 
@@ -107,8 +108,9 @@ namespace optiSCAN.Views
                     if (doTempWin)
                     {
                         string path = Path.Combine(Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows", "Temp");
-                        freed += CleanDir(path);
-                        Dispatcher.Invoke(() => AppendLog($"Temp Windows nettoyé : {FormatSize(freed)}"));
+                        long f = CleanDir(path);
+                        freed += f;
+                        Dispatcher.Invoke(() => AppendLog($"Temp Windows nettoyé : {FormatSize(f)}"));
                     }
                     if (doTempUser)
                     {
@@ -246,10 +248,54 @@ namespace optiSCAN.Views
             Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows", @"Logs");
         private static string FirefoxCachePath()
         {
-            var profilesBase = Path.Combine(LocalApp, @"Mozilla\Firefox\Profiles");
-            if (!Directory.Exists(profilesBase)) return string.Empty;
-            foreach (var dir in Directory.EnumerateDirectories(profilesBase))
-                if (dir.Contains(".default")) return Path.Combine(dir, "cache2");
+            var localProfilesBase = Path.Combine(LocalApp, @"Mozilla\Firefox\Profiles");
+            if (!Directory.Exists(localProfilesBase))
+                return string.Empty;
+
+            // Priorité : default-release, puis default, puis premier profil local disponible.
+            var directories = Directory.EnumerateDirectories(localProfilesBase).ToList();
+            string? preferred = directories.FirstOrDefault(d => d.Contains(".default-release", StringComparison.OrdinalIgnoreCase))
+                                ?? directories.FirstOrDefault(d => d.Contains(".default", StringComparison.OrdinalIgnoreCase))
+                                ?? directories.FirstOrDefault();
+
+            if (!string.IsNullOrEmpty(preferred))
+            {
+                var cache = Path.Combine(preferred, "cache2");
+                if (Directory.Exists(cache))
+                    return cache;
+            }
+
+            // Repli : lire profiles.ini (Roaming), puis mapper vers le dossier de cache LocalAppData.
+            var roaming = Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData);
+            var profilesIni = Path.Combine(roaming, @"Mozilla\Firefox\profiles.ini");
+            if (!File.Exists(profilesIni))
+                return string.Empty;
+
+            try
+            {
+                var lines = File.ReadAllLines(profilesIni);
+                foreach (var line in lines)
+                {
+                    if (!line.StartsWith("Path=", StringComparison.OrdinalIgnoreCase))
+                        continue;
+                    var relativeOrAbsolute = line["Path=".Length..].Trim();
+                    if (string.IsNullOrEmpty(relativeOrAbsolute))
+                        continue;
+
+                    var profileName = Path.GetFileName(relativeOrAbsolute.TrimEnd('\\', '/'));
+                    if (string.IsNullOrEmpty(profileName))
+                        continue;
+
+                    var localCandidate = Path.Combine(localProfilesBase, profileName, "cache2");
+                    if (Directory.Exists(localCandidate))
+                        return localCandidate;
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("CleanControl", "Lecture de profiles.ini Firefox", ex);
+            }
+
             return string.Empty;
         }
 

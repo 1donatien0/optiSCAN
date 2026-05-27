@@ -1,4 +1,5 @@
 using Microsoft.Toolkit.Uwp.Notifications;
+using optiSCAN.Localization;
 using optiSCAN.Models;
 
 namespace optiSCAN.Services
@@ -39,6 +40,12 @@ namespace optiSCAN.Services
             ToastNotificationManagerCompat.OnActivated += SurActivationToastStatic;
         }
 
+        /// <summary>Réinitialise l'enregistrement du hook toast (tests unitaires uniquement).</summary>
+        internal static void ResetActivationHookForTests()
+        {
+            _activationHooked = false;
+        }
+
         private static void SurActivationToastStatic(ToastNotificationActivatedEventArgsCompat e)
         {
             try
@@ -72,20 +79,20 @@ namespace optiSCAN.Services
                     .AddArgument("action", "threat")
                     .AddArgument("file", threat.FilePath)
                     .AddArgument("virus", threat.VirusName)
-                    .AddText("Menace détectée")
+                    .AddText(LocalizationService.GetString("Notif_ThreatTitle"))
                     .AddText(threat.VirusName)
                     .AddText($"{threat.FileName} • {severity}")
                     .AddButton(new ToastButton()
-                        .SetContent("Mettre en quarantaine")
+                        .SetContent(LocalizationService.GetString("Notif_QuarantineBtn"))
                         .AddArgument("action", "quarantine")
                         .AddArgument("file", threat.FilePath)
                         .AddArgument("virus", threat.VirusName))
                     .AddButton(new ToastButton()
-                        .SetContent("Ignorer")
+                        .SetContent(LocalizationService.GetString("Notif_IgnoreBtn"))
                         .AddArgument("action", "ignore")
                         .AddArgument("file", threat.FilePath))
                     .AddButton(new ToastButton()
-                        .SetContent("Ouvrir optiSCAN")
+                        .SetContent(LocalizationService.GetString("Notif_OpenApp"))
                         .AddArgument("action", "open"))
                     .SetToastDuration(ToastDuration.Long)
                     .Show();
@@ -104,10 +111,10 @@ namespace optiSCAN.Services
             {
                 new ToastContentBuilder()
                     .AddArgument("action", "quarantined")
-                    .AddText("Fichier mis en quarantaine")
+                    .AddText(LocalizationService.GetString("Notif_QuarantinedTitle"))
                     .AddText($"{threat.FileName} → {threat.VirusName}")
                     .AddButton(new ToastButton()
-                        .SetContent("Voir quarantaine")
+                        .SetContent(LocalizationService.GetString("Notif_ViewQuarantine"))
                         .AddArgument("action", "showquarantine"))
                     .Show();
             }
@@ -127,8 +134,8 @@ namespace optiSCAN.Services
                 {
                     new ToastContentBuilder()
                         .AddArgument("action", "scanok")
-                        .AddText("Scan terminé")
-                        .AddText($"{filesScanned} fichiers analysés, aucune menace")
+                        .AddText(LocalizationService.GetString("Notif_ScanOkTitle"))
+                        .AddText(LocalizationService.Format("Notif_ScanOkBody", filesScanned))
                         .Show();
                 }
                 else
@@ -136,13 +143,13 @@ namespace optiSCAN.Services
                     new ToastContentBuilder()
                         .AddArgument("action", "scanthreats")
                         .AddArgument("threats", threatsFound.ToString())
-                        .AddText($"Scan terminé — {threatsFound} menace(s)")
-                        .AddText("Consultez l'historique pour plus de détails")
+                        .AddText(LocalizationService.Format("Notif_ScanThreatsTitle", threatsFound))
+                        .AddText(LocalizationService.GetString("Notif_ScanThreatsBody"))
                         .AddButton(new ToastButton()
-                            .SetContent("Ouvrir l'historique")
+                            .SetContent(LocalizationService.GetString("Notif_HistoryBtn"))
                             .AddArgument("action", "history"))
                         .AddButton(new ToastButton()
-                            .SetContent("Ouvrir optiSCAN")
+                            .SetContent(LocalizationService.GetString("Notif_OpenApp"))
                             .AddArgument("action", "open"))
                         .Show();
                 }
@@ -161,10 +168,10 @@ namespace optiSCAN.Services
             {
                 new ToastContentBuilder()
                     .AddArgument("action", "update")
-                    .AddText("Mises à jour disponibles")
-                    .AddText($"Nouvelles signatures ClamAV v{version}")
+                    .AddText(LocalizationService.GetString("Notif_UpdateTitle"))
+                    .AddText(LocalizationService.Format("Notif_UpdateBody", version))
                     .AddButton(new ToastButton()
-                        .SetContent("Mettre à jour")
+                        .SetContent(LocalizationService.GetString("Notif_UpdateBtn"))
                         .AddArgument("action", "update"))
                     .Show();
             }
@@ -182,8 +189,8 @@ namespace optiSCAN.Services
             {
                 new ToastContentBuilder()
                     .AddArgument("action", "rtpstarted")
-                    .AddText("Protection temps réel activée")
-                    .AddText("optiSCAN surveille les fichiers en arrière-plan")
+                    .AddText(LocalizationService.GetString("Notif_RtpStartedTitle"))
+                    .AddText(LocalizationService.GetString("Notif_RtpStartedBody"))
                     .SetToastDuration(ToastDuration.Short)
                     .Show();
             }

@@ -1,3 +1,4 @@
+using optiSCAN.Localization;
 using optiSCAN.Models;
 using optiSCAN.Strings;
 using System.Windows;
@@ -63,8 +64,8 @@ namespace optiSCAN.Views
                 Services.ServiceContainer.Default.RequestExportScanSessionPdf(session);
             else
                 System.Windows.MessageBox.Show(
-                    "Sélectionnez une ligne dans l’onglet « Scans antivirus », puis cliquez sur Exporter PDF (sélection).",
-                    "optiSCAN — Historique",
+                    LocalizationService.GetString("Hist_ExportPdfSelect"),
+                    LocalizationService.GetString("Hist_Title"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
         }

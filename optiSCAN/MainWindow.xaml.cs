@@ -1,4 +1,5 @@
 using MaterialDesignThemes.Wpf;
+using optiSCAN.Localization;
 using optiSCAN.Models;
 using optiSCAN.Services;
 using optiSCAN.Strings;
@@ -12,6 +13,7 @@ using System.Windows.Forms;
 using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
+using System.Windows.Input;
 using Button = System.Windows.Controls.Button;
 using MediaColor = System.Windows.Media.Color;
 
@@ -42,6 +44,7 @@ namespace optiSCAN
 
         private readonly Services.NavigationService _navigationService = new();
         private readonly SemaphoreSlim _manualSignatureUpdateLock = new(1, 1);
+        private readonly RoutedCommand _quickScanShortcutCommand = new();
         private bool _isClosing = false;
         private bool _wasScanning;
         private bool _isSyncingSidebarSelection;
@@ -124,12 +127,25 @@ namespace optiSCAN
                 KeyboardShortcuts.Register(this,
                     new[] { OptiscanStrings.PanelIds.Overview, OptiscanStrings.PanelIds.Antivirus, OptiscanStrings.PanelIds.Clean, OptiscanStrings.PanelIds.History, OptiscanStrings.PanelIds.Options },
                     SwitchPanel);
+                RegisterScanShortcuts();
             }
             catch (Exception ex)
             {
                 AppLogger.Error("MainWindow", "Initialisation fenêtre principale", ex);
-                SetStatus($"Erreur: {ex.Message}", isError: true);
+                SetStatus(LocalizationService.Format("Status_Error", ex.Message), isError: true);
             }
+        }
+
+        private void RegisterScanShortcuts()
+        {
+            CommandBindings.Add(new CommandBinding(_quickScanShortcutCommand, (_, _) =>
+            {
+                if (ViewModel?.QuickScanCommand?.CanExecute(null) == true)
+                    ViewModel.QuickScanCommand.Execute(null);
+            }));
+
+            // F5 : raccourci d'analyse rapide indiqué dans l'interface Antivirus.
+            InputBindings.Add(new KeyBinding(_quickScanShortcutCommand, Key.F5, ModifierKeys.None));
         }
 
         private void InitializeTrayIcon()
@@ -139,23 +155,14 @@ namespace optiSCAN
                 return;
 
             _trayMenu = new ContextMenuStrip();
-            _trayMenu.Items.Add("Ouvrir", null, (_, _) => Dispatcher.Invoke(ShowWindowFromTray));
+            _trayMenu.Items.Add(LocalizationService.GetString("Tray_Open"), null, (_, _) => Dispatcher.Invoke(ShowWindowFromTray));
             _trayMenu.Items.Add(new ToolStripSeparator());
-            _trayMenu.Items.Add("Quitter", null, (_, _) => Dispatcher.Invoke(ExitFromTray));
+            _trayMenu.Items.Add(LocalizationService.GetString("Tray_Exit"), null, (_, _) => Dispatcher.Invoke(ExitFromTray));
 
-            // ApplicationIcon est "optiSCAN.ico" (copié en sortie). On le charge depuis le répertoire de l'exécutable.
-            // Solution de repli robuste : icône système si le fichier n'est pas trouvable.
-            var icon = System.Drawing.SystemIcons.Application;
-            try
-            {
-                var iconPath = Path.Combine(AppContext.BaseDirectory, "optiSCAN.ico");
-                if (File.Exists(iconPath))
-                    icon = new System.Drawing.Icon(iconPath);
-            }
-            catch
-            {
-                icon = System.Drawing.SystemIcons.Application;
-            }
+            // Priorité 1 : icône embarquée dans optiSCAN.exe (toujours présente après publish).
+            // Priorité 2 : optiSCAN.ico à côté de l'exécutable.
+            // Repli final : icône système.
+            var icon = ResolveTrayIcon();
 
             _trayIcon = new NotifyIcon
             {
@@ -171,6 +178,37 @@ namespace optiSCAN
                     Dispatcher.Invoke(ShowWindowFromTray);
             };
             _trayIcon.DoubleClick += (_, _) => Dispatcher.Invoke(ShowWindowFromTray);
+        }
+
+        private static System.Drawing.Icon ResolveTrayIcon()
+        {
+            try
+            {
+                var processPath = Environment.ProcessPath;
+                if (!string.IsNullOrWhiteSpace(processPath) && File.Exists(processPath))
+                {
+                    var embedded = System.Drawing.Icon.ExtractAssociatedIcon(processPath);
+                    if (embedded != null)
+                        return embedded;
+                }
+            }
+            catch
+            {
+                // Continue vers fallback fichier.
+            }
+
+            try
+            {
+                var iconPath = Path.Combine(AppContext.BaseDirectory, "optiSCAN.ico");
+                if (File.Exists(iconPath))
+                    return new System.Drawing.Icon(iconPath);
+            }
+            catch
+            {
+                // Continue vers fallback système.
+            }
+
+            return System.Drawing.SystemIcons.Application;
         }
 
         private void ShowWindowFromTray()
@@ -207,9 +245,9 @@ namespace optiSCAN
 
                 bool clamAvOk = _clamAvEngine?.IsClamAvInstalled() ?? false;
                 if (!runtimeReport.IsClamAvReady)
-                    SetStatus(runtimeReport.BuildSummaryLine() + " — voir README § 3 ou scripts\\verify-runtime-deps.ps1", isWarning: true);
+                    SetStatus(runtimeReport.BuildSummaryLine() + LocalizationService.GetString("Main_RuntimeHint"), isWarning: true);
                 else
-                    SetStatus(clamAvOk ? "ClamAV est opérationnel." : "ClamAV est introuvable sur cette machine.", isWarning: !clamAvOk);
+                    SetStatus(clamAvOk ? LocalizationService.GetString("Main_ClamOperational") : LocalizationService.GetString("Main_ClamNotFound"), isWarning: !clamAvOk);
 
                 RefreshAntivirusStatus();
                 RefreshQuarantineList();
@@ -234,7 +272,7 @@ namespace optiSCAN
             catch (Exception ex)
             {
                 AppLogger.Error("MainWindow", "SurChargementFenetrePrincipale", ex);
-                SetStatus($"Erreur: {ex.Message}", isError: true);
+                SetStatus(LocalizationService.Format("Status_Error", ex.Message), isError: true);
             }
             await Task.CompletedTask;
         }
@@ -427,7 +465,7 @@ namespace optiSCAN
 
             if (txtSidebarClamAvBadge != null)
             {
-                txtSidebarClamAvBadge.Text = clamAvOk ? "ClamAV actif" : "ClamAV absent";
+                txtSidebarClamAvBadge.Text = clamAvOk ? LocalizationService.GetString("Main_ClamBadgeActive") : LocalizationService.GetString("Main_ClamBadgeMissing");
                 txtSidebarClamAvBadge.Foreground = clamAvOk
                     ? ThemeUiBrushes.Get("SuccessGreen", txtSidebarClamAvBadge)
                     : ThemeUiBrushes.Get("DangerRed", txtSidebarClamAvBadge);
@@ -571,35 +609,35 @@ namespace optiSCAN
 
             var statusSb = new StringBuilder();
             if (clam)
-                statusSb.AppendLine($"ClamAV — base {clamVer} (MAJ {clamWhen})");
+                statusSb.AppendLine(LocalizationService.Format("Rec_StatusClamOk", clamVer, clamWhen));
             else
-                statusSb.AppendLine("ClamAV — non détecté (dossier clamav/x64 attendu à côté de l’exécutable).");
-            statusSb.Append($"YARA — {yaraRules:N0} règle(s), paquet {yaraPack} (MAJ {yaraWhen})");
+                statusSb.AppendLine(LocalizationService.GetString("Rec_StatusClamMissing"));
+            statusSb.Append(LocalizationService.Format("Rec_StatusYara", yaraRules, yaraPack, yaraWhen));
             overview.UpdateProtectionStatus(protectedOk, statusSb.ToString().Trim());
 
             string sig = !clam
-                ? "ClamAV est absent : copiez les binaires ClamAV ou réinstallez optiSCAN avec le dossier clamav."
+                ? LocalizationService.GetString("Rec_SigClamMissing")
                 : (!yaraAvail || yaraRules == 0
-                    ? "YARA : aucune règle chargée — ouvrez Antivirus → onglet Signatures pour mettre à jour."
-                    : $"Moteurs prêts — {yaraRules:N0} règle(s) YARA actives avec ClamAV.");
+                    ? LocalizationService.GetString("Rec_SigNoYara")
+                    : LocalizationService.Format("Rec_SigReady", yaraRules));
             int sigSev = !clam || !yaraAvail || yaraRules == 0 ? 1 : 0;
 
             var cleanHist = _logManager?.GetCleanHistory() ?? Array.Empty<CleanSession>();
             DateTime? lastClean = cleanHist.Count > 0 ? cleanHist[0].StartedAt : null;
             bool suggestClean = !lastClean.HasValue || (DateTime.Now - lastClean.Value).TotalDays > 14;
             string hyp = suggestClean
-                ? "Envisagez un nettoyage des fichiers temporaires et caches (menu Nettoyer) si ce n’est pas fait récemment."
-                : $"Dernier nettoyage enregistré le {lastClean:dd/MM/yyyy} — priorité basse.";
+                ? LocalizationService.GetString("Rec_CleanSuggest")
+                : LocalizationService.Format("Rec_CleanRecent", lastClean!.Value.ToString("d", LocalizationService.CurrentCulture));
             int hypSev = suggestClean ? 1 : 0;
 
             var sessions = _logManager?.GetHistory() ?? Array.Empty<ScanSession>();
             var cutoff = DateTime.Now.AddDays(-30);
             int threats30 = sessions.Where(s => s.StartedAt >= cutoff).Sum(s => s.ThreatsFound);
             string act = sessions.Count == 0
-                ? "Aucune analyse dans l’historique — lancez une analyse rapide (Antivirus)."
+                ? LocalizationService.GetString("Rec_ActNone")
                 : threats30 > 0
-                    ? $"30 derniers jours : {threats30:N0} menace(s) signalée(s) — consultez Historique / onglet Analyse."
-                    : "Historique d’analyses disponible — ouvrez l’onglet Historique pour le détail.";
+                    ? LocalizationService.Format("Rec_ActThreats", threats30)
+                    : LocalizationService.GetString("Rec_ActOk");
             int actSev = threats30 > 0 ? 1 : (sessions.Count == 0 ? 1 : 2);
 
             overview.UpdateRecommendations(sig, sigSev, hyp, hypSev, act, actSev);
@@ -635,8 +673,8 @@ namespace optiSCAN
                 var rulesCount = _yaraEngine?.RulesCount ?? 0;
                 ViewModel.YaraRulesCount = rulesCount;
                 ViewModel.YaraStatus = (_yaraEngine?.IsAvailable ?? false)
-                    ? $"YARA opérationnel — {rulesCount} règle(s)"
-                    : "YARA non disponible (yara64.exe manquant ou aucune règle)";
+                    ? LocalizationService.Format("Vm_YaraOperational", rulesCount)
+                    : LocalizationService.GetString("Vm_YaraUnavailable");
                 ViewModel.RefreshProtectionStatus();
             }
 
@@ -670,12 +708,12 @@ namespace optiSCAN
                 var threats = ViewModel?.Threats ?? Enumerable.Empty<ThreatInfo>();
                 var quar = _quarantineManager?.GetEntries() ?? Array.Empty<QuarantineEntry>();
                 html.ExportFullReport(hist, threats, quar, UserPreferences.Current, dlg.FileName);
-                SetStatus($"Rapport HTML enregistré : {dlg.FileName}");
+                SetStatus(LocalizationService.Format("Status_HtmlSaved", dlg.FileName));
             }
             catch (Exception ex)
             {
                 AppLogger.Error("MainWindow", "Export HTML", ex);
-                SetStatus($"Export HTML impossible : {ex.Message}", isError: true);
+                SetStatus(LocalizationService.Format("Status_HtmlFailed", ex.Message), isError: true);
             }
         }
 
@@ -685,8 +723,8 @@ namespace optiSCAN
             if (sessions.Count == 0)
             {
                 System.Windows.MessageBox.Show(this,
-                    "Aucune analyse n’est enregistrée dans l’historique. Lancez d’abord une analyse depuis l’onglet Antivirus.",
-                    "Export PDF",
+                    LocalizationService.GetString("Status_ExportNoHistory"),
+                    LocalizationService.GetString("Hist_ExportPdfTitle"),
                     MessageBoxButton.OK,
                     MessageBoxImage.Information);
                 return;
@@ -709,12 +747,12 @@ namespace optiSCAN
 
                 var gen = new PdfReportGenerator();
                 gen.GenerateReportFromSession(session, dlg.FileName);
-                SetStatus($"Rapport PDF enregistré : {dlg.FileName}");
+                SetStatus(LocalizationService.Format("Status_PdfSaved", dlg.FileName));
             }
             catch (Exception ex)
             {
                 AppLogger.Error("MainWindow", "Export PDF", ex);
-                SetStatus($"Export PDF impossible : {ex.Message}", isError: true);
+                SetStatus(LocalizationService.Format("Status_PdfFailed", ex.Message), isError: true);
             }
         }
 
@@ -772,7 +810,7 @@ namespace optiSCAN
             if (txtSidebarVersion != null)
                 txtSidebarVersion.Text = $"{release} ({semver})";
             if (txtFooterVersion != null)
-                txtFooterVersion.Text = $"optiSCAN {release} — Fourni par Dona By";
+                txtFooterVersion.Text = LocalizationService.Format("Main_FooterVersion", release);
         }
 
         // ── Ré-affichage depuis la systray ou IPC ────────────────────────────────
@@ -877,7 +915,7 @@ namespace optiSCAN
             if (sender is Button btn && btn.Tag is string filePath)
             {
                 ExclusionSettings.Current.AddFile(filePath);
-                SetStatus($"Fichier ignoré : {System.IO.Path.GetFileName(filePath)}", isWarning: true);
+                SetStatus(LocalizationService.Format("Status_FileIgnored", System.IO.Path.GetFileName(filePath)), isWarning: true);
                 ((Views.AntivirusView)panelAntivirus)?.RefreshAllData();
             }
         }
@@ -892,13 +930,13 @@ namespace optiSCAN
                     if (System.IO.File.Exists(filePath))
                     {
                         System.IO.File.Delete(filePath);
-                        SetStatus($"Fichier supprimé : {System.IO.Path.GetFileName(filePath)}", iconKindName: UiIconKinds.Delete);
+                        SetStatus(LocalizationService.Format("Status_FileDeleted", System.IO.Path.GetFileName(filePath)), iconKindName: UiIconKinds.Delete);
                     }
                     ((Views.AntivirusView)panelAntivirus)?.RefreshAllData();
                 }
                 catch (Exception ex)
                 {
-                    SetStatus($"Erreur suppression : {ex.Message}", isError: true);
+                    SetStatus(LocalizationService.Format("Status_DeleteFailed", ex.Message), isError: true);
                 }
             }
         }
@@ -947,7 +985,7 @@ namespace optiSCAN
             => (panelAntivirus as Views.AntivirusView)?.AppendSignatureLog($"[ClamAV] {line}");
 
         private void SurSortieMisesAJourRegles(object? sender, string line)
-            => (panelAntivirus as Views.AntivirusView)?.AppendSignatureLog($"[Règles] {line}");
+            => (panelAntivirus as Views.AntivirusView)?.AppendSignatureLog($"{LocalizationService.GetString("Status_SigLogRules")} {line}");
 
         public async void BtnManualUpdateSignatures_Click(object sender, RoutedEventArgs e)
         {
@@ -985,7 +1023,7 @@ namespace optiSCAN
                 completedOk = false;
                 AppLogger.Error("MainWindow", "BtnManualUpdateSignatures_Click", ex);
                 antivirusView?.AppendSignatureLog(UiLogText.Error($"Erreur : {ex.Message}"));
-                SetStatus($"Mise à jour : {ex.Message}", isError: true);
+                SetStatus(LocalizationService.Format("Status_UpdateError", ex.Message), isError: true);
             }
             finally
             {
@@ -1015,7 +1053,7 @@ namespace optiSCAN
             try { _rulesUpdater?.CancelUpdate(); }
             catch (Exception ex) { AppLogger.Warn("MainWindow", "CancelUpdate règles", ex); }
 
-            antivirusView?.AppendSignatureLog("Mise à jour interrompue par l'utilisateur");
+            antivirusView?.AppendSignatureLog(LocalizationService.GetString("Status_SigInterrupted"));
             antivirusView?.SetSignatureUpdating(false);
         }
 
