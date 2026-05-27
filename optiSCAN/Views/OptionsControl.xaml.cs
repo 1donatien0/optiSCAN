@@ -12,7 +12,6 @@ using System.Windows.Input;
 using WinForms = System.Windows.Forms;
 using WpfButton = System.Windows.Controls.Button;
 using WpfCheckBox = System.Windows.Controls.CheckBox;
-using WpfComboBox = System.Windows.Controls.ComboBox;
 
 namespace optiSCAN.Views
 {
@@ -73,7 +72,7 @@ namespace optiSCAN.Views
                     chkDarkTheme.IsEnabled = prefs.SyncWindowsTheme != true;
 
                 if (cmbUiLanguage != null)
-                    SelectUiLanguageCombo(prefs.UiCulture);
+                    SelectUiLanguageCombo(UserPreferences.Current.UiCulture);
 
                 if (cmbFavoriteScan != null)
                 {
@@ -218,34 +217,40 @@ namespace optiSCAN.Views
         private void SelectUiLanguageCombo(string? culture)
         {
             if (cmbUiLanguage == null) return;
+
             var normalized = string.IsNullOrWhiteSpace(culture)
                 ? LocalizationService.CurrentCulture.Name
                 : culture;
+
             var wantEn = normalized.StartsWith("en", StringComparison.OrdinalIgnoreCase);
             cmbUiLanguage.SelectedIndex = wantEn ? 1 : 0;
         }
 
-        /// <summary>
-        /// Premier clic dans un ScrollViewer : donne le focus à la ComboBox pour ouvrir la liste de façon fiable.
-        /// </summary>
         private void ComboBox_PreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
         {
-            if (sender is not WpfComboBox cb || cb.IsDropDownOpen)
+            if (sender is not System.Windows.Controls.ComboBox cb || cb.IsDropDownOpen)
                 return;
+
             cb.Focus();
+            cb.IsDropDownOpen = true;
+            e.Handled = true;
         }
 
         private void ComboBox_DropDownOpened(object sender, EventArgs e)
         {
             if (sender == cmbUiLanguage)
+            {
                 _languageTagBeforeDropDown = GetSelectedLanguageTag();
+            }
             else if (sender == cmbFavoriteScan)
+            {
                 _favoriteScanIndexBeforeDropDown = cmbFavoriteScan?.SelectedIndex ?? -1;
+            }
         }
 
         private string? GetSelectedLanguageTag()
         {
-            if (cmbUiLanguage?.SelectedItem is ComboBoxItem item)
+            if (cmbUiLanguage?.SelectedItem is System.Windows.Controls.ComboBoxItem item)
                 return item.Tag as string;
             return null;
         }

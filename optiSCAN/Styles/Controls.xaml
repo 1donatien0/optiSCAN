@@ -244,7 +244,6 @@
         <Setter Property="ScrollViewer.HorizontalScrollBarVisibility" Value="Auto"/>
         <Setter Property="ScrollViewer.VerticalScrollBarVisibility" Value="Auto"/>
         <Setter Property="ItemTemplate" Value="{StaticResource DonabyComboBoxTextTemplate}"/>
-        <Setter Property="SelectionBoxItemTemplate" Value="{StaticResource DonabyComboBoxTextTemplate}"/>
         <Setter Property="ItemContainerStyle" Value="{StaticResource DonabyComboBoxItem}"/>
         <Setter Property="Template">
             <Setter.Value>
@@ -260,13 +259,13 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="6"/>
+                        <!-- SelectionBoxItemTemplate est en lecture seule : pas de Setter de style (MC3080). -->
                         <ContentPresenter x:Name="selectionPresenter"
                                           Margin="{TemplateBinding Padding}"
                                           HorizontalAlignment="Left"
                                           VerticalAlignment="Center"
                                           Content="{TemplateBinding SelectionBoxItem}"
-                                          ContentTemplate="{TemplateBinding SelectionBoxItemTemplate}"
-                                          ContentStringFormat="{TemplateBinding SelectionBoxItemStringFormat}"
+                                          ContentTemplate="{StaticResource DonabyComboBoxTextTemplate}"
                                           TextElement.Foreground="{DynamicResource TextDark}"
                                           IsHitTestVisible="False"/>
                         <ToggleButton x:Name="dropDownToggle"

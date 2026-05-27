@@ -141,8 +141,9 @@
                                        Foreground="{DynamicResource TextDark}"
                                        Margin="0,0,0,6"/>
                             <ComboBox x:Name="cmbUiLanguage"
-                                      Style="{StaticResource DonabyComboBox}"
-                                      DisplayMemberPath="Content"
+                                      Style="{x:Null}"
+                                      Background="Transparent"
+                                      Cursor="Hand"
                                       DropDownOpened="ComboBox_DropDownOpened"
                                       DropDownClosed="CmbUiLanguage_DropDownClosed"
                                       PreviewMouseLeftButtonDown="ComboBox_PreviewMouseLeftButtonDown"
@@ -162,7 +163,9 @@
                                        Foreground="{DynamicResource TextDark}"
                                        Margin="0,0,0,6"/>
                             <ComboBox x:Name="cmbFavoriteScan"
-                                      Style="{StaticResource DonabyComboBox}"
+                                      Style="{x:Null}"
+                                      Background="Transparent"
+                                      Cursor="Hand"
                                       DisplayMemberPath="Content"
                                       DropDownOpened="ComboBox_DropDownOpened"
                                       DropDownClosed="CmbFavoriteScan_DropDownClosed"

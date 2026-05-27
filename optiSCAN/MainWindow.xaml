@@ -13,7 +13,8 @@
         MinHeight="600" MinWidth="1024"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource AppBg}"
-        FontFamily="{DynamicResource AppFontFamily}">
+        FontFamily="{DynamicResource AppFontFamily}"
+        Icon="optiSCAN.ico">
 
     <Grid>
         <Grid.ColumnDefinitions>
