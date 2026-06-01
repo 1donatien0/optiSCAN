@@ -496,4 +496,17 @@
   <data name="Risk_Rec_Major" xml:space="preserve"><value>Recommended: quarantine {0} as soon as possible.</value></data>
   <data name="Risk_Rec_Minor" xml:space="preserve"><value>Optional: monitor {0} or quarantine as a precaution.</value></data>
   <data name="Risk_Rec_Info" xml:space="preserve"><value>Information: {0} — no immediate action required.</value></data>
+  <data name="Risk_Reason_UnknownName" xml:space="preserve"><value>Unknown threat name</value></data>
+  <data name="Risk_Reason_Keyword" xml:space="preserve"><value>Keyword « {0} » found in name</value></data>
+  <data name="Risk_Reason_KeywordNormalized" xml:space="preserve"><value>Keyword « {0} » found in normalized name</value></data>
+  <data name="Risk_Reason_GenericThreat" xml:space="preserve"><value>Generic threat</value></data>
+  <data name="Risk_Reason_File" xml:space="preserve"><value>File: {0}</value></data>
+  <data name="Risk_Reason_Corroborated" xml:space="preserve"><value>Corroborated detection (ClamAV + YARA)</value></data>
+  <data name="Risk_Reason_SmallPayload" xml:space="preserve"><value>Small size — possible malicious payload</value></data>
+  <data name="Risk_Reason_LargeFile" xml:space="preserve"><value>Large file — lower risk</value></data>
+  <data name="Risk_File_SystemCritical" xml:space="preserve"><value>Critical system file</value></data>
+  <data name="Risk_File_Executable" xml:space="preserve"><value>Executable extension ({0})</value></data>
+  <data name="Risk_File_Macro" xml:space="preserve"><value>Macro-enabled document ({0})</value></data>
+  <data name="Risk_File_Temp" xml:space="preserve"><value>Temporary file</value></data>
+  <data name="Risk_File_Standard" xml:space="preserve"><value>Standard file</value></data>
 </root>

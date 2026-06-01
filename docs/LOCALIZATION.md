@@ -1,6 +1,6 @@
 # Langues de l’interface — optiSCAN v7.0
 
-optiSCAN propose une interface **française (fr-FR)** et **anglaise (en-US)**. Les deux langues sont **embarquées dans l’exécutable** (pas de pack de langue à télécharger séparément, contrairement à Microsoft Defender).
+optiSCAN propose une interface **française (fr-FR)** et **anglaise (en-US)**. Les deux langues sont **embarquées dans l’exécutable** (pas de pack de langue séparé).
 
 ## Pour l’utilisateur final
 
@@ -8,7 +8,7 @@ optiSCAN propose une interface **française (fr-FR)** et **anglaise (en-US)**. L
 
 L’installateur Inno Setup affiche un **choix de langue** (français / English) au début de l’assistant.
 
-- **English** → au premier lancement, l’application démarre en **en-US**.
+- **English** → au premier lancement, l’application démarre en **en-US** (si aucune préférence existante).
 - **Français** → démarrage en **fr-FR**.
 
 La langue est enregistrée dans :
@@ -18,24 +18,26 @@ La langue est enregistrée dans :
 
 ### Changer la langue après installation
 
-1. Ouvrir **Options** (raccourci `Ctrl+5`).
+1. Ouvrir **Options** (`Ctrl+5`).
 2. Section **GÉNÉRAL** → **Langue de l’interface** : *Français* ou *English*.
-3. Confirmer le message → **optiSCAN redémarre** pour appliquer la langue partout.
+3. Confirmer → **optiSCAN redémarre** pour appliquer la langue partout.
 
 Sans redémarrage, une partie des textes XAML ne se met pas à jour.
 
 ### Menu contextuel Windows (Explorateur)
 
-Clic droit sur un fichier :
-
 - FR : **Scanner avec optiSCAN**
 - EN : **Scan with optiSCAN**
 
-Le libellé suit la langue de l’application (installateur ou changement dans Options).
-
 ### Réinstallation
 
-Si une copie précédente avait déjà enregistré **fr-FR** dans les préférences, une **réinstallation en anglais** peut laisser l’interface en français tant que l’utilisateur n’a pas changé la langue dans Options (la préférence utilisateur prime sur la langue de l’installateur).
+Si une copie précédente avait déjà enregistré **fr-FR**, une réinstallation en anglais peut laisser l’interface en français tant que l’utilisateur n’a pas changé la langue dans Options.
+
+### Premier lancement
+
+Un message d’**accueil** (signatures, scan rapide F5, exclusions, limite UAC) s’affiche une fois (`OnboardingService`).
+
+---
 
 ## Pour les développeurs et traducteurs
 
@@ -46,43 +48,76 @@ Si une copie précédente avait déjà enregistré **fr-FR** dans les préféren
 | `optiSCAN/Resources/UiStrings.resx` | Français (défaut) |
 | `optiSCAN/Resources/UiStrings.en.resx` | Anglais (en-US) |
 
-Les clés doivent être **identiques** dans les deux fichiers.
+Les clés doivent être **identiques** dans les deux fichiers (parité FR/EN obligatoire).
+
+Volume indicatif : **~400 clés** (juin 2026).
+
+### Préfixes de clés (convention)
+
+| Préfixe | Usage |
+|---------|--------|
+| `Overview_`, `Av_`, `Hist_`, `Clean_`, `Opt_` | Panneaux principaux |
+| `Main_`, `Nav_`, `Status_`, `Vm_` | Fenêtre, navigation, statut, ViewModel |
+| `Freshclam_` | MAJ signatures (UI + logs utilisateur) |
+| `Av_Action_`, `Confirm_`, `Notif_` | Actions antivirus, dialogues, toasts |
+| `Risk_` | Sévérités, recommandations, raisons de score |
+| `Onboarding_`, `Export_` | Premier lancement, filtres export |
 
 ### Code
 
 | Composant | Rôle |
 |-----------|------|
-| `Localization/LocalizationService.cs` | Culture courante, `GetString`, `Format`, persistance, redémarrage |
+| `Localization/LocalizationService.cs` | Culture, `GetString`, `Format`, persistance, redémarrage |
 | `Localization/LocExtension.cs` | `{loc:Loc Key=...}` en XAML |
-| `Strings/OptiscanStrings.cs` | Messages récurrents (confirmations, statuts MAJ) |
-| `Localization/ShellContextMenuSupport.cs` | Menu contextuel Explorateur selon la culture |
+| `Strings/OptiscanStrings.cs` | Panneaux, confirmations récurrentes |
+| `Localization/ShellContextMenuSupport.cs` | Menu contextuel Explorateur |
 
-Initialisation : tout début de `App.OnStartup` → `LocalizationService.Initialize()`.
+Initialisation : `App.OnStartup` → `LocalizationService.Initialize()` (avant mode headless ou UI).
 
 ### Ajouter ou modifier un libellé
 
-1. Ajouter la clé et la valeur FR dans `UiStrings.resx`.
-2. Ajouter la **même clé** et la traduction EN dans `UiStrings.en.resx`.
-3. Utiliser en XAML : `Text="{loc:Loc Key=Ma_Cle}"`  
-   ou en C# : `LocalizationService.GetString("Ma_Cle")` / `Format("Ma_Cle", arg0, ...)`.
+1. Clé + valeur FR dans `UiStrings.resx`.
+2. **Même clé** + traduction EN dans `UiStrings.en.resx`.
+3. XAML : `Text="{loc:Loc Key=Ma_Cle}"`  
+   C# : `LocalizationService.GetString("Ma_Cle")` ou `Format("Ma_Cle", arg0, ...)`.
 
 ### Tests
 
 ```powershell
-dotnet test .\optiSCAN.Tests\optiSCAN.Tests.csproj --filter Localization
+dotnet test optiSCAN.Tests\optiSCAN.Tests.csproj -c Release --filter Localization
 ```
 
 Fichier : `optiSCAN.Tests/LocalizationServiceTests.cs`.
 
+### Périmètre traduit (v7.0)
+
+| Zone | État |
+|------|------|
+| XAML (panneaux, Options, sidebar tooltips) | FR/EN |
+| `AntivirusActions` (statut barre via `ActionCompleted`) | FR/EN |
+| `RiskScoringService` (badges, recommandations, raisons) | FR/EN |
+| `ScanUserDisplay`, toasts, Freshclam messages UI | FR/EN |
+| Logs navigateurs **Clean** (noms produits localisés) | FR/EN |
+| Installateur (.NET 8, désinstallation données) | FR/EN |
+
 ### Périmètre non traduit (volontaire ou technique)
 
-- Sorties **ClamAV** / **freshclam** / **YARA** (logs techniques, souvent en anglais).
+- Sorties brutes **clamscan** / **freshclam** / **YARA** (logs techniques).
 - Noms de menaces, chemins de fichiers, versions de bases.
-- Contenu détaillé des **rapports PDF/HTML** exportés (principalement FR aujourd’hui).
-- Marques produit : **ClamAV**, **YARA**, touches **F5**.
+- Corps détaillé des rapports **PDF/HTML** exportés (titres partiels via UI).
+- Marques : **ClamAV**, **YARA**, raccourci **F5**.
 
 ### Installateur
 
-- Messages .NET 8 manquant : bilingues dans `installer/setup.iss` (`InitializeSetup`).
+- Messages .NET 8 manquant : bilingues (`InitializeSetup` dans `installer/setup.iss`).
 - `WriteInstallerUiCulture()` : écrit `UiCulture` en `ssPostInstall`.
-- `RegisterExplorerContextMenu()` : enregistre le menu contextuel selon `ActiveLanguage`.
+- Suppression données utilisateur à la désinstallation : dialogue **FR + EN**.
+- `RegisterExplorerContextMenu()` : libellé selon `ActiveLanguage`.
+
+### Registre Inno → application
+
+Au **premier lancement** (aucun `preferences.dat`), `UserPreferences` lit :
+
+- `HKCU\Software\optiSCAN\AutoUpdateSignatures` (1/0) → `SignatureAutoUpdateEnabled`
+
+Voir `UserPreferences.ApplyInnoSetupDefaults()`.

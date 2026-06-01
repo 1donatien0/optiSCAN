@@ -95,6 +95,59 @@
         </Style.Triggers>
     </Style>
 
+    <!-- Cartes d'action Accueil — Button pour IsPressed + hover (remplace Border + MouseLeftButtonUp) -->
+    <Style x:Key="HubActionCardButton" TargetType="Button">
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+        <Setter Property="VerticalContentAlignment" Value="Stretch"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="card"
+                            Background="{DynamicResource CardBg}"
+                            BorderBrush="{DynamicResource CardBorderAccent}"
+                            BorderThickness="1"
+                            CornerRadius="12"
+                            Padding="0"
+                            Effect="{DynamicResource CardShadow}">
+                        <ContentPresenter HorizontalAlignment="Stretch"
+                                          VerticalAlignment="Stretch"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="card" Property="Opacity" Value="0.9"/>
+                        </Trigger>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="card" Property="Background" Value="{DynamicResource CardBgHover}"/>
+                            <Setter TargetName="card" Property="BorderBrush" Value="{DynamicResource PrimaryBlue}"/>
+                            <Setter TargetName="card" Property="Effect" Value="{DynamicResource GlowShadowAccent}"/>
+                        </Trigger>
+                        <EventTrigger RoutedEvent="MouseEnter">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="card"
+                                                     Storyboard.TargetProperty="Opacity"
+                                                     To="0.97" Duration="0:0:0.12"/>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                        <EventTrigger RoutedEvent="MouseLeave">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="card"
+                                                     Storyboard.TargetProperty="Opacity"
+                                                     To="1" Duration="0:0:0.12"/>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
     <Style x:Key="ContentPanelCard" TargetType="Border" BasedOn="{StaticResource GlassCard}">
         <Setter Property="Padding" Value="16,14"/>
         <Setter Property="Background" Value="{DynamicResource CardBg}"/>
@@ -633,6 +686,19 @@
                             <Setter TargetName="headerPresenter" Property="TextElement.Foreground"
                                     Value="{DynamicResource TextOnPrimary}"/>
                             <Setter Property="FontWeight" Value="SemiBold"/>
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="tabBg"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         From="0.88" To="1" Duration="0:0:0.18">
+                                            <DoubleAnimation.EasingFunction>
+                                                <QuadraticEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
                         </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="tabBg" Property="BorderBrush" Value="{DynamicResource PrimaryBlue}"/>
@@ -646,6 +712,24 @@
                             <Setter TargetName="headerPresenter" Property="TextElement.Foreground"
                                     Value="{DynamicResource TextDark}"/>
                         </MultiTrigger>
+                        <EventTrigger RoutedEvent="MouseEnter">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="tabBg"
+                                                     Storyboard.TargetProperty="Opacity"
+                                                     To="0.94" Duration="0:0:0.12"/>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                        <EventTrigger RoutedEvent="MouseLeave">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="tabBg"
+                                                     Storyboard.TargetProperty="Opacity"
+                                                     To="1" Duration="0:0:0.12"/>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
@@ -663,27 +747,46 @@
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="TabItem">
-                    <Border x:Name="bg" Background="Transparent"
-                            BorderBrush="{DynamicResource PrimaryBlue}"
-                            BorderThickness="0,0,0,2"
-                            Padding="{TemplateBinding Padding}">
+                    <Grid Background="Transparent">
                         <ContentPresenter x:Name="headerPresenter"
                                           ContentSource="Header"
+                                          Margin="{TemplateBinding Padding}"
                                           VerticalAlignment="Center"
                                           HorizontalAlignment="Center"
                                           RecognizesAccessKey="True"
                                           TextElement.Foreground="{TemplateBinding Foreground}"/>
-                    </Border>
+                        <Rectangle x:Name="underline" Height="2" VerticalAlignment="Bottom"
+                                   Fill="{DynamicResource AccentBlue}" Opacity="0"
+                                   RadiusX="1" RadiusY="1"/>
+                    </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsSelected" Value="True">
                             <Setter Property="Foreground" Value="{DynamicResource TextAccent}"/>
                             <Setter TargetName="headerPresenter" Property="TextElement.Foreground"
                                     Value="{DynamicResource TextAccent}"/>
-                            <Setter TargetName="bg" Property="BorderThickness" Value="0,0,0,2"/>
-                            <Setter TargetName="bg" Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
-                        </Trigger>
-                        <Trigger Property="IsSelected" Value="False">
-                            <Setter TargetName="bg" Property="BorderThickness" Value="0"/>
+                            <Setter TargetName="underline" Property="Opacity" Value="1"/>
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="underline"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         From="0" To="1" Duration="0:0:0.18">
+                                            <DoubleAnimation.EasingFunction>
+                                                <QuadraticEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="underline"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0" Duration="0:0:0.12"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
                         <MultiTrigger>
                             <MultiTrigger.Conditions>
@@ -693,6 +796,7 @@
                             <Setter Property="Foreground" Value="{DynamicResource TextMedium}"/>
                             <Setter TargetName="headerPresenter" Property="TextElement.Foreground"
                                     Value="{DynamicResource TextMedium}"/>
+                            <Setter TargetName="underline" Property="Opacity" Value="0.35"/>
                         </MultiTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>

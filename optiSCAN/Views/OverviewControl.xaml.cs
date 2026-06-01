@@ -264,13 +264,11 @@ namespace optiSCAN.Views
         }
 
         // ── Cartes d'action → navigation ────────────────────────────────────
-        // Handler pour MouseLeftButtonUp sur les Borders des cartes d'action
 
-        private void ActionCard_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        private void ActionCard_Click(object sender, RoutedEventArgs e)
         {
-            // Le Tag est porté par le Border qui émet l'événement
             string? target = null;
-            if (sender is System.Windows.Controls.Border border && border.Tag is string t)
+            if (sender is FrameworkElement fe && fe.Tag is string t)
                 target = t;
 
             if (target == null) return;
