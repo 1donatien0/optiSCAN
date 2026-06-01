@@ -1,6 +1,6 @@
-# Publication et installateur — optiSCAN v6.0
+# Publication et installateur — optiSCAN v7.0
 
-Guide opérationnel pour produire `optiSCAN_Setup_v6.0.0.exe` (ou la version courante dans `Directory.Build.props` / `installer/setup.iss`).
+Guide opérationnel pour produire `optiSCAN_Setup_v7.0.0.exe` (ou la version courante dans `Directory.Build.props` / `installer/setup.iss`).
 
 ## Prérequis
 
@@ -67,7 +67,7 @@ $pub = ".\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64"
 & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" .\installer\setup.iss
 ```
 
-Installateur généré : `installer\output\optiSCAN_Setup_v6.0.0.exe`.
+Installateur généré : `installer\output\optiSCAN_Setup_v7.0.0.exe`.
 
 ## Variante tout-en-un
 

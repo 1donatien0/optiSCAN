@@ -14,6 +14,7 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Threading;
 using System.Windows.Input;
+using System.Windows.Media.Animation;
 using Button = System.Windows.Controls.Button;
 using MediaColor = System.Windows.Media.Color;
 
@@ -31,18 +32,19 @@ namespace optiSCAN
         /// <summary>ViewModel partagé (scan, quarantaine, progression). DataContext de la fenêtre.</summary>
         public ScanViewModel? ViewModel { get; private set; }
 
-        private NotifyIcon? _trayIcon;
-        private ContextMenuStrip? _trayMenu;
+        private SystemTrayHost? _trayHost;
 
         private ClamAvEngine? _clamAvEngine;
         private YaraEngine? _yaraEngine;
         private ScanOrchestrator? _antivirusOrchestrator;
         private ScanLogManager? _logManager;
         private QuarantineManager? _quarantineManager;
+        private readonly HistoryExportService _historyExport = new();
         private FreshclamUpdater? _freshclamUpdater;
         private YaraForgeUpdater? _rulesUpdater;
 
         private readonly Services.NavigationService _navigationService = new();
+        private Services.NavigationRefreshCoordinator? _navRefreshCoordinator;
         private readonly SemaphoreSlim _manualSignatureUpdateLock = new(1, 1);
         private readonly RoutedCommand _quickScanShortcutCommand = new();
         private bool _isClosing = false;
@@ -52,6 +54,11 @@ namespace optiSCAN
         private bool _lastStatusIsError;
         private bool _lastStatusIsWarning;
         private string? _lastStatusIconKind;
+
+        // ── Cache TTL signatures (évite de relire le disque à chaque navigation) ──
+        private DateTime _lastSigRefreshAt = DateTime.MinValue;
+        private static readonly TimeSpan SigCacheTtl = TimeSpan.FromSeconds(30);
+        private (string ClamVer, string ClamWhen, string YaraVer, string YaraWhen)? _sigCache;
 
         // Après InitializeComponent / RegisterPanels, le constructeur assigne
         // ServiceContainer.Default.Navigation : les vues naviguent sans référencer MainWindow.
@@ -70,7 +77,10 @@ namespace optiSCAN
 
             try
             {
-                InitializeTrayIcon();
+                _trayHost = new SystemTrayHost();
+                _trayHost.Initialize(
+                    () => Dispatcher.Invoke(ShowWindowFromTray),
+                    () => Dispatcher.Invoke(ExitFromTray));
 
                 // Services partagés via le singleton applicatif (mêmes instances que ScanViewModel).
                 var c = ServiceContainer.Default;
@@ -84,16 +94,29 @@ namespace optiSCAN
 
                 _freshclamUpdater.UpdateOutput += SurSortieFreshclam;
                 _rulesUpdater.UpdateOutput += SurSortieMisesAJourRegles;
+                _freshclamUpdater.UpdateOutput += (_, _) => Dispatcher.InvokeAsync(RefreshLiveFooter);
+                _rulesUpdater.UpdateOutput += (_, _) => Dispatcher.InvokeAsync(RefreshLiveFooter);
                 _freshclamUpdater.UpdateCompleted += (_, _) =>
-                    Dispatcher.InvokeAsync(RefreshSignaturesDisplay);
+                    Dispatcher.InvokeAsync(() =>
+                    {
+                        InvalidateSigCache();
+                        RefreshSignaturesDisplay(forceRefresh: true);
+                        RefreshLiveFooter();
+                    });
                 _rulesUpdater.UpdateCompleted += (_, _) =>
-                    Dispatcher.InvokeAsync(RefreshSignaturesDisplay);
+                    Dispatcher.InvokeAsync(() =>
+                    {
+                        InvalidateSigCache();
+                        RefreshSignaturesDisplay(forceRefresh: true);
+                        RefreshLiveFooter();
+                    });
 
                 // ViewModel partage le même container : pas de re-instanciation.
                 ViewModel = new ScanViewModel(c);
                 ViewModel.PropertyChanged -= SurChangementProprieteScanViewModel;
                 ViewModel.PropertyChanged += SurChangementProprieteScanViewModel;
                 _wasScanning = ViewModel.IsScanning;
+                Dispatcher.InvokeAsync(RefreshLiveFooter);
                 c.ThreatLookup = path => ViewModel?.Threats.FirstOrDefault(t =>
                     string.Equals(t.FilePath, path, StringComparison.OrdinalIgnoreCase));
                 this.DataContext = ViewModel;
@@ -122,6 +145,7 @@ namespace optiSCAN
                 IpcManager.HookShowMessage(this, ShowWindow);
 
                 ThemeManager.ThemeChanged += SurChangementTheme;
+                UpdateThemeToggleTooltip(ThemeManager.IsDarkTheme);
 
                 // Raccourcis Ctrl+1..Ctrl+5 : une seule RoutedCommand, le paramètre est le nom du panneau.
                 KeyboardShortcuts.Register(this,
@@ -146,69 +170,6 @@ namespace optiSCAN
 
             // F5 : raccourci d'analyse rapide indiqué dans l'interface Antivirus.
             InputBindings.Add(new KeyBinding(_quickScanShortcutCommand, Key.F5, ModifierKeys.None));
-        }
-
-        private void InitializeTrayIcon()
-        {
-            // Si la fenêtre est recréée (rare), éviter de dupliquer l'icône tray.
-            if (_trayIcon != null)
-                return;
-
-            _trayMenu = new ContextMenuStrip();
-            _trayMenu.Items.Add(LocalizationService.GetString("Tray_Open"), null, (_, _) => Dispatcher.Invoke(ShowWindowFromTray));
-            _trayMenu.Items.Add(new ToolStripSeparator());
-            _trayMenu.Items.Add(LocalizationService.GetString("Tray_Exit"), null, (_, _) => Dispatcher.Invoke(ExitFromTray));
-
-            // Priorité 1 : icône embarquée dans optiSCAN.exe (toujours présente après publish).
-            // Priorité 2 : optiSCAN.ico à côté de l'exécutable.
-            // Repli final : icône système.
-            var icon = ResolveTrayIcon();
-
-            _trayIcon = new NotifyIcon
-            {
-                Text = "optiSCAN",
-                Icon = icon,
-                Visible = true,
-                ContextMenuStrip = _trayMenu
-            };
-
-            _trayIcon.MouseClick += (_, e) =>
-            {
-                if (e.Button == MouseButtons.Left)
-                    Dispatcher.Invoke(ShowWindowFromTray);
-            };
-            _trayIcon.DoubleClick += (_, _) => Dispatcher.Invoke(ShowWindowFromTray);
-        }
-
-        private static System.Drawing.Icon ResolveTrayIcon()
-        {
-            try
-            {
-                var processPath = Environment.ProcessPath;
-                if (!string.IsNullOrWhiteSpace(processPath) && File.Exists(processPath))
-                {
-                    var embedded = System.Drawing.Icon.ExtractAssociatedIcon(processPath);
-                    if (embedded != null)
-                        return embedded;
-                }
-            }
-            catch
-            {
-                // Continue vers fallback fichier.
-            }
-
-            try
-            {
-                var iconPath = Path.Combine(AppContext.BaseDirectory, "optiSCAN.ico");
-                if (File.Exists(iconPath))
-                    return new System.Drawing.Icon(iconPath);
-            }
-            catch
-            {
-                // Continue vers fallback système.
-            }
-
-            return System.Drawing.SystemIcons.Application;
         }
 
         private void ShowWindowFromTray()
@@ -253,6 +214,8 @@ namespace optiSCAN
                 RefreshQuarantineList();
                 RefreshHistory();
                 RefreshSignaturesDisplay();
+                // Bandeau élévation : affiché si optiSCAN tourne sans droits admin.
+                (panelOverview as Views.OverviewControl)?.ApplyElevationBanner();
                 try
                 {
                     ServiceContainer.Default.ApplyPreferencesOnStartup();
@@ -268,6 +231,7 @@ namespace optiSCAN
                 _navigationService.NavigateTo(OptiscanStrings.PanelIds.Overview);
 
                 SetStatus(OptiscanStrings.UiMessages.ProtectionActive);
+                OnboardingService.ShowIfNeeded(this);
             }
             catch (Exception ex)
             {
@@ -294,16 +258,23 @@ namespace optiSCAN
             ServiceContainer.Default.FocusAntivirusSignaturesRequested -= SurDemandeFocusSignaturesAntivirus;
             ServiceContainer.Default.FocusAntivirusSignaturesRequested += SurDemandeFocusSignaturesAntivirus;
 
+            // Le coordinateur gère les rafraîchissements par vue (extrait de MainWindow).
+            _navRefreshCoordinator?.Detach();
+            _navRefreshCoordinator = new Services.NavigationRefreshCoordinator(
+                _navigationService,
+                Dispatcher,
+                refreshHistory:         RefreshHistory,
+                refreshAntivirusStatus: RefreshAntivirusStatus,
+                refreshSignatures:      () => RefreshSignaturesDisplay(),
+                refreshAntivirusData:   RefreshAntivirusData);
+
+            // SyncSidebarSelection reste dans MainWindow (manipulation UI directe).
             _navigationService.Navigated -= SurNavigationNaviguee;
             _navigationService.Navigated += SurNavigationNaviguee;
         }
 
         private void SurNavigationNaviguee(object? sender, string panelName) =>
-            Dispatcher.BeginInvoke(() =>
-            {
-                SyncSidebarSelection(panelName);
-                ApplyNavigationSideEffects(panelName);
-            }, DispatcherPriority.Background);
+            Dispatcher.BeginInvoke(() => SyncSidebarSelection(panelName), DispatcherPriority.Background);
 
         private void SyncSidebarSelection(string panelName)
         {
@@ -343,13 +314,20 @@ namespace optiSCAN
 
         private void SurChangementProprieteScanViewModel(object? sender, PropertyChangedEventArgs e)
         {
-            if (e.PropertyName != nameof(ScanViewModel.IsScanning) || ViewModel == null)
-                return;
+            if (ViewModel == null) return;
 
-            if (_wasScanning && !ViewModel.IsScanning)
-                Dispatcher.BeginInvoke(RefreshHistory, GetHistoryRefreshPriority());
+            if (e.PropertyName == nameof(ScanViewModel.IsScanning))
+            {
+                if (_wasScanning && !ViewModel.IsScanning)
+                    Dispatcher.BeginInvoke(RefreshHistory, GetHistoryRefreshPriority());
 
-            _wasScanning = ViewModel.IsScanning;
+                _wasScanning = ViewModel.IsScanning;
+            }
+
+            if (e.PropertyName is nameof(ScanViewModel.IsScanning)
+                or nameof(ScanViewModel.ScanProgressDetail)
+                or nameof(ScanViewModel.IsUpdating))
+                Dispatcher.InvokeAsync(RefreshLiveFooter);
         }
 
         private DispatcherPriority GetHistoryRefreshPriority() =>
@@ -428,30 +406,7 @@ namespace optiSCAN
         public void SwitchPanel(string panelName) =>
             _navigationService.NavigateTo(panelName);
 
-        /// <summary>
-        /// Rafraîchissements déclenchés à chaque <see cref="NavigationService.NavigateTo"/>,
-        /// y compris depuis les cartes Vue d'ensemble ou la fin d'analyse (pas seulement la sidebar).
-        /// </summary>
-        private void ApplyNavigationSideEffects(string panelName)
-        {
-            if (_logManager == null)
-                return;
-
-            switch (panelName)
-            {
-                case OptiscanStrings.PanelIds.Overview:
-                    RefreshHistory();
-                    RefreshAntivirusStatus();
-                    RefreshSignaturesDisplay();
-                    break;
-                case OptiscanStrings.PanelIds.Antivirus:
-                    RefreshAntivirusData();
-                    break;
-                case OptiscanStrings.PanelIds.History:
-                    RefreshHistory();
-                    break;
-            }
-        }
+        // Les rafraîchissements de navigation sont maintenant gérés par NavigationRefreshCoordinator.
 
         // ── Rafraîchissement ─────────────────────────────────────────────────────
         // RefreshYaraStatus() est intentionnellement supprimé : YaraRulesCount et
@@ -559,10 +514,17 @@ namespace optiSCAN
                     }
                     break;
 
+                case "openav":
+                    ShowWindow();
+                    _navigationService.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
+                    (panelAntivirus as Views.AntivirusView)?.SelectScanTab();
+                    break;
+
                 case "open":
                 case "threat":
                     ShowWindow();
                     _navigationService.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
+                    (panelAntivirus as Views.AntivirusView)?.SelectScanTab();
                     break;
 
                 case "showquarantine":
@@ -651,13 +613,33 @@ namespace optiSCAN
             RefreshSignaturesDisplay();
         }
 
-        /// <summary>Rafraîchit les blocs YARA | ClamAV (Signatures + Vue d'ensemble + VM).</summary>
-        private void RefreshSignaturesDisplay()
+        /// <summary>
+        /// Invalide le cache TTL des signatures (à appeler après une MAJ effective).
+        /// </summary>
+        private void InvalidateSigCache()
         {
-            var clamVer = _freshclamUpdater?.GetLocalDatabaseVersion() ?? "—";
-            var clamWhen = _freshclamUpdater?.GetLastSignatureChangeDisplay() ?? "—";
-            var yaraVer = _rulesUpdater?.GetRulesPackVersionDisplay() ?? "—";
-            var yaraWhen = _rulesUpdater?.GetRulesLastUpdateDisplay() ?? "—";
+            _lastSigRefreshAt = DateTime.MinValue;
+            _sigCache = null;
+        }
+
+        /// <summary>Rafraîchit les blocs YARA | ClamAV (Signatures + Vue d'ensemble + VM).</summary>
+        private void RefreshSignaturesDisplay(bool forceRefresh = false)
+        {
+            // Cache TTL : on relit le disque seulement si le cache est expiré ou forcé.
+            string clamVer, clamWhen, yaraVer, yaraWhen;
+            if (!forceRefresh && _sigCache.HasValue && (DateTime.UtcNow - _lastSigRefreshAt) < SigCacheTtl)
+            {
+                (clamVer, clamWhen, yaraVer, yaraWhen) = _sigCache.Value;
+            }
+            else
+            {
+                clamVer  = _freshclamUpdater?.GetLocalDatabaseVersion()       ?? "—";
+                clamWhen = _freshclamUpdater?.GetLastSignatureChangeDisplay()  ?? "—";
+                yaraVer  = _rulesUpdater?.GetRulesPackVersionDisplay()         ?? "—";
+                yaraWhen = _rulesUpdater?.GetRulesLastUpdateDisplay()          ?? "—";
+                _sigCache = (clamVer, clamWhen, yaraVer, yaraWhen);
+                _lastSigRefreshAt = DateTime.UtcNow;
+            }
 
             (panelAntivirus as Views.AntivirusView)?.UpdateSignaturesPanel(yaraVer, yaraWhen, clamVer, clamWhen);
             (panelOverview as Views.OverviewControl)?.UpdateSignaturesSummary(yaraVer, yaraWhen, clamVer, clamWhen);
@@ -666,8 +648,8 @@ namespace optiSCAN
             {
                 ViewModel.DbVersion = clamVer;
                 ViewModel.RulesPackVersion = yaraVer;
-                ViewModel.LastUpdateDisplay = clamWhen == "—" ? "Jamais" : clamWhen;
-                ViewModel.RulesLastUpdateDisplay = yaraWhen == "—" ? "Jamais" : yaraWhen;
+                ViewModel.LastUpdateDisplay = clamWhen == "—" ? LocalizationService.GetString("Vm_Never") : clamWhen;
+                ViewModel.RulesLastUpdateDisplay = yaraWhen == "—" ? LocalizationService.GetString("Vm_Never") : yaraWhen;
                 // Synchronise YaraRulesCount et YaraStatus : omis auparavant, ce qui
                 // laissait le VM avec des valeurs obsolètes après une MAJ manuelle.
                 var rulesCount = _yaraEngine?.RulesCount ?? 0;
@@ -692,79 +674,56 @@ namespace optiSCAN
 
         private void TryExportScanReportHtml()
         {
-            try
-            {
-                var dlg = new Microsoft.Win32.SaveFileDialog
-                {
-                    Filter = "Page web HTML (*.html)|*.html|Tous les fichiers (*.*)|*.*",
-                    FileName = $"optiSCAN_rapport_{DateTime.Now:yyyyMMdd_HHmm}.html",
-                    DefaultExt = ".html",
-                    AddExtension = true
-                };
-                if (dlg.ShowDialog(this) != true) return;
-
-                var html = new HtmlExportService();
-                var hist = _logManager?.GetHistory() ?? Array.Empty<ScanSession>();
-                var threats = ViewModel?.Threats ?? Enumerable.Empty<ThreatInfo>();
-                var quar = _quarantineManager?.GetEntries() ?? Array.Empty<QuarantineEntry>();
-                html.ExportFullReport(hist, threats, quar, UserPreferences.Current, dlg.FileName);
-                SetStatus(LocalizationService.Format("Status_HtmlSaved", dlg.FileName));
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Error("MainWindow", "Export HTML", ex);
-                SetStatus(LocalizationService.Format("Status_HtmlFailed", ex.Message), isError: true);
-            }
+            var result = _historyExport.TryExportHtml(
+                this,
+                _logManager,
+                ViewModel?.Threats ?? Enumerable.Empty<ThreatInfo>(),
+                _quarantineManager?.GetEntries() ?? Array.Empty<QuarantineEntry>());
+            if (!result.WasCancelled && !string.IsNullOrEmpty(result.Message))
+                SetStatus(result.Message, isError: result.IsError);
         }
 
         private void TryExportLastScanPdf()
         {
-            var sessions = _logManager?.GetHistory() ?? Array.Empty<ScanSession>();
-            if (sessions.Count == 0)
-            {
-                System.Windows.MessageBox.Show(this,
-                    LocalizationService.GetString("Status_ExportNoHistory"),
-                    LocalizationService.GetString("Hist_ExportPdfTitle"),
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                return;
-            }
-            TryExportScanSessionPdf(sessions[0]);
+            var result = _historyExport.TryExportLastScanPdf(this, _logManager);
+            if (!result.WasCancelled && !string.IsNullOrEmpty(result.Message))
+                SetStatus(result.Message, isError: result.IsError);
         }
 
         private void TryExportScanSessionPdf(ScanSession session)
         {
-            try
-            {
-                var dlg = new Microsoft.Win32.SaveFileDialog
-                {
-                    Filter = "Document PDF (*.pdf)|*.pdf|Tous les fichiers (*.*)|*.*",
-                    FileName = $"optiSCAN_scan_{session.StartedAt:yyyyMMdd_HHmm}.pdf",
-                    DefaultExt = ".pdf",
-                    AddExtension = true
-                };
-                if (dlg.ShowDialog(this) != true) return;
-
-                var gen = new PdfReportGenerator();
-                gen.GenerateReportFromSession(session, dlg.FileName);
-                SetStatus(LocalizationService.Format("Status_PdfSaved", dlg.FileName));
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Error("MainWindow", "Export PDF", ex);
-                SetStatus(LocalizationService.Format("Status_PdfFailed", ex.Message), isError: true);
-            }
+            var result = _historyExport.TryExportSessionPdf(this, session);
+            if (!result.WasCancelled && !string.IsNullOrEmpty(result.Message))
+                SetStatus(result.Message, isError: result.IsError);
         }
 
         // ── Statut ───────────────────────────────────────────────────────────────
+        private void UpdateThemeToggleTooltip(bool isDark)
+        {
+            if (btnModesSombre == null) return;
+            btnModesSombre.ToolTip = LocalizationService.GetString(
+                isDark ? "Nav_TooltipThemeLight" : "Nav_TooltipThemeDark");
+        }
+
         private void SurChangementTheme(object? sender, bool isDark)
         {
             Dispatcher.InvokeAsync(() =>
             {
+                UpdateThemeToggleTooltip(isDark);
+
+                // Synchronise la case « Thème sombre » dans Options
+                // (peut avoir changé via le bouton sidebar, pas la checkbox elle-même)
+                panelOptions.SyncDarkThemeCheckbox(isDark);
+
                 RefreshAntivirusStatus();
                 RefreshOverviewProtectionAndRecommendations();
                 if (_lastStatusText != null)
-                    SetStatus(_lastStatusText, _lastStatusIsError, _lastStatusIsWarning, _lastStatusIconKind);
+                {
+                    if (!IsLiveFooterActive())
+                        ApplyPinnedFooter();
+                    else
+                        RefreshLiveFooter();
+                }
             });
         }
 
@@ -777,40 +736,136 @@ namespace optiSCAN
 
             Dispatcher.InvokeAsync(() =>
             {
-                var textKey = isError ? "DangerRed" : isWarning ? "AlertGold" : "TextMedium";
-                var iconKey = isError ? "DangerRed" : isWarning ? "WarningOrange" : "SuccessGreen";
-                var textBrush = ThemeUiBrushes.Get(textKey, lblStatus) ?? lblStatus?.Foreground;
-                var iconBrush = ThemeUiBrushes.Get(iconKey, statusFooterIcon) ?? statusFooterIcon?.Foreground;
+                if (!IsLiveFooterActive())
+                    ApplyPinnedFooter();
+                AppLogger.Debug("MainWindow", $"Statut: {text}");
+            });
+        }
 
+        private bool IsLiveFooterActive()
+        {
+            if (ViewModel?.IsScanning == true)
+                return true;
+            if (IsSignatureUpdateRunning())
+                return true;
+            return ViewModel?.IsUpdating == true;
+        }
+
+        private bool IsSignatureUpdateRunning() =>
+            (_freshclamUpdater?.IsUpdating ?? false) || (_rulesUpdater?.IsUpdating ?? false);
+
+        private void RefreshLiveFooter()
+        {
+            if (ViewModel == null) return;
+
+            if (ViewModel.IsScanning)
+            {
+                if (statusFooterSpinner != null)
+                    statusFooterSpinner.Visibility = Visibility.Visible;
+                if (statusFooterIcon != null)
+                    statusFooterIcon.Visibility = Visibility.Collapsed;
+                StopRefreshSpin();
+
+                var detail = ViewModel.ScanProgressDetail;
                 if (lblStatus != null)
                 {
-                    lblStatus.Text = text;
+                    lblStatus.Text = string.IsNullOrWhiteSpace(detail)
+                        ? LocalizationService.GetString("Main_StatusScanning")
+                        : detail;
+                    var textBrush = ThemeUiBrushes.Get("TextMedium", lblStatus);
+                    if (textBrush != null)
+                        lblStatus.Foreground = textBrush;
+                }
+                return;
+            }
+
+            if (statusFooterSpinner != null)
+                statusFooterSpinner.Visibility = Visibility.Collapsed;
+            if (statusFooterIcon != null)
+                statusFooterIcon.Visibility = Visibility.Visible;
+
+            if (IsSignatureUpdateRunning() || ViewModel.IsUpdating)
+            {
+                if (lblStatus != null)
+                {
+                    lblStatus.Text = LocalizationService.GetString("Main_StatusUpdating");
+                    var textBrush = ThemeUiBrushes.Get("TextMedium", lblStatus);
                     if (textBrush != null)
                         lblStatus.Foreground = textBrush;
                 }
 
                 if (statusFooterIcon != null)
                 {
-                    var kindName = iconKindName ?? UiIconKinds.ForStatusFooter(isError, isWarning);
-                    if (Enum.TryParse<PackIconKind>(kindName, ignoreCase: false, out var kind))
+                    if (Enum.TryParse<PackIconKind>(UiIconKinds.Refresh, ignoreCase: false, out var kind))
                         statusFooterIcon.Kind = kind;
-                    if (iconBrush != null)
-                        statusFooterIcon.Foreground = iconBrush;
+                    var accent = ThemeUiBrushes.Get("AccentBlue", statusFooterIcon);
+                    if (accent != null)
+                        statusFooterIcon.Foreground = accent;
+                    StartRefreshSpin();
                 }
+                return;
+            }
 
-                AppLogger.Debug("MainWindow", $"Statut: {text}");
+            StopRefreshSpin();
+            ApplyPinnedFooter();
+        }
+
+        private void ApplyPinnedFooter()
+        {
+            if (_lastStatusText == null) return;
+
+            var textKey = _lastStatusIsError ? "DangerRed" : _lastStatusIsWarning ? "AlertGold" : "TextMedium";
+            var iconKey = _lastStatusIsError ? "DangerRed" : _lastStatusIsWarning ? "WarningOrange" : "SuccessGreen";
+            var textBrush = ThemeUiBrushes.Get(textKey, lblStatus) ?? lblStatus?.Foreground;
+            var iconBrush = ThemeUiBrushes.Get(iconKey, statusFooterIcon) ?? statusFooterIcon?.Foreground;
+
+            if (lblStatus != null)
+            {
+                lblStatus.Text = _lastStatusText;
+                if (textBrush != null)
+                    lblStatus.Foreground = textBrush;
+            }
+
+            if (statusFooterIcon != null)
+            {
+                var kindName = _lastStatusIconKind ?? UiIconKinds.ForStatusFooter(_lastStatusIsError, _lastStatusIsWarning);
+                if (Enum.TryParse<PackIconKind>(kindName, ignoreCase: false, out var kind))
+                    statusFooterIcon.Kind = kind;
+                if (iconBrush != null)
+                    statusFooterIcon.Foreground = iconBrush;
+            }
+        }
+
+        private void StartRefreshSpin()
+        {
+            if (statusFooterIcon == null) return;
+
+            statusFooterIcon.RenderTransformOrigin = new System.Windows.Point(0.5, 0.5);
+            if (statusFooterIcon.RenderTransform is not RotateTransform rotate)
+            {
+                rotate = new RotateTransform();
+                statusFooterIcon.RenderTransform = rotate;
+            }
+
+            rotate.BeginAnimation(RotateTransform.AngleProperty, new DoubleAnimation(0, 360, TimeSpan.FromSeconds(1.1))
+            {
+                RepeatBehavior = RepeatBehavior.Forever
             });
+        }
+
+        private void StopRefreshSpin()
+        {
+            if (statusFooterIcon?.RenderTransform is RotateTransform rotate)
+                rotate.BeginAnimation(RotateTransform.AngleProperty, null);
         }
 
         private void ApplyVersionLabels()
         {
-            // Nomenclature : vM.m (README, v6.0) + M.m.p (assembly / installateur).
+            // Nomenclature : vM.m (README, v7.0) + M.m.p (assembly / installateur).
             var release = ProductVersionInfo.ReleaseLabel;
             var semver = ProductVersionInfo.SemVer;
             if (txtSidebarVersion != null)
                 txtSidebarVersion.Text = $"{release} ({semver})";
-            if (txtFooterVersion != null)
-                txtFooterVersion.Text = LocalizationService.Format("Main_FooterVersion", release);
         }
 
         // ── Ré-affichage depuis la systray ou IPC ────────────────────────────────
@@ -856,15 +911,8 @@ namespace optiSCAN
         {
             try
             {
-                // Retirer l'icône tray pour éviter qu'elle reste "fantôme" (explorer).
-                if (_trayIcon != null)
-                {
-                    _trayIcon.Visible = false;
-                    _trayIcon.Dispose();
-                    _trayIcon = null;
-                }
-                _trayMenu?.Dispose();
-                _trayMenu = null;
+                _trayHost?.Dispose();
+                _trayHost = null;
 
                 // Désabonnement local des events branchés ici
                 if (_freshclamUpdater != null) _freshclamUpdater.UpdateOutput -= SurSortieFreshclam;
@@ -890,93 +938,6 @@ namespace optiSCAN
 
         // ── Quarantaine ──────────────────────────────────────────────────────────
 
-        /// <summary>Met le fichier identifié par <c>btn.Tag</c> en quarantaine chiffrée.</summary>
-        public void BtnQuarantineThreat_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button btn && btn.Tag is string filePath)
-            {
-                var c = ServiceContainer.Default;
-                var known = c.FindKnownThreat(filePath);
-                var result = known != null
-                    ? c.Actions.QuarantineThreat(known.Clone())
-                    : c.Actions.QuarantineThreat(filePath);
-                SetStatus(result.Message, isError: result.IsError);
-                if (result.Success)
-                {
-                    RefreshQuarantineList();
-                    ((Views.AntivirusView)panelAntivirus)?.RefreshAllData();
-                }
-            }
-        }
-
-        /// <summary>Ajoute le fichier identifié par <c>btn.Tag</c> aux exclusions (ignoré lors des futurs scans).</summary>
-        public void BtnIgnoreThreat_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button btn && btn.Tag is string filePath)
-            {
-                ExclusionSettings.Current.AddFile(filePath);
-                SetStatus(LocalizationService.Format("Status_FileIgnored", System.IO.Path.GetFileName(filePath)), isWarning: true);
-                ((Views.AntivirusView)panelAntivirus)?.RefreshAllData();
-            }
-        }
-
-        /// <summary>Supprime définitivement le fichier identifié par <c>btn.Tag</c>.</summary>
-        public void BtnDeleteThreat_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button btn && btn.Tag is string filePath)
-            {
-                try
-                {
-                    if (System.IO.File.Exists(filePath))
-                    {
-                        System.IO.File.Delete(filePath);
-                        SetStatus(LocalizationService.Format("Status_FileDeleted", System.IO.Path.GetFileName(filePath)), iconKindName: UiIconKinds.Delete);
-                    }
-                    ((Views.AntivirusView)panelAntivirus)?.RefreshAllData();
-                }
-                catch (Exception ex)
-                {
-                    SetStatus(LocalizationService.Format("Status_DeleteFailed", ex.Message), isError: true);
-                }
-            }
-        }
-
-        /// <summary>Restaure un fichier depuis la quarantaine vers son emplacement d'origine.</summary>
-        public void BtnRestoreFromQuarantine_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button btn && btn.Tag is string quarantineId)
-            {
-                if (_quarantineManager?.Restore(quarantineId) == true)
-                {
-                    SetStatus(OptiscanStrings.UiMessages.RestoreFromQuarantineSuccess);
-                    RefreshQuarantineList();
-                    ((Views.AntivirusView)panelAntivirus)?.RefreshAllData();
-                }
-                else
-                {
-                    SetStatus(OptiscanStrings.UiMessages.RestoreFromQuarantineError, isError: true);
-                }
-            }
-        }
-
-        /// <summary>Supprime définitivement un fichier de la quarantaine (pas de restauration possible).</summary>
-        public void BtnDeleteFromQuarantine_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button btn && btn.Tag is string quarantineId)
-            {
-                if (_quarantineManager?.DeletePermanently(quarantineId) == true)
-                {
-                    SetStatus(OptiscanStrings.UiMessages.DeleteThreatPermanentlySuccess, iconKindName: UiIconKinds.Delete);
-                    RefreshQuarantineList();
-                    ((Views.AntivirusView)panelAntivirus)?.RefreshAllData();
-                }
-                else
-                {
-                    SetStatus(OptiscanStrings.UiMessages.DeleteThreatPermanentlyError, isError: true);
-                }
-            }
-        }
-
         // ── Mise à jour des signatures ───────────────────────────────────────────
 
         // Handlers nommés — souscrits une seule fois à l'init pour éviter
@@ -999,6 +960,7 @@ namespace optiSCAN
             }
 
             SetStatus(OptiscanStrings.StatusUpdates.FullSignaturesUpdateStarting, iconKindName: UiIconKinds.Refresh);
+            RefreshLiveFooter();
             var antivirusView = panelAntivirus as Views.AntivirusView;
             var completedOk = true;
 
@@ -1016,7 +978,8 @@ namespace optiSCAN
                         _rulesUpdater,
                         line => antivirusView?.AppendSignatureLog(line)).ConfigureAwait(false)).ConfigureAwait(true);
 
-                RefreshSignaturesDisplay();
+                InvalidateSigCache();
+                RefreshSignaturesDisplay(forceRefresh: true);
             }
             catch (Exception ex)
             {
@@ -1034,6 +997,7 @@ namespace optiSCAN
                 else
                     SetStatus(OptiscanStrings.StatusUpdates.FullSignaturesUpdateFinishedWithErrors, isWarning: true);
 
+                RefreshLiveFooter();
                 _manualSignatureUpdateLock.Release();
             }
         }

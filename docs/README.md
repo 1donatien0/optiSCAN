@@ -2,14 +2,10 @@
 
 | Document | Public | Contenu |
 |----------|--------|---------|
-| [../README.md](../README.md) | Développeurs, contributeurs | Guide complet v6.0 (architecture, ClamAV, UI, services) |
-| [BUILD.md](BUILD.md) | Release / packaging | Nettoyage, `dotnet publish`, Inno Setup, dépannage |
-| [LOCALIZATION.md](LOCALIZATION.md) | Utilisateurs, traducteurs | Français / English : installateur, Options, fichiers `.resx` |
-| [AUDIT-UI-COULEURS.md](AUDIT-UI-COULEURS.md) | UI / design | Lisibilité clair/sombre, tokens, uniformisation |
-| [AUDIT-UI-REACTIVITE.md](AUDIT-UI-REACTIVITE.md) | UI / perf perçue | Réactivité au clic (navigation, refresh, schtasks) |
+| [../README.md](../README.md) | Développeurs | Guide architecture v7.0 |
+| [AUDIT-COMPLET.md](AUDIT-COMPLET.md) | QA / release | Synthèse risques et état du produit (juin 2026) |
+| [BUILD.md](BUILD.md) | Release | `dotnet publish`, Inno Setup |
+| [LOCALIZATION.md](LOCALIZATION.md) | Traducteurs | FR/EN, `.resx`, installateur |
+| [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md) | Release | Contrôles avant publication |
 
-Fichiers associés hors Markdown :
-
-- `LICENSE.txt` — licence du produit
-- `installer/setup.iss` — script Inno Setup
-- `scripts/clean-before-publish.ps1` — préparation avant publish
+Fichiers associés : `installer/setup.iss`, `scripts/verify-runtime-deps.ps1`, `.github/workflows/ci.yml`.

@@ -13,10 +13,13 @@ namespace optiSCAN
     public static class ThemeManager
     {
         private static bool _isDarkTheme = false; // Clair par défaut
+        private static bool _highContrast;
         private static DispatcherTimer? _windowsThemeWatchTimer;
         private static bool? _lastWindowsDarkTheme;
 
         public static event EventHandler<bool>? ThemeChanged;
+
+        public static bool HighContrast => _highContrast;
 
         public static bool IsDarkTheme
         {
@@ -39,6 +42,7 @@ namespace optiSCAN
         public static void Initialize()
         {
             var prefs = UserPreferences.Current;
+            _highContrast = prefs.HighContrastEnabled;
             if (prefs.SyncWindowsTheme)
             {
                 bool dark = IsWindowsAppsDarkTheme();
@@ -72,6 +76,16 @@ namespace optiSCAN
                 AppLogger.Warn("ThemeManager", "IsWindowsAppsDarkTheme", ex);
             }
             return false;
+        }
+
+        /// <summary>Active ou désactive le thème à contraste renforcé.</summary>
+        public static void SetHighContrast(bool enabled)
+        {
+            var prefs = UserPreferences.Current;
+            prefs.HighContrastEnabled = enabled;
+            prefs.Save();
+            _highContrast = enabled;
+            ApplyTheme(_isDarkTheme);
         }
 
         /// <summary>Bascule sombre ↔ clair et sauvegarde la préférence.</summary>
@@ -204,9 +218,13 @@ namespace optiSCAN
             int idx = merged.IndexOf(existing);
             merged.Remove(existing);
 
-            var uri = isDark
-                ? new Uri("/Themes/Donaby.Dark.xaml", UriKind.Relative)
-                : new Uri("/Themes/Donaby.Light.xaml", UriKind.Relative);
+            Uri uri;
+            if (_highContrast)
+                uri = new Uri("/Themes/Donaby.HighContrast.xaml", UriKind.Relative);
+            else
+                uri = isDark
+                    ? new Uri("/Themes/Donaby.Dark.xaml", UriKind.Relative)
+                    : new Uri("/Themes/Donaby.Light.xaml", UriKind.Relative);
 
             merged.Insert(idx, new System.Windows.ResourceDictionary { Source = uri });
         }
