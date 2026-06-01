@@ -21,7 +21,7 @@ namespace optiSCAN.Views
     public partial class OptionsControl : System.Windows.Controls.UserControl
     {
         private readonly ObservableCollection<string> _exclusions = new();
-        private ScheduledScanService ScheduledScan => ServiceContainer.Default.ScheduledScan;
+        private IScheduledScanService ScheduledScan => ServiceContainer.Default.ScheduledScan;
         private bool _suppressPreferenceEvents;
         private string? _languageTagBeforeDropDown;
         private int _favoriteScanIndexBeforeDropDown;
@@ -32,6 +32,7 @@ namespace optiSCAN.Views
             lstExclusions.ItemsSource = _exclusions;
             InitScheduleTimeComboBoxes();
             LoadPreferences();
+            Loaded += (_, _) => _ = LoadScheduledTaskStateAsync();
         }
 
         private void InitScheduleTimeComboBoxes()
@@ -52,6 +53,24 @@ namespace optiSCAN.Views
             if (cmbScheduleMinute?.SelectedItem is string ms && int.TryParse(ms, out var parsed))
                 m = parsed;
             return new TimeSpan(h, m, 0);
+        }
+
+        /// <summary>
+        /// Synchronise la case « Thème sombre » avec l'état réel du thème.
+        /// À appeler depuis MainWindow quand le thème change via le bouton sidebar.
+        /// </summary>
+        public void SyncDarkThemeCheckbox(bool isDark)
+        {
+            _suppressPreferenceEvents = true;
+            try
+            {
+                if (chkDarkTheme != null)
+                    chkDarkTheme.IsChecked = isDark;
+            }
+            finally
+            {
+                _suppressPreferenceEvents = false;
+            }
         }
 
         private void LoadPreferences()
@@ -95,14 +114,15 @@ namespace optiSCAN.Views
                 if (chkAutoUpdate != null)
                     chkAutoUpdate.IsChecked = prefs.SignatureAutoUpdateEnabled;
 
-                if (chkScheduledScan != null)
-                    chkScheduledScan.IsChecked = ScheduledScan.IsTaskExists();
+                if (chkHighContrast != null)
+                    chkHighContrast.IsChecked = prefs.HighContrastEnabled;
 
                 _exclusions.Clear();
                 foreach (var path in ex.ExcludedFolders)
                     _exclusions.Add(path);
 
-                RefreshScheduledStatus();
+                if (txtScheduledNextRun != null)
+                    txtScheduledNextRun.Text = LocalizationService.GetString("Opt_SchedLoading");
             }
             finally
             {
@@ -110,10 +130,30 @@ namespace optiSCAN.Views
             }
         }
 
-        private void RefreshScheduledStatus()
+        private async System.Threading.Tasks.Task LoadScheduledTaskStateAsync()
+        {
+            if (chkScheduledScan == null) return;
+            chkScheduledScan.IsEnabled = false;
+            try
+            {
+                bool exists = await System.Threading.Tasks.Task.Run(() => ScheduledScan.IsTaskExists());
+                _suppressPreferenceEvents = true;
+                try { chkScheduledScan.IsChecked = exists; }
+                finally { _suppressPreferenceEvents = false; }
+                await RefreshScheduledStatusAsync();
+            }
+            finally
+            {
+                chkScheduledScan.IsEnabled = true;
+            }
+        }
+
+        private async System.Threading.Tasks.Task RefreshScheduledStatusAsync()
         {
             if (txtScheduledNextRun == null) return;
-            if (!ScheduledScan.IsTaskExists())
+
+            bool exists = await System.Threading.Tasks.Task.Run(() => ScheduledScan.IsTaskExists());
+            if (!exists)
             {
                 txtScheduledNextRun.Text = LocalizationService.GetString("Opt_SchedNone");
                 if (btnScheduledRunNow != null) btnScheduledRunNow.IsEnabled = false;
@@ -123,7 +163,7 @@ namespace optiSCAN.Views
 
             if (btnScheduledRunNow != null) btnScheduledRunNow.IsEnabled = true;
             if (pnlScheduleTime != null) pnlScheduleTime.IsEnabled = false;
-            var next = ScheduledScan.GetNextRunTime();
+            var next = await System.Threading.Tasks.Task.Run(() => ScheduledScan.GetNextRunTime());
             txtScheduledNextRun.Text = next.HasValue
                 ? LocalizationService.Format("Opt_SchedNextRun", next.Value.ToString("f", LocalizationService.CurrentCulture))
                 : LocalizationService.GetString("Opt_SchedActiveUnknown");
@@ -188,29 +228,55 @@ namespace optiSCAN.Views
                     }
                     break;
 
-                case "ScheduledScan":
-                    if (isOn)
-                    {
-                        if (!ScheduledScan.CreateDailyScan(GetSelectedScheduleTime()))
-                            System.Windows.MessageBox.Show(
-                                LocalizationService.GetString("Opt_SchedTaskFailed"),
-                                LocalizationService.GetString("Opt_SchedTaskTitle"),
-                                MessageBoxButton.OK,
-                                MessageBoxImage.Warning);
-                    }
-                    else
-                    {
-                        ScheduledScan.DeleteTask();
-                    }
-                    _suppressPreferenceEvents = true;
-                    try
-                    {
-                        if (chkScheduledScan != null)
-                            chkScheduledScan.IsChecked = ScheduledScan.IsTaskExists();
-                    }
-                    finally { _suppressPreferenceEvents = false; }
-                    RefreshScheduledStatus();
+                case "HighContrast":
+                    ThemeManager.SetHighContrast(isOn);
                     break;
+
+                case "ScheduledScan":
+                    // schtasks peut prendre jusqu'à ~15 s : on déporte en Task.Run
+                    // pour ne pas geler le thread UI, et on désactive la case pendant ce temps.
+                    if (chkScheduledScan != null) chkScheduledScan.IsEnabled = false;
+                    if (pnlScheduleTime != null) pnlScheduleTime.IsEnabled = false;
+                    if (btnScheduledRunNow != null) btnScheduledRunNow.IsEnabled = false;
+                    var schedTime = GetSelectedScheduleTime();
+                    _ = ApplyScheduledScanAsync(isOn, schedTime);
+                    break;
+            }
+        }
+
+        /// <summary>
+        /// Crée ou supprime la tâche planifiée hors thread UI (schtasks peut prendre ~15 s).
+        /// Réactive les contrôles et affiche le statut une fois terminé.
+        /// </summary>
+        private async System.Threading.Tasks.Task ApplyScheduledScanAsync(bool enable, TimeSpan? schedTime)
+        {
+            try
+            {
+                bool ok = await System.Threading.Tasks.Task.Run(() =>
+                    ScheduledScanApply.SetEnabled(enable, schedTime, ScheduledScan));
+
+                if (enable && !ok)
+                    System.Windows.MessageBox.Show(
+                        LocalizationService.GetString("Opt_SchedTaskFailed"),
+                        LocalizationService.GetString("Opt_SchedTaskTitle"),
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Warning);
+            }
+            finally
+            {
+                // Toujours sur le thread UI.
+                _suppressPreferenceEvents = true;
+                try
+                {
+                    bool exists = await System.Threading.Tasks.Task.Run(() => ScheduledScan.IsTaskExists());
+                    if (chkScheduledScan != null)
+                    {
+                        chkScheduledScan.IsChecked = exists;
+                        chkScheduledScan.IsEnabled = true;
+                    }
+                }
+                finally { _suppressPreferenceEvents = false; }
+                await RefreshScheduledStatusAsync();
             }
         }
 
@@ -310,25 +376,36 @@ namespace optiSCAN.Views
             prefs.Save();
         }
 
-        private void BtnScheduledRunNow_Click(object sender, RoutedEventArgs e)
+        private async void BtnScheduledRunNow_Click(object sender, RoutedEventArgs e)
         {
-            if (!ScheduledScan.IsTaskExists())
+            bool exists = await System.Threading.Tasks.Task.Run(() => ScheduledScan.IsTaskExists());
+            if (!exists)
             {
                 System.Windows.MessageBox.Show(LocalizationService.GetString("Opt_SchedEnableFirst"), LocalizationService.GetString("App_TitleShort"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
-            if (!ScheduledScan.RunNow())
+
+            if (btnScheduledRunNow != null) btnScheduledRunNow.IsEnabled = false;
+            try
             {
-                System.Windows.MessageBox.Show(LocalizationService.GetString("Opt_SchedRunFailed"), LocalizationService.GetString("App_TitleShort"),
-                    MessageBoxButton.OK, MessageBoxImage.Warning);
-                return;
+                bool ok = await System.Threading.Tasks.Task.Run(() => ScheduledScan.RunNow());
+                if (!ok)
+                {
+                    System.Windows.MessageBox.Show(LocalizationService.GetString("Opt_SchedRunFailed"), LocalizationService.GetString("App_TitleShort"),
+                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+                System.Windows.MessageBox.Show(
+                    LocalizationService.GetString("Opt_SchedRunOk"),
+                    LocalizationService.GetString("App_TitleShort"),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                await RefreshScheduledStatusAsync();
             }
-            System.Windows.MessageBox.Show(
-                LocalizationService.GetString("Opt_SchedRunOk"),
-                LocalizationService.GetString("App_TitleShort"),
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
-            RefreshScheduledStatus();
+            finally
+            {
+                if (btnScheduledRunNow != null) btnScheduledRunNow.IsEnabled = true;
+            }
         }
 
         private static void SetAutoStart(bool enable)

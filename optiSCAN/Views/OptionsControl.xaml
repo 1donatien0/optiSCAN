@@ -4,17 +4,10 @@
              xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:loc="clr-namespace:optiSCAN.Localization">
 
-    <DockPanel Background="{DynamicResource ContentBg}">
-
-        <!-- ══ HERO BAND ═══════════════════════════════════════════════════ -->
-        <Border DockPanel.Dock="Top"
-                Margin="24,16,24,0"
-                CornerRadius="12"
-                BorderBrush="{DynamicResource BorderSubtle}"
-                BorderThickness="1"
-                Background="{DynamicResource PageHeaderMica}"
-                Effect="{DynamicResource CardShadow}"
-                Padding="18,14">
+    <DockPanel Background="Transparent">
+        <Rectangle DockPanel.Dock="Top" Height="2" Margin="48,0,48,0" Opacity="0.55"
+                   Fill="{DynamicResource AccentLineGradient}"/>
+        <Border DockPanel.Dock="Top" Style="{StaticResource PageHeaderBandDense}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -30,13 +23,7 @@
                                Margin="0,4,0,0"/>
                 </StackPanel>
 
-                <Border Grid.Column="1"
-                        Width="48" Height="48" CornerRadius="24"
-                        Background="{DynamicResource PageHeaderIconRing}"
-                        BorderBrush="{DynamicResource PageHeaderIconBorder}"
-                        BorderThickness="1"
-                        HorizontalAlignment="Right"
-                        VerticalAlignment="Center">
+                <Border Grid.Column="1" Style="{StaticResource PageHeaderIcon}">
                     <md:PackIcon Kind="Cog" Width="26" Height="26"
                                  Foreground="{DynamicResource TextAccent}"
                                  HorizontalAlignment="Center"
@@ -50,9 +37,8 @@
             <StackPanel Margin="24,20,24,24">
 
                 <!-- ── GÉNÉRAL ────────────────────────────────────────────────── -->
-                <Border Background="{DynamicResource CardBg}"
-                        CornerRadius="12" Padding="24,20"
-                        Effect="{DynamicResource CardShadow}"
+                <Border Style="{StaticResource GlassCard}"
+                        Padding="24,20"
                         Margin="0,0,0,14">
                     <StackPanel>
 
@@ -116,6 +102,24 @@
                             </StackPanel>
                         </StackPanel>
 
+                        <!-- Contraste renforcé -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                            <CheckBox x:Name="chkHighContrast"
+                                      VerticalAlignment="Top"
+                                      Margin="0,2,16,0"
+                                      Checked="CheckOption_Changed"
+                                      Unchecked="CheckOption_Changed"
+                                      Tag="HighContrast"/>
+                            <StackPanel>
+                                <TextBlock Text="{loc:Loc Key=Opt_HighContrast}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextDark}"/>
+                                <TextBlock Text="{loc:Loc Key=Opt_HighContrastSub}"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                           Margin="0,3,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+
                         <!-- Suivre le thème Windows -->
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                             <CheckBox x:Name="chkSyncWindowsTheme"
@@ -141,9 +145,7 @@
                                        Foreground="{DynamicResource TextDark}"
                                        Margin="0,0,0,6"/>
                             <ComboBox x:Name="cmbUiLanguage"
-                                      Style="{x:Null}"
-                                      Background="Transparent"
-                                      Cursor="Hand"
+                                      Style="{StaticResource DonabyComboBox}"
                                       DropDownOpened="ComboBox_DropDownOpened"
                                       DropDownClosed="CmbUiLanguage_DropDownClosed"
                                       PreviewMouseLeftButtonDown="ComboBox_PreviewMouseLeftButtonDown"
@@ -163,9 +165,7 @@
                                        Foreground="{DynamicResource TextDark}"
                                        Margin="0,0,0,6"/>
                             <ComboBox x:Name="cmbFavoriteScan"
-                                      Style="{x:Null}"
-                                      Background="Transparent"
-                                      Cursor="Hand"
+                                      Style="{StaticResource DonabyComboBox}"
                                       DisplayMemberPath="Content"
                                       DropDownOpened="ComboBox_DropDownOpened"
                                       DropDownClosed="CmbFavoriteScan_DropDownClosed"
@@ -185,9 +185,8 @@
                 </Border>
 
                 <!-- ── ANTIVIRUS ─────────────────────────────────────────────── -->
-                <Border Background="{DynamicResource CardBg}"
-                        CornerRadius="12" Padding="24,20"
-                        Effect="{DynamicResource CardShadow}"
+                <Border Style="{StaticResource GlassCard}"
+                        Padding="24,20"
                         Margin="0,0,0,14">
                     <StackPanel>
 
@@ -269,6 +268,9 @@
                                     <TextBlock Text="{loc:Loc Key=Opt_ScheduledSub}"
                                                FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
                                                Margin="0,3,0,0" TextWrapping="Wrap"/>
+                                    <TextBlock Text="{loc:Loc Key=Opt_SchedUacHint}"
+                                               FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource WarningOrange}"
+                                               Margin="0,6,0,0" TextWrapping="Wrap"/>
                                 </StackPanel>
                             </StackPanel>
                             <StackPanel x:Name="pnlScheduleTime" Orientation="Horizontal" Margin="32,10,0,6">
@@ -298,9 +300,8 @@
                 </Border>
 
                 <!-- ── APPLICATION (mises à jour binaire) ───────────────────── -->
-                <Border Background="{DynamicResource CardBg}"
-                        CornerRadius="12" Padding="24,20"
-                        Effect="{DynamicResource CardShadow}"
+                <Border Style="{StaticResource GlassCard}"
+                        Padding="24,20"
                         Margin="0,0,0,14">
                     <StackPanel>
                         <TextBlock Text="{loc:Loc Key=Opt_App}"
@@ -324,9 +325,8 @@
                 </Border>
 
                 <!-- ── EXCLUSIONS ────────────────────────────────────────────── -->
-                <Border Background="{DynamicResource CardBg}"
-                        CornerRadius="12" Padding="24,20"
-                        Effect="{DynamicResource CardShadow}">
+                <Border Style="{StaticResource GlassCard}"
+                        Padding="24,20">
                     <StackPanel>
 
                         <TextBlock Text="{loc:Loc Key=Opt_Exclusions}"
@@ -398,12 +398,8 @@
                                             <Button Grid.Column="2"
                                                     Tag="{Binding}"
                                                     Click="BtnRemoveExclusion_Click"
-                                                    Background="Transparent"
-                                                    BorderThickness="0"
-                                                    Foreground="{DynamicResource DangerRed}"
-                                                    Cursor="Hand" FontSize="{DynamicResource FontSize.Large}"
-                                                    Padding="6,0"
-                                                    Content="✕"/>
+                                                    Style="{StaticResource DangerIconButton}"
+                                                    ToolTip="{loc:Loc Key=Opt_RemoveExclusion}"/>
                                         </Grid>
                                     </Border>
                                 </DataTemplate>

@@ -75,4 +75,14 @@ namespace optiSCAN.Services
 
         public Task<string> GetVersionAsync() => _engine.GetVersionAsync();
     }
+
+    /// <summary>Gestion de la tâche planifiée Windows (schtasks).</summary>
+    public interface IScheduledScanService
+    {
+        bool CreateDailyScan(TimeSpan? time = null);
+        bool DeleteTask();
+        bool IsTaskExists();
+        DateTime? GetNextRunTime();
+        bool RunNow();
+    }
 }

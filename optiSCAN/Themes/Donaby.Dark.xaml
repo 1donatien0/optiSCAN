@@ -7,17 +7,24 @@
          9 ramps × 7 stops. Variables équivalentes aux CSS vars.
     ═══════════════════════════════════════════════════════════════ -->
 
-    <!-- ── FONDS ── -->
-    <SolidColorBrush x:Key="AppBg"          Color="#1A1917"/>
-    <SolidColorBrush x:Key="SidebarBg"      Color="#100F0D"/>
-    <SolidColorBrush x:Key="ContentBg"      Color="#1A1917"/>
-    <SolidColorBrush x:Key="HeaderBg"       Color="#242320"/>
-    <SolidColorBrush x:Key="CardBg"         Color="#242320"/>
-    <SolidColorBrush x:Key="CardBgHover"    Color="#2E2C42"/>
-    <SolidColorBrush x:Key="SurfaceBg"      Color="#2E2D2A"/>
+    <!-- ── FONDS (navy glass — mockup futuriste) ── -->
+    <SolidColorBrush x:Key="AppBg"          Color="#080C14"/>
+    <SolidColorBrush x:Key="SidebarBg"      Color="#050810"/>
+    <SolidColorBrush x:Key="ContentBg"      Color="#080C14"/>
+    <SolidColorBrush x:Key="ContentBgDeep"  Color="#080C14"/>
+    <SolidColorBrush x:Key="HeaderBg"       Color="#111828"/>
+    <!-- Cartes en verre semi-transparent sur le fond mesh -->
+    <SolidColorBrush x:Key="CardBg"         Color="#CC192236"/>
+    <SolidColorBrush x:Key="CardBgHover"    Color="#DD1E2A42"/>
+    <SolidColorBrush x:Key="SurfaceBg"      Color="#99101828"/>
+    <SolidColorBrush x:Key="GlassCardBg"    Color="#A3161E30"/>
+    <SolidColorBrush x:Key="BorderGlass"    Color="#554A6080"/>
+    <!-- Voile givré sur le mesh (simule diffusion acrylic WPF) -->
+    <SolidColorBrush x:Key="GlassFrostVeil" Color="#12182838"/>
 
     <!-- ── SIDEBAR ── -->
-    <SolidColorBrush x:Key="SidebarActiveItem"  Color="#26215C"/>
+    <SolidColorBrush x:Key="SidebarActiveItem"  Color="#2A2558"/>
+    <SolidColorBrush x:Key="SidebarActiveGlow"  Color="#6B5CE8"/>
     <SolidColorBrush x:Key="SidebarIndicator"   Color="#9F97F0"/>
     <SolidColorBrush x:Key="SidebarText"        Color="#686660"/>
     <SolidColorBrush x:Key="SidebarTextActive"  Color="#F0EDE8"/>
@@ -62,22 +69,90 @@
     <!-- ── ICÔNE SUR FOND ACCENT — anneau semi-transparent posé sur PrimaryBlue ── -->
     <SolidColorBrush x:Key="AccentIconRing"     Color="#33FFFFFF"/>
 
+    <!-- Bordure lumineuse glass -->
+    <SolidColorBrush x:Key="CardBorderAccent"  Color="#44556090"/>
+
+    <!-- Bordure verre — reflet haut-gauche + teinte violette bas-droite -->
+    <LinearGradientBrush x:Key="GlassCardRim" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#66FFFFFF" Offset="0"/>
+        <GradientStop Color="#334A6080" Offset="0.42"/>
+        <GradientStop Color="#286B5CE8" Offset="1"/>
+    </LinearGradientBrush>
+
+    <!-- Bordure lumineuse active (hover) -->
+    <LinearGradientBrush x:Key="CardBorderGlow" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#886B5CE8" Offset="0"/>
+        <GradientStop Color="#443B82F6" Offset="1"/>
+    </LinearGradientBrush>
+
     <!-- ── OMBRES (minimalistes, Donaby Design style) ── -->
     <DropShadowEffect x:Key="CardShadow"
-                      Color="#000000" Opacity="0.18"
-                      BlurRadius="12" ShadowDepth="2" Direction="270"/>
+                      Color="#000000" Opacity="0.32"
+                      BlurRadius="20" ShadowDepth="3" Direction="270"/>
 
-    <!-- ── EN-TÊTE DE PAGE (Accueil, etc.) — dégradé type Mica, suit le thème ── -->
-    <LinearGradientBrush x:Key="PageHeaderMica" StartPoint="0,0" EndPoint="0,1">
-        <GradientStop Color="#2E2D2A" Offset="0"/>
-        <GradientStop Color="#26215C" Offset="0.5"/>
-        <GradientStop Color="#1A1917" Offset="1"/>
+    <!-- ── DÉGRADÉS ACCENT (boutons, carte héros) ── -->
+    <LinearGradientBrush x:Key="AccentGradient" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#7C5CFF" Offset="0"/>
+        <GradientStop Color="#5B4FE8" Offset="0.45"/>
+        <GradientStop Color="#3B82F6" Offset="1"/>
     </LinearGradientBrush>
-    <SolidColorBrush x:Key="PageHeaderIconRing"   Color="#26215C"/>
-    <SolidColorBrush x:Key="PageHeaderIconBorder" Color="#3C3489"/>
+    <LinearGradientBrush x:Key="HeroCardGradient" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#8B5CF6" Offset="0"/>
+        <GradientStop Color="#6366F1" Offset="0.5"/>
+        <GradientStop Color="#3B82F6" Offset="1"/>
+    </LinearGradientBrush>
+    <LinearGradientBrush x:Key="ContentAreaMesh" StartPoint="0,1" EndPoint="1,0">
+        <GradientStop Color="#1A1040" Offset="0"/>
+        <GradientStop Color="#00000000" Offset="0.35"/>
+        <GradientStop Color="#152A5C" Offset="0.75"/>
+        <GradientStop Color="#00000000" Offset="1"/>
+    </LinearGradientBrush>
+
+    <!-- ── EN-TÊTE DE PAGE — verre + dégradé violet ── -->
+    <LinearGradientBrush x:Key="PageHeaderMica" StartPoint="0,0" EndPoint="1,1">
+        <GradientStop Color="#1F2641" Offset="0"/>
+        <GradientStop Color="#2D2A60" Offset="0.55"/>
+        <GradientStop Color="#141A30" Offset="1"/>
+    </LinearGradientBrush>
+
+    <!-- Accent fin pour lignes décoratives -->
+    <LinearGradientBrush x:Key="AccentLineGradient" StartPoint="0,0" EndPoint="1,0">
+        <GradientStop Color="#00000000" Offset="0"/>
+        <GradientStop Color="#7C5CFF" Offset="0.4"/>
+        <GradientStop Color="#3B82F6" Offset="0.7"/>
+        <GradientStop Color="#00000000" Offset="1"/>
+    </LinearGradientBrush>
+    <SolidColorBrush x:Key="PageHeaderIconRing"   Color="#3D3580"/>
+    <SolidColorBrush x:Key="PageHeaderIconBorder" Color="#6B5CE8"/>
+
+    <DropShadowEffect x:Key="GlowShadowAccent"
+                      Color="#7C5CFF" Opacity="0.65"
+                      BlurRadius="28" ShadowDepth="0"/>
+
+    <!-- Halo de bouclier (plus large, pour le hero shield) -->
+    <DropShadowEffect x:Key="ShieldGlow"
+                      Color="#6B5CE8" Opacity="0.8"
+                      BlurRadius="48" ShadowDepth="0"/>
+
+    <!-- Hero accueil — ambiance violet Donaby autour du PNG teal (logo battant intact) -->
+    <Color x:Key="HeroHaloOuterColor">#6B5CE8</Color>
+    <Color x:Key="HeroHaloInnerColor">#9F97F0</Color>
+    <DropShadowEffect x:Key="HeroShieldPulseGlow"
+                      Color="#7C5CE8" Opacity="0.58"
+                      BlurRadius="36" ShadowDepth="0"/>
+
+    <!-- ── Fond mesh animé (MainWindow) ── -->
+    <Color x:Key="MeshBlob1Color">#7C5CFF</Color>
+    <Color x:Key="MeshBlob2Color">#3B82F6</Color>
 
     <!-- ── INDICATEUR TOGGLE (icône lune pour le bouton thème) ── -->
     <SolidColorBrush x:Key="ThemeToggleBg"      Color="#26215C"/>
     <SolidColorBrush x:Key="ThemeToggleFg"      Color="#9F97F0"/>
+
+    <!-- Badges sévérité menaces (grille Antivirus — thème clair/sombre) -->
+    <SolidColorBrush x:Key="RiskCritical"       Color="#E24B4A"/>
+    <SolidColorBrush x:Key="RiskMajor"          Color="#EF9F27"/>
+    <SolidColorBrush x:Key="RiskMinor"          Color="#BA7517"/>
+    <SolidColorBrush x:Key="RiskInformational"  Color="#5DCAA5"/>
 
 </ResourceDictionary>

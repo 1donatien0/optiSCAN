@@ -173,6 +173,8 @@ namespace optiSCAN.Views
 
         public void SelectQuarantineTab() => SelectTab(1);
 
+        public void SelectScanTab() => SelectTab(0);
+
         public void UpdateSignaturesPanel(string yaraVersion, string yaraLastMaj, string clamVersion, string clamLastMaj)
         {
             Dispatcher.InvokeAsync(() =>
