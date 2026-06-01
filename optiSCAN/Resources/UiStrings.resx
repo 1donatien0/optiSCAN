@@ -375,6 +375,8 @@
   <data name="Hist_EmptyCleans" xml:space="preserve"><value>Aucun nettoyage enregistré</value></data>
   <data name="Hist_EmptyCleansSub" xml:space="preserve"><value>Les sessions de nettoyage apparaîtront ici.</value></data>
   <data name="Hist_FilterLabel" xml:space="preserve"><value>Filtrer</value></data>
+  <data name="Hist_FilterResult" xml:space="preserve"><value>Résultat</value></data>
+  <data name="Hist_FilterSearch" xml:space="preserve"><value>Recherche</value></data>
   <data name="Hist_FilterAll" xml:space="preserve"><value>Tous les scans</value></data>
   <data name="Hist_FilterWithThreats" xml:space="preserve"><value>Avec menaces</value></data>
   <data name="Hist_FilterNoThreats" xml:space="preserve"><value>Sans menace</value></data>
@@ -454,4 +456,32 @@
   <data name="Av_PickFolder" xml:space="preserve"><value>Sélectionnez le dossier à analyser</value></data>
   <data name="Av_PickFile" xml:space="preserve"><value>Sélectionnez un fichier à analyser</value></data>
   <data name="Shell_ScanWith" xml:space="preserve"><value>Scanner avec optiSCAN</value></data>
+  <data name="Opt_SchedLoading" xml:space="preserve"><value>Chargement de la tâche planifiée…</value></data>
+  <data name="Opt_SchedUacHint" xml:space="preserve"><value>Le scan planifié s'exécute sans interface (--fullscan). Sans droits administrateur, certains dossiers système ne sont pas analysés. Utilisez « Exécuter en tant qu'administrateur » sur l'accueil pour une couverture maximale.</value></data>
+  <data name="Opt_HighContrast" xml:space="preserve"><value>Contraste renforcé</value></data>
+  <data name="Opt_HighContrastSub" xml:space="preserve"><value>Bordures et textes plus marqués pour une meilleure lisibilité.</value></data>
+  <data name="Scan_FullPartialWithoutAdmin" xml:space="preserve"><value>Analyse complète — couverture partielle sans droits administrateur (voir bandeau Accueil).</value></data>
+  <data name="Clean_Browser_Edge" xml:space="preserve"><value>Microsoft Edge</value></data>
+  <data name="Clean_Browser_Chrome" xml:space="preserve"><value>Google Chrome</value></data>
+  <data name="Clean_Browser_Firefox" xml:space="preserve"><value>Mozilla Firefox</value></data>
+  <data name="Clean_Browser_Brave" xml:space="preserve"><value>Brave</value></data>
+  <data name="Clean_Browser_Opera" xml:space="preserve"><value>Opera</value></data>
+  <data name="Clean_Browser_Vivaldi" xml:space="preserve"><value>Vivaldi</value></data>
+  <data name="Clean_Browser_Arc" xml:space="preserve"><value>Arc</value></data>
+  <data name="Av_Action_FileNotFound" xml:space="preserve"><value>Fichier introuvable : {0}</value></data>
+  <data name="Av_Action_DetectedDefault" xml:space="preserve"><value>Détecté</value></data>
+  <data name="Av_Action_QuarantineOk" xml:space="preserve"><value>Fichier mis en quarantaine : {0}</value></data>
+  <data name="Av_Action_QuarantineFail" xml:space="preserve"><value>Échec quarantaine : {0}</value></data>
+  <data name="Av_Action_AlreadyExcluded" xml:space="preserve"><value>Déjà exclu des analyses : {0}</value></data>
+  <data name="Av_Action_ExcludeFail" xml:space="preserve"><value>Impossible d'exclure : {0}</value></data>
+  <data name="Av_Action_ExcludedOk" xml:space="preserve"><value>Fichier exclu des analyses : {0}</value></data>
+  <data name="Av_Action_DeleteOk" xml:space="preserve"><value>Fichier supprimé : {0}</value></data>
+  <data name="Av_Action_DeleteMissing" xml:space="preserve"><value>Fichier déjà absent : {0}</value></data>
+  <data name="Av_Action_DeleteError" xml:space="preserve"><value>Erreur suppression : {0}</value></data>
+  <data name="Av_Action_InvalidPath" xml:space="preserve"><value>Chemin de fichier invalide.</value></data>
+  <data name="Av_Action_UpdateStopped" xml:space="preserve"><value>Mise à jour interrompue par l'utilisateur</value></data>
+  <data name="Export_HtmlFilter" xml:space="preserve"><value>Page web HTML (*.html)|*.html|Tous les fichiers (*.*)|*.*</value></data>
+  <data name="Export_PdfFilter" xml:space="preserve"><value>Document PDF (*.pdf)|*.pdf|Tous les fichiers (*.*)|*.*</value></data>
+  <data name="Onboarding_Title" xml:space="preserve"><value>Bienvenue dans optiSCAN</value></data>
+  <data name="Onboarding_Body" xml:space="preserve"><value>Quelques étapes recommandées :&#10;&#10;• Mettre à jour les signatures (Antivirus → Signatures)&#10;• Lancer une analyse rapide (F5)&#10;• Configurer les exclusions si besoin (Options)&#10;&#10;Sans droits administrateur, l'analyse complète et le scan planifié ne couvrent pas tous les dossiers système.</value></data>
 </root>

@@ -31,7 +31,9 @@ dotnet publish optiSCAN\optiSCAN.csproj -c Release -r win-x64 --self-contained t
 - [ ] Scan rapide (F5) + fin de scan → toast **Ouvrir Antivirus**
 - [ ] Menace RTP → toast avec quarantaine + **Ouvrir Antivirus**
 - [ ] Nettoyer : **Analyser** ne parcourt que les cases cochées
-- [ ] Options : scan planifié (schtasks) sans gel prolongé
+- [ ] Options : scan planifié (schtasks) sans gel prolongé ; hint UAC visible
+- [ ] Options : contraste renforcé bascule correctement
+- [ ] Premier lancement : assistant de bienvenue (une fois)
 - [ ] Bandeau UAC Accueil + relance administrateur si besoin
 - [ ] Quarantaine : ajout, restauration, refus chemins sensibles
 

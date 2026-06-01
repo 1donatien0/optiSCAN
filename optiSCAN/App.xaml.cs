@@ -16,13 +16,6 @@ namespace optiSCAN
         private static Mutex? _instanceMutex;
         private const string MutexName = "Global\\optiSCAN_UniqueInstance";
 
-        // Modes headless supportés en ligne de commande (utilisés par la tâche
-        // planifiée Windows et l'automatisation). En mode headless, l'UI WPF
-        // n'est jamais affichée — l'app exécute le scan demandé puis Shutdown.
-        private const string ArgFullScan = "--fullscan";
-        private const string ArgQuickScan = "--quickscan";
-        private const string ArgQuiet = "--quiet";
-
         /// <summary>
         /// Appelé au démarrage de l'application. Gère dans l'ordre :
         /// le mode headless (scan sans UI), puis le contrôle d'instance unique,
@@ -36,12 +29,12 @@ namespace optiSCAN
             // Détecté en premier pour éviter d'afficher la fenêtre principale.
             // ScheduledScanService crée la tâche schtasks avec --fullscan --quiet ;
             // sans ce parsing, l'app se lançait simplement avec son UI.
-            var headlessMode = ParseHeadlessMode(e.Args);
-            if (headlessMode != HeadlessMode.None)
+            var headlessMode = HeadlessScanArguments.ParseMode(e.Args);
+            if (headlessMode != HeadlessScanArguments.Mode.None)
             {
                 ShutdownMode = ShutdownMode.OnExplicitShutdown;
                 base.OnStartup(e);
-                await RunHeadlessAsync(headlessMode, IsQuiet(e.Args));
+                await RunHeadlessAsync(headlessMode, HeadlessScanArguments.IsQuiet(e.Args));
                 Shutdown();
                 return;
             }
@@ -69,30 +62,11 @@ namespace optiSCAN
 
         // ── Headless ────────────────────────────────────────────────────────────
 
-        private enum HeadlessMode { None, FullScan, QuickScan }
-
-        /// <summary>Détecte le mode headless depuis les arguments de ligne de commande.</summary>
-        private static HeadlessMode ParseHeadlessMode(string[] args)
-        {
-            foreach (var a in args)
-            {
-                if (string.Equals(a, ArgFullScan, StringComparison.OrdinalIgnoreCase))
-                    return HeadlessMode.FullScan;
-                if (string.Equals(a, ArgQuickScan, StringComparison.OrdinalIgnoreCase))
-                    return HeadlessMode.QuickScan;
-            }
-            return HeadlessMode.None;
-        }
-
-        /// <summary>Retourne <c>true</c> si l'argument <c>--quiet</c> est présent.</summary>
-        private static bool IsQuiet(string[] args)
-            => args.Any(a => string.Equals(a, ArgQuiet, StringComparison.OrdinalIgnoreCase));
-
         /// <summary>
         /// Exécute un scan en mode headless (sans fenêtre WPF), persiste le résultat
         /// dans l'historique et déclenche la quarantaine automatique si configurée.
         /// </summary>
-        private async Task RunHeadlessAsync(HeadlessMode mode, bool quiet)
+        private async Task RunHeadlessAsync(HeadlessScanArguments.Mode mode, bool quiet)
         {
             try
             {
@@ -104,10 +78,13 @@ namespace optiSCAN
 
                 logger.WriteToLog($"[Headless] Démarrage — mode {mode}, quiet={quiet}");
 
+                if (mode == HeadlessScanArguments.Mode.FullScan && !ElevationHelper.IsRunningElevated())
+                    logger.WriteToLog("[Headless] Analyse complète sans élévation — dossiers système partiels.");
+
                 ScanResult result = mode switch
                 {
-                    HeadlessMode.FullScan => await orchestrator.FullScanAsync(),
-                    HeadlessMode.QuickScan => await orchestrator.QuickScanAsync(),
+                    HeadlessScanArguments.Mode.FullScan => await orchestrator.FullScanAsync(),
+                    HeadlessScanArguments.Mode.QuickScan => await orchestrator.QuickScanAsync(),
                     _ => throw new InvalidOperationException("Mode headless non supporté")
                 };
 

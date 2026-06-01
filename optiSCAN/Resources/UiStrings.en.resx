@@ -375,6 +375,8 @@
   <data name="Hist_EmptyCleans" xml:space="preserve"><value>No clean sessions recorded</value></data>
   <data name="Hist_EmptyCleansSub" xml:space="preserve"><value>System clean sessions will appear here.</value></data>
   <data name="Hist_FilterLabel" xml:space="preserve"><value>Filter</value></data>
+  <data name="Hist_FilterResult" xml:space="preserve"><value>Result</value></data>
+  <data name="Hist_FilterSearch" xml:space="preserve"><value>Search</value></data>
   <data name="Hist_FilterAll" xml:space="preserve"><value>All scans</value></data>
   <data name="Hist_FilterWithThreats" xml:space="preserve"><value>With threats</value></data>
   <data name="Hist_FilterNoThreats" xml:space="preserve"><value>No threats</value></data>
@@ -454,4 +456,32 @@
   <data name="Av_PickFolder" xml:space="preserve"><value>Select the folder to scan</value></data>
   <data name="Av_PickFile" xml:space="preserve"><value>Select the file to scan</value></data>
   <data name="Shell_ScanWith" xml:space="preserve"><value>Scan with optiSCAN</value></data>
+  <data name="Opt_SchedLoading" xml:space="preserve"><value>Loading scheduled task…</value></data>
+  <data name="Opt_SchedUacHint" xml:space="preserve"><value>The scheduled scan runs headless (--fullscan). Without administrator rights, some system folders are skipped. Use Run as administrator on Home for full coverage.</value></data>
+  <data name="Opt_HighContrast" xml:space="preserve"><value>High contrast</value></data>
+  <data name="Opt_HighContrastSub" xml:space="preserve"><value>Stronger borders and text for improved readability.</value></data>
+  <data name="Scan_FullPartialWithoutAdmin" xml:space="preserve"><value>Full scan — partial coverage without administrator rights (see Home banner).</value></data>
+  <data name="Clean_Browser_Edge" xml:space="preserve"><value>Microsoft Edge</value></data>
+  <data name="Clean_Browser_Chrome" xml:space="preserve"><value>Google Chrome</value></data>
+  <data name="Clean_Browser_Firefox" xml:space="preserve"><value>Mozilla Firefox</value></data>
+  <data name="Clean_Browser_Brave" xml:space="preserve"><value>Brave</value></data>
+  <data name="Clean_Browser_Opera" xml:space="preserve"><value>Opera</value></data>
+  <data name="Clean_Browser_Vivaldi" xml:space="preserve"><value>Vivaldi</value></data>
+  <data name="Clean_Browser_Arc" xml:space="preserve"><value>Arc</value></data>
+  <data name="Av_Action_FileNotFound" xml:space="preserve"><value>File not found: {0}</value></data>
+  <data name="Av_Action_DetectedDefault" xml:space="preserve"><value>Detected</value></data>
+  <data name="Av_Action_QuarantineOk" xml:space="preserve"><value>File quarantined: {0}</value></data>
+  <data name="Av_Action_QuarantineFail" xml:space="preserve"><value>Quarantine failed: {0}</value></data>
+  <data name="Av_Action_AlreadyExcluded" xml:space="preserve"><value>Already excluded from scans: {0}</value></data>
+  <data name="Av_Action_ExcludeFail" xml:space="preserve"><value>Could not exclude: {0}</value></data>
+  <data name="Av_Action_ExcludedOk" xml:space="preserve"><value>File excluded from scans: {0}</value></data>
+  <data name="Av_Action_DeleteOk" xml:space="preserve"><value>File deleted: {0}</value></data>
+  <data name="Av_Action_DeleteMissing" xml:space="preserve"><value>File already gone: {0}</value></data>
+  <data name="Av_Action_DeleteError" xml:space="preserve"><value>Delete error: {0}</value></data>
+  <data name="Av_Action_InvalidPath" xml:space="preserve"><value>Invalid file path.</value></data>
+  <data name="Av_Action_UpdateStopped" xml:space="preserve"><value>Update stopped by user</value></data>
+  <data name="Export_HtmlFilter" xml:space="preserve"><value>HTML web page (*.html)|*.html|All files (*.*)|*.*</value></data>
+  <data name="Export_PdfFilter" xml:space="preserve"><value>PDF document (*.pdf)|*.pdf|All files (*.*)|*.*</value></data>
+  <data name="Onboarding_Title" xml:space="preserve"><value>Welcome to optiSCAN</value></data>
+  <data name="Onboarding_Body" xml:space="preserve"><value>Recommended first steps:&#10;&#10;• Update signatures (Antivirus → Signatures)&#10;• Run a quick scan (F5)&#10;• Configure exclusions if needed (Options)&#10;&#10;Without administrator rights, full and scheduled scans do not cover all system folders.</value></data>
 </root>

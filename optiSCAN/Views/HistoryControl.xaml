@@ -83,21 +83,36 @@
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
-                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="12,8,12,6">
-                                <TextBlock Text="{loc:Loc Key=Hist_FilterLabel}"
+                            <Grid Grid.Row="0" Margin="12,8,12,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="172"/>
+                                    <ColumnDefinition Width="20"/>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="{loc:Loc Key=Hist_FilterResult}"
                                            VerticalAlignment="Center"
                                            Foreground="{DynamicResource TextMuted}"
                                            FontSize="{DynamicResource FontSize.Small}"
                                            Margin="0,0,8,0"/>
-                                <ComboBox x:Name="cmbScanFilter"
+                                <ComboBox Grid.Column="1" x:Name="cmbScanFilter"
                                           Style="{StaticResource DonabyComboBox}"
-                                          Width="168" Height="32"
+                                          Height="32" VerticalAlignment="Center"
                                           SelectionChanged="ScanFilter_Changed"/>
-                                <TextBox x:Name="txtScanSearch"
-                                         ToolTip="{loc:Loc Key=Hist_SearchScan}"
-                                         Width="220" Height="32" Margin="10,0,0,0"
+                                <TextBlock Grid.Column="3"
+                                           Text="{loc:Loc Key=Hist_FilterSearch}"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource TextMuted}"
+                                           FontSize="{DynamicResource FontSize.Small}"
+                                           Margin="0,0,8,0"/>
+                                <TextBox Grid.Column="4" x:Name="txtScanSearch"
+                                         Height="32" VerticalAlignment="Center"
+                                         md:HintAssist.Hint="{loc:Loc Key=Hist_SearchScan}"
+                                         md:HintAssist.Foreground="{DynamicResource TextMuted}"
                                          TextChanged="ScanFilter_Changed"/>
-                            </StackPanel>
+                            </Grid>
 
                             <Grid Grid.Row="1">
                             <DataGrid x:Name="dgScanHistory"
@@ -198,10 +213,23 @@
                                 <RowDefinition Height="*"/>
                             </Grid.RowDefinitions>
 
-                            <TextBox Grid.Row="0" x:Name="txtCleanSearch"
-                                     ToolTip="{loc:Loc Key=Hist_SearchClean}"
-                                     Height="32" Margin="12,8,12,6"
-                                     TextChanged="CleanFilter_Changed"/>
+                            <Grid Grid.Row="0" Margin="12,8,12,6">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Grid.Column="0"
+                                           Text="{loc:Loc Key=Hist_FilterSearch}"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource TextMuted}"
+                                           FontSize="{DynamicResource FontSize.Small}"
+                                           Margin="0,0,8,0"/>
+                                <TextBox Grid.Column="1" x:Name="txtCleanSearch"
+                                         Height="32" VerticalAlignment="Center"
+                                         md:HintAssist.Hint="{loc:Loc Key=Hist_SearchClean}"
+                                         md:HintAssist.Foreground="{DynamicResource TextMuted}"
+                                         TextChanged="CleanFilter_Changed"/>
+                            </Grid>
 
                             <Grid Grid.Row="1">
                             <DataGrid x:Name="dgCleanHistory"

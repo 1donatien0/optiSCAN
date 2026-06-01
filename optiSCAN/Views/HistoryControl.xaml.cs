@@ -22,11 +22,11 @@ namespace optiSCAN.Views
         public HistoryControl()
         {
             InitializeComponent();
+            InitFilterControls();
             if (txtScanDetail != null)
                 txtScanDetail.Text = LocalizationService.GetString("Hist_DetailSelectScan");
             if (txtCleanDetail != null)
                 txtCleanDetail.Text = LocalizationService.GetString("Hist_DetailSelectClean");
-            Loaded += (_, _) => InitFilterControls();
         }
 
         private void InitFilterControls()

@@ -320,47 +320,47 @@
                     BorderBrush="{DynamicResource BorderColor}"
                     BorderThickness="0,1,0,0"
                     Padding="16,7">
-                <Grid>
+                <Grid ClipToBounds="True">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Gauche : statut + icône + activité live -->
-                    <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                    <!-- Gauche : statut (tronqué si long — ne doit pas recouvrir Vanier) -->
+                    <DockPanel Grid.Column="0" LastChildFill="True" Margin="0,0,20,0"
+                               VerticalAlignment="Center">
                         <ProgressBar x:Name="statusFooterSpinner"
+                                     DockPanel.Dock="Left"
                                      Width="36" Height="3"
                                      IsIndeterminate="True"
                                      Visibility="Collapsed"
                                      Foreground="{DynamicResource AccentBlue}"
                                      Background="{DynamicResource BorderSubtle}"
                                      VerticalAlignment="Center" Margin="0,0,8,0"/>
-                        <md:PackIcon x:Name="statusFooterIcon" Kind="CheckboxMarked" Width="14" Height="14"
+                        <md:PackIcon x:Name="statusFooterIcon"
+                                     DockPanel.Dock="Left"
+                                     Kind="CheckboxMarked" Width="14" Height="14"
                                      Foreground="{DynamicResource SuccessGreen}"
                                      VerticalAlignment="Center" Margin="0,0,6,0"/>
                         <TextBlock x:Name="lblStatus"
                                    Text="{loc:Loc Key=Main_StatusReady}"
                                    Foreground="{DynamicResource TextMedium}"
-                                   FontSize="{DynamicResource FontSize.Body}" VerticalAlignment="Center"/>
-                    </StackPanel>
+                                   FontSize="{DynamicResource FontSize.Body}"
+                                   VerticalAlignment="Center"
+                                   TextTrimming="CharacterEllipsis"
+                                   TextWrapping="NoWrap"
+                                   ToolTip="{Binding Text, RelativeSource={RelativeSource Self}}"/>
+                    </DockPanel>
 
-                    <!-- Centre : mention légale -->
+                    <!-- Droite : Vanier (version uniquement dans la sidebar) -->
                     <TextBlock Grid.Column="1"
                                Text="{loc:Loc Key=Main_FooterFree}"
                                Foreground="{DynamicResource TextMuted}"
-                               FontSize="{DynamicResource FontSize.Small}" VerticalAlignment="Center"
-                               Margin="0,0,24,0"
+                               FontSize="{DynamicResource FontSize.Small}"
+                               VerticalAlignment="Center"
+                               HorizontalAlignment="Right"
+                               TextWrapping="NoWrap"
                                FontStyle="Italic"/>
-
-                    <!-- Droite : version + crédit -->
-                    <StackPanel Grid.Column="2" Orientation="Horizontal" VerticalAlignment="Center">
-                        <md:PackIcon Kind="Wrench" Width="12" Height="12"
-                                     Foreground="{DynamicResource TextMuted}"
-                                     VerticalAlignment="Center" Margin="0,0,4,0"/>
-                        <TextBlock x:Name="txtFooterVersion"
-                                   FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
-                                   Text="{loc:Loc Key=Main_FooterVersion}"/>
-                    </StackPanel>
                 </Grid>
             </Border>
         </Grid>

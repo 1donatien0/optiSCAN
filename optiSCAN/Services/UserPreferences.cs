@@ -77,6 +77,12 @@ namespace optiSCAN.Services
         /// <summary>Culture UI (fr-FR ou en-US). Vide = langue de l'installateur au premier lancement.</summary>
         public string UiCulture { get; set; } = string.Empty;
 
+        /// <summary>Assistant de bienvenue affiché une fois au premier lancement.</summary>
+        public bool OnboardingCompleted { get; set; }
+
+        /// <summary>Thème à contraste renforcé (lisibilité accrue).</summary>
+        public bool HighContrastEnabled { get; set; }
+
         // ── Méthodes ──────────────────────────────────────────────────────────────
 
         /// <summary>

@@ -39,6 +39,7 @@ namespace optiSCAN
         private ScanOrchestrator? _antivirusOrchestrator;
         private ScanLogManager? _logManager;
         private QuarantineManager? _quarantineManager;
+        private readonly HistoryExportService _historyExport = new();
         private FreshclamUpdater? _freshclamUpdater;
         private YaraForgeUpdater? _rulesUpdater;
 
@@ -230,6 +231,7 @@ namespace optiSCAN
                 _navigationService.NavigateTo(OptiscanStrings.PanelIds.Overview);
 
                 SetStatus(OptiscanStrings.UiMessages.ProtectionActive);
+                OnboardingService.ShowIfNeeded(this);
             }
             catch (Exception ex)
             {
@@ -672,68 +674,27 @@ namespace optiSCAN
 
         private void TryExportScanReportHtml()
         {
-            try
-            {
-                var dlg = new Microsoft.Win32.SaveFileDialog
-                {
-                    Filter = "Page web HTML (*.html)|*.html|Tous les fichiers (*.*)|*.*",
-                    FileName = $"optiSCAN_rapport_{DateTime.Now:yyyyMMdd_HHmm}.html",
-                    DefaultExt = ".html",
-                    AddExtension = true
-                };
-                if (dlg.ShowDialog(this) != true) return;
-
-                var html = new HtmlExportService();
-                var hist = _logManager?.GetHistory() ?? Array.Empty<ScanSession>();
-                var threats = ViewModel?.Threats ?? Enumerable.Empty<ThreatInfo>();
-                var quar = _quarantineManager?.GetEntries() ?? Array.Empty<QuarantineEntry>();
-                html.ExportFullReport(hist, threats, quar, UserPreferences.Current, dlg.FileName);
-                SetStatus(LocalizationService.Format("Status_HtmlSaved", dlg.FileName));
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Error("MainWindow", "Export HTML", ex);
-                SetStatus(LocalizationService.Format("Status_HtmlFailed", ex.Message), isError: true);
-            }
+            var result = _historyExport.TryExportHtml(
+                this,
+                _logManager,
+                ViewModel?.Threats ?? Enumerable.Empty<ThreatInfo>(),
+                _quarantineManager?.GetEntries() ?? Array.Empty<QuarantineEntry>());
+            if (!result.WasCancelled && !string.IsNullOrEmpty(result.Message))
+                SetStatus(result.Message, isError: result.IsError);
         }
 
         private void TryExportLastScanPdf()
         {
-            var sessions = _logManager?.GetHistory() ?? Array.Empty<ScanSession>();
-            if (sessions.Count == 0)
-            {
-                System.Windows.MessageBox.Show(this,
-                    LocalizationService.GetString("Status_ExportNoHistory"),
-                    LocalizationService.GetString("Hist_ExportPdfTitle"),
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                return;
-            }
-            TryExportScanSessionPdf(sessions[0]);
+            var result = _historyExport.TryExportLastScanPdf(this, _logManager);
+            if (!result.WasCancelled && !string.IsNullOrEmpty(result.Message))
+                SetStatus(result.Message, isError: result.IsError);
         }
 
         private void TryExportScanSessionPdf(ScanSession session)
         {
-            try
-            {
-                var dlg = new Microsoft.Win32.SaveFileDialog
-                {
-                    Filter = "Document PDF (*.pdf)|*.pdf|Tous les fichiers (*.*)|*.*",
-                    FileName = $"optiSCAN_scan_{session.StartedAt:yyyyMMdd_HHmm}.pdf",
-                    DefaultExt = ".pdf",
-                    AddExtension = true
-                };
-                if (dlg.ShowDialog(this) != true) return;
-
-                var gen = new PdfReportGenerator();
-                gen.GenerateReportFromSession(session, dlg.FileName);
-                SetStatus(LocalizationService.Format("Status_PdfSaved", dlg.FileName));
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Error("MainWindow", "Export PDF", ex);
-                SetStatus(LocalizationService.Format("Status_PdfFailed", ex.Message), isError: true);
-            }
+            var result = _historyExport.TryExportSessionPdf(this, session);
+            if (!result.WasCancelled && !string.IsNullOrEmpty(result.Message))
+                SetStatus(result.Message, isError: result.IsError);
         }
 
         // ── Statut ───────────────────────────────────────────────────────────────
@@ -976,93 +937,6 @@ namespace optiSCAN
         }
 
         // ── Quarantaine ──────────────────────────────────────────────────────────
-
-        /// <summary>Met le fichier identifié par <c>btn.Tag</c> en quarantaine chiffrée.</summary>
-        public void BtnQuarantineThreat_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button btn && btn.Tag is string filePath)
-            {
-                var c = ServiceContainer.Default;
-                var known = c.FindKnownThreat(filePath);
-                var result = known != null
-                    ? c.Actions.QuarantineThreat(known.Clone())
-                    : c.Actions.QuarantineThreat(filePath);
-                SetStatus(result.Message, isError: result.IsError);
-                if (result.Success)
-                {
-                    RefreshQuarantineList();
-                    ((Views.AntivirusView)panelAntivirus)?.RefreshAllData();
-                }
-            }
-        }
-
-        /// <summary>Ajoute le fichier identifié par <c>btn.Tag</c> aux exclusions (ignoré lors des futurs scans).</summary>
-        public void BtnIgnoreThreat_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button btn && btn.Tag is string filePath)
-            {
-                ExclusionSettings.Current.AddFile(filePath);
-                SetStatus(LocalizationService.Format("Status_FileIgnored", System.IO.Path.GetFileName(filePath)), isWarning: true);
-                ((Views.AntivirusView)panelAntivirus)?.RefreshAllData();
-            }
-        }
-
-        /// <summary>Supprime définitivement le fichier identifié par <c>btn.Tag</c>.</summary>
-        public void BtnDeleteThreat_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button btn && btn.Tag is string filePath)
-            {
-                try
-                {
-                    if (System.IO.File.Exists(filePath))
-                    {
-                        System.IO.File.Delete(filePath);
-                        SetStatus(LocalizationService.Format("Status_FileDeleted", System.IO.Path.GetFileName(filePath)), iconKindName: UiIconKinds.Delete);
-                    }
-                    ((Views.AntivirusView)panelAntivirus)?.RefreshAllData();
-                }
-                catch (Exception ex)
-                {
-                    SetStatus(LocalizationService.Format("Status_DeleteFailed", ex.Message), isError: true);
-                }
-            }
-        }
-
-        /// <summary>Restaure un fichier depuis la quarantaine vers son emplacement d'origine.</summary>
-        public void BtnRestoreFromQuarantine_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button btn && btn.Tag is string quarantineId)
-            {
-                if (_quarantineManager?.Restore(quarantineId) == true)
-                {
-                    SetStatus(OptiscanStrings.UiMessages.RestoreFromQuarantineSuccess);
-                    RefreshQuarantineList();
-                    ((Views.AntivirusView)panelAntivirus)?.RefreshAllData();
-                }
-                else
-                {
-                    SetStatus(OptiscanStrings.UiMessages.RestoreFromQuarantineError, isError: true);
-                }
-            }
-        }
-
-        /// <summary>Supprime définitivement un fichier de la quarantaine (pas de restauration possible).</summary>
-        public void BtnDeleteFromQuarantine_Click(object sender, RoutedEventArgs e)
-        {
-            if (sender is Button btn && btn.Tag is string quarantineId)
-            {
-                if (_quarantineManager?.DeletePermanently(quarantineId) == true)
-                {
-                    SetStatus(OptiscanStrings.UiMessages.DeleteThreatPermanentlySuccess, iconKindName: UiIconKinds.Delete);
-                    RefreshQuarantineList();
-                    ((Views.AntivirusView)panelAntivirus)?.RefreshAllData();
-                }
-                else
-                {
-                    SetStatus(OptiscanStrings.UiMessages.DeleteThreatPermanentlyError, isError: true);
-                }
-            }
-        }
 
         // ── Mise à jour des signatures ───────────────────────────────────────────
 

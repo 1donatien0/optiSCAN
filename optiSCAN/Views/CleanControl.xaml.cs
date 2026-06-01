@@ -159,43 +159,43 @@ namespace optiSCAN.Views
                     {
                         long f = CleanDir(EdgeCachePath());
                         freed += f;
-                        Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedCache", "Edge", FormatSize(f))));
+                        Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedCache", LocalizationService.GetString("Clean_Browser_Edge"), FormatSize(f))));
                     }
                     if (sel.Chrome)
                     {
                         long f = CleanDir(ChromeCachePath());
                         freed += f;
-                        Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedCache", "Chrome", FormatSize(f))));
+                        Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedCache", LocalizationService.GetString("Clean_Browser_Chrome"), FormatSize(f))));
                     }
                     if (sel.Firefox)
                     {
                         long f = CleanDir(FirefoxCachePath());
                         freed += f;
-                        Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedCache", "Firefox", FormatSize(f))));
+                        Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedCache", LocalizationService.GetString("Clean_Browser_Firefox"), FormatSize(f))));
                     }
                     if (sel.Brave)
                     {
                         long f = CleanDir(BraveCachePath());
                         freed += f;
-                        Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedCache", "Brave", FormatSize(f))));
+                        Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedCache", LocalizationService.GetString("Clean_Browser_Brave"), FormatSize(f))));
                     }
                     if (sel.Opera)
                     {
                         long f = CleanDir(OperaCachePath());
                         freed += f;
-                        Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedCache", "Opera", FormatSize(f))));
+                        Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedCache", LocalizationService.GetString("Clean_Browser_Opera"), FormatSize(f))));
                     }
                     if (sel.Vivaldi)
                     {
                         long f = CleanDir(VivaldiCachePath());
                         freed += f;
-                        Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedCache", "Vivaldi", FormatSize(f))));
+                        Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedCache", LocalizationService.GetString("Clean_Browser_Vivaldi"), FormatSize(f))));
                     }
                     if (sel.Arc)
                     {
                         long f = CleanDir(ArcCachePath());
                         freed += f;
-                        Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedCache", "Arc", FormatSize(f))));
+                        Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedCache", LocalizationService.GetString("Clean_Browser_Arc"), FormatSize(f))));
                     }
                     if (sel.Logs)
                     {

@@ -499,7 +499,10 @@ namespace optiSCAN.ViewModels
                 DisplayScanProgressRequested?.Invoke(this, EventArgs.Empty);
             }
 
-            StatusMessage = ScanUserDisplay.ScanStarting(type, path);
+            if (type == ScanType.FullScan && !ElevationHelper.IsRunningElevated())
+                StatusMessage = LocalizationService.GetString("Scan_FullPartialWithoutAdmin");
+            else
+                StatusMessage = ScanUserDisplay.ScanStarting(type, path);
 
             _cts = new CancellationTokenSource();
             var epoch = Interlocked.Increment(ref _scanEpoch);

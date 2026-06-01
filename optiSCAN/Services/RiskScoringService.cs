@@ -129,7 +129,7 @@ namespace optiSCAN.Services
             return worst ?? new RiskAssessment
             {
                 Severity = "AUCUNE MENACE",
-                Color = "#27AE60",
+                Color = PdfRiskPalette.GetSeverityColor(RiskLevel.Informational),
                 BrushKey = "RiskInformational",
                 IconKind = UiIconKinds.Success,
                 Recommendation = "Système sain."

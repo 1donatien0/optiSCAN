@@ -1,0 +1,104 @@
+using optiSCAN.Localization;
+using optiSCAN.Models;
+using System.IO;
+using System.Windows;
+using SaveFileDialog = Microsoft.Win32.SaveFileDialog;
+
+namespace optiSCAN.Services
+{
+    /// <summary>Export HTML/PDF de l'historique — logique extraite de <see cref="MainWindow"/>.</summary>
+    public sealed class HistoryExportService
+    {
+        public HistoryExportResult TryExportHtml(
+            Window owner,
+            ScanLogManager? logManager,
+            IEnumerable<ThreatInfo> threats,
+            IEnumerable<QuarantineEntry> quarantine)
+        {
+            try
+            {
+                var dlg = new SaveFileDialog
+                {
+                    Filter = LocalizationService.GetString("Export_HtmlFilter"),
+                    FileName = $"optiSCAN_rapport_{DateTime.Now:yyyyMMdd_HHmm}.html",
+                    DefaultExt = ".html",
+                    AddExtension = true
+                };
+                if (dlg.ShowDialog(owner) != true)
+                    return HistoryExportResult.UserCancelled;
+
+                var html = new HtmlExportService();
+                var hist = logManager?.GetHistory() ?? Array.Empty<ScanSession>();
+                html.ExportFullReport(hist, threats, quarantine, UserPreferences.Current, dlg.FileName);
+                return HistoryExportResult.Succeeded(
+                    LocalizationService.Format("Status_HtmlSaved", dlg.FileName));
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("HistoryExportService", "Export HTML", ex);
+                return HistoryExportResult.Failed(
+                    LocalizationService.Format("Status_HtmlFailed", ex.Message));
+            }
+        }
+
+        public HistoryExportResult TryExportLastScanPdf(Window owner, ScanLogManager? logManager)
+        {
+            var sessions = logManager?.GetHistory() ?? Array.Empty<ScanSession>();
+            if (sessions.Count == 0)
+            {
+                System.Windows.MessageBox.Show(
+                    owner,
+                    LocalizationService.GetString("Status_ExportNoHistory"),
+                    LocalizationService.GetString("Hist_ExportPdfTitle"),
+                    System.Windows.MessageBoxButton.OK,
+                    System.Windows.MessageBoxImage.Information);
+                return HistoryExportResult.UserCancelled;
+            }
+
+            return TryExportSessionPdf(owner, sessions[0]);
+        }
+
+        public HistoryExportResult TryExportSessionPdf(Window owner, ScanSession session)
+        {
+            try
+            {
+                var dlg = new SaveFileDialog
+                {
+                    Filter = LocalizationService.GetString("Export_PdfFilter"),
+                    FileName = $"optiSCAN_scan_{session.StartedAt:yyyyMMdd_HHmm}.pdf",
+                    DefaultExt = ".pdf",
+                    AddExtension = true
+                };
+                if (dlg.ShowDialog(owner) != true)
+                    return HistoryExportResult.UserCancelled;
+
+                var gen = new PdfReportGenerator();
+                gen.GenerateReportFromSession(session, dlg.FileName);
+                return HistoryExportResult.Succeeded(
+                    LocalizationService.Format("Status_PdfSaved", dlg.FileName));
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("HistoryExportService", "Export PDF", ex);
+                return HistoryExportResult.Failed(
+                    LocalizationService.Format("Status_PdfFailed", ex.Message));
+            }
+        }
+    }
+
+    public readonly struct HistoryExportResult
+    {
+        public bool WasCancelled { get; init; }
+        public bool Success { get; init; }
+        public string Message { get; init; }
+        public bool IsError { get; init; }
+
+        public static HistoryExportResult UserCancelled => new() { WasCancelled = true };
+
+        public static HistoryExportResult Succeeded(string message) =>
+            new() { Success = true, Message = message };
+
+        public static HistoryExportResult Failed(string message) =>
+            new() { Success = false, IsError = true, Message = message };
+    }
+}
