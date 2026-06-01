@@ -105,6 +105,7 @@
                 <Setter Property="Foreground"  Value="{DynamicResource TextSecondary}"/>
                 <Setter Property="FontFamily"  Value="{DynamicResource AppFontFamily}"/>
                 <Setter Property="FontSize"    Value="{DynamicResource FontSize.Body}"/>
+                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
             </Style>
 
             <!-- ═══════════════════════════════════════════════════════
@@ -125,6 +126,12 @@
                 <Setter Property="FontSize"        Value="{DynamicResource FontSize.Body}"/>
                 <Setter Property="Padding"         Value="8,6"/>
                 <Setter Property="SelectionBrush"  Value="{DynamicResource AccentBg}"/>
+                <Setter Property="FocusVisualStyle" Value="{x:Null}"/>
+                <Style.Triggers>
+                    <Trigger Property="IsKeyboardFocused" Value="True">
+                        <Setter Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
+                    </Trigger>
+                </Style.Triggers>
             </Style>
 
             <!-- ComboBox / ComboBoxItem — template Donaby (voir Controls.xaml) -->

@@ -1,0 +1,78 @@
+name: CI — Build, Test & Publish
+
+on:
+  push:
+    branches: [ main, master, develop, dev ]
+  pull_request:
+    branches: [ main, master ]
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    name: Build & Test (windows-latest)
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore NuGet packages
+        run: dotnet restore optiSCAN.sln
+
+      - name: Build (Debug)
+        run: dotnet build optiSCAN.sln --configuration Debug --no-restore
+
+      - name: Run tests
+        run: dotnet test optiSCAN.Tests/optiSCAN.Tests.csproj --configuration Debug --no-build --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-results
+          path: TestResults/*.trx
+
+  publish:
+    name: Publish win-x64 (Release)
+    runs-on: windows-latest
+    needs: build-test
+    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 8
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+
+      - name: Restore NuGet packages
+        run: dotnet restore optiSCAN.sln
+
+      - name: Publish win-x64 (self-contained)
+        run: >
+          dotnet publish optiSCAN/optiSCAN.csproj
+          --configuration Release
+          --runtime win-x64
+          --self-contained true
+          -p:PublishSingleFile=false
+          --output publish/win-x64
+
+      - name: Verify runtime dependencies (ClamAV + YARA)
+        shell: pwsh
+        run: pwsh -File scripts/verify-runtime-deps.ps1 -PublishDir publish/win-x64
+
+      - name: Upload publish artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: optiSCAN-win-x64-${{ github.sha }}
+          path: publish/win-x64/
+          retention-days: 14

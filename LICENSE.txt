@@ -1,6 +1,6 @@
 ==============================================================================
   optiSCAN — Contrat de licence utilisateur final (CLUF / EULA)
-  v6.0 — 2026
+  v7.0 — 2026
   Auteur : Dona By
   Site   : https://sourceforge.net/u/donaby
 ==============================================================================
@@ -14,9 +14,9 @@ pas le logiciel et supprimez toute copie en votre possession.
 ARTICLE 1 — DÉFINITIONS
 ------------------------------------------------------------------------------
 
-« Logiciel » désigne le programme optiSCAN v6.0 (édition ClamAV ; build 6.0.0), ses
+« Logiciel » désigne le programme optiSCAN v7.0 (édition ClamAV ; build 7.0.0), ses
 composants, ressources, fichiers de configuration et toute mise à jour fournie
-par l'auteur au titre de la branche v6.x du produit.
+par l'auteur au titre de la branche v7.x du produit.
 
 « Auteur » désigne Dona By, titulaire exclusif des droits
 sur le Logiciel.
@@ -169,5 +169,5 @@ Pour toute question relative à ce contrat ou au Logiciel :
 
 ------------------------------------------------------------------------------
   Copyright © 2026 Dona By. Tous droits réservés.
-  optiSCAN v6.0 — logiciel gratuit — Vanier, Canada.
+  optiSCAN v7.0 — logiciel gratuit — Vanier, Canada.
 ------------------------------------------------------------------------------

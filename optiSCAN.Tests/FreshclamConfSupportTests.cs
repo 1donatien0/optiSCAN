@@ -79,4 +79,5 @@ public sealed class FreshclamConfSupportTests : IDisposable
         Assert.Equal(preferred, result);
         Assert.True(FreshclamConfSupport.IsOurManagedConf(File.ReadAllText(preferred)));
     }
+
 }

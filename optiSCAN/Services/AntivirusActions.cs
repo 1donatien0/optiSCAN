@@ -1,3 +1,4 @@
+using optiSCAN.Localization;
 using optiSCAN.Models;
 using System.IO;
 using System.Runtime.Versioning;
@@ -6,14 +7,6 @@ namespace optiSCAN.Services
 {
     /// <summary>
     /// Centralise les actions exécutables depuis l'UI antivirus.
-    ///
-    /// Avant ce service, AntivirusView déléguait 7 boutons vers MainWindow
-    /// via un cast (Win?.BtnXxx_Click). Toute la logique métier était dans
-    /// MainWindow.xaml.cs, et la vue ne compilait/testait que dans son contexte.
-    ///
-    /// Maintenant, AntivirusView peut appeler ces actions directement sans
-    /// connaître MainWindow. La vue déclenche l'action, le service fait le
-    /// travail, l'UI rafraîchit via les events du container.
     /// </summary>
     [SupportedOSPlatform("windows")]
     public sealed class AntivirusActions
@@ -29,11 +22,7 @@ namespace optiSCAN.Services
             _rules = container.RulesUpdater;
         }
 
-        /// <summary>Événement déclenché après une action ayant modifié l'état de la quarantaine
-        /// ou des menaces. Les vues s'y abonnent pour rafraîchir leurs DataGrids.</summary>
         public event EventHandler<ActionResult>? ActionCompleted;
-
-        // ── Actions sur menaces détectées ────────────────────────────────────────
 
         public ActionResult QuarantineThreat(string filePath) =>
             QuarantineThreat(ResolveThreatForPath(filePath));
@@ -41,18 +30,18 @@ namespace optiSCAN.Services
         public ActionResult QuarantineThreat(ThreatInfo threat)
         {
             if (string.IsNullOrEmpty(threat.FilePath) || !File.Exists(threat.FilePath))
-                return Complete(false, $"Fichier introuvable : {Path.GetFileName(threat.FilePath)}");
+                return Complete(false, LocalizationService.Format("Av_Action_FileNotFound", Path.GetFileName(threat.FilePath)));
 
             if (threat.FileSize < 0)
                 threat.FileSize = SafeFileSize(threat.FilePath);
             if (string.IsNullOrWhiteSpace(threat.VirusName))
-                threat.VirusName = "Détecté";
+                threat.VirusName = LocalizationService.GetString("Av_Action_DetectedDefault");
             threat.Status = ThreatStatus.Detected;
 
             bool ok = _quarantine.Quarantine(threat);
             return Complete(ok,
-                ok ? UiLogText.Ok($"Fichier mis en quarantaine : {Path.GetFileName(threat.FilePath)}")
-                   : UiLogText.Error($"Échec quarantaine : {Path.GetFileName(threat.FilePath)}"));
+                ok ? LocalizationService.Format("Av_Action_QuarantineOk", Path.GetFileName(threat.FilePath))
+                   : LocalizationService.Format("Av_Action_QuarantineFail", Path.GetFileName(threat.FilePath)));
         }
 
         private static ThreatInfo ResolveThreatForPath(string filePath)
@@ -64,7 +53,7 @@ namespace optiSCAN.Services
             return new ThreatInfo
             {
                 FilePath = filePath,
-                VirusName = "Détecté",
+                VirusName = LocalizationService.GetString("Av_Action_DetectedDefault"),
                 DetectedAt = DateTime.Now,
                 Status = ThreatStatus.Detected,
                 FileSize = SafeFileSize(filePath),
@@ -74,19 +63,23 @@ namespace optiSCAN.Services
         public ActionResult IgnoreThreat(string filePath)
         {
             if (string.IsNullOrWhiteSpace(filePath))
-                return Complete(false, "Chemin de fichier invalide.", isError: true);
+                return Complete(false, LocalizationService.GetString("Av_Action_InvalidPath"), isError: true);
 
             if (!ExclusionSettings.Current.AddFile(filePath))
             {
                 if (ExclusionSettings.Current.IsFileExcluded(filePath))
-                    return Complete(true, $"Déjà exclu des analyses : {Path.GetFileName(filePath)}", isWarning: true);
+                    return Complete(true,
+                        LocalizationService.Format("Av_Action_AlreadyExcluded", Path.GetFileName(filePath)),
+                        isWarning: true);
 
-                return Complete(false, $"Impossible d'exclure : {Path.GetFileName(filePath)}", isError: true);
+                return Complete(false,
+                    LocalizationService.Format("Av_Action_ExcludeFail", Path.GetFileName(filePath)),
+                    isError: true);
             }
 
             AppLogger.Info("AntivirusActions", $"Fichier exclu des analyses : {filePath}");
             return Complete(true,
-                UiLogText.Warn($"Fichier exclu des analyses : {Path.GetFileName(filePath)}"),
+                LocalizationService.Format("Av_Action_ExcludedOk", Path.GetFileName(filePath)),
                 isWarning: true);
         }
 
@@ -97,25 +90,27 @@ namespace optiSCAN.Services
                 if (File.Exists(filePath))
                 {
                     File.Delete(filePath);
-                    return Complete(true, UiLogText.Ok($"Fichier supprimé : {Path.GetFileName(filePath)}"));
+                    return Complete(true,
+                        LocalizationService.Format("Av_Action_DeleteOk", Path.GetFileName(filePath)));
                 }
-                return Complete(false, $"Fichier déjà absent : {Path.GetFileName(filePath)}");
+                return Complete(false,
+                    LocalizationService.Format("Av_Action_DeleteMissing", Path.GetFileName(filePath)));
             }
             catch (Exception ex)
             {
                 AppLogger.Error("AntivirusActions", $"DeleteThreatFile {filePath}", ex);
-                return Complete(false, UiLogText.Error($"Erreur suppression : {ex.Message}"), isError: true);
+                return Complete(false,
+                    LocalizationService.Format("Av_Action_DeleteError", ex.Message),
+                    isError: true);
             }
         }
-
-        // ── Actions sur entrées de quarantaine ───────────────────────────────────
 
         public ActionResult RestoreFromQuarantine(string quarantineId)
         {
             bool ok = _quarantine.Restore(quarantineId);
             return Complete(ok,
-                ok ? UiLogText.Ok("Fichier restauré depuis la quarantaine")
-                   : UiLogText.Error("Restauration impossible (chemin sensible, manifest invalide ou disque)"),
+                ok ? LocalizationService.GetString("Ui_RestoreOk")
+                   : LocalizationService.GetString("Ui_RestoreError"),
                 isError: !ok);
         }
 
@@ -123,12 +118,10 @@ namespace optiSCAN.Services
         {
             bool ok = _quarantine.DeletePermanently(quarantineId);
             return Complete(ok,
-                ok ? UiLogText.Ok("Fichier supprimé définitivement de la quarantaine")
-                   : UiLogText.Error("Suppression impossible"),
+                ok ? LocalizationService.GetString("Ui_DeleteOk")
+                   : LocalizationService.GetString("Ui_DeleteError"),
                 isError: !ok);
         }
-
-        // ── Actions sur mises à jour signatures ──────────────────────────────────
 
         public void StopAllUpdates()
         {
@@ -138,10 +131,8 @@ namespace optiSCAN.Services
             try { _rules.CancelUpdate(); }
             catch (Exception ex) { AppLogger.Warn("AntivirusActions", "Cancel rules", ex); }
 
-            Complete(true, UiLogText.Info("Mise à jour interrompue par l'utilisateur"));
+            Complete(true, LocalizationService.GetString("Av_Action_UpdateStopped"));
         }
-
-        // ── Helpers ──────────────────────────────────────────────────────────────
 
         private static long SafeFileSize(string path)
         {
@@ -163,7 +154,6 @@ namespace optiSCAN.Services
         }
     }
 
-    /// <summary>Résultat synchrone d'une action UI antivirus.</summary>
     public sealed class ActionResult
     {
         public bool Success { get; init; }

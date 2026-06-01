@@ -21,6 +21,9 @@ namespace optiSCAN.Models
         /// <summary>Espace libéré en octets lors de cette session.</summary>
         public long BytesFreed { get; set; }
 
+        /// <summary>Journal d'opérations de la session (étapes, volumes par cible, erreurs éventuelles).</summary>
+        public string OperationLog { get; set; } = "";
+
         /// <summary>Date formatée pour l'affichage dans les listes (ex. « 22/05/2026 14:30 »).</summary>
         [JsonIgnore]
         public string DateDisplay =>

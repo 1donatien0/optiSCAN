@@ -1,69 +1,81 @@
-# Vérifie les binaires ClamAV / YARA attendus à côté de optiSCAN (développement ou publish).
-# Usage : depuis la racine du dépôt :
-#   .\scripts\verify-runtime-deps.ps1
-#   .\scripts\verify-runtime-deps.ps1 -PublishDir ".\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64"
+<#
+.SYNOPSIS
+    Vérifie que tous les binaires et fichiers critiques sont présents dans le dossier
+    de publication avant de créer l'installateur Inno Setup.
 
-param(
-    [string]$PublishDir = ""
+.PARAMETER PublishDir
+    Chemin du dossier de publication (ex. publish\win-x64).
+
+.EXAMPLE
+    pwsh -File scripts\verify-runtime-deps.ps1 -PublishDir publish\win-x64
+#>
+
+param (
+    [Parameter(Mandatory = $true)]
+    [string] $PublishDir
 )
 
-$ErrorActionPreference = "Stop"
-$repoRoot = Split-Path -Parent $PSScriptRoot
-if ($PublishDir) {
-    $base = (Resolve-Path $PublishDir).Path
-} else {
-    $base = Join-Path $repoRoot "optiSCAN"
-}
+$ErrorActionPreference = 'Stop'
+$failed = @()
 
-$arch = if ([Environment]::Is64BitOperatingSystem) { "x64" } else { "x86" }
-$yaraArch = if ([Environment]::Is64BitOperatingSystem) { "64" } else { "32" }
-
-Write-Host "optiSCAN — vérification des dépendances runtime"
-Write-Host "Base : $base"
-Write-Host ""
-
-$ok = $true
-
-function Test-PathReport($label, $path, [switch]$Required) {
-    $exists = Test-Path -LiteralPath $path
-    $mark = if ($exists) { "[OK]" } else { "[--]" ; if ($Required) { $script:ok = $false } }
-    Write-Host "$mark $label"
-    Write-Host "     $path"
-    return $exists
-}
-
-$clamscan = Join-Path $base "clamav\$arch\clamscan.exe"
-$freshclam = Join-Path $base "clamav\$arch\freshclam.exe"
-$yara = Join-Path $base "yara\yara$yaraArch.exe"
-$yarac = Join-Path $base "yara\yarac$yaraArch.exe"
-$rules = Join-Path $base "rules"
-
-Test-PathReport "clamscan.exe" $clamscan -Required
-Test-PathReport "freshclam.exe" $freshclam
-Test-PathReport "yara$yaraArch.exe" $yara -Required
-Test-PathReport "yarac$yaraArch.exe" $yarac
-
-if (Test-Path -LiteralPath $rules) {
-    $yarCount = (Get-ChildItem -LiteralPath $rules -Filter "*.yar" -File -ErrorAction SilentlyContinue).Count
-    if ($yarCount -gt 0) {
-        Write-Host "[OK] rules/*.yar ($yarCount fichier(s))"
+function Check {
+    param([string]$RelPath, [string]$Description)
+    $full = Join-Path $PublishDir $RelPath
+    if (-not (Test-Path $full)) {
+        Write-Host "  MANQUANT  $RelPath  ($Description)" -ForegroundColor Red
+        $script:failed += $RelPath
     } else {
-        Write-Host "[--] rules/*.yar (aucun fichier .yar)"
-        $ok = $false
+        Write-Host "  OK        $RelPath" -ForegroundColor Green
     }
-    Write-Host "     $rules"
-} else {
-    Write-Host "[--] dossier rules/"
-    Write-Host "     $rules"
-    $ok = $false
 }
+
+Write-Host "`n=== verify-runtime-deps.ps1 - $PublishDir ===`n" -ForegroundColor Cyan
+
+Write-Host "[ Executable ]"
+Check "optiSCAN.exe" "Executable principal"
+
+Write-Host "`n[ ClamAV x64 ]"
+Check "clamav\x64\clamscan.exe"  "Scanner ClamAV"
+Check "clamav\x64\freshclam.exe" "Mise a jour signatures"
+Check "clamav\x64\clambc.exe"    "Bytecode ClamAV"
+Check "clamav\certs\clamav.crt"  "Certificat CA Cisco-Talos"
+
+Write-Host "`n[ Signatures ClamAV ]"
+$sigFiles = Get-ChildItem -Path (Join-Path $PublishDir "clamav\database") -Filter "*.cvd" -ErrorAction SilentlyContinue
+if ($sigFiles.Count -eq 0) {
+    $sigFiles = Get-ChildItem -Path (Join-Path $PublishDir "clamav\database") -Filter "*.cld" -ErrorAction SilentlyContinue
+}
+if ($sigFiles.Count -eq 0) {
+    Write-Host "  MANQUANT  clamav\database\*.cvd / *.cld  (base de signatures)" -ForegroundColor Red
+    $failed += "clamav\database\*.cvd"
+} else {
+    foreach ($f in $sigFiles) {
+        Write-Host "  OK        clamav\database\$($f.Name)" -ForegroundColor Green
+    }
+}
+
+Write-Host "`n[ YARA ]"
+Check "yara\yara64.exe" "YARA engine x64"
+Check "yara\yara32.exe" "YARA engine x86"
+
+$yaraRules = Get-ChildItem -Path (Join-Path $PublishDir "rules") -Filter "*.yar" -Recurse -ErrorAction SilentlyContinue
+if ($yaraRules.Count -eq 0) {
+    Write-Host "  MANQUANT  rules\*.yar  (regles YARA)" -ForegroundColor Red
+    $failed += "rules\*.yar"
+} else {
+    Write-Host "  OK        rules\ - $($yaraRules.Count) regle(s) .yar" -ForegroundColor Green
+}
+
+Write-Host "`n[ Ressources ]"
+Check "optiSCAN.ico"      "Icone application"
+Check "optiSCAN_hero.png" "Image hero bouclier"
 
 Write-Host ""
-if ($ok) {
-    Write-Host "Toutes les dépendances obligatoires sont présentes."
+if ($failed.Count -eq 0) {
+    Write-Host "=== Toutes les dependances sont presentes. Publication OK. ===" -ForegroundColor Green
     exit 0
+} else {
+    Write-Host "=== ECHEC : $($failed.Count) dependance(s) manquante(s) ===" -ForegroundColor Red
+    foreach ($f in $failed) { Write-Host "  - $f" -ForegroundColor Red }
+    exit 1
 }
-
-Write-Host "Dépendances manquantes. Voir README.md section 3 (ClamAV) et structure optiSCAN/clamav, optiSCAN/yara, optiSCAN/rules."
-Write-Host "Publication : dotnet publish -c Release puis freshclam sur le dossier publish."
-exit 1
