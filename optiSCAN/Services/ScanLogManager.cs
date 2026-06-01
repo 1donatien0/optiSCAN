@@ -50,8 +50,7 @@ namespace optiSCAN.Services
 
             PersistHistory();
 
-            // Journal texte enrichi
-            AppendToTextLog(result);
+            WriteToLog(FormatScanDetail(result));
         }
 
         /// <summary>
@@ -129,26 +128,67 @@ namespace optiSCAN.Services
 
         // ── Helpers ─────────────────────────────────────────────────────────────
 
-        private void AppendToTextLog(ScanResult result)
+        /// <summary>Texte détaillé d'une session (menaces, statut, erreurs) — affiché dans Historique et journal fichier.</summary>
+        public static string FormatScanDetail(ScanResult result) =>
+            FormatScanDetailCore(
+                result.TypeDisplay,
+                result.TargetPath,
+                result.StartedAt,
+                result.FinishedAt,
+                result.FilesScanned,
+                result.FilesSkipped,
+                result.ThreatsFound,
+                result.Status.ToString(),
+                result.ErrorMessage,
+                result.Threats);
+
+        /// <summary>Texte détaillé à partir d'une entrée d'historique persistée.</summary>
+        public static string FormatScanDetail(ScanSession session) =>
+            FormatScanDetailCore(
+                session.TypeDisplay,
+                session.TargetPath,
+                session.StartedAt,
+                session.FinishedAt,
+                session.FilesScanned,
+                session.FilesSkipped,
+                session.ThreatsFound,
+                session.StatusDisplay,
+                session.ErrorMessage,
+                session.Threats);
+
+        private static string FormatScanDetailCore(
+            string typeDisplay,
+            string targetPath,
+            DateTime startedAt,
+            DateTime? finishedAt,
+            int filesScanned,
+            int filesSkipped,
+            int threatsFound,
+            string status,
+            string? errorMessage,
+            IReadOnlyList<ThreatInfo> threats)
         {
             var sb = new StringBuilder();
-            sb.AppendLine($"--- Scan {result.TypeDisplay} ---");
-            sb.AppendLine($"  Cible      : {result.TargetPath}");
-            sb.AppendLine($"  Démarré    : {result.StartedAt:dd/MM/yyyy HH:mm:ss}");
-            sb.AppendLine($"  Terminé    : {result.FinishedAt?.ToString("dd/MM/yyyy HH:mm:ss") ?? "N/A"}");
-            sb.AppendLine($"  Fichiers   : {result.FilesScanned}");
-            sb.AppendLine($"  Menaces    : {result.ThreatsFound}");
-            sb.AppendLine($"  Statut     : {result.Status}");
+            sb.AppendLine($"--- Scan {typeDisplay} ---");
+            sb.AppendLine($"  Cible      : {targetPath}");
+            sb.AppendLine($"  Démarré    : {startedAt:dd/MM/yyyy HH:mm:ss}");
+            sb.AppendLine($"  Terminé    : {finishedAt?.ToString("dd/MM/yyyy HH:mm:ss") ?? "N/A"}");
+            sb.AppendLine($"  Fichiers   : {filesScanned}");
+            if (filesSkipped > 0)
+                sb.AppendLine($"  Ignorés    : {filesSkipped}");
+            sb.AppendLine($"  Menaces    : {threatsFound}");
+            sb.AppendLine($"  Statut     : {status}");
+            if (!string.IsNullOrWhiteSpace(errorMessage))
+                sb.AppendLine($"  Erreur     : {errorMessage}");
 
-            if (result.Threats.Count > 0)
+            if (threats.Count > 0)
             {
                 sb.AppendLine("  Détails menaces :");
-                foreach (var t in result.Threats)
-                    sb.AppendLine($"    • {t.FilePath} → {t.VirusName}");
+                foreach (var t in threats)
+                    sb.AppendLine($"    • {t.FilePath} → {t.VirusName} ({t.DetectedBy})");
             }
 
-            sb.AppendLine();
-            WriteToLog(sb.ToString());
+            return sb.ToString().TrimEnd();
         }
 
         private List<ScanSession> LoadHistory()

@@ -38,6 +38,13 @@ namespace optiSCAN.Views
                 txtProtectionStatus?.ClearValue(TextBlock.ForegroundProperty);
                 txtOverviewClamAvStatus?.ClearValue(TextBlock.ForegroundProperty);
                 txtOverviewYaraCount?.ClearValue(TextBlock.ForegroundProperty);
+
+                // Effet hero : DynamicResource se réapplique au swap Donaby.*
+                if (shieldImage != null)
+                {
+                    shieldImage.ClearValue(System.Windows.Controls.Image.EffectProperty);
+                    shieldImage.Effect = TryFindResource("HeroShieldPulseGlow") as System.Windows.Media.Effects.Effect;
+                }
             });
         }
 
@@ -231,6 +238,29 @@ namespace optiSCAN.Views
         {
             if (txtProtectionHeadline != null && string.IsNullOrWhiteSpace(txtProtectionHeadline.Text))
                 txtProtectionHeadline.Text = LocalizationService.GetString("Overview_Protected");
+        }
+
+        // ── Bandeau élévation UAC ────────────────────────────────────────────
+
+        /// <summary>
+        /// Affiche ou masque le bandeau "Analyse partielle" selon le niveau d'élévation.
+        /// Appelé par MainWindow après initialisation.
+        /// </summary>
+        public void ApplyElevationBanner()
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                if (bannerPartialScan == null) return;
+                bool elevated = ElevationHelper.IsRunningElevated();
+                bannerPartialScan.Visibility = elevated ? Visibility.Collapsed : Visibility.Visible;
+            });
+        }
+
+        private void BtnRunAsAdmin_Click(object sender, RoutedEventArgs e)
+        {
+            bool ok = ElevationHelper.RelaunchElevated();
+            if (ok)
+                System.Windows.Application.Current.Shutdown();
         }
 
         // ── Cartes d'action → navigation ────────────────────────────────────

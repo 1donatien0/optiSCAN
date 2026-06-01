@@ -1,7 +1,7 @@
 ; =============================================================================
 ; optiSCAN — Installateur Windows (Inno Setup)
 ; =============================================================================
-; AppRelease = nom vM.m (v6.0) · AppVersion = semver / Directory.Build.props
+; AppRelease = nom vM.m (v7.0) · AppVersion = semver / Directory.Build.props
 
 #define AppName        "optiSCAN"
 #define AppVersion     "1.0.0"
@@ -237,14 +237,24 @@ begin
 
     if DirExists(UserDataLocal) or DirExists(UserDataRoaming) then
     begin
-      Response := MsgBox(
-        'Voulez-vous aussi supprimer toutes les données utilisateur d''optiSCAN ?' + #13#10 + #13#10 +
-        '  • Historique des scans' + #13#10 +
-        '  • Fichiers en quarantaine' + #13#10 +
-        '  • Préférences et exclusions' + #13#10 +
-        '  • Journaux et logs' + #13#10 + #13#10 +
-        'Choisir « Non » conserve ces données pour une éventuelle réinstallation.',
-        mbConfirmation, MB_YESNO or MB_DEFBUTTON2);
+      if ActiveLanguage = 'english' then
+        Response := MsgBox(
+          'Do you also want to remove all optiSCAN user data?' + #13#10 + #13#10 +
+          '  • Scan history' + #13#10 +
+          '  • Quarantined files' + #13#10 +
+          '  • Preferences and exclusions' + #13#10 +
+          '  • Logs' + #13#10 + #13#10 +
+          'Choose No to keep this data for a future reinstall.',
+          mbConfirmation, MB_YESNO or MB_DEFBUTTON2)
+      else
+        Response := MsgBox(
+          'Voulez-vous aussi supprimer toutes les données utilisateur d''optiSCAN ?' + #13#10 + #13#10 +
+          '  • Historique des scans' + #13#10 +
+          '  • Fichiers en quarantaine' + #13#10 +
+          '  • Préférences et exclusions' + #13#10 +
+          '  • Journaux et logs' + #13#10 + #13#10 +
+          'Choisir « Non » conserve ces données pour une éventuelle réinstallation.',
+          mbConfirmation, MB_YESNO or MB_DEFBUTTON2);
 
       if Response = IDYES then
       begin
