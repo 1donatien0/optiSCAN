@@ -188,8 +188,10 @@
         <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
 
-    <!-- Bouton principal — dégradé accent + halo -->
+    <!-- Bouton principal — fond via TemplateBinding (dégradé ou couleur sémantique) -->
     <Style x:Key="GradientPrimaryButton" TargetType="Button">
+        <Setter Property="Background"      Value="{DynamicResource AccentGradient}"/>
+        <Setter Property="Effect"          Value="{DynamicResource GlowShadowAccent}"/>
         <Setter Property="Foreground"      Value="{DynamicResource TextOnPrimary}"/>
         <Setter Property="FontFamily"      Value="{DynamicResource AppFontFamily}"/>
         <Setter Property="FontWeight"      Value="SemiBold"/>
@@ -201,44 +203,65 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="bg" CornerRadius="8"
-                            Background="{DynamicResource AccentGradient}"
+                            Background="{TemplateBinding Background}"
                             Padding="{TemplateBinding Padding}"
-                            Effect="{DynamicResource GlowShadowAccent}">
+                            Effect="{TemplateBinding Effect}">
                         <ContentPresenter HorizontalAlignment="Center"
                                           VerticalAlignment="Center"/>
                     </Border>
                     <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="bg" Property="Opacity" Value="0.92"/>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="bg" Property="Opacity" Value="0.85"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.45"/>
                             <Setter TargetName="bg" Property="Effect" Value="{x:Null}"/>
                         </Trigger>
+                        <EventTrigger RoutedEvent="MouseEnter">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="bg"
+                                                     Storyboard.TargetProperty="Opacity"
+                                                     To="0.92" Duration="0:0:0.14"/>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                        <EventTrigger RoutedEvent="MouseLeave">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="bg"
+                                                     Storyboard.TargetProperty="Opacity"
+                                                     To="1" Duration="0:0:0.14"/>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
     </Style>
 
-    <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource GradientPrimaryButton}"/>
+    <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource GradientPrimaryButton}">
+        <Setter Property="Background" Value="{DynamicResource AccentGradient}"/>
+        <Setter Property="Effect" Value="{DynamicResource GlowShadowAccent}"/>
+    </Style>
 
-    <!-- Style DangerButton -->
     <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
         <Setter Property="Background" Value="{DynamicResource DangerRed}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextOnPrimary}"/>
+        <Setter Property="Effect" Value="{x:Null}"/>
     </Style>
 
-    <!-- Style WarningButton -->
     <Style x:Key="WarningButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
         <Setter Property="Background" Value="{DynamicResource WarningOrange}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextOnPrimary}"/>
+        <Setter Property="Effect" Value="{x:Null}"/>
     </Style>
 
-    <!-- Style SuccessButton -->
     <Style x:Key="SuccessButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
         <Setter Property="Background" Value="{DynamicResource SuccessGreen}"/>
         <Setter Property="Foreground" Value="{DynamicResource TextOnPrimary}"/>
+        <Setter Property="Effect" Value="{x:Null}"/>
     </Style>
 
     <!-- Style SecondaryButton -->
@@ -255,9 +278,15 @@
                                           VerticalAlignment="Center"/>
                     </Border>
                     <ControlTemplate.Triggers>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="bg" Property="Opacity" Value="0.85"/>
+                        </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="bg" Property="Background" Value="{DynamicResource AccentBg}"/>
                             <Setter TargetName="bg" Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -290,6 +319,9 @@
                                           Margin="{TemplateBinding Padding}"/>
                     </Border>
                     <ControlTemplate.Triggers>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="bg" Property="Opacity" Value="0.85"/>
+                        </Trigger>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="bg" Property="Background" Value="{DynamicResource CardBgHover}"/>
                             <Setter TargetName="bg" Property="BorderBrush" Value="{DynamicResource BorderStrong}"/>
@@ -616,9 +648,10 @@
                 <ControlTemplate TargetType="RadioButton">
                     <Border x:Name="bg" Background="Transparent">
                         <Grid>
-                            <!-- Indicateur gauche actif -->
+                            <!-- Indicateur gauche actif (opacité animée) -->
                             <Rectangle x:Name="bar" Width="3" HorizontalAlignment="Left"
-                                       Fill="Transparent" RadiusX="2" RadiusY="2"/>
+                                       Fill="{DynamicResource SidebarIndicator}"
+                                       Opacity="0" RadiusX="2" RadiusY="2"/>
                             <!-- Overlay hover -->
                             <Rectangle x:Name="hoverOverlay"
                                        Fill="{DynamicResource AccentBlue}" Opacity="0"/>
@@ -631,12 +664,49 @@
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="bg" Property="Background" Value="{DynamicResource SidebarActiveItem}"/>
                             <Setter TargetName="bg" Property="Effect" Value="{DynamicResource GlowShadowAccent}"/>
-                            <Setter TargetName="bar" Property="Fill"       Value="{DynamicResource SidebarIndicator}"/>
-                            <Setter Property="Foreground"                  Value="{DynamicResource SidebarTextActive}"/>
+                            <Setter TargetName="bar" Property="Opacity" Value="1"/>
+                            <Setter Property="Foreground" Value="{DynamicResource SidebarTextActive}"/>
+                            <Trigger.EnterActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="bar"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         From="0" To="1" Duration="0:0:0.2">
+                                            <DoubleAnimation.EasingFunction>
+                                                <QuadraticEase EasingMode="EaseOut"/>
+                                            </DoubleAnimation.EasingFunction>
+                                        </DoubleAnimation>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.EnterActions>
+                            <Trigger.ExitActions>
+                                <BeginStoryboard>
+                                    <Storyboard>
+                                        <DoubleAnimation Storyboard.TargetName="bar"
+                                                         Storyboard.TargetProperty="Opacity"
+                                                         To="0" Duration="0:0:0.15"/>
+                                    </Storyboard>
+                                </BeginStoryboard>
+                            </Trigger.ExitActions>
                         </Trigger>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="hoverOverlay" Property="Opacity" Value="0.07"/>
-                        </Trigger>
+                        <EventTrigger RoutedEvent="MouseEnter">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="hoverOverlay"
+                                                     Storyboard.TargetProperty="Opacity"
+                                                     To="0.07" Duration="0:0:0.12"/>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                        <EventTrigger RoutedEvent="MouseLeave">
+                            <BeginStoryboard>
+                                <Storyboard>
+                                    <DoubleAnimation Storyboard.TargetName="hoverOverlay"
+                                                     Storyboard.TargetProperty="Opacity"
+                                                     To="0" Duration="0:0:0.12"/>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>

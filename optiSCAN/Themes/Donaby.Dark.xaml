@@ -50,7 +50,7 @@
     <SolidColorBrush x:Key="AlertBg"            Color="#412402"/>
 
     <!-- ── AVERTISSEMENT / ORANGE ── -->
-    <SolidColorBrush x:Key="WarningOrange"      Color="#EF9F27"/>
+    <SolidColorBrush x:Key="WarningOrange"      Color="#FB923C"/>
 
     <!-- ── DANGER / ROUGE ── -->
     <SolidColorBrush x:Key="DangerRed"          Color="#E24B4A"/>

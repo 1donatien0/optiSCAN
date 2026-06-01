@@ -50,8 +50,11 @@
                                VerticalAlignment="Center"/>
                 </StackPanel>
 
-                <!-- Statut protection (caché visuellement, conservé pour le code-behind) -->
-                <TextBlock x:Name="txtProtectionStatus" Visibility="Collapsed"/>
+                <TextBlock x:Name="txtProtectionStatus"
+                           FontSize="{DynamicResource FontSize.Small}"
+                           Foreground="{DynamicResource TextMuted}"
+                           Margin="0,6,0,0"
+                           TextWrapping="Wrap"/>
             </StackPanel>
 
             <!-- Bouclier avec animation pulse — PNG inchangé, halos violet Donaby -->
