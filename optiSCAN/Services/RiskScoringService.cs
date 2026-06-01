@@ -1,3 +1,4 @@
+using optiSCAN.Localization;
 using optiSCAN.Models;
 using System.IO;
 
@@ -128,11 +129,11 @@ namespace optiSCAN.Services
             }
             return worst ?? new RiskAssessment
             {
-                Severity = "AUCUNE MENACE",
+                Severity = LocalizationService.GetString("Risk_Severity_None"),
                 Color = PdfRiskPalette.GetSeverityColor(RiskLevel.Informational),
                 BrushKey = "RiskInformational",
                 IconKind = UiIconKinds.Success,
-                Recommendation = "Système sain."
+                Recommendation = LocalizationService.GetString("Risk_Rec_Healthy")
             };
         }
 
@@ -234,10 +235,10 @@ namespace optiSCAN.Services
 
         private static string GetSeverityString(RiskLevel level) => level switch
         {
-            RiskLevel.Critical => "CRITIQUE",
-            RiskLevel.Major => "MAJEUR",
-            RiskLevel.Minor => "MINEUR",
-            _ => "INFORMATIONNEL"
+            RiskLevel.Critical => LocalizationService.GetString("Risk_Severity_Critical"),
+            RiskLevel.Major => LocalizationService.GetString("Risk_Severity_Major"),
+            RiskLevel.Minor => LocalizationService.GetString("Risk_Severity_Minor"),
+            _ => LocalizationService.GetString("Risk_Severity_Informational")
         };
 
         public static string GetSeverityBrushKey(RiskLevel level) => level switch
@@ -252,17 +253,19 @@ namespace optiSCAN.Services
 
         private static string GetSeverityIconKind(RiskLevel level) => UiIconKinds.ForRiskLevel(level);
 
-        private static string GetRecommendation(RiskLevel level, ThreatInfo threat) => level switch
+        private static string GetRecommendation(RiskLevel level, ThreatInfo threat)
         {
-            RiskLevel.Critical =>
-                $"ACTION IMMÉDIATE REQUISE : Mettez en quarantaine ou supprimez {threat.FileName} immédiatement.",
-            RiskLevel.Major =>
-                $"Action recommandée : Mettez en quarantaine {threat.FileName} dès que possible.",
-            RiskLevel.Minor =>
-                $"Action facultative : Surveillez {threat.FileName} ou mettez-le en quarantaine par précaution.",
-            _ =>
-                $"Information : {threat.VirusName} — aucune action immédiate requise."
-        };
+            var name = Path.GetFileName(threat.FilePath);
+            if (string.IsNullOrEmpty(name))
+                name = threat.FileName;
+            return level switch
+            {
+                RiskLevel.Critical => LocalizationService.Format("Risk_Rec_Critical", name),
+                RiskLevel.Major => LocalizationService.Format("Risk_Rec_Major", name),
+                RiskLevel.Minor => LocalizationService.Format("Risk_Rec_Minor", name),
+                _ => LocalizationService.Format("Risk_Rec_Info", threat.VirusName ?? name),
+            };
+        }
     }
 
     // ── Modèles ──────────────────────────────────────────────────────────────────

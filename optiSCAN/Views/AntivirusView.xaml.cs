@@ -84,13 +84,6 @@ namespace optiSCAN.Views
             {
                 if (antivirusHeroLastScan != null)
                     antivirusHeroLastScan.Text = FormatHeroLastScan(lastScan);
-
-                if (antivirusLastScan != null)
-                {
-                    antivirusLastScan.Text = lastScan.HasValue
-                        ? lastScan.Value.ToString("dd/MM/yyyy HH:mm", CultureInfo.CurrentCulture)
-                        : "—";
-                }
             }, DispatcherPriority.Background);
         }
 

@@ -96,6 +96,8 @@
         <GradientStop Color="#5B4FE8" Offset="0.45"/>
         <GradientStop Color="#3B82F6" Offset="1"/>
     </LinearGradientBrush>
+    <SolidColorBrush x:Key="HeroCardBorder"     Color="#44FFFFFF"/>
+
     <LinearGradientBrush x:Key="HeroCardGradient" StartPoint="0,0" EndPoint="1,1">
         <GradientStop Color="#8B5CF6" Offset="0"/>
         <GradientStop Color="#6366F1" Offset="0.5"/>

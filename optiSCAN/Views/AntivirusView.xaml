@@ -312,8 +312,6 @@
                                            FontWeight="Bold" FontSize="{DynamicResource FontSize.Large}" VerticalAlignment="Center"/>
                             </Grid>
                         </Border>
-
-                        <TextBlock x:Name="antivirusLastScan" Visibility="Collapsed" Text="—"/>
                     </StackPanel>
                 </Border>
             </ScrollViewer>

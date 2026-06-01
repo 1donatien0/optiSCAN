@@ -484,4 +484,16 @@
   <data name="Export_PdfFilter" xml:space="preserve"><value>PDF document (*.pdf)|*.pdf|All files (*.*)|*.*</value></data>
   <data name="Onboarding_Title" xml:space="preserve"><value>Welcome to optiSCAN</value></data>
   <data name="Onboarding_Body" xml:space="preserve"><value>Recommended first steps:&#10;&#10;• Update signatures (Antivirus → Signatures)&#10;• Run a quick scan (F5)&#10;• Configure exclusions if needed (Options)&#10;&#10;Without administrator rights, full and scheduled scans do not cover all system folders.</value></data>
+  <data name="Hist_TooltipExportHtml" xml:space="preserve"><value>HTML report (history, quarantine, active threats)</value></data>
+  <data name="Hist_TooltipExportPdf" xml:space="preserve"><value>PDF for the selected row in Antivirus Scan</value></data>
+  <data name="Risk_Severity_None" xml:space="preserve"><value>NO THREATS</value></data>
+  <data name="Risk_Severity_Critical" xml:space="preserve"><value>CRITICAL</value></data>
+  <data name="Risk_Severity_Major" xml:space="preserve"><value>MAJOR</value></data>
+  <data name="Risk_Severity_Minor" xml:space="preserve"><value>MINOR</value></data>
+  <data name="Risk_Severity_Informational" xml:space="preserve"><value>INFORMATIONAL</value></data>
+  <data name="Risk_Rec_Healthy" xml:space="preserve"><value>System is healthy.</value></data>
+  <data name="Risk_Rec_Critical" xml:space="preserve"><value>IMMEDIATE ACTION REQUIRED: quarantine or delete {0} now.</value></data>
+  <data name="Risk_Rec_Major" xml:space="preserve"><value>Recommended: quarantine {0} as soon as possible.</value></data>
+  <data name="Risk_Rec_Minor" xml:space="preserve"><value>Optional: monitor {0} or quarantine as a precaution.</value></data>
+  <data name="Risk_Rec_Info" xml:space="preserve"><value>Information: {0} — no immediate action required.</value></data>
 </root>

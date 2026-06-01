@@ -49,7 +49,7 @@
     <SolidColorBrush x:Key="AlertBg"            Color="#FAEEDA"/>
 
     <!-- ── AVERTISSEMENT / ORANGE ── -->
-    <SolidColorBrush x:Key="WarningOrange"      Color="#854F0B"/>
+    <SolidColorBrush x:Key="WarningOrange"      Color="#FB923C"/>
 
     <!-- ── DANGER / ROUGE ── -->
     <SolidColorBrush x:Key="DangerRed"          Color="#A32D2D"/>
@@ -112,6 +112,8 @@
         <GradientStop Color="#534AB7" Offset="0.5"/>
         <GradientStop Color="#4F6DD8" Offset="1"/>
     </LinearGradientBrush>
+    <SolidColorBrush x:Key="HeroCardBorder"     Color="#88000000"/>
+
     <LinearGradientBrush x:Key="HeroCardGradient" StartPoint="0,0" EndPoint="1,1">
         <GradientStop Color="#7C6CF0" Offset="0"/>
         <GradientStop Color="#534AB7" Offset="0.55"/>

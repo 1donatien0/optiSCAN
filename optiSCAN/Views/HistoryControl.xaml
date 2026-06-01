@@ -30,13 +30,13 @@
                             Click="BtnExportHtml_Click"
                             Style="{StaticResource ExportButton}"
                             Margin="0,0,8,0"
-                            ToolTip="Rapport HTML (historique, quarantaine, menaces actives)"/>
+                            ToolTip="{loc:Loc Key=Hist_TooltipExportHtml}"/>
 
                     <Button Content="{loc:Loc Key=Hist_ExportPdf}"
                             Click="BtnExportSelectedPdf_Click"
                             Style="{StaticResource ExportButton}"
                             Margin="0,0,8,0"
-                            ToolTip="PDF de la ligne sélectionnée dans Scan Antivirus"/>
+                            ToolTip="{loc:Loc Key=Hist_TooltipExportPdf}"/>
 
                     <Button Click="BtnOpenAntivirus_Click"
                             Style="{StaticResource ExportButton}">

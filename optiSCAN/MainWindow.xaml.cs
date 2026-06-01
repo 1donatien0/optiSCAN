@@ -135,6 +135,8 @@ namespace optiSCAN
                 c.Notifications.ToastActivated -= SurActivationToast;
                 c.Notifications.ToastActivated += SurActivationToast;
                 c.Notifications.SyncFromUserPreferences();
+                c.Actions.ActionCompleted -= SurActionAntivirusTerminee;
+                c.Actions.ActionCompleted += SurActionAntivirusTerminee;
 
                 // Abonnement aux événements
                 this.Loaded += async (s, e) => await SurChargementFenetrePrincipale();
@@ -352,6 +354,7 @@ namespace optiSCAN
             c.FocusAntivirusSignaturesRequested -= SurDemandeFocusSignaturesAntivirus;
             c.RealTimeProtection.ThreatDetected -= SurMenaceTempsReelDetectee;
             c.Notifications.ToastActivated -= SurActivationToast;
+            c.Actions.ActionCompleted -= SurActionAntivirusTerminee;
         }
 
         // ── Navigation ───────────────────────────────────────────────────────────
@@ -470,6 +473,19 @@ namespace optiSCAN
                 RefreshQuarantineList();
                 RefreshOverviewProtectionAndRecommendations();
             }), DispatcherPriority.Background);
+        }
+
+        private void SurActionAntivirusTerminee(object? sender, ActionResult result)
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                SetStatus(result.Message, isError: result.IsError, isWarning: result.IsWarning);
+                if (result.Success)
+                {
+                    RefreshQuarantineList();
+                    (panelAntivirus as Views.AntivirusView)?.RefreshAllData();
+                }
+            }, DispatcherPriority.Normal);
         }
 
         private void SurActivationToast(object? sender, ToastActivationEventArgs e)
