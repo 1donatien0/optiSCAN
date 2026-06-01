@@ -7,6 +7,152 @@
          ║  pour s'adapter au mode clair/sombre. Ne pas le redéfinir ici.  ║
          ╚══════════════════════════════════════════════════════════════════╝ -->
 
+    <!-- ── Cartes & en-têtes (glassmorphism — bordure GlassCardRim + fond semi-transparent) ── -->
+    <Style x:Key="GlassCard" TargetType="Border">
+        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="Background" Value="{DynamicResource GlassCardBg}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource GlassCardRim}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Effect" Value="{DynamicResource CardShadow}"/>
+        <Setter Property="Padding" Value="14,12"/>
+        <Setter Property="SnapsToDevicePixels" Value="True"/>
+        <Setter Property="UseLayoutRounding" Value="True"/>
+    </Style>
+
+    <Style x:Key="MetricCard" TargetType="Border" BasedOn="{StaticResource GlassCard}">
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Background" Value="{DynamicResource CardBg}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource CardBorderAccent}"/>
+    </Style>
+
+    <Style x:Key="HeroMetricCard" TargetType="Border">
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Background" Value="{DynamicResource HeroCardGradient}"/>
+        <Setter Property="BorderBrush" Value="#55FFFFFF"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Effect" Value="{DynamicResource GlowShadowAccent}"/>
+        <Setter Property="Padding" Value="14,12"/>
+    </Style>
+
+    <Style x:Key="PageHeaderBand" TargetType="Border">
+        <Setter Property="Margin" Value="24,16,24,0"/>
+        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource GlassCardRim}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Background" Value="{DynamicResource PageHeaderMica}"/>
+        <Setter Property="Effect" Value="{DynamicResource CardShadow}"/>
+        <Setter Property="Padding" Value="18,14"/>
+    </Style>
+
+    <Style x:Key="PageHeaderBandDense" TargetType="Border" BasedOn="{StaticResource PageHeaderBand}">
+        <Setter Property="Margin" Value="16,16,16,0"/>
+    </Style>
+
+    <Style x:Key="PageHeaderIcon" TargetType="Border">
+        <Setter Property="Width" Value="48"/>
+        <Setter Property="Height" Value="48"/>
+        <Setter Property="CornerRadius" Value="24"/>
+        <Setter Property="Background" Value="{DynamicResource PageHeaderIconRing}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource PageHeaderIconBorder}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="HorizontalAlignment" Value="Right"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+    </Style>
+
+    <Style x:Key="SectionLabel" TargetType="TextBlock">
+        <Setter Property="FontFamily" Value="{DynamicResource AppFontFamily}"/>
+        <Setter Property="FontSize" Value="{DynamicResource FontSize.Caption}"/>
+        <Setter Property="FontWeight" Value="Bold"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextAccent}"/>
+    </Style>
+
+    <Style x:Key="LogConsolePanel" TargetType="Border" BasedOn="{StaticResource GlassCard}">
+        <Setter Property="Padding" Value="14,12"/>
+    </Style>
+
+    <Style x:Key="LogConsoleTextBox" TargetType="TextBox">
+        <Setter Property="IsReadOnly" Value="True"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Foreground" Value="{DynamicResource TextMedium}"/>
+        <Setter Property="FontFamily" Value="Consolas"/>
+        <Setter Property="FontSize" Value="{DynamicResource FontSize.Caption}"/>
+        <Setter Property="TextWrapping" Value="Wrap"/>
+        <Setter Property="AcceptsReturn" Value="True"/>
+    </Style>
+
+    <Style x:Key="HubActionCard" TargetType="Border" BasedOn="{StaticResource GlassCard}">
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Background" Value="{DynamicResource CardBg}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource CardBorderAccent}"/>
+        <Style.Triggers>
+            <Trigger Property="IsMouseOver" Value="True">
+                <Setter Property="Background" Value="{DynamicResource CardBgHover}"/>
+                <Setter Property="BorderBrush" Value="{DynamicResource PrimaryBlue}"/>
+                <Setter Property="Effect" Value="{DynamicResource GlowShadowAccent}"/>
+            </Trigger>
+        </Style.Triggers>
+    </Style>
+
+    <Style x:Key="ContentPanelCard" TargetType="Border" BasedOn="{StaticResource GlassCard}">
+        <Setter Property="Padding" Value="16,14"/>
+        <Setter Property="Background" Value="{DynamicResource CardBg}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource CardBorderAccent}"/>
+    </Style>
+
+    <Style x:Key="DangerIconButton" TargetType="Button">
+        <Setter Property="Width" Value="28"/>
+        <Setter Property="Height" Value="28"/>
+        <Setter Property="Padding" Value="0"/>
+        <Setter Property="Cursor" Value="Hand"/>
+        <Setter Property="Background" Value="Transparent"/>
+        <Setter Property="BorderThickness" Value="0"/>
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="bg" CornerRadius="6" Background="{TemplateBinding Background}">
+                        <md:PackIcon Kind="Close" Width="14" Height="14"
+                                     Foreground="{DynamicResource DangerRed}"
+                                     HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="bg" Property="Background" Value="{DynamicResource AlertBg}"/>
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45"/>
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- ── Antivirus — panneaux verre (v7) ── -->
+    <Style x:Key="AvGlassTabShell" TargetType="Border">
+        <Setter Property="CornerRadius" Value="12"/>
+        <Setter Property="ClipToBounds" Value="True"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource GlassCardRim}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+        <Setter Property="Background" Value="{DynamicResource GlassCardBg}"/>
+        <Setter Property="Effect" Value="{DynamicResource CardShadow}"/>
+    </Style>
+
+    <Style x:Key="AvSideRailCard" TargetType="Border" BasedOn="{StaticResource ContentPanelCard}">
+        <Setter Property="Padding" Value="12"/>
+        <Setter Property="CornerRadius" Value="10"/>
+        <Setter Property="Margin" Value="0"/>
+    </Style>
+
+    <Style x:Key="AvSigMetricTile" TargetType="Border">
+        <Setter Property="CornerRadius" Value="6"/>
+        <Setter Property="Padding" Value="7,5"/>
+        <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
+        <Setter Property="BorderBrush" Value="{DynamicResource GlassCardRim}"/>
+        <Setter Property="BorderThickness" Value="1"/>
+    </Style>
+
     <!-- Style DataGridHeader -->
     <Style x:Key="DgHeader" TargetType="DataGridColumnHeader">
         <Setter Property="Background"       Value="{DynamicResource SurfaceBg}"/>
@@ -42,9 +188,8 @@
         <Setter Property="VerticalAlignment" Value="Center"/>
     </Style>
 
-    <!-- Style PrimaryButton -->
-    <Style x:Key="PrimaryButton" TargetType="Button">
-        <Setter Property="Background"      Value="{DynamicResource PrimaryBlue}"/>
+    <!-- Bouton principal — dégradé accent + halo -->
+    <Style x:Key="GradientPrimaryButton" TargetType="Button">
         <Setter Property="Foreground"      Value="{DynamicResource TextOnPrimary}"/>
         <Setter Property="FontFamily"      Value="{DynamicResource AppFontFamily}"/>
         <Setter Property="FontWeight"      Value="SemiBold"/>
@@ -56,23 +201,27 @@
             <Setter.Value>
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="bg" CornerRadius="8"
-                            Background="{TemplateBinding Background}"
-                            Padding="{TemplateBinding Padding}">
+                            Background="{DynamicResource AccentGradient}"
+                            Padding="{TemplateBinding Padding}"
+                            Effect="{DynamicResource GlowShadowAccent}">
                         <ContentPresenter HorizontalAlignment="Center"
                                           VerticalAlignment="Center"/>
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="bg" Property="Opacity" Value="0.85"/>
+                            <Setter TargetName="bg" Property="Opacity" Value="0.92"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.45"/>
+                            <Setter TargetName="bg" Property="Effect" Value="{x:Null}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
     </Style>
+
+    <Style x:Key="PrimaryButton" TargetType="Button" BasedOn="{StaticResource GradientPrimaryButton}"/>
 
     <!-- Style DangerButton -->
     <Style x:Key="DangerButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
@@ -107,7 +256,8 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="bg" Property="Opacity" Value="0.75"/>
+                            <Setter TargetName="bg" Property="Background" Value="{DynamicResource AccentBg}"/>
+                            <Setter TargetName="bg" Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
                         </Trigger>
                     </ControlTemplate.Triggers>
                 </ControlTemplate>
@@ -141,7 +291,8 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="bg" Property="Opacity" Value="0.8"/>
+                            <Setter TargetName="bg" Property="Background" Value="{DynamicResource CardBgHover}"/>
+                            <Setter TargetName="bg" Property="BorderBrush" Value="{DynamicResource BorderStrong}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter Property="Opacity" Value="0.45"/>
@@ -163,10 +314,11 @@
                 <ControlTemplate TargetType="Button">
                     <Border x:Name="card"
                             Background="{DynamicResource CardBg}"
-                            BorderBrush="{DynamicResource BorderColor}"
+                            BorderBrush="{DynamicResource CardBorderAccent}"
                             BorderThickness="1"
                             CornerRadius="10"
                             Padding="10,8"
+                            Effect="{DynamicResource CardShadow}"
                             MinHeight="88">
                         <ContentPresenter HorizontalAlignment="Center"
                                           VerticalAlignment="Center"/>
@@ -174,6 +326,8 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">
                             <Setter TargetName="card" Property="Background" Value="{DynamicResource CardBgHover}"/>
+                            <Setter TargetName="card" Property="BorderBrush" Value="{DynamicResource PrimaryBlue}"/>
+                            <Setter TargetName="card" Property="Effect" Value="{DynamicResource GlowShadowAccent}"/>
                         </Trigger>
                         <Trigger Property="IsEnabled" Value="False">
                             <Setter TargetName="card" Property="Opacity" Value="0.55"/>
@@ -362,8 +516,9 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter TargetName="tabBg" Property="Background" Value="{DynamicResource PrimaryBlue}"/>
-                            <Setter TargetName="tabBg" Property="BorderBrush" Value="{DynamicResource PrimaryBlue}"/>
+                            <Setter TargetName="tabBg" Property="Background" Value="{DynamicResource AccentGradient}"/>
+                            <Setter TargetName="tabBg" Property="BorderBrush" Value="{DynamicResource BorderGlass}"/>
+                            <Setter TargetName="tabBg" Property="Effect" Value="{DynamicResource GlowShadowAccent}"/>
                             <Setter Property="Foreground" Value="{DynamicResource TextOnPrimary}"/>
                             <Setter TargetName="headerPresenter" Property="TextElement.Foreground"
                                     Value="{DynamicResource TextOnPrimary}"/>
@@ -411,10 +566,11 @@
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsSelected" Value="True">
-                            <Setter Property="Foreground" Value="{DynamicResource TextDark}"/>
+                            <Setter Property="Foreground" Value="{DynamicResource TextAccent}"/>
                             <Setter TargetName="headerPresenter" Property="TextElement.Foreground"
-                                    Value="{DynamicResource TextDark}"/>
+                                    Value="{DynamicResource TextAccent}"/>
                             <Setter TargetName="bg" Property="BorderThickness" Value="0,0,0,2"/>
+                            <Setter TargetName="bg" Property="BorderBrush" Value="{DynamicResource AccentBlue}"/>
                         </Trigger>
                         <Trigger Property="IsSelected" Value="False">
                             <Setter TargetName="bg" Property="BorderThickness" Value="0"/>
@@ -432,6 +588,14 @@
                 </ControlTemplate>
             </Setter.Value>
         </Setter>
+    </Style>
+
+    <!-- ── État vide réutilisable (DataGrid sans données, etc.) ── -->
+    <Style x:Key="EmptyStatePlaceholder" TargetType="StackPanel">
+        <Setter Property="HorizontalAlignment" Value="Center"/>
+        <Setter Property="VerticalAlignment" Value="Center"/>
+        <Setter Property="IsHitTestVisible" Value="False"/>
+        <Setter Property="Opacity" Value="0.55"/>
     </Style>
 
     <!-- Icônes dans en-têtes d'onglets (héritent Foreground du TabItem) -->
@@ -466,6 +630,7 @@
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsChecked" Value="True">
                             <Setter TargetName="bg" Property="Background" Value="{DynamicResource SidebarActiveItem}"/>
+                            <Setter TargetName="bg" Property="Effect" Value="{DynamicResource GlowShadowAccent}"/>
                             <Setter TargetName="bar" Property="Fill"       Value="{DynamicResource SidebarIndicator}"/>
                             <Setter Property="Foreground"                  Value="{DynamicResource SidebarTextActive}"/>
                         </Trigger>

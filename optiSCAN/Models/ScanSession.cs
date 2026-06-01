@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Text.Json.Serialization;
 
 namespace optiSCAN.Models
@@ -32,6 +33,15 @@ namespace optiSCAN.Models
         /// <summary>Libellé du statut final (ex. « Completed », « Cancelled »).</summary>
         public string StatusDisplay { get; set; } = string.Empty;
 
+        /// <summary>Message d'erreur si le scan s'est terminé en échec.</summary>
+        public string? ErrorMessage { get; set; }
+
+        /// <summary>Fichiers ignorés (exclusions, dossiers protégés).</summary>
+        public int FilesSkipped { get; set; }
+
+        /// <summary>Menaces détectées (chemins et noms conservés pour l'historique et les exports).</summary>
+        public List<ThreatInfo> Threats { get; set; } = new();
+
         /// <summary>Durée formatée en français (ex. « 2 min 34 s ») ; « — » si la session n'est pas terminée.</summary>
         [JsonIgnore]
         public string DurationDisplay =>
@@ -56,7 +66,10 @@ namespace optiSCAN.Models
             TargetPath = result.TargetPath,
             FilesScanned = result.FilesScanned,
             ThreatsFound = result.ThreatsFound,
-            StatusDisplay = result.Status.ToString()
+            StatusDisplay = result.Status.ToString(),
+            ErrorMessage = result.ErrorMessage,
+            FilesSkipped = result.FilesSkipped,
+            Threats = result.Threats.Select(t => t.Clone()).ToList()
         };
     }
 }

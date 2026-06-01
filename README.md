@@ -1,9 +1,9 @@
-# Guide Complet — optiSCAN v6.0
+# Guide Complet — optiSCAN v7.0
 
 > **Version de référence.** Ce guide décrit l'architecture, les modules et les procédures
-> de la version **v6.0** du produit (build **6.0.0**, édition ClamAV). Architecture mono-fenêtre avec services avancés + Donaby Design System.
+> de la version **v7.0** du produit (build **7.0.0**, édition ClamAV). Architecture mono-fenêtre avec services avancés + Donaby Design System.
 >
-> **Nomenclature (comme v1.0 … v5.0)** — **v6.0** : nom de release (documentation, CLUF). **6.0.0** : identifiant d’assembly et d’installateur (`Directory.Build.props`, Inno Setup).
+> **Nomenclature (comme v1.0 … v6.0)** — **v7.0** : nom de release (documentation, CLUF). **7.0.0** : identifiant d’assembly et d’installateur (`Directory.Build.props`, Inno Setup).
 >
 > **Design system : Donaby Design** — thème sombre/clair dynamique, tokens DynamicResource WPF.
 > Développé par **© 2026 Donatien Byakombe (Dona By)**.
@@ -240,7 +240,7 @@ après la date textuelle (le premier champ est une date lisible, pas un entier).
 
 ---
 
-## 4. Architecture mono-fenêtre (v6.0)
+## 4. Architecture mono-fenêtre (v7.0)
 
 Les sous-sections **4.1** à **4.11** suivent une lecture « produit » : navigation et panneaux, détail du panneau Antivirus, menaces et pipeline, options techniques (MAJ, exclusions, quarantaine, logs), exports, puis contenu de la vue d’ensemble.
 
@@ -253,7 +253,7 @@ Les vues sont empilées dans un seul `Grid` (`MainWindow.xaml`) : une seule est 
 | `Overview` | Vue d'ensemble | `OverviewControl` | Cartes d'action, statistiques 30 j., recommandations dynamiques, état ClamAV/YARA et signatures |
 | `Antivirus` | Antivirus | `AntivirusView` | Scans ; onglets **Analyse en cours** / **Quarantaine** / **Historique** / **Signatures** (`ScanViewModel`) |
 | `Clean` | Nettoyer | `CleanControl` | Analyse / nettoyage (caches navigateurs, temp, corbeille) + **historique local** (colonne **Libéré** = `BytesDisplay`) |
-| `History` | Historique | `HistoryControl` | Scans / nettoyages ; onglet **Journal** (`ReadLastLogLines`) ; export **HTML** / **PDF** (dernier ou ligne sélectionnée) |
+| `History` | Historique | `HistoryControl` | Scans / nettoyages avec **détail** sous chaque grille (menaces, journal d'opérations) ; export **HTML** / **PDF** (ligne sélectionnée) |
 | `Options` | Options | `OptionsControl` | **Langue** (fr/en, redémarrage), thème / `SyncWindowsTheme`, scan favori, RTP, quarantaine auto, planif. (`ServiceContainer.ScheduledScan`, prochaine exécution, **Lancer maintenant**), exclusions |
 
 Raccourcis clavier : `Ctrl+1` … `Ctrl+5` (`KeyboardShortcuts`) — ordre des panneaux : **Vue d’ensemble**, **Antivirus**, **Nettoyer**, **Historique**, **Options**.
@@ -338,7 +338,7 @@ Stockage : `%LOCALAPPDATA%\optiSCAN\Quarantine\` — `{guid}.quar` + `manifest.j
 | Fichier / service | Rôle |
 |---|---|
 | `ScanLogManager` → `scan_history.json` / `clean_history.json` | Historique des sessions (100 entrées max chacun) |
-| `ScanLogManager` → `optiSCAN.log` | Journal texte des analyses ; lu dans **Historique → onglet Journal** |
+| `ScanLogManager` → `optiSCAN.log` | Journal texte fichier (support / mode headless) ; détail affiché dans **Historique → Scans** |
 | `AppLogger` → `optiscan-YYYY-MM-DD.log` | Logs applicatifs (composants, erreurs) ; purge **> 30 jours**, au plus **1×/jour** (marqueur `.lastcleanup` persisté) |
 
 ### 4.10 Exports PDF et HTML
@@ -420,7 +420,7 @@ Instance unique : **`ServiceContainer.Default.ScheduledScan`** (partagée avec *
 
 ---
 
-## 6. Workflow utilisateur optiSCAN v6.0
+## 6. Workflow utilisateur optiSCAN v7.0
 
 ```
 DÉMARRAGE (UI)
@@ -484,7 +484,7 @@ Add-MpPreference -ExclusionPath "C:\Program Files\optiSCAN\clamav\database"
 
 ---
 
-## 8. Packaging final (v6.0)
+## 8. Packaging final (v7.0)
 
 Guide détaillé : **[docs/BUILD.md](docs/BUILD.md)**.
 
@@ -515,7 +515,7 @@ $pub = ".\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64"
 & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" .\installer\setup.iss
 ```
 
-Sortie typique : `installer\output\optiSCAN_Setup_v6.0.0.exe` (versions dans `#define` de `setup.iss`).
+Sortie typique : `installer\output\optiSCAN_Setup_v7.0.0.exe` (versions dans `#define` de `setup.iss`).
 
 **Variante tout-en-un** : `.\installer\build-release-setup.ps1` (nettoie, publie, lance ISCC).
 
@@ -524,7 +524,7 @@ Sortie typique : `installer\output\optiSCAN_Setup_v6.0.0.exe` (versions dans `#d
 **Contenu de l'installateur (~260 Mo avec signatures initiales) :**
 
 ```
-optiSCAN_Setup_v6.0.0.exe
+optiSCAN_Setup_v7.0.0.exe
     ├── optiSCAN.exe
     ├── optiSCAN.ico
     ├── *.dll (runtime .NET 8)
@@ -568,6 +568,13 @@ Les deux langues sont **incluses dans le même binaire** (pas de pack de langue 
 ---
 
 ## 11. Historique des versions produit
+
+### v7.0 — Lifting UI Donaby + identité visuelle
+
+- **Lifting apparence** — glassmorphism, fond mesh animé, cartes métriques, en-têtes de page unifiés
+- **Logo hero animé** — bouclier optiSCAN avec pulse (accueil), logo compact dans la sidebar
+- **Footer allégé** — attribution unique (© Dona By), version sans redondance
+- **Versioning unifié** — nom **v7.0** + build **7.0.0** (`Directory.Build.props`, Inno Setup, **LICENSE.txt**, manifeste, rapports PDF/HTML)
 
 ### v6.0 — Version majeure (publication)
 

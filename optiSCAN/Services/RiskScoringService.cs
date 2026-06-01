@@ -106,6 +106,7 @@ namespace optiSCAN.Services
                 Level = finalLevel,
                 Severity = GetSeverityString(finalLevel),
                 Color = GetSeverityColor(finalLevel),
+                BrushKey = GetSeverityBrushKey(finalLevel),
                 IconKind = GetSeverityIconKind(finalLevel),
                 Recommendation = GetRecommendation(finalLevel, threat),
                 Reasons = reasons
@@ -129,6 +130,7 @@ namespace optiSCAN.Services
             {
                 Severity = "AUCUNE MENACE",
                 Color = "#27AE60",
+                BrushKey = "RiskInformational",
                 IconKind = UiIconKinds.Success,
                 Recommendation = "Système sain."
             };
@@ -238,13 +240,15 @@ namespace optiSCAN.Services
             _ => "INFORMATIONNEL"
         };
 
-        private static string GetSeverityColor(RiskLevel level) => level switch
+        public static string GetSeverityBrushKey(RiskLevel level) => level switch
         {
-            RiskLevel.Critical => "#C0392B",
-            RiskLevel.Major => "#E67E22",
-            RiskLevel.Minor => "#F1C40F",
-            _ => "#27AE60"
+            RiskLevel.Critical => "RiskCritical",
+            RiskLevel.Major => "RiskMajor",
+            RiskLevel.Minor => "RiskMinor",
+            _ => "RiskInformational"
         };
+
+        private static string GetSeverityColor(RiskLevel level) => PdfRiskPalette.GetSeverityColor(level);
 
         private static string GetSeverityIconKind(RiskLevel level) => UiIconKinds.ForRiskLevel(level);
 
@@ -277,6 +281,8 @@ namespace optiSCAN.Services
         public RiskLevel Level { get; set; }
         public string Severity { get; set; } = string.Empty;
         public string Color { get; set; } = string.Empty;
+        /// <summary>Clé DynamicResource Donaby (RiskCritical, RiskMajor, …).</summary>
+        public string BrushKey { get; set; } = string.Empty;
         /// <summary>Nom <see cref="MaterialDesignThemes.Wpf.PackIconKind"/> (ex. Alert, CheckCircle).</summary>
         public string IconKind { get; set; } = string.Empty;
         public string Recommendation { get; set; } = string.Empty;

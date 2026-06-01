@@ -11,7 +11,7 @@ namespace optiSCAN.Services
     /// pour un scan quotidien automatique, via schtasks.exe (outil natif Windows).
     /// Aucune dépendance NuGet requise.
     /// </summary>
-    public class ScheduledScanService
+    public class ScheduledScanService : IScheduledScanService
     {
         private const string TaskName = "optiSCAN_DailyScan";
         private readonly string _exePath;
@@ -218,7 +218,7 @@ namespace optiSCAN.Services
             return next;
         }
 
-        private static bool TryParseNextRunFromTaskXml(string xml, out DateTime next)
+        internal static bool TryParseNextRunFromTaskXml(string xml, out DateTime next)
         {
             next = default;
             try
@@ -252,7 +252,7 @@ namespace optiSCAN.Services
             return false;
         }
 
-        private static bool TryParseNextRunFromListOutput(string text, out DateTime next)
+        internal static bool TryParseNextRunFromListOutput(string text, out DateTime next)
         {
             next = default;
             foreach (var raw in text.Split(new[] { "\r\n", "\n", "\r" }, StringSplitOptions.None))

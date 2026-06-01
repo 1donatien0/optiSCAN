@@ -1,6 +1,6 @@
 # Audit UI — réactivité au clic (navigation et interactions)
 
-**optiSCAN v6.0** — analyse statique du code (`MainWindow`, `NavigationService`, vues, ViewModels)  
+**optiSCAN v7.0** — analyse statique du code (`MainWindow`, `NavigationService`, vues, ViewModels)  
 **Date** : audit statique du dépôt (pas de profilage ETW / WPR sur machine réelle).
 
 ---

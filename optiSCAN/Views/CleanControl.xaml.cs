@@ -1,3 +1,4 @@
+using optiSCAN.Localization;
 using optiSCAN.Models;
 using optiSCAN.Services;
 using System.Collections.Generic;
@@ -17,6 +18,24 @@ namespace optiSCAN.Views
         // Analyse doit être lancée avant de pouvoir nettoyer
         private bool _analysed = false;
 
+        private readonly struct CleanSelection
+        {
+            public bool TempWin { get; init; }
+            public bool TempUser { get; init; }
+            public bool Recycle { get; init; }
+            public bool Logs { get; init; }
+            public bool Edge { get; init; }
+            public bool Chrome { get; init; }
+            public bool Firefox { get; init; }
+            public bool Brave { get; init; }
+            public bool Opera { get; init; }
+            public bool Vivaldi { get; init; }
+            public bool Arc { get; init; }
+
+            public bool AnySystem => TempWin || TempUser || Recycle || Logs;
+            public bool AnyBrowser => Edge || Chrome || Firefox || Brave || Opera || Vivaldi || Arc;
+        }
+
         public CleanControl()
         {
             InitializeComponent();
@@ -25,23 +44,37 @@ namespace optiSCAN.Views
         // ── Analyser ─────────────────────────────────────────────────────────
         private async void btnAnalyze_Click(object sender, RoutedEventArgs e)
         {
+            var sel = ReadCleanSelection();
+            if (!sel.AnySystem && !sel.AnyBrowser)
+            {
+                System.Windows.MessageBox.Show(
+                    LocalizationService.GetString("Clean_LogHint"),
+                    LocalizationService.GetString("Clean_Title"),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Information);
+                return;
+            }
+
             btnAnalyze.IsEnabled = false;
             btnCleanNow.IsEnabled = false;
             _analysed = false;
-            SetLog("=== ANALYSE EN COURS ===");
+            SetEmptyResultState(false);
+            SetLog(LocalizationService.GetString("Clean_LogAnalyzeStart"));
 
             await Task.Run(() =>
             {
-                long tempWin = MeasureDir(Path.Combine(Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows", "Temp"));
-                long tempUser = MeasureDir(Path.GetTempPath());
-                long edgeCache = MeasureDir(EdgeCachePath());
-                long chromeCache = MeasureDir(ChromeCachePath());
-                long ffCache = MeasureDir(FirefoxCachePath());
-                long braveCache = MeasureDir(BraveCachePath());
-                long operaCache = MeasureDir(OperaCachePath());
-                long vivaldiCache = MeasureDir(VivaldiCachePath());
-                long arcCache = MeasureDir(ArcCachePath());
-                long logsSize = MeasureDir(WindowsLogsPath());
+                long tempWin = sel.TempWin
+                    ? MeasureDir(Path.Combine(Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows", "Temp"))
+                    : 0;
+                long tempUser = sel.TempUser ? MeasureDir(Path.GetTempPath()) : 0;
+                long logsSize = sel.Logs ? MeasureDir(WindowsLogsPath()) : 0;
+                long edgeCache = sel.Edge ? MeasureDir(EdgeCachePath()) : 0;
+                long chromeCache = sel.Chrome ? MeasureDir(ChromeCachePath()) : 0;
+                long ffCache = sel.Firefox ? MeasureDir(FirefoxCachePath()) : 0;
+                long braveCache = sel.Brave ? MeasureDir(BraveCachePath()) : 0;
+                long operaCache = sel.Opera ? MeasureDir(OperaCachePath()) : 0;
+                long vivaldiCache = sel.Vivaldi ? MeasureDir(VivaldiCachePath()) : 0;
+                long arcCache = sel.Arc ? MeasureDir(ArcCachePath()) : 0;
 
                 long sysTotal = tempWin + tempUser + logsSize;
                 long browserTotal = edgeCache + chromeCache + ffCache + braveCache + operaCache + vivaldiCache + arcCache;
@@ -53,22 +86,33 @@ namespace optiSCAN.Views
                     txtBrowserSize.Text = FormatSize(browserTotal);
                     txtTotalSize.Text = FormatSize(total);
 
-                    AppendLog($"Temp Windows    : {FormatSize(tempWin)}");
-                    AppendLog($"Temp utilisateur : {FormatSize(tempUser)}");
-                    AppendLog($"Journaux système : {FormatSize(logsSize)}");
-                    AppendLog($"Edge             : {FormatSize(edgeCache)}");
-                    AppendLog($"Chrome           : {FormatSize(chromeCache)}");
-                    AppendLog($"Firefox          : {FormatSize(ffCache)}");
-                    AppendLog($"Brave            : {FormatSize(braveCache)}");
-                    AppendLog($"Opera            : {FormatSize(operaCache)}");
-                    AppendLog($"Vivaldi          : {FormatSize(vivaldiCache)}");
-                    AppendLog($"Arc              : {FormatSize(arcCache)}");
+                    if (sel.TempWin)
+                        AppendLog(LocalizationService.Format("Clean_LogLineTempWin", FormatSize(tempWin)));
+                    if (sel.TempUser)
+                        AppendLog(LocalizationService.Format("Clean_LogLineTempUser", FormatSize(tempUser)));
+                    if (sel.Logs)
+                        AppendLog(LocalizationService.Format("Clean_LogLineLogs", FormatSize(logsSize)));
+                    if (sel.Edge)
+                        AppendLog(LocalizationService.Format("Clean_LogLineEdge", FormatSize(edgeCache)));
+                    if (sel.Chrome)
+                        AppendLog(LocalizationService.Format("Clean_LogLineChrome", FormatSize(chromeCache)));
+                    if (sel.Firefox)
+                        AppendLog(LocalizationService.Format("Clean_LogLineFirefox", FormatSize(ffCache)));
+                    if (sel.Brave)
+                        AppendLog(LocalizationService.Format("Clean_LogLineBrave", FormatSize(braveCache)));
+                    if (sel.Opera)
+                        AppendLog(LocalizationService.Format("Clean_LogLineOpera", FormatSize(operaCache)));
+                    if (sel.Vivaldi)
+                        AppendLog(LocalizationService.Format("Clean_LogLineVivaldi", FormatSize(vivaldiCache)));
+                    if (sel.Arc)
+                        AppendLog(LocalizationService.Format("Clean_LogLineArc", FormatSize(arcCache)));
                     AppendLog($"─────────────────────────");
-                    AppendLog($"Total libérable  : {FormatSize(total)}");
-                    AppendLog("=== ANALYSE TERMINÉE ===");
+                    AppendLog(LocalizationService.Format("Clean_LogTotal", FormatSize(total)));
+                    AppendLog(LocalizationService.GetString("Clean_LogAnalyzeEnd"));
 
                     _analysed = true;
-                    btnCleanNow.IsEnabled = true;
+                    btnCleanNow.IsEnabled = total > 0;
+                    SetEmptyResultState(total == 0);
                 });
             });
 
@@ -80,23 +124,11 @@ namespace optiSCAN.Views
         {
             if (!_analysed) return;
 
-            // Capturer les cases à cocher sur le thread UI : lire IsChecked dans
-            // Task.Run provoque une InvalidOperationException WPF et peut fermer l'app.
-            bool doTempWin = chkTempWin?.IsChecked == true;
-            bool doTempUser = chkTempUser?.IsChecked == true;
-            bool doRecycle = chkRecycleBin?.IsChecked == true;
-            bool doEdge = chkEdge?.IsChecked == true;
-            bool doChrome = chkChrome?.IsChecked == true;
-            bool doFirefox = chkFirefox?.IsChecked == true;
-            bool doBrave = chkBrave?.IsChecked == true;
-            bool doOpera = chkOpera?.IsChecked == true;
-            bool doVivaldi = chkVivaldi?.IsChecked == true;
-            bool doArc = chkArc?.IsChecked == true;
-            bool doLogs = chkLogs?.IsChecked == true;
+            var sel = ReadCleanSelection();
 
             btnAnalyze.IsEnabled = false;
             btnCleanNow.IsEnabled = false;
-            AppendLog("=== NETTOYAGE EN COURS ===");
+            AppendLog(LocalizationService.GetString("Clean_LogCleanStart"));
             var cleanStarted = DateTime.Now;
 
             try
@@ -105,78 +137,78 @@ namespace optiSCAN.Views
                 {
                     long freed = 0;
 
-                    if (doTempWin)
+                    if (sel.TempWin)
                     {
                         string path = Path.Combine(Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows", "Temp");
                         long f = CleanDir(path);
                         freed += f;
-                        Dispatcher.Invoke(() => AppendLog($"Temp Windows nettoyé : {FormatSize(f)}"));
+                        Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedTempWin", FormatSize(f))));
                     }
-                    if (doTempUser)
+                    if (sel.TempUser)
                     {
                         long f = CleanDir(Path.GetTempPath());
                         freed += f;
-                        Dispatcher.Invoke(() => AppendLog($"Temp utilisateur nettoyé : {FormatSize(f)}"));
+                        Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedTempUser", FormatSize(f))));
                     }
-                    if (doRecycle)
+                    if (sel.Recycle)
                     {
                         SHEmptyRecycleBin(IntPtr.Zero, null, 0x0007);
-                        Dispatcher.Invoke(() => AppendLog("Corbeille vidée."));
+                        Dispatcher.Invoke(() => AppendLog(LocalizationService.GetString("Clean_LogRecycleEmptied")));
                     }
-                    if (doEdge)
+                    if (sel.Edge)
                     {
                         long f = CleanDir(EdgeCachePath());
                         freed += f;
-                        Dispatcher.Invoke(() => AppendLog($"Cache Edge : {FormatSize(f)}"));
+                        Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedCache", "Edge", FormatSize(f))));
                     }
-                    if (doChrome)
+                    if (sel.Chrome)
                     {
                         long f = CleanDir(ChromeCachePath());
                         freed += f;
-                        Dispatcher.Invoke(() => AppendLog($"Cache Chrome : {FormatSize(f)}"));
+                        Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedCache", "Chrome", FormatSize(f))));
                     }
-                    if (doFirefox)
+                    if (sel.Firefox)
                     {
                         long f = CleanDir(FirefoxCachePath());
                         freed += f;
-                        Dispatcher.Invoke(() => AppendLog($"Cache Firefox : {FormatSize(f)}"));
+                        Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedCache", "Firefox", FormatSize(f))));
                     }
-                    if (doBrave)
+                    if (sel.Brave)
                     {
                         long f = CleanDir(BraveCachePath());
                         freed += f;
-                        Dispatcher.Invoke(() => AppendLog($"Cache Brave : {FormatSize(f)}"));
+                        Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedCache", "Brave", FormatSize(f))));
                     }
-                    if (doOpera)
+                    if (sel.Opera)
                     {
                         long f = CleanDir(OperaCachePath());
                         freed += f;
-                        Dispatcher.Invoke(() => AppendLog($"Cache Opera : {FormatSize(f)}"));
+                        Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedCache", "Opera", FormatSize(f))));
                     }
-                    if (doVivaldi)
+                    if (sel.Vivaldi)
                     {
                         long f = CleanDir(VivaldiCachePath());
                         freed += f;
-                        Dispatcher.Invoke(() => AppendLog($"Cache Vivaldi : {FormatSize(f)}"));
+                        Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedCache", "Vivaldi", FormatSize(f))));
                     }
-                    if (doArc)
+                    if (sel.Arc)
                     {
                         long f = CleanDir(ArcCachePath());
                         freed += f;
-                        Dispatcher.Invoke(() => AppendLog($"Cache Arc : {FormatSize(f)}"));
+                        Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedCache", "Arc", FormatSize(f))));
                     }
-                    if (doLogs)
+                    if (sel.Logs)
                     {
                         long f = CleanDir(WindowsLogsPath());
                         freed += f;
-                        Dispatcher.Invoke(() => AppendLog($"Journaux système nettoyés : {FormatSize(f)}"));
+                        Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedLogs", FormatSize(f))));
                     }
 
                     Dispatcher.Invoke(() =>
                     {
                         AppendLog($"─────────────────────────");
-                        AppendLog($"Total libéré : {FormatSize(freed)}");
-                        AppendLog("=== NETTOYAGE TERMINÉ ===");
+                        AppendLog(LocalizationService.Format("Clean_LogFreedTotal", FormatSize(freed)));
+                        AppendLog(LocalizationService.GetString("Clean_LogCleanEnd"));
                         txtTempSize.Text = "0 Mo";
                         txtBrowserSize.Text = "0 Mo";
                         txtTotalSize.Text = "0 Mo";
@@ -184,7 +216,7 @@ namespace optiSCAN.Views
                         btnCleanNow.IsEnabled = false;
 
                         var cleanEnd = DateTime.Now;
-                        var targets = BuildCleanTargetsSummary(doTempWin, doTempUser, doRecycle, doEdge, doChrome, doFirefox, doBrave, doOpera, doVivaldi, doArc, doLogs);
+                        var targets = BuildCleanTargetsSummary(sel);
                         try
                         {
                             ServiceContainer.Default.Logger.SaveCleanSession(new CleanSession
@@ -192,7 +224,8 @@ namespace optiSCAN.Views
                                 StartedAt = cleanStarted,
                                 FinishedAt = cleanEnd,
                                 TargetsSummary = targets,
-                                BytesFreed = freed
+                                BytesFreed = freed,
+                                OperationLog = CaptureCleanOperationLog()
                             });
                             ServiceContainer.Default.RequestScanHistoryViewsRefresh();
                         }
@@ -206,7 +239,7 @@ namespace optiSCAN.Views
             catch (Exception ex)
             {
                 AppLogger.Warn("CleanControl", "Nettoyage système", ex);
-                AppendLog($"Erreur pendant le nettoyage : {ex.Message}");
+                AppendLog(LocalizationService.Format("Clean_ErrCleaning", ex.Message));
             }
             finally
             {
@@ -217,6 +250,13 @@ namespace optiSCAN.Views
         }
 
         // ── Journalisation ───────────────────────────────────────────────────
+        private void SetEmptyResultState(bool show)
+        {
+            if (emptyCleanResultState == null || txtCleanLog == null) return;
+            emptyCleanResultState.Visibility = show ? Visibility.Visible : Visibility.Collapsed;
+            txtCleanLog.Visibility = show ? Visibility.Collapsed : Visibility.Visible;
+        }
+
         private void SetLog(string text)
         {
             if (txtCleanLog != null)
@@ -228,11 +268,22 @@ namespace optiSCAN.Views
             Dispatcher.InvokeAsync(() =>
             {
                 if (txtCleanLog == null) return;
-                if (txtCleanLog.Text.StartsWith("Cliquez"))
+                if (txtCleanLog.Text.StartsWith("Cliquez", StringComparison.OrdinalIgnoreCase)
+                    || txtCleanLog.Text.StartsWith("Click", StringComparison.OrdinalIgnoreCase))
                     txtCleanLog.Text = string.Empty;
                 txtCleanLog.Text += $"[{DateTime.Now:HH:mm:ss}] {line}\n";
                 txtCleanLog.ScrollToEnd();
             });
+        }
+
+        private string CaptureCleanOperationLog()
+        {
+            var t = txtCleanLog?.Text?.Trim() ?? "";
+            if (string.IsNullOrEmpty(t)) return "";
+            if (t.StartsWith("Cliquez", StringComparison.OrdinalIgnoreCase)
+                || t.StartsWith("Click", StringComparison.OrdinalIgnoreCase))
+                return "";
+            return t;
         }
 
         // ── Chemins de cache navigateurs ─────────────────────────────────────
@@ -350,22 +401,35 @@ namespace optiSCAN.Views
             return freed;
         }
 
-        private static string BuildCleanTargetsSummary(
-            bool tempWin, bool tempUser, bool recycle, bool edge, bool chrome, bool firefox, bool brave,
-            bool opera, bool vivaldi, bool arc, bool logs)
+        private CleanSelection ReadCleanSelection() => new()
+        {
+            TempWin = chkTempWin?.IsChecked == true,
+            TempUser = chkTempUser?.IsChecked == true,
+            Recycle = chkRecycleBin?.IsChecked == true,
+            Logs = chkLogs?.IsChecked == true,
+            Edge = chkEdge?.IsChecked == true,
+            Chrome = chkChrome?.IsChecked == true,
+            Firefox = chkFirefox?.IsChecked == true,
+            Brave = chkBrave?.IsChecked == true,
+            Opera = chkOpera?.IsChecked == true,
+            Vivaldi = chkVivaldi?.IsChecked == true,
+            Arc = chkArc?.IsChecked == true
+        };
+
+        private static string BuildCleanTargetsSummary(CleanSelection sel)
         {
             var parts = new List<string>(12);
-            if (tempWin) parts.Add("Temp Windows");
-            if (tempUser) parts.Add("Temp utilisateur");
-            if (recycle) parts.Add("Corbeille");
-            if (edge) parts.Add("Edge");
-            if (chrome) parts.Add("Chrome");
-            if (firefox) parts.Add("Firefox");
-            if (brave) parts.Add("Brave");
-            if (opera) parts.Add("Opera");
-            if (vivaldi) parts.Add("Vivaldi");
-            if (arc) parts.Add("Arc");
-            if (logs) parts.Add("Journaux système");
+            if (sel.TempWin) parts.Add(LocalizationService.GetString("Clean_TempWinCb"));
+            if (sel.TempUser) parts.Add(LocalizationService.GetString("Clean_TempUserCb"));
+            if (sel.Recycle) parts.Add(LocalizationService.GetString("Clean_RecycleCb"));
+            if (sel.Logs) parts.Add(LocalizationService.GetString("Clean_LogsCb"));
+            if (sel.Edge) parts.Add(LocalizationService.GetString("Clean_Edge"));
+            if (sel.Chrome) parts.Add(LocalizationService.GetString("Clean_Chrome"));
+            if (sel.Firefox) parts.Add(LocalizationService.GetString("Clean_Firefox"));
+            if (sel.Brave) parts.Add(LocalizationService.GetString("Clean_Brave"));
+            if (sel.Opera) parts.Add(LocalizationService.GetString("Clean_Opera"));
+            if (sel.Vivaldi) parts.Add(LocalizationService.GetString("Clean_Vivaldi"));
+            if (sel.Arc) parts.Add(LocalizationService.GetString("Clean_Arc"));
             return parts.Count == 0 ? "—" : string.Join(", ", parts);
         }
 

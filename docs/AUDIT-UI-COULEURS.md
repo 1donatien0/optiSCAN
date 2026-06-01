@@ -1,6 +1,6 @@
 # Audit UI — lisibilité, mode sombre et uniformisation
 
-**optiSCAN v6.0** — `Donaby.Light.xaml` / `Donaby.Dark.xaml` + styles `App.xaml` / `Controls.xaml`  
+**optiSCAN v7.0** — `Donaby.Light.xaml` / `Donaby.Dark.xaml` + styles `App.xaml` / `Controls.xaml`  
 **Date** : audit statique du dépôt (XAML + thèmes + code-behind couleurs).
 
 ---

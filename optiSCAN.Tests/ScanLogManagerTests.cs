@@ -38,6 +38,27 @@ public sealed class ScanLogManagerTests : IDisposable
     }
 
     [Fact]
+    public void SaveScanResult_persists_threat_details()
+    {
+        _manager.SaveScanResult(new ScanResult
+        {
+            Type = ScanType.File,
+            TargetPath = @"C:\test.exe",
+            Status = ScanStatus.Completed,
+            FilesScanned = 1,
+            Threats =
+            {
+                ThreatInfo.FromClamAv(@"C:\infected.dll", "Test.Virus", 1024)
+            }
+        });
+
+        var session = _manager.GetHistory()[0];
+        Assert.Single(session.Threats);
+        Assert.Equal(@"C:\infected.dll", session.Threats[0].FilePath);
+        Assert.Equal("Test.Virus", session.Threats[0].VirusName);
+    }
+
+    [Fact]
     public void WriteToLog_and_ReadLastLogLines_roundtrip()
     {
         _manager.WriteToLog("ligne de test optiSCAN");

@@ -1,5 +1,6 @@
 using optiSCAN.Localization;
 using optiSCAN.Models;
+using Microsoft.Win32;
 using System.IO;
 using System.Runtime.Versioning;
 using System.Text.Json.Serialization;
@@ -147,7 +148,35 @@ namespace optiSCAN.Services
             var migrated = SecureStore.MigrateFromPlaintext<UserPreferences>(legacyPlaintextPath, securePath);
             if (migrated != null) return migrated;
 
-            return new UserPreferences();
+            // Premier lancement : synchroniser avec les choix faits à l'installation (Inno Setup).
+            // Inno écrit HKCU\Software\optiSCAN\AutoUpdateSignatures (dword 1/0) quand la tâche est
+            // cochée/décochée. Sans cette lecture, UserPreferences ignore le choix de l'installateur.
+            var prefs = new UserPreferences();
+            ApplyInnoSetupDefaults(prefs);
+            return prefs;
+        }
+
+        /// <summary>
+        /// Lit les clés registre écrites par Inno Setup et les applique aux préférences
+        /// par défaut. Appelé uniquement au premier lancement (aucun fichier de prefs existant).
+        /// </summary>
+        private static void ApplyInnoSetupDefaults(UserPreferences prefs)
+        {
+            try
+            {
+                using var key = Registry.CurrentUser.OpenSubKey(@"Software\optiSCAN");
+                if (key == null) return;
+
+                // AutoUpdateSignatures : 1 = activé, 0 = désactivé
+                if (key.GetValue("AutoUpdateSignatures") is int autoUpdate)
+                    prefs.SignatureAutoUpdateEnabled = autoUpdate != 0;
+
+                AppLogger.Info("UserPreferences", $"Valeurs Inno appliquées : AutoUpdateSignatures={prefs.SignatureAutoUpdateEnabled}");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("UserPreferences", "ApplyInnoSetupDefaults", ex);
+            }
         }
 
         /// <summary>Sauvegarde vers un chemin explicite (tests).</summary>

@@ -1,15 +1,15 @@
 ; =============================================================================
 ; optiSCAN — Installateur Windows (Inno Setup)
 ; =============================================================================
-; AppRelease = nom vM.m (v6.0) · AppVersion = semver / Directory.Build.props
+; AppRelease = nom vM.m (v7.0) · AppVersion = semver / Directory.Build.props
 
 #define AppName        "optiSCAN"
-#define AppVersion     "6.0.0"
+#define AppVersion     "7.0.0"
 #define AppPublisher   "Dona By"
 #define AppURL         "https://sourceforge.net/projects/optiscan/"
 #define AppExeName     "optiSCAN.exe"
 #define AppId          "{{F3A2C1D0-5B6E-4F7A-8C9D-0E1F2A3B4C5D}"
-#define AppRelease     "v6.0"
+#define AppRelease     "v7.0"
 #define AppIconFile    "..\optiSCAN\optiSCAN.ico"
 
 ; ── ISPP : emplacement de publish (VS / dotnet peuvent sortir dans publish\win-x64\ ou publish\)

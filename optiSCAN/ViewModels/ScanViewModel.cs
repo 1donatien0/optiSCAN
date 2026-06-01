@@ -103,7 +103,7 @@ namespace optiSCAN.ViewModels
             set { _scanProgressDetail = value; OnPropertyChanged(); }
         }
 
-        private string _clamAvVersion = "Vérification…";
+        private string _clamAvVersion = LocalizationService.GetString("Vm_Checking");
         public string ClamAvVersion
         {
             get => _clamAvVersion;
@@ -117,7 +117,7 @@ namespace optiSCAN.ViewModels
             set { _dbVersion = value; OnPropertyChanged(); }
         }
 
-        private string _lastUpdateDisplay = "Jamais";
+        private string _lastUpdateDisplay = LocalizationService.GetString("Vm_Never");
         public string LastUpdateDisplay
         {
             get => _lastUpdateDisplay;
@@ -378,7 +378,7 @@ namespace optiSCAN.ViewModels
                 TryStep("Base de signatures", () =>
                 {
                     DbVersion = _updater.GetLocalDatabaseVersion();
-                    LastUpdateDisplay = _updater.LastUpdateTime?.ToString("dd/MM/yyyy HH:mm") ?? "Jamais";
+                    LastUpdateDisplay = _updater.LastUpdateTime?.ToString("dd/MM/yyyy HH:mm") ?? LocalizationService.GetString("Vm_Never");
                     RulesPackVersion = _rulesUpdater.GetRulesPackVersionDisplay();
                     RulesLastUpdateDisplay = _rulesUpdater.GetRulesLastUpdateDisplay();
                 });
@@ -399,9 +399,9 @@ namespace optiSCAN.ViewModels
                     RefreshProtectionStatus();
                 });
 
-                TryStep("Chargement historique", () => { LoadHistory(); RefreshRecentTargets(); });
+                TryStep(LocalizationService.GetString("Vm_LoadingHistory"), () => { LoadHistory(); RefreshRecentTargets(); });
                 TryStep("Compteur analyses (migration)", MigrateScanCountFromHistoryIfNeeded);
-                TryStep("Chargement quarantaine", () => LoadQuarantine());
+                TryStep(LocalizationService.GetString("Vm_LoadingQuarantine"), () => LoadQuarantine());
 
                 if (!IsClamAvAvailable)
                     StatusMessage = ScanUserDisplay.ReadyDegraded;
@@ -417,7 +417,7 @@ namespace optiSCAN.ViewModels
                 // grâce aux TryStep ci-dessus, mais on ceinture-bretelles.
                 AppLogger.Fatal("ScanViewModel", "Init globale", ex);
                 InitializationError = ex.Message;
-                StatusMessage = $"Erreur d'initialisation : {ex.Message}";
+                StatusMessage = LocalizationService.Format("Vm_InitError", ex.Message);
             }
             finally
             {
@@ -561,7 +561,7 @@ namespace optiSCAN.ViewModels
             }
             catch (Exception ex)
             {
-                StatusMessage = $"Erreur : {ex.Message}";
+                StatusMessage = LocalizationService.Format("Vm_ScanError", ex.Message);
             }
             finally
             {
@@ -622,19 +622,20 @@ namespace optiSCAN.ViewModels
                 if (p.TotalFiles > 0 && displayedFiles > 0 && displayedFiles <= p.TotalFiles)
                 {
                     var pctVal = Math.Min(100.0, displayedFiles * 100.0 / p.TotalFiles);
-                    ScanProgressDetail = $"{displayedFiles:N0} / {p.TotalFiles:N0} fichiers — {(int)pctVal} %";
+                    ScanProgressDetail = LocalizationService.Format(
+                        "Vm_ScanProgressCountPct", displayedFiles, p.TotalFiles, (int)pctVal);
                 }
                 else if (displayedFiles > 0)
                 {
-                    ScanProgressDetail = $"{displayedFiles:N0} fichier(s) parcourus — analyse en cours…";
+                    ScanProgressDetail = LocalizationService.Format("Vm_ScanProgressScanned", displayedFiles);
                 }
                 else if (p.TotalFiles > 0)
                 {
-                    ScanProgressDetail = $"Environ {p.TotalFiles:N0} fichier(s) à parcourir — analyse en cours…";
+                    ScanProgressDetail = LocalizationService.Format("Vm_ScanProgressEstimated", p.TotalFiles);
                 }
                 else
                 {
-                    ScanProgressDetail = "Analyse en cours…";
+                    ScanProgressDetail = LocalizationService.GetString("Vm_ScanInProgress");
                 }
 
                 double pctForBar = p.TotalFiles > 0 && displayedFiles > 0 && displayedFiles <= p.TotalFiles
@@ -673,7 +674,7 @@ namespace optiSCAN.ViewModels
             {
                 StatusMessage = result.Message;
                 DbVersion = _updater.GetLocalDatabaseVersion();
-                LastUpdateDisplay = _updater.LastUpdateTime?.ToString("dd/MM/yyyy HH:mm") ?? "Jamais";
+                LastUpdateDisplay = _updater.LastUpdateTime?.ToString("dd/MM/yyyy HH:mm") ?? LocalizationService.GetString("Vm_Never");
                 RulesPackVersion = _rulesUpdater.GetRulesPackVersionDisplay();
                 RulesLastUpdateDisplay = _rulesUpdater.GetRulesLastUpdateDisplay();
             });

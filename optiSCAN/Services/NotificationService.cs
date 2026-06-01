@@ -92,6 +92,9 @@ namespace optiSCAN.Services
                         .AddArgument("action", "ignore")
                         .AddArgument("file", threat.FilePath))
                     .AddButton(new ToastButton()
+                        .SetContent(LocalizationService.GetString("Notif_OpenAntivirus"))
+                        .AddArgument("action", "openav"))
+                    .AddButton(new ToastButton()
                         .SetContent(LocalizationService.GetString("Notif_OpenApp"))
                         .AddArgument("action", "open"))
                     .SetToastDuration(ToastDuration.Long)
@@ -136,6 +139,9 @@ namespace optiSCAN.Services
                         .AddArgument("action", "scanok")
                         .AddText(LocalizationService.GetString("Notif_ScanOkTitle"))
                         .AddText(LocalizationService.Format("Notif_ScanOkBody", filesScanned))
+                        .AddButton(new ToastButton()
+                            .SetContent(LocalizationService.GetString("Notif_OpenAntivirus"))
+                            .AddArgument("action", "openav"))
                         .Show();
                 }
                 else
@@ -145,6 +151,9 @@ namespace optiSCAN.Services
                         .AddArgument("threats", threatsFound.ToString())
                         .AddText(LocalizationService.Format("Notif_ScanThreatsTitle", threatsFound))
                         .AddText(LocalizationService.GetString("Notif_ScanThreatsBody"))
+                        .AddButton(new ToastButton()
+                            .SetContent(LocalizationService.GetString("Notif_OpenAntivirus"))
+                            .AddArgument("action", "openav"))
                         .AddButton(new ToastButton()
                             .SetContent(LocalizationService.GetString("Notif_HistoryBtn"))
                             .AddArgument("action", "history"))

@@ -3,6 +3,7 @@ using System.IO;
 using System.Net.Http;
 using System.Net.NetworkInformation;
 using System.Text.RegularExpressions;
+using optiSCAN.Localization;
 using optiSCAN.Strings;
 
 namespace optiSCAN.Services
@@ -120,7 +121,7 @@ namespace optiSCAN.Services
         public async Task<UpdateResult> UpdateAsync(CancellationToken ct = default)
         {
             if (IsUpdating)
-                return new UpdateResult { Success = false, Message = "Mise à jour ClamAV déjà en cours." };
+                return new UpdateResult { Success = false, Message = LocalizationService.GetString("Freshclam_AlreadyUpdating") };
 
             IsUpdating = true;
 
@@ -138,9 +139,9 @@ namespace optiSCAN.Services
                 if (!File.Exists(_freshclamExe))
                 {
                     result.Success = true;
-                    result.Message = "freshclam.exe non trouvé — signatures locales utilisées.";
+                    result.Message = LocalizationService.GetString("Freshclam_ExeNotFound");
                     result.AlreadyUpToDate = true;
-                    SurSortieFreshclam("freshclam.exe introuvable — mise à jour ignorée.");
+                    SurSortieFreshclam(LocalizationService.GetString("Freshclam_ExeNotFoundLog"));
                     return result;
                 }
 
@@ -148,8 +149,8 @@ namespace optiSCAN.Services
                 if (!IsNetworkAvailable())
                 {
                     result.Success = false;
-                    result.Message = "Pas de connexion réseau — mise à jour reportée.";
-                    SurSortieFreshclam("[NET] Aucune connexion réseau détectée.");
+                    result.Message = LocalizationService.GetString("Freshclam_NoNetwork");
+                    SurSortieFreshclam(LocalizationService.GetString("Freshclam_NoNetworkLog"));
                     return result;
                 }
 
@@ -206,7 +207,7 @@ namespace optiSCAN.Services
                     {
                         if (!proc.HasExited)
                         {
-                            SurSortieFreshclam(UiLogText.Info("Annulation : arrêt du process freshclam…"));
+                            SurSortieFreshclam(UiLogText.Info(LocalizationService.GetString("Freshclam_LogCancelProcess")));
                             proc.Kill(entireProcessTree: true);
                         }
                     }
@@ -230,9 +231,9 @@ namespace optiSCAN.Services
                 result.Success = proc.ExitCode is 0 or 1;
                 result.Message = proc.ExitCode switch
                 {
-                    0 => "Signatures ClamAV mises à jour avec succès.",
-                    1 => "Signatures ClamAV déjà à jour.",
-                    _ => $"Erreur freshclam (code {proc.ExitCode})."
+                    0 => LocalizationService.GetString("Freshclam_SuccessUpdated"),
+                    1 => LocalizationService.GetString("Freshclam_SuccessUpToDate"),
+                    _ => LocalizationService.Format("Freshclam_ErrorExitCode", proc.ExitCode)
                 };
 
                 if (result.Success)
@@ -247,13 +248,13 @@ namespace optiSCAN.Services
                 result.Success = false;
                 // Différencier annulation utilisateur vs timeout global.
                 result.Message = ct.IsCancellationRequested
-                    ? "Mise à jour annulée par l'utilisateur."
-                    : $"Mise à jour annulée (timeout {UpdateTimeout.TotalMinutes:0} min ou stop manuel).";
+                    ? LocalizationService.GetString("Freshclam_CancelledUser")
+                    : LocalizationService.Format("Freshclam_CancelledTimeout", (int)UpdateTimeout.TotalMinutes);
             }
             catch (Exception ex)
             {
                 result.Success = false;
-                result.Message = $"Erreur : {ex.Message}";
+                result.Message = LocalizationService.Format("Vm_ScanError", ex.Message);
                 AppLogger.Error("FreshclamUpdater", "UpdateAsync", ex);
             }
             finally
@@ -394,7 +395,8 @@ namespace optiSCAN.Services
                         if (age > StaleLockAge)
                         {
                             File.Delete(lockPath);
-                            SurSortieFreshclam(UiLogText.Info($"Verrou orphelin supprimé : {Path.GetFileName(lockPath)}"));
+                            SurSortieFreshclam(UiLogText.Info(LocalizationService.Format(
+                                "Freshclam_LogStaleLockRemoved", Path.GetFileName(lockPath))));
                         }
                     }
                     catch (Exception ex)
@@ -472,7 +474,7 @@ namespace optiSCAN.Services
                 fallbackConf,
                 _freshclamConf,
                 _ => BuildConfBytes(),
-                path => SurSortieFreshclam(UiLogText.Info($"freshclam.conf réparé (BOM retiré) : {path}")));
+                path => SurSortieFreshclam(UiLogText.Info(LocalizationService.Format("Freshclam_LogConfRepaired", path))));
         }
 
         private byte[]? BuildConfBytes()
@@ -589,7 +591,7 @@ namespace optiSCAN.Services
                     if (File.Exists(bundled))
                     {
                         File.Copy(bundled, dest, overwrite: true);
-                        SurSortieFreshclam($"Certificat CVD (clamav.crt) : {dest}");
+                        SurSortieFreshclam(LocalizationService.Format("Freshclam_LogCvdCert", dest));
                     }
                     return File.Exists(dest) && new FileInfo(dest).Length >= 256;
                 }
@@ -615,11 +617,11 @@ namespace optiSCAN.Services
             {
                 _effectiveCvdCertsDir = fallback;
                 if (!string.Equals(_effectiveCvdCertsDir, _certsDir, StringComparison.OrdinalIgnoreCase))
-                    SurSortieFreshclam($"Certificats CVD (hors Program Files) : {_effectiveCvdCertsDir}");
+                    SurSortieFreshclam(LocalizationService.Format("Freshclam_LogCvdCertsDir", _effectiveCvdCertsDir));
                 return;
             }
 
-            SurSortieFreshclam(UiLogText.Warn("clamav.crt introuvable — vérifiez l'installation ou la connexion réseau."));
+            SurSortieFreshclam(UiLogText.Warn(LocalizationService.GetString("Freshclam_LogCvdCertMissing")));
         }
 
         private static async Task TryDownloadClamAvRootCertAsync(string destDir, CancellationToken ct)

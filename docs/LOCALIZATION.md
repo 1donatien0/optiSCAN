@@ -1,4 +1,4 @@
-# Langues de l’interface — optiSCAN v6.0
+# Langues de l’interface — optiSCAN v7.0
 
 optiSCAN propose une interface **française (fr-FR)** et **anglaise (en-US)**. Les deux langues sont **embarquées dans l’exécutable** (pas de pack de langue à télécharger séparément, contrairement à Microsoft Defender).
 

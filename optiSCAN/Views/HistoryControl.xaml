@@ -4,17 +4,10 @@
              xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:loc="clr-namespace:optiSCAN.Localization">
 
-    <DockPanel Background="{DynamicResource ContentBg}">
-
-        <!-- ══ HERO BAND ═══════════════════════════════════════════════════ -->
-        <Border DockPanel.Dock="Top"
-                Margin="24,16,24,0"
-                CornerRadius="12"
-                BorderBrush="{DynamicResource BorderSubtle}"
-                BorderThickness="1"
-                Background="{DynamicResource PageHeaderMica}"
-                Effect="{DynamicResource CardShadow}"
-                Padding="18,14">
+    <DockPanel Background="Transparent">
+        <Rectangle DockPanel.Dock="Top" Height="2" Margin="48,0,48,0" Opacity="0.55"
+                   Fill="{DynamicResource AccentLineGradient}"/>
+        <Border DockPanel.Dock="Top" Style="{StaticResource PageHeaderBandDense}">
             <Grid>
                 <Grid.ColumnDefinitions>
                     <ColumnDefinition Width="*"/>
@@ -43,7 +36,7 @@
                             Click="BtnExportSelectedPdf_Click"
                             Style="{StaticResource ExportButton}"
                             Margin="0,0,8,0"
-                            ToolTip="PDF de la ligne sélectionnée dans Scans antivirus"/>
+                            ToolTip="PDF de la ligne sélectionnée dans Scan Antivirus"/>
 
                     <Button Click="BtnOpenAntivirus_Click"
                             Style="{StaticResource ExportButton}">
@@ -67,108 +60,217 @@
         </Border>
 
         <!-- ══ CORPS : onglets + grille ══════════════════════════════════== -->
-        <Border Background="{DynamicResource CardBg}"
-                CornerRadius="12" Margin="24,16,24,24"
-                Effect="{DynamicResource CardShadow}">
+        <Border Style="{StaticResource GlassCard}"
+                Margin="24,16,24,24" Padding="0">
             <TabControl Background="Transparent" BorderThickness="0"
                         Padding="0">
                 <TabControl.ItemContainerStyle>
                     <Style TargetType="TabItem" BasedOn="{StaticResource DonabyTabItemUnderline}"/>
                 </TabControl.ItemContainerStyle>
 
-                <!-- Scans antivirus -->
+                <!-- Scan Antivirus -->
                 <TabItem Header="{loc:Loc Key=Hist_TabScans}">
-                    <DataGrid x:Name="dgScanHistory"
-                              AutoGenerateColumns="False"
-                              IsReadOnly="True"
-                              CanUserAddRows="False"
-                              GridLinesVisibility="Horizontal"
-                              HorizontalGridLinesBrush="{DynamicResource BorderSubtle}"
-                              Background="Transparent"
-                              BorderThickness="0"
-                              ColumnHeaderStyle="{DynamicResource DgHeader}"
-                              RowStyle="{DynamicResource DgRow}"
-                              AlternationCount="2"
-                              VirtualizingPanel.IsVirtualizing="True">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="{loc:Loc Key=Hist_ColDate}"
-                                                Binding="{Binding StartedAt, StringFormat={}{0:dd/MM/yyyy HH:mm}}"
-                                                Width="155"/>
-                            <DataGridTextColumn Header="{loc:Loc Key=Hist_ColType}"
-                                                Binding="{Binding TypeDisplay}"
-                                                Width="130"/>
-                            <DataGridTextColumn Header="{loc:Loc Key=Hist_ColTarget}"
-                                                Binding="{Binding TargetPath}"
-                                                Width="*">
-                                <DataGridTextColumn.ElementStyle>
-                                    <Style TargetType="TextBlock" BasedOn="{StaticResource DgCellTextEllipsis}">
-                                        <Setter Property="ToolTip" Value="{Binding TargetPath}"/>
-                                    </Style>
-                                </DataGridTextColumn.ElementStyle>
-                            </DataGridTextColumn>
-                            <DataGridTextColumn Header="{loc:Loc Key=Hist_ColFiles}"
-                                                Binding="{Binding FilesScanned, StringFormat={}{0:N0}}"
-                                                Width="90"/>
-                            <DataGridTextColumn Header="{loc:Loc Key=Hist_ColDuration}"
-                                                Binding="{Binding DurationDisplay}"
-                                                Width="100"/>
-                            <DataGridTextColumn Header="{loc:Loc Key=Hist_ColResult}"
-                                                Binding="{Binding ThreatsBadge}"
-                                                Width="*">
-                                <DataGridTextColumn.ElementStyle>
-                                    <Style TargetType="TextBlock" BasedOn="{StaticResource DgCellTextEllipsis}">
-                                        <Setter Property="ToolTip" Value="{Binding ThreatsBadge}"/>
-                                    </Style>
-                                </DataGridTextColumn.ElementStyle>
-                            </DataGridTextColumn>
-                        </DataGrid.Columns>
-                    </DataGrid>
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="2*"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
+
+                        <Grid Grid.Row="0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <StackPanel Grid.Row="0" Orientation="Horizontal" Margin="12,8,12,6">
+                                <TextBlock Text="{loc:Loc Key=Hist_FilterLabel}"
+                                           VerticalAlignment="Center"
+                                           Foreground="{DynamicResource TextMuted}"
+                                           FontSize="{DynamicResource FontSize.Small}"
+                                           Margin="0,0,8,0"/>
+                                <ComboBox x:Name="cmbScanFilter"
+                                          Style="{StaticResource DonabyComboBox}"
+                                          Width="168" Height="32"
+                                          SelectionChanged="ScanFilter_Changed"/>
+                                <TextBox x:Name="txtScanSearch"
+                                         ToolTip="{loc:Loc Key=Hist_SearchScan}"
+                                         Width="220" Height="32" Margin="10,0,0,0"
+                                         TextChanged="ScanFilter_Changed"/>
+                            </StackPanel>
+
+                            <Grid Grid.Row="1">
+                            <DataGrid x:Name="dgScanHistory"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  CanUserAddRows="False"
+                                  GridLinesVisibility="Horizontal"
+                                  HorizontalGridLinesBrush="{DynamicResource BorderSubtle}"
+                                  Background="Transparent"
+                                  BorderThickness="0"
+                                  ColumnHeaderStyle="{DynamicResource DgHeader}"
+                                  RowStyle="{DynamicResource DgRow}"
+                                  AlternationCount="2"
+                                  VirtualizingPanel.IsVirtualizing="True"
+                                  SelectionChanged="DgScanHistory_SelectionChanged">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="{loc:Loc Key=Hist_ColDate}"
+                                                    Binding="{Binding StartedAt, StringFormat={}{0:dd/MM/yyyy HH:mm}}"
+                                                    Width="155"/>
+                                <DataGridTextColumn Header="{loc:Loc Key=Hist_ColType}"
+                                                    Binding="{Binding TypeDisplay}"
+                                                    Width="130"/>
+                                <DataGridTextColumn Header="{loc:Loc Key=Hist_ColTarget}"
+                                                    Binding="{Binding TargetPath}"
+                                                    Width="*">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource DgCellTextEllipsis}">
+                                            <Setter Property="ToolTip" Value="{Binding TargetPath}"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="{loc:Loc Key=Hist_ColFiles}"
+                                                    Binding="{Binding FilesScanned, StringFormat={}{0:N0}}"
+                                                    Width="90"/>
+                                <DataGridTextColumn Header="{loc:Loc Key=Hist_ColDuration}"
+                                                    Binding="{Binding DurationDisplay}"
+                                                    Width="100"/>
+                                <DataGridTextColumn Header="{loc:Loc Key=Hist_ColResult}"
+                                                    Binding="{Binding ThreatsBadge}"
+                                                    Width="*">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource DgCellTextEllipsis}">
+                                            <Setter Property="ToolTip" Value="{Binding ThreatsBadge}"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                            <StackPanel x:Name="emptyScanState" Visibility="Collapsed"
+                                        Style="{StaticResource EmptyStatePlaceholder}">
+                                <md:PackIcon Kind="History" Width="48" Height="48"
+                                             Foreground="{DynamicResource TextMuted}"
+                                             HorizontalAlignment="Center"/>
+                                <TextBlock Text="{loc:Loc Key=Hist_EmptyScans}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextMedium}"
+                                           HorizontalAlignment="Center" Margin="0,10,0,4"/>
+                                <TextBlock Text="{loc:Loc Key=Hist_EmptyScansSub}"
+                                           FontSize="{DynamicResource FontSize.Body}"
+                                           Foreground="{DynamicResource TextMuted}"
+                                           HorizontalAlignment="Center"/>
+                            </StackPanel>
+                            </Grid>
+                        </Grid>
+
+                        <TextBlock Grid.Row="1" Text="{loc:Loc Key=Hist_DetailTitle}"
+                                   FontSize="{DynamicResource FontSize.Small}" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextMuted}"
+                                   Margin="12,8,12,4"/>
+
+                        <Border Grid.Row="2" Margin="12,0,12,12"
+                                Style="{StaticResource LogConsolePanel}"
+                                MinHeight="88" MaxHeight="200" Padding="0">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10,8">
+                                <TextBlock x:Name="txtScanDetail"
+                                           TextWrapping="Wrap"
+                                           FontFamily="Consolas"
+                                           FontSize="{DynamicResource FontSize.Small}"
+                                           Foreground="{DynamicResource TextDark}"/>
+                            </ScrollViewer>
+                        </Border>
+                    </Grid>
                 </TabItem>
 
-                <!-- Nettoyages système -->
+                <!-- Nettoyage Système -->
                 <TabItem Header="{loc:Loc Key=Hist_TabCleans}">
-                    <DataGrid x:Name="dgCleanHistory"
-                              AutoGenerateColumns="False"
-                              IsReadOnly="True"
-                              CanUserAddRows="False"
-                              GridLinesVisibility="Horizontal"
-                              HorizontalGridLinesBrush="{DynamicResource BorderSubtle}"
-                              Background="Transparent"
-                              BorderThickness="0"
-                              ColumnHeaderStyle="{DynamicResource DgHeader}"
-                              RowStyle="{DynamicResource DgRow}">
-                        <DataGrid.Columns>
-                            <DataGridTextColumn Header="{loc:Loc Key=Hist_ColDate}"
-                                                Binding="{Binding DateDisplay}"
-                                                Width="155"/>
-                            <DataGridTextColumn Header="{loc:Loc Key=Hist_ColTargets}"
-                                                Binding="{Binding TargetsSummary}"
-                                                Width="*">
-                                <DataGridTextColumn.ElementStyle>
-                                    <Style TargetType="TextBlock" BasedOn="{StaticResource DgCellTextEllipsis}">
-                                        <Setter Property="ToolTip" Value="{Binding TargetsSummary}"/>
-                                    </Style>
-                                </DataGridTextColumn.ElementStyle>
-                            </DataGridTextColumn>
-                            <DataGridTextColumn Header="{loc:Loc Key=Hist_ColFreed}"
-                                                Binding="{Binding BytesDisplay}"
-                                                Width="100"/>
-                            <DataGridTextColumn Header="{loc:Loc Key=Hist_ColDuration}"
-                                                Binding="{Binding DurationDisplay}"
-                                                Width="100"/>
-                        </DataGrid.Columns>
-                    </DataGrid>
-                </TabItem>
+                    <Grid>
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="2*"/>
+                            <RowDefinition Height="Auto"/>
+                            <RowDefinition Height="*"/>
+                        </Grid.RowDefinitions>
 
-                <!-- Journal -->
-                <TabItem Header="{loc:Loc Key=Hist_TabLog}">
-                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="12">
-                        <TextBox x:Name="txtScanJournal"
-                                 IsReadOnly="True" TextWrapping="Wrap"
-                                 FontFamily="{DynamicResource AppFontFamily}" FontSize="{DynamicResource FontSize.Small}"
-                                 Background="Transparent" BorderThickness="0"
-                                 Foreground="{DynamicResource TextDark}"/>
-                    </ScrollViewer>
+                        <Grid Grid.Row="0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <TextBox Grid.Row="0" x:Name="txtCleanSearch"
+                                     ToolTip="{loc:Loc Key=Hist_SearchClean}"
+                                     Height="32" Margin="12,8,12,6"
+                                     TextChanged="CleanFilter_Changed"/>
+
+                            <Grid Grid.Row="1">
+                            <DataGrid x:Name="dgCleanHistory"
+                                  AutoGenerateColumns="False"
+                                  IsReadOnly="True"
+                                  CanUserAddRows="False"
+                                  GridLinesVisibility="Horizontal"
+                                  HorizontalGridLinesBrush="{DynamicResource BorderSubtle}"
+                                  Background="Transparent"
+                                  BorderThickness="0"
+                                  ColumnHeaderStyle="{DynamicResource DgHeader}"
+                                  RowStyle="{DynamicResource DgRow}"
+                                  SelectionChanged="DgCleanHistory_SelectionChanged">
+                            <DataGrid.Columns>
+                                <DataGridTextColumn Header="{loc:Loc Key=Hist_ColDate}"
+                                                    Binding="{Binding DateDisplay}"
+                                                    Width="155"/>
+                                <DataGridTextColumn Header="{loc:Loc Key=Hist_ColTargets}"
+                                                    Binding="{Binding TargetsSummary}"
+                                                    Width="*">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource DgCellTextEllipsis}">
+                                            <Setter Property="ToolTip" Value="{Binding TargetsSummary}"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
+                                <DataGridTextColumn Header="{loc:Loc Key=Hist_ColFreed}"
+                                                    Binding="{Binding BytesDisplay}"
+                                                    Width="100"/>
+                                <DataGridTextColumn Header="{loc:Loc Key=Hist_ColDuration}"
+                                                    Binding="{Binding DurationDisplay}"
+                                                    Width="100"/>
+                            </DataGrid.Columns>
+                        </DataGrid>
+
+                            <StackPanel x:Name="emptyCleanState" Visibility="Collapsed"
+                                        Style="{StaticResource EmptyStatePlaceholder}">
+                                <md:PackIcon Kind="Broom" Width="48" Height="48"
+                                             Foreground="{DynamicResource TextMuted}"
+                                             HorizontalAlignment="Center"/>
+                                <TextBlock Text="{loc:Loc Key=Hist_EmptyCleans}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextMedium}"
+                                           HorizontalAlignment="Center" Margin="0,10,0,4"/>
+                                <TextBlock Text="{loc:Loc Key=Hist_EmptyCleansSub}"
+                                           FontSize="{DynamicResource FontSize.Body}"
+                                           Foreground="{DynamicResource TextMuted}"
+                                           HorizontalAlignment="Center"/>
+                            </StackPanel>
+                            </Grid>
+                        </Grid>
+
+                        <TextBlock Grid.Row="1" Text="{loc:Loc Key=Hist_DetailTitle}"
+                                   FontSize="{DynamicResource FontSize.Small}" FontWeight="SemiBold"
+                                   Foreground="{DynamicResource TextMuted}"
+                                   Margin="12,8,12,4"/>
+
+                        <Border Grid.Row="2" Margin="12,0,12,12"
+                                Style="{StaticResource LogConsolePanel}"
+                                MinHeight="88" MaxHeight="200" Padding="0">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10,8">
+                                <TextBlock x:Name="txtCleanDetail"
+                                           TextWrapping="Wrap"
+                                           FontFamily="Consolas"
+                                           FontSize="{DynamicResource FontSize.Small}"
+                                           Foreground="{DynamicResource TextDark}"/>
+                            </ScrollViewer>
+                        </Border>
+                    </Grid>
                 </TabItem>
 
             </TabControl>

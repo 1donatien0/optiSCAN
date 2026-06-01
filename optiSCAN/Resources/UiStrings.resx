@@ -58,6 +58,14 @@
   <resheader name="writer">
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
+  <data name="Nav_TooltipHome" xml:space="preserve"><value>Tableau de bord (Ctrl+1)</value></data>
+  <data name="Nav_TooltipClean" xml:space="preserve"><value>Nettoyer le système (Ctrl+2)</value></data>
+  <data name="Nav_TooltipAntivirus" xml:space="preserve"><value>Antivirus — ClamAV + YARA (Ctrl+3)</value></data>
+  <data name="Nav_TooltipHistory" xml:space="preserve"><value>Historique des analyses (Ctrl+4)</value></data>
+  <data name="Nav_TooltipOptions" xml:space="preserve"><value>Paramètres (Ctrl+5)</value></data>
+  <data name="Nav_TooltipWebsite" xml:space="preserve"><value>Site web optiSCAN</value></data>
+  <data name="Nav_TooltipThemeLight" xml:space="preserve"><value>Passer en mode clair</value></data>
+  <data name="Nav_TooltipThemeDark" xml:space="preserve"><value>Passer en mode sombre</value></data>
   <data name="Nav_Home" xml:space="preserve"><value>Accueil</value></data>
   <data name="Nav_Clean" xml:space="preserve"><value>Nettoyer</value></data>
   <data name="Nav_Antivirus" xml:space="preserve"><value>Antivirus</value></data>
@@ -123,6 +131,7 @@
   <data name="Notif_QuarantineBtn" xml:space="preserve"><value>Mettre en quarantaine</value></data>
   <data name="Notif_IgnoreBtn" xml:space="preserve"><value>Ignorer</value></data>
   <data name="Notif_OpenApp" xml:space="preserve"><value>Ouvrir optiSCAN</value></data>
+  <data name="Notif_OpenAntivirus" xml:space="preserve"><value>Ouvrir Antivirus</value></data>
   <data name="Notif_QuarantinedTitle" xml:space="preserve"><value>Fichier mis en quarantaine</value></data>
   <data name="Notif_ViewQuarantine" xml:space="preserve"><value>Voir quarantaine</value></data>
   <data name="Notif_ScanOkTitle" xml:space="preserve"><value>Scan terminé</value></data>
@@ -159,6 +168,8 @@
   <data name="Overview_YaraLoaded" xml:space="preserve"><value>{0:N0} règles</value></data>
   <data name="Overview_YaraMissing" xml:space="preserve"><value>Non chargé</value></data>
   <data name="Overview_LastScan" xml:space="preserve"><value>Dernière analyse</value></data>
+  <data name="Overview_PartialScanBanner" xml:space="preserve"><value>Analyse partielle — certains dossiers système sont inaccessibles sans droits administrateur.</value></data>
+  <data name="Overview_RunAsAdmin" xml:space="preserve"><value>Analyser en administrateur</value></data>
   <data name="Protection_BadgeActive" xml:space="preserve"><value>Actif</value></data>
   <data name="Protection_BadgeDegraded" xml:space="preserve"><value>Dégradé</value></data>
   <data name="Protection_BadgeInactive" xml:space="preserve"><value>Inactif</value></data>
@@ -212,6 +223,8 @@
   <data name="Av_TabSignatures" xml:space="preserve"><value>Signatures</value></data>
   <data name="Av_Update" xml:space="preserve"><value>Mettre à jour</value></data>
   <data name="Av_StopUpdate" xml:space="preserve"><value>Arrêter</value></data>
+  <data name="Av_NoThreats" xml:space="preserve"><value>Aucune menace détectée</value></data>
+  <data name="Av_SystemClean" xml:space="preserve"><value>Votre système est propre.</value></data>
   <data name="Clean_Title" xml:space="preserve"><value>Nettoyage du système</value></data>
   <data name="Clean_Sub" xml:space="preserve"><value>Libérez de l'espace en supprimant les fichiers inutiles.</value></data>
   <data name="Clean_TempWin" xml:space="preserve"><value>Temp Windows</value></data>
@@ -236,15 +249,39 @@
   <data name="Clean_Opera" xml:space="preserve"><value>Opera</value></data>
   <data name="Clean_Vivaldi" xml:space="preserve"><value>Vivaldi</value></data>
   <data name="Clean_Arc" xml:space="preserve"><value>Arc</value></data>
+  <data name="Clean_LogAnalyzeStart" xml:space="preserve"><value>=== ANALYSE EN COURS ===</value></data>
+  <data name="Clean_LogAnalyzeEnd" xml:space="preserve"><value>=== ANALYSE TERMINÉE ===</value></data>
+  <data name="Clean_LogCleanStart" xml:space="preserve"><value>=== NETTOYAGE EN COURS ===</value></data>
+  <data name="Clean_LogLineTempWin" xml:space="preserve"><value>Temp Windows    : {0}</value></data>
+  <data name="Clean_LogLineTempUser" xml:space="preserve"><value>Temp utilisateur : {0}</value></data>
+  <data name="Clean_LogLineLogs" xml:space="preserve"><value>Journaux système : {0}</value></data>
+  <data name="Clean_LogLineEdge" xml:space="preserve"><value>Edge             : {0}</value></data>
+  <data name="Clean_LogLineChrome" xml:space="preserve"><value>Chrome           : {0}</value></data>
+  <data name="Clean_LogLineFirefox" xml:space="preserve"><value>Firefox          : {0}</value></data>
+  <data name="Clean_LogLineBrave" xml:space="preserve"><value>Brave            : {0}</value></data>
+  <data name="Clean_LogLineOpera" xml:space="preserve"><value>Opera            : {0}</value></data>
+  <data name="Clean_LogLineVivaldi" xml:space="preserve"><value>Vivaldi          : {0}</value></data>
+  <data name="Clean_LogLineArc" xml:space="preserve"><value>Arc              : {0}</value></data>
+  <data name="Clean_LogFreedTempWin" xml:space="preserve"><value>Temp Windows nettoyé : {0}</value></data>
+  <data name="Clean_LogFreedTempUser" xml:space="preserve"><value>Temp utilisateur nettoyé : {0}</value></data>
+  <data name="Clean_LogRecycleEmptied" xml:space="preserve"><value>Corbeille vidée.</value></data>
+  <data name="Clean_LogFreedCache" xml:space="preserve"><value>Cache {0} : {1}</value></data>
+  <data name="Clean_LogFreedLogs" xml:space="preserve"><value>Journaux système nettoyés : {0}</value></data>
+  <data name="Clean_LogFreedTotal" xml:space="preserve"><value>Total libéré : {0}</value></data>
+  <data name="Clean_LogTotal" xml:space="preserve"><value>Total libérable  : {0}</value></data>
+  <data name="Clean_LogCleanEnd" xml:space="preserve"><value>=== NETTOYAGE TERMINÉ ===</value></data>
+  <data name="Clean_ErrCleaning" xml:space="preserve"><value>Erreur pendant le nettoyage : {0}</value></data>
   <data name="Clean_LogTitle" xml:space="preserve"><value>Journal d'opérations</value></data>
   <data name="Clean_LogHint" xml:space="preserve"><value>Cliquez sur Analyser pour estimer l'espace récupérable&#x0a;(fichiers temporaires et caches des navigateurs cochés).</value></data>
+  <data name="Clean_EmptyTitle" xml:space="preserve"><value>Rien à libérer</value></data>
+  <data name="Clean_EmptySub" xml:space="preserve"><value>Aucun fichier récupérable détecté lors de l'analyse.</value></data>
   <data name="Hist_Title" xml:space="preserve"><value>Historique</value></data>
   <data name="Hist_Sub" xml:space="preserve"><value>Consultez et exportez vos rapports d'analyse et de nettoyage.</value></data>
   <data name="Hist_ExportHtml" xml:space="preserve"><value>Exporter HTML</value></data>
   <data name="Hist_ExportPdf" xml:space="preserve"><value>Exporter PDF (sélection)</value></data>
   <data name="Hist_OpenAv" xml:space="preserve"><value>Ouvrir l'antivirus</value></data>
-  <data name="Hist_TabScans" xml:space="preserve"><value>Scans antivirus</value></data>
-  <data name="Hist_TabCleans" xml:space="preserve"><value>Nettoyages système</value></data>
+  <data name="Hist_TabScans" xml:space="preserve"><value>Scan Antivirus</value></data>
+  <data name="Hist_TabCleans" xml:space="preserve"><value>Nettoyage Système</value></data>
   <data name="Opt_Title" xml:space="preserve"><value>Options</value></data>
   <data name="Opt_Sub" xml:space="preserve"><value>Personnalisez le comportement d'optiSCAN.</value></data>
   <data name="Opt_General" xml:space="preserve"><value>GÉNÉRAL</value></data>
@@ -288,6 +325,7 @@
   <data name="Opt_Add" xml:space="preserve"><value>Ajouter</value></data>
   <data name="Opt_Browse" xml:space="preserve"><value>Parcourir…</value></data>
   <data name="Opt_ExclNote" xml:space="preserve"><value>Les chemins exclus ne sont analysés ni par ClamAV ni par YARA.</value></data>
+  <data name="Opt_RemoveExclusion" xml:space="preserve"><value>Retirer cette exclusion</value></data>
   <data name="DotNet_MissingTitle" xml:space="preserve"><value>.NET 8 Desktop Runtime requis</value></data>
   <data name="DotNet_MissingBody" xml:space="preserve"><value>.NET 8 Desktop Runtime n'est pas installé sur cet ordinateur.&#x0D;&#x0A;&#x0D;&#x0A;optiSCAN en a besoin pour fonctionner.&#x0D;&#x0A;Voulez-vous être redirigé vers la page de téléchargement ?</value></data>
   <data name="Overview_StatsTitle" xml:space="preserve"><value>Statistiques de protection</value></data>
@@ -302,8 +340,9 @@
   <data name="Overview_SignaturesSection" xml:space="preserve"><value>Signatures et règles</value></data>
   <data name="Overview_LastUpdateShort" xml:space="preserve"><value>Dernière MAJ</value></data>
   <data name="Main_StatusReady" xml:space="preserve"><value>Prêt — protection active.</value></data>
-  <data name="Main_FooterFree" xml:space="preserve"><value>optiSCAN est un logiciel gratuit — Vanier, Canada.</value></data>
-  <data name="Main_FooterVersion" xml:space="preserve"><value>optiSCAN {0} — Fourni par Dona By</value></data>
+  <data name="Main_StatusScanning" xml:space="preserve"><value>Analyse antivirus en cours…</value></data>
+  <data name="Main_StatusUpdating" xml:space="preserve"><value>Mise à jour des signatures…</value></data>
+  <data name="Main_FooterFree" xml:space="preserve"><value>Logiciel gratuit — conçu à Vanier (Ottawa), Canada</value></data>
   <data name="Main_SidebarActive" xml:space="preserve"><value>actif</value></data>
   <data name="Main_ClamBadgeActive" xml:space="preserve"><value>ClamAV actif</value></data>
   <data name="Main_ClamBadgeMissing" xml:space="preserve"><value>ClamAV absent</value></data>
@@ -329,8 +368,22 @@
   <data name="Hist_ColResult" xml:space="preserve"><value>Résultat</value></data>
   <data name="Hist_ColTargets" xml:space="preserve"><value>Cibles</value></data>
   <data name="Hist_ColFreed" xml:space="preserve"><value>Libéré</value></data>
-  <data name="Hist_TabLog" xml:space="preserve"><value>Journal</value></data>
-  <data name="Hist_ExportPdfSelect" xml:space="preserve"><value>Sélectionnez une ligne dans l'onglet « Scans antivirus », puis cliquez sur Exporter PDF (sélection).</value></data>
+  <data name="Hist_DetailTitle" xml:space="preserve"><value>Détail de la session</value></data>
+  <data name="Hist_DetailSelectScan" xml:space="preserve"><value>Sélectionnez une analyse pour afficher le détail (menaces, erreurs, statut).</value></data>
+  <data name="Hist_EmptyScans" xml:space="preserve"><value>Aucun scan enregistré</value></data>
+  <data name="Hist_EmptyScansSub" xml:space="preserve"><value>Les analyses antivirus apparaîtront ici.</value></data>
+  <data name="Hist_EmptyCleans" xml:space="preserve"><value>Aucun nettoyage enregistré</value></data>
+  <data name="Hist_EmptyCleansSub" xml:space="preserve"><value>Les sessions de nettoyage apparaîtront ici.</value></data>
+  <data name="Hist_FilterLabel" xml:space="preserve"><value>Filtrer</value></data>
+  <data name="Hist_FilterAll" xml:space="preserve"><value>Tous les scans</value></data>
+  <data name="Hist_FilterWithThreats" xml:space="preserve"><value>Avec menaces</value></data>
+  <data name="Hist_FilterNoThreats" xml:space="preserve"><value>Sans menace</value></data>
+  <data name="Hist_SearchScan" xml:space="preserve"><value>Rechercher (cible ou type)…</value></data>
+  <data name="Hist_SearchClean" xml:space="preserve"><value>Rechercher (cibles)…</value></data>
+  <data name="Hist_DetailSelectClean" xml:space="preserve"><value>Sélectionnez un nettoyage pour afficher le journal d'opérations.</value></data>
+  <data name="Hist_DetailThreatsLegacy" xml:space="preserve"><value>(Session antérieure : chemins et noms des menaces non enregistrés.)</value></data>
+  <data name="Hist_DetailCleanSummary" xml:space="preserve"><value>Cibles : {0}&#x0a;Libéré : {1} — Durée : {2}&#x0a;&#x0a;(Session antérieure : journal d'opérations non enregistré.)</value></data>
+  <data name="Hist_ExportPdfSelect" xml:space="preserve"><value>Sélectionnez une ligne dans l'onglet « Scan Antivirus », puis cliquez sur Exporter PDF (sélection).</value></data>
   <data name="Hist_ExportPdfTitle" xml:space="preserve"><value>Export PDF</value></data>
   <data name="Tray_Open" xml:space="preserve"><value>Ouvrir</value></data>
   <data name="Tray_Exit" xml:space="preserve"><value>Quitter</value></data>
@@ -365,6 +418,33 @@
   <data name="Vm_DeleteOk" xml:space="preserve"><value>Fichier supprimé définitivement.</value></data>
   <data name="Vm_DeleteFail" xml:space="preserve"><value>Erreur lors de la suppression.</value></data>
   <data name="Vm_PurgeCount" xml:space="preserve"><value>{0} fichier(s) supprimé(s) de la quarantaine.</value></data>
+  <data name="Vm_Checking" xml:space="preserve"><value>Vérification…</value></data>
+  <data name="Vm_Never" xml:space="preserve"><value>Jamais</value></data>
+  <data name="Vm_ScanInProgress" xml:space="preserve"><value>Analyse en cours…</value></data>
+  <data name="Vm_ScanProgressCountPct" xml:space="preserve"><value>{0:N0} / {1:N0} fichiers — {2} %</value></data>
+  <data name="Vm_ScanProgressScanned" xml:space="preserve"><value>{0:N0} fichier(s) parcourus — analyse en cours…</value></data>
+  <data name="Vm_ScanProgressEstimated" xml:space="preserve"><value>Environ {0:N0} fichier(s) à parcourir — analyse en cours…</value></data>
+  <data name="Freshclam_AlreadyUpdating" xml:space="preserve"><value>Mise à jour ClamAV déjà en cours.</value></data>
+  <data name="Freshclam_ExeNotFound" xml:space="preserve"><value>freshclam.exe non trouvé — signatures locales utilisées.</value></data>
+  <data name="Freshclam_ExeNotFoundLog" xml:space="preserve"><value>freshclam.exe introuvable — mise à jour ignorée.</value></data>
+  <data name="Freshclam_NoNetwork" xml:space="preserve"><value>Pas de connexion réseau — mise à jour reportée.</value></data>
+  <data name="Freshclam_NoNetworkLog" xml:space="preserve"><value>[NET] Aucune connexion réseau détectée.</value></data>
+  <data name="Freshclam_SuccessUpdated" xml:space="preserve"><value>Signatures ClamAV mises à jour avec succès.</value></data>
+  <data name="Freshclam_SuccessUpToDate" xml:space="preserve"><value>Signatures ClamAV déjà à jour.</value></data>
+  <data name="Freshclam_ErrorExitCode" xml:space="preserve"><value>Erreur freshclam (code {0}).</value></data>
+  <data name="Freshclam_CancelledUser" xml:space="preserve"><value>Mise à jour annulée par l'utilisateur.</value></data>
+  <data name="Freshclam_CancelledTimeout" xml:space="preserve"><value>Mise à jour annulée (timeout {0} min ou stop manuel).</value></data>
+  <data name="Freshclam_LogCancelProcess" xml:space="preserve"><value>Annulation : arrêt du process freshclam…</value></data>
+  <data name="Freshclam_LogStaleLockRemoved" xml:space="preserve"><value>Verrou orphelin supprimé : {0}</value></data>
+  <data name="Freshclam_LogConfRepaired" xml:space="preserve"><value>freshclam.conf réparé (BOM retiré) : {0}</value></data>
+  <data name="Freshclam_LogCvdCert" xml:space="preserve"><value>Certificat CVD (clamav.crt) : {0}</value></data>
+  <data name="Freshclam_LogCvdCertsDir" xml:space="preserve"><value>Certificats CVD (hors Program Files) : {0}</value></data>
+  <data name="Freshclam_LogCvdCertMissing" xml:space="preserve"><value>clamav.crt introuvable — vérifiez l'installation ou la connexion réseau.</value></data>
+  <data name="Tray_Tooltip" xml:space="preserve"><value>optiSCAN — protection antivirus</value></data>
+  <data name="Vm_InitError" xml:space="preserve"><value>Erreur d'initialisation : {0}</value></data>
+  <data name="Vm_ScanError" xml:space="preserve"><value>Erreur : {0}</value></data>
+  <data name="Vm_LoadingHistory" xml:space="preserve"><value>Chargement historique</value></data>
+  <data name="Vm_LoadingQuarantine" xml:space="preserve"><value>Chargement quarantaine</value></data>
   <data name="Vm_YaraOperational" xml:space="preserve"><value>YARA opérationnel — {0} règle(s)</value></data>
   <data name="Vm_YaraUnavailable" xml:space="preserve"><value>YARA non disponible (yara64.exe manquant ou aucune règle)</value></data>
   <data name="Vm_SigEngineReloaded" xml:space="preserve"><value>Moteur de détection : règles mises à jour (rechargement au prochain scan)</value></data>

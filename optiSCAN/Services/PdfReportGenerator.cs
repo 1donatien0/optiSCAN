@@ -1,4 +1,5 @@
 using optiSCAN.Models;
+using System.Linq;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
 using QuestPDF.Infrastructure;
@@ -219,7 +220,9 @@ namespace optiSCAN.Services
                 Type = MapScanType(session.TypeDisplay),
             };
 
-            if (session.ThreatsFound > 0)
+            if (session.Threats.Count > 0)
+                result.Threats = session.Threats.Select(t => t.Clone()).ToList();
+            else if (session.ThreatsFound > 0)
             {
                 var path = string.IsNullOrWhiteSpace(session.TargetPath) ? "—" : session.TargetPath;
                 var at = session.FinishedAt ?? session.StartedAt;

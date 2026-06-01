@@ -31,16 +31,19 @@
                 BorderThickness="0,0,1,0">
             <DockPanel>
 
-                <!-- Logo (icône seule) -->
+                <!-- Logo compact (optiSCAN_shield) -->
                 <StackPanel DockPanel.Dock="Top" Margin="0,18,0,10"
                             HorizontalAlignment="Center">
                     <Border Width="42" Height="42" CornerRadius="12"
                             Background="{DynamicResource AccentBg}"
-                            HorizontalAlignment="Center">
-                        <md:PackIcon Kind="Shield" Width="24" Height="24"
-                                     Foreground="{DynamicResource PrimaryBlue}"
-                                     HorizontalAlignment="Center"
-                                     VerticalAlignment="Center"/>
+                            BorderBrush="{DynamicResource CardBorderAccent}"
+                            BorderThickness="1"
+                            HorizontalAlignment="Center"
+                            ClipToBounds="True">
+                        <Image Source="/optiSCAN;component/optiSCAN_shield.png"
+                               Width="38" Height="38"
+                               HorizontalAlignment="Center" VerticalAlignment="Center"
+                               RenderOptions.BitmapScalingMode="HighQuality"/>
                     </Border>
                 </StackPanel>
 
@@ -69,7 +72,7 @@
                             BorderBrush="{DynamicResource BorderColor}"
                             BorderThickness="1"
                             Cursor="Hand"
-                            ToolTip="Site web">
+                            ToolTip="{loc:Loc Key=Nav_TooltipWebsite}">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="bg" CornerRadius="8"
@@ -96,8 +99,7 @@
                             Width="48" Height="36" Margin="0,3"
                             Background="{DynamicResource ThemeToggleBg}"
                             BorderThickness="0"
-                            Cursor="Hand"
-                            ToolTip="Mode sombre">
+                            Cursor="Hand">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="bg" CornerRadius="8"
@@ -123,13 +125,16 @@
                            Margin="10,4,10,4"/>
 
                 <!-- Navigation RadioButtons — icône + label empilés, centrés -->
-                <StackPanel DockPanel.Dock="Top">
+                <StackPanel DockPanel.Dock="Top"
+                            KeyboardNavigation.TabNavigation="Local">
 
                     <!-- Vue d'ensemble -->
                     <RadioButton x:Name="navOverview"
                                  Style="{StaticResource NavItem}"
                                  Tag="{x:Static strings:OptiscanStrings+PanelIds.Overview}"
-                                 Checked="NavItem_Checked">
+                                 Checked="NavItem_Checked"
+                                 IsTabStop="True"
+                                 ToolTip="{loc:Loc Key=Nav_TooltipHome}">
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                             <md:PackIcon Kind="Monitor" Width="22" Height="22"
                                          HorizontalAlignment="Center"
@@ -143,7 +148,9 @@
                     <RadioButton x:Name="navClean"
                                  Style="{StaticResource NavItem}"
                                  Tag="{x:Static strings:OptiscanStrings+PanelIds.Clean}"
-                                 Checked="NavItem_Checked">
+                                 Checked="NavItem_Checked"
+                                 IsTabStop="True"
+                                 ToolTip="{loc:Loc Key=Nav_TooltipClean}">
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                             <md:PackIcon Kind="Broom" Width="22" Height="22"
                                          HorizontalAlignment="Center"
@@ -157,7 +164,9 @@
                     <RadioButton x:Name="navAntivirus"
                                  Style="{StaticResource NavItem}"
                                  Tag="{x:Static strings:OptiscanStrings+PanelIds.Antivirus}"
-                                 Checked="NavItem_Checked">
+                                 Checked="NavItem_Checked"
+                                 IsTabStop="True"
+                                 ToolTip="{loc:Loc Key=Nav_TooltipAntivirus}">
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                             <Grid HorizontalAlignment="Center">
                                 <md:PackIcon Kind="ShieldCheck" Width="22" Height="22"
@@ -183,7 +192,9 @@
                     <RadioButton x:Name="navHistory"
                                  Style="{StaticResource NavItem}"
                                  Tag="{x:Static strings:OptiscanStrings+PanelIds.History}"
-                                 Checked="NavItem_Checked">
+                                 Checked="NavItem_Checked"
+                                 IsTabStop="True"
+                                 ToolTip="{loc:Loc Key=Nav_TooltipHistory}">
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                             <md:PackIcon Kind="History" Width="22" Height="22"
                                          HorizontalAlignment="Center"
@@ -197,7 +208,9 @@
                     <RadioButton x:Name="navOptions"
                                  Style="{StaticResource NavItem}"
                                  Tag="{x:Static strings:OptiscanStrings+PanelIds.Options}"
-                                 Checked="NavItem_Checked">
+                                 Checked="NavItem_Checked"
+                                 IsTabStop="True"
+                                 ToolTip="{loc:Loc Key=Nav_TooltipOptions}">
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                             <md:PackIcon Kind="Cog" Width="22" Height="22"
                                          HorizontalAlignment="Center"
@@ -215,11 +228,82 @@
         <!-- ═══════════════════════════════════════════════
              CONTENU PRINCIPAL
         ═══════════════════════════════════════════════ -->
-        <Grid Grid.Column="1" Background="{DynamicResource ContentBg}">
+        <Grid Grid.Column="1" Background="{DynamicResource ContentBgDeep}">
             <Grid.RowDefinitions>
                 <RowDefinition Height="*"/>
                 <RowDefinition Height="Auto"/>
             </Grid.RowDefinitions>
+
+            <!-- ── Fond mesh animé (deux taches lumineuses qui se déplacent) ── -->
+            <Canvas Grid.Row="0" Grid.RowSpan="2" IsHitTestVisible="False" ClipToBounds="True">
+                <!-- Tache violette (haut-gauche → bas-droite) -->
+                <Ellipse x:Name="meshBlob1"
+                         Width="520" Height="420"
+                         Canvas.Left="-80" Canvas.Top="-60"
+                         Opacity="0.13">
+                    <Ellipse.Fill>
+                        <RadialGradientBrush>
+                            <GradientStop Color="{DynamicResource MeshBlob1Color}" Offset="0"/>
+                            <GradientStop Color="#00000000" Offset="1"/>
+                        </RadialGradientBrush>
+                    </Ellipse.Fill>
+                    <Ellipse.RenderTransform>
+                        <TranslateTransform x:Name="blob1Transform" X="0" Y="0"/>
+                    </Ellipse.RenderTransform>
+                    <Ellipse.Triggers>
+                        <EventTrigger RoutedEvent="Loaded">
+                            <BeginStoryboard>
+                                <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                    <DoubleAnimation Storyboard.TargetName="blob1Transform"
+                                                     Storyboard.TargetProperty="X"
+                                                     From="0" To="180" Duration="0:0:14"
+                                                     EasingFunction="{x:Null}"/>
+                                    <DoubleAnimation Storyboard.TargetName="blob1Transform"
+                                                     Storyboard.TargetProperty="Y"
+                                                     From="0" To="120" Duration="0:0:18"
+                                                     EasingFunction="{x:Null}"/>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                    </Ellipse.Triggers>
+                </Ellipse>
+                <!-- Tache bleue (bas-droite) -->
+                <Ellipse x:Name="meshBlob2"
+                         Width="460" Height="380"
+                         Canvas.Right="-60" Canvas.Bottom="-40"
+                         Opacity="0.10">
+                    <Ellipse.Fill>
+                        <RadialGradientBrush>
+                            <GradientStop Color="{DynamicResource MeshBlob2Color}" Offset="0"/>
+                            <GradientStop Color="#00000000" Offset="1"/>
+                        </RadialGradientBrush>
+                    </Ellipse.Fill>
+                    <Ellipse.RenderTransform>
+                        <TranslateTransform x:Name="blob2Transform" X="0" Y="0"/>
+                    </Ellipse.RenderTransform>
+                    <Ellipse.Triggers>
+                        <EventTrigger RoutedEvent="Loaded">
+                            <BeginStoryboard>
+                                <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                    <DoubleAnimation Storyboard.TargetName="blob2Transform"
+                                                     Storyboard.TargetProperty="X"
+                                                     From="0" To="-140" Duration="0:0:20"
+                                                     EasingFunction="{x:Null}"/>
+                                    <DoubleAnimation Storyboard.TargetName="blob2Transform"
+                                                     Storyboard.TargetProperty="Y"
+                                                     From="0" To="-90" Duration="0:0:15"
+                                                     EasingFunction="{x:Null}"/>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                    </Ellipse.Triggers>
+                </Ellipse>
+            </Canvas>
+
+            <!-- Voile givré — atténue le mesh, rapproche l'effet acrylic WPF -->
+            <Border Grid.Row="0" Grid.RowSpan="2"
+                    Background="{DynamicResource GlassFrostVeil}"
+                    IsHitTestVisible="False"/>
 
             <!-- Panneaux (empilés, un seul visible à la fois) -->
             <Grid Grid.Row="0">
@@ -230,7 +314,7 @@
                 <views:OptionsControl   x:Name="panelOptions"   Visibility="Collapsed"/>
             </Grid>
 
-            <!-- ── Barre de statut (footer 3 colonnes) ── -->
+            <!-- ── Barre de statut (footer compact : statut | Vanier) ── -->
             <Border Grid.Row="1"
                     Background="{DynamicResource HeaderBg}"
                     BorderBrush="{DynamicResource BorderColor}"
@@ -240,11 +324,17 @@
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="*"/>
                         <ColumnDefinition Width="Auto"/>
-                        <ColumnDefinition Width="Auto"/>
                     </Grid.ColumnDefinitions>
 
-                    <!-- Gauche : statut + icône -->
+                    <!-- Gauche : statut + icône + activité live -->
                     <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
+                        <ProgressBar x:Name="statusFooterSpinner"
+                                     Width="36" Height="3"
+                                     IsIndeterminate="True"
+                                     Visibility="Collapsed"
+                                     Foreground="{DynamicResource AccentBlue}"
+                                     Background="{DynamicResource BorderSubtle}"
+                                     VerticalAlignment="Center" Margin="0,0,8,0"/>
                         <md:PackIcon x:Name="statusFooterIcon" Kind="CheckboxMarked" Width="14" Height="14"
                                      Foreground="{DynamicResource SuccessGreen}"
                                      VerticalAlignment="Center" Margin="0,0,6,0"/>
