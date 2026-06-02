@@ -333,8 +333,7 @@ namespace optiSCAN.Services
                 var scannedPath = m.Success ? m.Groups["path"].Value.Trim() : string.Empty;
 
                 result.FilesScanned++;
-                const int pathUpdateEvery = 12;
-                if (result.FilesScanned % pathUpdateEvery == 0 || result.FilesScanned % 50 == 0)
+                if (ShouldReportScanProgress(result.FilesScanned))
                 {
                     progress?.Report(new ScanProgress
                     {
@@ -346,6 +345,16 @@ namespace optiSCAN.Services
                     });
                 }
             }
+        }
+
+        /// <summary>Évite de saturer l'UI tout en gardant une progression lisible (pas de bonds de +12).</summary>
+        private static bool ShouldReportScanProgress(int filesScanned)
+        {
+            if (filesScanned <= 25)
+                return true;
+            if (filesScanned % 5 == 0)
+                return true;
+            return filesScanned % 100 == 0;
         }
 
         private static void ParseStats(string line, ScanResult result)

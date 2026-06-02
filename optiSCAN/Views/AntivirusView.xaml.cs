@@ -260,10 +260,11 @@ namespace optiSCAN.Views
             if (sender is System.Windows.Controls.Button btn && btn.Tag is string filePath)
             {
                 var known = ServiceContainer.Default.FindKnownThreat(filePath);
-                if (known != null)
-                    Actions.QuarantineThreat(known.Clone());
-                else
-                    Actions.QuarantineThreat(filePath);
+                var result = known != null
+                    ? Actions.QuarantineThreat(known.Clone())
+                    : Actions.QuarantineThreat(filePath);
+                if (result.Success)
+                    VM?.RemoveDetectedThreat(filePath);
                 RefreshAllData();
             }
         }
@@ -272,7 +273,9 @@ namespace optiSCAN.Views
         {
             if (sender is System.Windows.Controls.Button btn && btn.Tag is string filePath)
             {
-                Actions.IgnoreThreat(filePath);
+                var result = Actions.IgnoreThreat(filePath);
+                if (result.Success)
+                    VM?.RemoveDetectedThreat(filePath);
                 RefreshAllData();
             }
         }
@@ -289,17 +292,20 @@ namespace optiSCAN.Views
                     MessageBoxImage.Warning) != MessageBoxResult.Yes)
                 return;
 
-            Actions.DeleteThreatFile(filePath);
+            var result = Actions.DeleteThreatFile(filePath);
+            if (result.Success)
+                VM?.RemoveDetectedThreat(filePath);
             RefreshAllData();
         }
 
         private void BtnRestoreFromQuarantine_Click(object sender, RoutedEventArgs e)
         {
-            if (sender is System.Windows.Controls.Button btn && btn.Tag is string quarantineId)
-            {
-                Actions.RestoreFromQuarantine(quarantineId);
+            if (sender is not System.Windows.Controls.Button btn || btn.Tag is not string quarantineId)
+                return;
+
+            var result = Actions.RestoreFromQuarantine(quarantineId);
+            if (result.Success)
                 RefreshAllData();
-            }
         }
 
         private void BtnDeleteFromQuarantine_Click(object sender, RoutedEventArgs e)
@@ -314,8 +320,9 @@ namespace optiSCAN.Views
                     MessageBoxImage.Question) != MessageBoxResult.Yes)
                 return;
 
-            Actions.DeleteFromQuarantine(quarantineId);
-            RefreshAllData();
+            var result = Actions.DeleteFromQuarantine(quarantineId);
+            if (result.Success)
+                RefreshAllData();
         }
 
         private void BtnManualUpdateSignatures_Click(object sender, RoutedEventArgs e)

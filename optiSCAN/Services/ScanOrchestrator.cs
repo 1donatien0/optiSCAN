@@ -311,8 +311,6 @@ namespace optiSCAN.Services
                     {
                         Message = $"{m.RuleName} — {m.FilePath}",
                         Phase = ScanPhase.ThreatFound,
-                        FilesScanned = total, // yara a tout itéré
-                        TotalFiles = total,
                         ThreatsFound = result.Threats.Count,
                         ThreatInfo = threat,
                         CurrentFilePath = m.FilePath,

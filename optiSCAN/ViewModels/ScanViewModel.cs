@@ -623,7 +623,7 @@ namespace optiSCAN.ViewModels
                         displayedFiles);
                 }
 
-                if (p.TotalFiles > 0 && displayedFiles > 0 && displayedFiles <= p.TotalFiles)
+                if (p.TotalFiles > 0 && displayedFiles > 0)
                 {
                     var pctVal = Math.Min(100.0, displayedFiles * 100.0 / p.TotalFiles);
                     ScanProgressDetail = LocalizationService.Format(
@@ -642,13 +642,14 @@ namespace optiSCAN.ViewModels
                     ScanProgressDetail = LocalizationService.GetString("Vm_ScanInProgress");
                 }
 
-                double pctForBar = p.TotalFiles > 0 && displayedFiles > 0 && displayedFiles <= p.TotalFiles
-                    ? Math.Min(100.0, displayedFiles * 100.0 / p.TotalFiles)
-                    : p.PercentComplete;
-                if (pctForBar >= 0)
+                if (p.TotalFiles > 0 && displayedFiles > 0)
                 {
                     IsIndeterminate = false;
-                    ProgressValue = Math.Max(ProgressValue, pctForBar);
+                    ProgressValue = Math.Min(100.0, displayedFiles * 100.0 / p.TotalFiles);
+                }
+                else if (displayedFiles > 0)
+                {
+                    IsIndeterminate = true;
                 }
 
                 if (p.Phase == ScanPhase.ThreatFound && p.ThreatInfo != null)
@@ -813,6 +814,24 @@ namespace optiSCAN.ViewModels
                 if (Threats.Any(t => string.Equals(t.FilePath, threat.FilePath, StringComparison.OrdinalIgnoreCase)))
                     return;
                 Threats.Add(threat);
+                ThreatsFound = Threats.Count;
+                OnPropertyChanged(nameof(SummaryDisplay));
+            });
+        }
+
+        /// <summary>Retire une menace de la grille après suppression ou quarantaine du fichier source.</summary>
+        public void RemoveDetectedThreat(string? filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath)) return;
+            WpfApp.Current?.Dispatcher.Invoke(() =>
+            {
+                var removed = Threats
+                    .Where(t => string.Equals(t.FilePath, filePath, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                if (removed.Count == 0)
+                    return;
+                foreach (var t in removed)
+                    Threats.Remove(t);
                 ThreatsFound = Threats.Count;
                 OnPropertyChanged(nameof(SummaryDisplay));
             });
