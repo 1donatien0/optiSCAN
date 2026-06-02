@@ -170,7 +170,7 @@ namespace optiSCAN.Services
         {
             var sb = new StringBuilder();
             sb.AppendLine($"--- Scan {typeDisplay} ---");
-            sb.AppendLine($"  Cible      : {RedactPath(targetPath)}");
+            sb.AppendLine($"  Cible      : {PathRedaction.RedactPath(targetPath)}");
             sb.AppendLine($"  Démarré    : {startedAt:dd/MM/yyyy HH:mm:ss}");
             sb.AppendLine($"  Terminé    : {finishedAt?.ToString("dd/MM/yyyy HH:mm:ss") ?? "N/A"}");
             sb.AppendLine($"  Fichiers   : {filesScanned}");
@@ -185,23 +185,10 @@ namespace optiSCAN.Services
             {
                 sb.AppendLine("  Détails menaces :");
                 foreach (var t in threats)
-                    sb.AppendLine($"    • {RedactPath(t.FilePath)} → {t.VirusName} ({t.DetectedBy})");
+                    sb.AppendLine($"    • {PathRedaction.RedactPath(t.FilePath)} → {t.VirusName} ({t.DetectedBy})");
             }
 
             return sb.ToString().TrimEnd();
-        }
-
-        private static string RedactPath(string? path)
-        {
-            if (string.IsNullOrEmpty(path))
-                return string.Empty;
-
-            var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            if (!string.IsNullOrEmpty(profile)
-                && path.StartsWith(profile, StringComparison.OrdinalIgnoreCase))
-                return "%UserProfile%" + path[profile.Length..];
-
-            return path;
         }
 
         private List<ScanSession> LoadHistory()

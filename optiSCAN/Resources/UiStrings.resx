@@ -466,6 +466,13 @@
   <data name="Vm_DeleteOk" xml:space="preserve"><value>Fichier supprimé définitivement.</value></data>
   <data name="Vm_DeleteFail" xml:space="preserve"><value>Erreur lors de la suppression.</value></data>
   <data name="Vm_PurgeCount" xml:space="preserve"><value>{0} fichier(s) supprimé(s) de la quarantaine.</value></data>
+  <data name="Scan_Yara_StartingWithCount" xml:space="preserve"><value>Analyse de {0} ({1:N0} fichiers)…</value></data>
+  <data name="Scan_Yara_Starting" xml:space="preserve"><value>Analyse de {0}…</value></data>
+  <data name="Scan_Zone_Starting" xml:space="preserve"><value>Zone {0}/{1} : {2}</value></data>
+  <data name="Scan_Zone_Done" xml:space="preserve"><value>Zone {0}/{1} terminée — {2:N0} fichier(s) analysés au total</value></data>
+  <data name="Scan_Yara_Rule" xml:space="preserve"><value>YARA : règle {0}</value></data>
+  <data name="Scan_Yara_Recursive" xml:space="preserve"><value>YARA : scan récursif de {0}…</value></data>
+  <data name="Scan_Progress_Starting" xml:space="preserve"><value>Analyse de {0}…</value></data>
   <data name="YaraForge_AlreadyRunning" xml:space="preserve"><value>Mise à jour des règles de détection déjà en cours.</value></data>
   <data name="YaraForge_ContactError" xml:space="preserve"><value>Impossible de contacter le serveur de mise à jour : {0}</value></data>
   <data name="YaraForge_AlreadyUpToDate" xml:space="preserve"><value>Les règles de détection sont déjà à jour.</value></data>

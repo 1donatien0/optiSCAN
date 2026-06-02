@@ -8,5 +8,6 @@ Toute la documentation produit est dans **[README.md](../README.md)** à la raci
 | FR / EN, `.resx` | [§9 Langues](../README.md#9-langues-de-linterface-fr-fr--en-us) |
 | Audit, tests, dettes | [§12 Audit](../README.md#12-audit-et-qualité) |
 | Posture /100, menaces | [§13 Sécurité](../README.md#13-sécurité-posture-et-menaces) |
+| Branches (`main` / `dev` seulement) | [Branches Git](../README.md#branches-git) |
 
 Scripts et installateur : `scripts/`, `installer/`, `.github/workflows/ci.yml`.

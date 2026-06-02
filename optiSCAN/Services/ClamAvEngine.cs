@@ -165,7 +165,7 @@ namespace optiSCAN.Services
 
             progress?.Report(new ScanProgress
             {
-                Message = $"Analyse de {Path.GetFileName(targetPath)}…",
+                Message = LocalizationService.Format("Scan_Progress_Starting", Path.GetFileName(targetPath)),
                 Phase = ScanPhase.Starting,
                 CurrentFilePath = targetPath,
             });

@@ -24,6 +24,36 @@
 | **12** | Audit et qualité |
 | **13** | Sécurité (posture /100, modèle de menace) |
 | **14** | Crédits |
+| — | [Branches Git](#branches-git) (main / dev uniquement) |
+
+---
+
+## Branches Git
+
+Le dépôt **1donatien0/optiSCAN-stable** n’utilise que **deux** branches, partageant **le même historique Git linéaire** depuis l’origine du projet (aucune branche parallèle orpheline, pas de rebase qui efface l’historique public).
+
+| Branche | Rôle |
+|---------|------|
+| **`main`** | Référence **publiée** : ce qui est sur GitHub pour les releases, CI publish + installateur Inno. |
+| **`dev`** | **Intégration** : développement courant ; fusion vers `main` quand une release est prête. |
+
+**Workflow habituel**
+
+1. Travailler et committer sur **`dev`** (`git checkout dev`).
+2. Quand une version est prête : `git checkout main` → `git merge dev` (souvent fast-forward) → `git push origin main`.
+3. Repasser sur **`dev`** pour la suite.
+
+Après une release, `main` et `dev` peuvent pointer sur le **même commit** (normal). Les prochains commits repartent sur `dev` jusqu’au prochain merge.
+
+**Branches interdites** sur `origin` : `master`, `develop`, `release/*`, etc. Pour lister et supprimer une branche distante obsolète :
+
+```powershell
+git fetch origin --prune
+git branch -r
+# Exemple : git push origin --delete nom-branche-obsolete
+```
+
+Branche par défaut GitHub : **`main`**. CI : uniquement `main` et `dev` (voir [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 
 ---
 

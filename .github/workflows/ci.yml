@@ -2,9 +2,9 @@ name: CI — Build, Test & Publish
 
 on:
   push:
-    branches: [ main, master, develop, dev ]
+    branches: [ main, dev ]
   pull_request:
-    branches: [ main, master ]
+    branches: [ main, dev ]
 
 permissions:
   contents: read
@@ -30,7 +30,13 @@ jobs:
         run: dotnet build optiSCAN.sln --configuration Release --no-restore
 
       - name: Run tests (Release)
-        run: dotnet test optiSCAN.Tests/optiSCAN.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+        run: >
+          dotnet test optiSCAN.Tests/optiSCAN.Tests.csproj
+          --configuration Release
+          --no-build
+          --logger "trx;LogFileName=test-results.trx"
+          --results-directory TestResults
+          --collect:"XPlat Code Coverage"
 
       - name: Upload test results
         if: always()
@@ -39,11 +45,19 @@ jobs:
           name: test-results
           path: TestResults/*.trx
 
+      - name: Upload code coverage
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: TestResults/**/coverage.cobertura.xml
+          retention-days: 14
+
       - name: Build (Debug)
         run: dotnet build optiSCAN.sln --configuration Debug --no-restore
 
-      - name: Upload Release build (dev branches)
-        if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/develop'
+      - name: Upload Release build (dev)
+        if: github.ref == 'refs/heads/dev'
         uses: actions/upload-artifact@v4
         with:
           name: optiSCAN-Release-build-${{ github.sha }}
@@ -54,7 +68,7 @@ jobs:
     name: Publish win-x64 (Release)
     runs-on: windows-latest
     needs: build-test
-    if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
+    if: github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout

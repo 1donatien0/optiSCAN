@@ -23,19 +23,7 @@ namespace optiSCAN.Services
             File.WriteAllText(outputPath, html, Encoding.UTF8);
         }
 
-        /// <summary>
-        /// Remplace le profil utilisateur dans un chemin par %UserProfile%
-        /// pour éviter d'exposer le nom de compte dans les exports partagés.
-        /// </summary>
-        private static string RedactPath(string? path)
-        {
-            if (string.IsNullOrEmpty(path))
-                return string.Empty;
-            var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            if (!string.IsNullOrEmpty(profile) && path.StartsWith(profile, StringComparison.OrdinalIgnoreCase))
-                return "%UserProfile%" + path[profile.Length..];
-            return path;
-        }
+        private static string RedactPath(string? path) => PathRedaction.RedactPath(path);
 
         private static string BuildHtml(
             IEnumerable<ScanSession> scans,

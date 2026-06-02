@@ -73,17 +73,22 @@ namespace optiSCAN.Services
         {
             var period = interval ?? TimeSpan.FromHours(24);
             _autoUpdateTimer?.Dispose();
+            // TimerCallback est void — on ne peut pas utiliser async directement.
+            // Task.Run avec catch complet garantit qu'aucune exception ne remonte
+            // sur le ThreadPool et ne crashe le processus silencieusement.
             _autoUpdateTimer = new System.Threading.Timer(
-                async _ =>
+                _ =>
                 {
-                    // Skip silencieux si une mise à jour est déjà en cours
-                    // (manuelle ou auto précédente non terminée).
                     if (IsUpdating) return;
-                    try { await UpdateAsync(); }
-                    catch (Exception ex)
+                    _ = Task.Run(async () =>
                     {
-                        AppLogger.Warn("FreshclamUpdater", "Auto-update", ex);
-                    }
+                        try { await UpdateAsync().ConfigureAwait(false); }
+                        catch (OperationCanceledException) { /* annulé normalement */ }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Warn("FreshclamUpdater", "Auto-update", ex);
+                        }
+                    });
                 },
                 null, period, period);
         }

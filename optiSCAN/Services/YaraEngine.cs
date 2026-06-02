@@ -1,3 +1,4 @@
+using optiSCAN.Localization;
 using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
@@ -318,7 +319,7 @@ namespace optiSCAN.Services
                 foreach (var ruleFile in Directory.GetFiles(_rulesDirectory, "*.yar"))
                 {
                     if (ct.IsCancellationRequested) break;
-                    progress?.Report($"YARA : règle {Path.GetFileNameWithoutExtension(ruleFile)}");
+                    progress?.Report(LocalizationService.Format("Scan_Yara_Rule", Path.GetFileNameWithoutExtension(ruleFile)));
                     var sub = await RunYaraScanAsync(
                         new[] { "-N", "--recursive", ruleFile, folderPath },
                         folderPath, ct);
@@ -327,7 +328,7 @@ namespace optiSCAN.Services
                 return matches;
             }
 
-            progress?.Report($"YARA : scan récursif de {Path.GetFileName(folderPath)}…");
+            progress?.Report(LocalizationService.Format("Scan_Yara_Recursive", Path.GetFileName(folderPath)));
             return await RunYaraScanRecursiveAsync(args, ct);
         }
 

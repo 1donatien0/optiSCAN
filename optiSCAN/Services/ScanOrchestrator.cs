@@ -1,3 +1,4 @@
+using optiSCAN.Localization;
 using optiSCAN.Models;
 using System.IO;
 using System.Linq;
@@ -256,8 +257,8 @@ namespace optiSCAN.Services
                 progress?.Report(new ScanProgress
                 {
                     Message = total > 0
-                        ? $"Analyse de {Path.GetFileName(folderPath)} ({total:N0} fichiers)…"
-                        : $"Analyse de {Path.GetFileName(folderPath)}…",
+                        ? LocalizationService.Format("Scan_Yara_StartingWithCount", Path.GetFileName(folderPath), total)
+                        : LocalizationService.Format("Scan_Yara_Starting", Path.GetFileName(folderPath)),
                     Phase = ScanPhase.Starting,
                     TotalFiles = total,
                     CurrentFilePath = folderPath,
@@ -265,14 +266,21 @@ namespace optiSCAN.Services
 
                 // Single-process : un seul yara64.exe avec --recursive.
                 // 10 à 50× plus rapide que l'ancienne approche un-process-par-fichier.
+                // filesYara compte synthétiquement les fichiers traités via les messages
+                // de progression YARA (un message ≈ un fichier) pour animer la ProgressBar.
+                int filesYara = 0;
                 var yaraProgress = new Progress<string>(msg =>
+                {
+                    System.Threading.Interlocked.Increment(ref filesYara);
                     progress?.Report(new ScanProgress
                     {
                         Message = msg,
                         Phase = ScanPhase.Scanning,
                         TotalFiles = total,
+                        FilesScanned = filesYara,
                         CurrentFilePath = folderPath,
-                    }));
+                    });
+                });
 
                 var allMatches = await _yara.ScanFolderAsync(folderPath, yaraProgress, ct);
 

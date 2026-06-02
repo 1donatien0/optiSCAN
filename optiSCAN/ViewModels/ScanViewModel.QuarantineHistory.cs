@@ -1,0 +1,149 @@
+using optiSCAN.Localization;
+using optiSCAN.Models;
+using optiSCAN.Services;
+using optiSCAN.Strings;
+using System.Linq;
+using System.Windows.Input;
+using WpfApp = System.Windows.Application;
+
+namespace optiSCAN.ViewModels
+{
+    public partial class ScanViewModel
+    {
+        private void QuarantineAllThreats()
+        {
+            if (Threats.Count == 0) return;
+            if (!_confirm.ConfirmYesNo(
+                    OptiscanStrings.Confirmations.QuarantineAll(Threats.Count),
+                    OptiscanStrings.Confirmations.Title))
+                return;
+
+            int count = _quarantine.QuarantineAll(Threats);
+            LoadQuarantine();
+            foreach (var threat in Threats)
+                threat.Status = ThreatStatus.Quarantined;
+            StatusMessage = LocalizationService.Format("Vm_QuarantineBatch", count);
+        }
+
+        private void RestoreFromQuarantine(string? id)
+        {
+            if (string.IsNullOrEmpty(id)) return;
+            bool ok = _quarantine.Restore(id);
+            LoadQuarantine();
+            StatusMessage = ok ? LocalizationService.GetString("Vm_RestoreOk") : LocalizationService.GetString("Vm_RestoreFail");
+        }
+
+        private void DeleteFromQuarantine(string? id)
+        {
+            if (string.IsNullOrEmpty(id)) return;
+            bool ok = _quarantine.DeletePermanently(id);
+            LoadQuarantine();
+            StatusMessage = ok ? LocalizationService.GetString("Vm_DeleteOk") : LocalizationService.GetString("Vm_DeleteFail");
+        }
+
+        private void PurgeAll()
+        {
+            int total = _quarantine.Count;
+            if (total == 0) return;
+            if (!_confirm.ConfirmYesNo(
+                    OptiscanStrings.Confirmations.PurgeQuarantine(total),
+                    OptiscanStrings.Confirmations.Title))
+                return;
+
+            int count = _quarantine.PurgeAll();
+            LoadQuarantine();
+            StatusMessage = LocalizationService.Format("Vm_PurgeCount", count);
+        }
+
+        public void LoadQuarantine(bool reset = true)
+        {
+            WpfApp.Current?.Dispatcher.Invoke(() =>
+            {
+                QuarantineTotalCount = _quarantine.Count;
+                if (reset)
+                    QuarantineEntries.Clear();
+                var offset = QuarantineEntries.Count;
+                foreach (var e in _quarantine.GetEntriesPaged(offset, QuarantinePageSize))
+                    QuarantineEntries.Add(e);
+                NotifyQuarantinePaging();
+            });
+        }
+
+        private void LoadMoreQuarantinePage() => LoadQuarantine(reset: false);
+
+        private void NotifyQuarantinePaging()
+        {
+            OnPropertyChanged(nameof(QuarantineHasMore));
+            OnPropertyChanged(nameof(QuarantinePagingStatus));
+            CommandManager.InvalidateRequerySuggested();
+        }
+
+        private void MigrateScanCountFromHistoryIfNeeded()
+        {
+            var prefs = UserPreferences.Current;
+            if (prefs.TotalScansCount > 0) return;
+            int n = _logger.GetHistory().Count;
+            if (n <= 0) return;
+            prefs.TotalScansCount = n;
+            prefs.Save();
+        }
+
+        private void LoadHistory()
+        {
+            WpfApp.Current?.Dispatcher.Invoke(() =>
+            {
+                History.Clear();
+                foreach (var s in _logger.GetHistory())
+                    History.Add(s);
+            });
+        }
+
+        public void AppendLiveThreat(ThreatInfo threat)
+        {
+            if (string.IsNullOrWhiteSpace(threat.FilePath)) return;
+            WpfApp.Current?.Dispatcher.Invoke(() =>
+            {
+                if (Threats.Any(t => string.Equals(t.FilePath, threat.FilePath, StringComparison.OrdinalIgnoreCase)))
+                    return;
+                Threats.Add(threat);
+                ThreatsFound = Threats.Count;
+                OnPropertyChanged(nameof(SummaryDisplay));
+            });
+        }
+
+        public void RemoveDetectedThreat(string? filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath)) return;
+            WpfApp.Current?.Dispatcher.Invoke(() =>
+            {
+                var removed = Threats
+                    .Where(t => string.Equals(t.FilePath, filePath, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                if (removed.Count == 0)
+                    return;
+                foreach (var t in removed)
+                    Threats.Remove(t);
+                ThreatsFound = Threats.Count;
+                OnPropertyChanged(nameof(SummaryDisplay));
+            });
+        }
+
+        public void RefreshQuarantineList() => LoadQuarantine(reset: true);
+
+        public void RefreshHistory()
+        {
+            LoadHistory();
+            RefreshRecentTargets();
+        }
+
+        public void RefreshRecentTargets()
+        {
+            WpfApp.Current?.Dispatcher.Invoke(() =>
+            {
+                RecentTargets.Clear();
+                foreach (var t in UserPreferences.Current.RecentTargets)
+                    RecentTargets.Add(t);
+            });
+        }
+    }
+}
