@@ -24,7 +24,7 @@
 | **10** | Dépendances et licences |
 | **11** | Historique des versions produit |
 | **12** | Crédits |
-| — | Voir aussi : [docs/BUILD.md](docs/BUILD.md) · [docs/LOCALIZATION.md](docs/LOCALIZATION.md) |
+| — | Voir aussi : [docs/](docs/README.md) (index) · [BUILD](docs/BUILD.md) · [LOCALIZATION](docs/LOCALIZATION.md) · [RELEASE-CHECKLIST](docs/RELEASE-CHECKLIST.md) · [AUDIT](docs/AUDIT.md) |
 
 ---
 
@@ -47,8 +47,12 @@
 (racine du dépôt optiSCAN)
 ├── README.md                          ← Ce fichier (guide complet)
 ├── docs/
-│   ├── BUILD.md                       ← Publish, nettoyage, Inno Setup
-│   └── LOCALIZATION.md                ← Français / English (utilisateur + dev)
+│   ├── README.md                      ← Index documentation
+│   ├── AUDIT.md                       ← Audit unique synthétisé (QA / release)
+│   ├── BUILD.md                       ← Publish, nettoyage, Inno, CI
+│   ├── LOCALIZATION.md                ← Français / English (utilisateur + dev)
+│   └── RELEASE-CHECKLIST.md           ← Contrôles avant installateur
+├── .github/workflows/ci.yml           ← Build, tests (83), publish + installateur (main)
 ├── scripts/
 │   ├── clean-before-publish.ps1       ← Nettoyage bin/obj avant release
 │   └── verify-runtime-deps.ps1        ← Vérifie clamav + yara + rules
@@ -94,26 +98,33 @@
     │   ├── ScanUserDisplay.cs         ← Libellés scan localisés
     │   ├── ScanThreatMerger.cs        ← Fusion menaces ClamAV + YARA
     │   ├── MultiTargetScanAggregator.cs ← Fusion multi-cibles avec déduplication des menaces
-    │   ├── AntivirusActions.cs        ← Quarantaine / suppression / MAJ (sans passer par MainWindow)
-    │   ├── QuarantineManager.cs       ← Quarantaine AES-GCM, manifeste signé, RestoreTo(chemin)
+    │   ├── AntivirusActions.cs        ← Quarantaine / suppression / MAJ + ActionCompleted
+    │   ├── NavigationService.cs       ← Panneaux + fondu 180 ms
+    │   ├── NavigationRefreshCoordinator.cs ← Refresh ciblé après navigation
+    │   ├── HistoryExportService.cs    ← Export HTML/PDF (depuis Historique)
+    │   ├── SystemTrayHost.cs          ← Systray (hors MainWindow)
+    │   ├── OnboardingService.cs       ← Message premier lancement
+    │   ├── HeadlessScanArguments.cs   ← --fullscan / --quickscan / --quiet
+    │   ├── ScheduledScanApply.cs      ← Logique enable/disable tâche (testable)
+    │   ├── ElevationHelper.cs         ← Relance UAC (--scan, analyse complète)
+    │   ├── QuarantineManager.cs       ← Quarantaine AES-GCM, manifeste signé
     │   ├── ScanLogManager.cs          ← Historique JSON + optiSCAN.log
-    │   ├── AppLogger.cs               ← Journal applicatif optiscan-*.log + nettoyage 30 j.
     │   ├── RealTimeProtection.cs      ← FileSystemWatcher (Options)
-    │   ├── ScheduledScanService.cs    ← schtasks (instance ServiceContainer.ScheduledScan)
-    │   ├── IpcManager.cs              ← Instance unique : message WM_SHOWME
-    │   ├── HtmlExportService.cs       ← Rapport HTML (Historique)
-    │   ├── SignatureUpdateCoordinator.cs
+    │   ├── ScheduledScanService.cs    ← schtasks (async côté Options)
+    │   ├── IpcManager.cs              ← Instance unique : WM_SHOWME
+    │   ├── HtmlExportService.cs       ← Rapport HTML
     │   ├── NotificationService.cs     ← Toasts Windows natifs
-    │   ├── RiskScoringService.cs      ← Score 0-100 (grille, toasts, PDF)
-    │   └── PdfReportGenerator.cs      ← Export rapport PDF (QuestPDF)
+    │   ├── RiskScoringService.cs      ← Score, sévérités i18n, PDF
+    │   └── PdfReportGenerator.cs      ← Export PDF (QuestPDF)
     │
     ├── Themes/
-    │   ├── Donaby.Dark.xaml           ← Thème sombre (tokens DynamicResource)
-    │   └── Donaby.Light.xaml          ← Thème clair (tokens DynamicResource)
+    │   ├── Donaby.Dark.xaml           ← Thème sombre
+    │   ├── Donaby.Light.xaml          ← Thème clair
+    │   └── Donaby.HighContrast.xaml   ← Contraste renforcé (Options)
     │
     ├── App.xaml                       ← Fusionne Donaby.Light + ThemeManager au démarrage
     ├── MainWindow.xaml                ← Fenêtre unique — 5 panneaux sidebar
-    ├── MainWindow.xaml.cs             ← Navigation, services, raccourcis
+    ├── MainWindow.xaml.cs             ← Composition, statut, MAJ signatures, RTP
     ├── optiSCAN.ico                   ← Icône app
     ├── yara/                          ← Binaires du moteur de détection
     ├── rules/                         ← Règles de détection (.yar) + cache _compiled.yarc
@@ -139,9 +150,10 @@ Fichiers de thème :
 
 | Fichier | Rôle |
 |---|---|
-| `Themes/Donaby.Dark.xaml` | Palette sombre (fond `#1A1917`, accents violets) |
-| `Themes/Donaby.Light.xaml` | Palette claire (fond `#F8F5F0`, accents violets) |
-| `Services/ThemeManager.cs` | Service statique de bascule, persistance `UserPreferences` (DPAPI) |
+| `Themes/Donaby.Dark.xaml` | Palette sombre |
+| `Themes/Donaby.Light.xaml` | Palette claire |
+| `Themes/Donaby.HighContrast.xaml` | Bordures et textes renforcés (Options) |
+| `Services/ThemeManager.cs` | Clair / sombre / contraste ; sync thème Windows |
 
 ### 2.2 ThemeManager
 
@@ -154,11 +166,16 @@ ThemeManager.Initialize(); // applique DarkTheme depuis UserPreferences (clair p
 // Bascule depuis le bouton de l'UI
 ThemeManager.Toggle();
 
+// Contraste renforcé (Options)
+ThemeManager.SetHighContrast(true);
+
 // S'abonner aux changements
 ThemeManager.ThemeChanged += (_, isDark) => { /* ... */ };
 ```
 
-La préférence est persistée avec les autres options dans `%AppData%\optiSCAN\preferences.dat` (chiffrement DPAPI + HMAC, voir `UserPreferences.cs`). La propriété `DarkTheme` vaut `true` pour le thème sombre Donaby.
+Styles boutons (`Styles/Controls.xaml`) : `GradientPrimaryButton`, `DangerButton`, `WarningButton`, `SuccessButton`, `HubActionCardButton`, etc. — couleurs sémantiques via `TemplateBinding.Background`.
+
+La préférence est persistée dans `%AppData%\optiSCAN\preferences.dat` (DPAPI + HMAC). Propriétés : `DarkTheme`, `SyncWindowsTheme`, `HighContrastEnabled`.
 
 ### 2.3 Tokens de couleur disponibles
 
@@ -250,17 +267,17 @@ Les vues sont empilées dans un seul `Grid` (`MainWindow.xaml`) : une seule est 
 
 | Clé `NavigateTo` | Panneau | Contrôle | Rôle principal |
 |---|---|---|---|
-| `Overview` | Vue d'ensemble | `OverviewControl` | Cartes d'action, statistiques 30 j., recommandations dynamiques, état ClamAV/YARA et signatures |
+| `Overview` | Vue d'ensemble | `OverviewControl` | Cartes d'action (boutons), bandeau UAC, statut protection, recommandations |
 | `Antivirus` | Antivirus | `AntivirusView` | Scans ; onglets **Analyse en cours** / **Quarantaine** / **Historique** / **Signatures** (`ScanViewModel`) |
 | `Clean` | Nettoyer | `CleanControl` | Analyse / nettoyage (caches navigateurs, temp, corbeille) + **historique local** (colonne **Libéré** = `BytesDisplay`) |
-| `History` | Historique | `HistoryControl` | Scans / nettoyages avec **détail** sous chaque grille (menaces, journal d'opérations) ; export **HTML** / **PDF** (ligne sélectionnée) |
+| `History` | Historique | `HistoryControl` | Filtres résultat + recherche ; export **HTML** / **PDF** via `HistoryExportService` |
 | `Options` | Options | `OptionsControl` | **Langue** (fr/en, redémarrage), thème / `SyncWindowsTheme`, scan favori, RTP, quarantaine auto, planif. (`ServiceContainer.ScheduledScan`, prochaine exécution, **Lancer maintenant**), exclusions |
 
 Raccourcis clavier : `Ctrl+1` … `Ctrl+5` (`KeyboardShortcuts`) — ordre des panneaux : **Vue d’ensemble**, **Antivirus**, **Nettoyer**, **Historique**, **Options**.
 
 ### 4.2 Fenêtre principale, barre système et icône
 
-L'interface repose sur `MainWindow` et la barre latérale (90 px). Une **icône dans la zone de notification** (`NotifyIcon`) permet de rouvrir la fenêtre (double-clic) ou d'utiliser le menu **Ouvrir** / **Quitter** (libellés selon la langue). Réduire la fenêtre laisse optiSCAN actif en arrière-plan. L'icône `optiSCAN.ico` sert aussi à la barre des tâches et à l'installateur.
+L'interface repose sur `MainWindow` et la barre latérale (90 px). Le **systray** est géré par `SystemTrayHost` (double-clic pour rouvrir, menu Ouvrir / Quitter). Réduire la fenêtre laisse optiSCAN actif en arrière-plan. Footer : statut dynamique (scan, MAJ) à gauche ; crédit Vanier à droite.
 
 ### 4.3 Panneau Antivirus (`NavigateTo("Antivirus")`)
 
@@ -280,10 +297,13 @@ Après chaque analyse réussie, `StartScanAsync` met à jour les **cibles récen
 
 Chaque ligne du tableau des menaces (`antivirusThreatsGrid`) propose deux actions :
 
-| Bouton | Handler | Comportement |
+| Bouton | Handler (`AntivirusView`) | Comportement |
 |---|---|---|
-| **Quarantaine** | `BtnQuarantineThreat_Click` → `AntivirusActions.QuarantineThreat` | Chiffrement **AES-256-GCM** ; le **nom de menace** est repris depuis la ligne du `ScanViewModel` (plus de libellé « Détecté » forcé) |
-| **Supprimer** | `BtnDeleteThreat_Click` → `AntivirusActions.DeleteThreatFile` | Suppression définitive du fichier source — irréversible |
+| **Quarantaine** | `AntivirusActions.QuarantineThreat` | AES-256-GCM ; nom de menace depuis la ligne |
+| **Supprimer** | `AntivirusActions.DeleteThreatFile` | Confirmation utilisateur, puis suppression définitive |
+| **Ignorer** | `AntivirusActions.IgnoreThreat` | Exclusion du fichier |
+
+`AntivirusActions.ActionCompleted` met à jour la **barre de statut** (`MainWindow`).
 
 En bas du tableau, le bouton **Tout mettre en quarantaine** (`BtnQuarantineAll_Click`) traite toutes les menaces listées en une seule opération.
 
@@ -343,19 +363,18 @@ Stockage : `%LOCALAPPDATA%\optiSCAN\Quarantine\` — `{guid}.quar` + `manifest.j
 
 ### 4.10 Exports PDF et HTML
 
-- **PDF** — `PdfReportGenerator` : déclenché via `ServiceContainer` (`ExportLastScanPdfRequested`, `ExportScanSessionPdfRequested` → `MainWindow.TryExportScanSessionPdf`). Boutons **Historique** : dernier scan ou **PDF (sélection)** sur la ligne choisie.
+- **PDF** — `PdfReportGenerator` : déclenché via `ServiceContainer` (`ExportScanSessionPdfRequested` → `MainWindow.TryExportScanSessionPdf`). Bouton **Historique** : **PDF (sélection)** sur la ligne choisie dans Scan Antivirus.
 - **HTML** — `HtmlExportService` : `RequestExportScanHistoryHtml()` depuis **Historique**.
 
 ### 4.11 Vue d'ensemble (dashboard)
 
 Le panneau **Vue d'ensemble** (`OverviewControl`, clé `Overview`) regroupe :
 
-- **Bannière** : état de protection (ClamAV / YARA / signatures) ; rafraîchie à chaque navigation **Overview** (`RefreshAntivirusStatus` + `UpdateAntivirusCardStatus`, signatures via `RefreshSignaturesDisplay`).
+- **Hero** : titre de protection (« Votre ordinateur est protégé » ou « Protection incomplète » selon les moteurs) et **dernière analyse** uniquement ; pas de détail ClamAV/YARA sur cet écran (voir onglet **Antivirus**).
 - **Quatre cartes d'action** : Nettoyer, Antivirus, Historique, mise à jour des signatures (navigation via `ServiceContainer` / `INavigationService`).
-- **Trois colonnes** sous les cartes :
+- **Deux colonnes** sous les cartes :
   - **Statistiques de protection** : synthèse textuelle sur **30 jours** (analyses, fichiers parcourus, menaces) à partir de l’historique persisté ; horodatage de dernière actualisation.
-  - **Recommandations** : trois encarts (signatures / hygiène disque / activité analyses) mis à jour dynamiquement selon l’état réel des moteurs, du nettoyage et de l’historique.
-  - **Cartes d'information** : état ClamAV et nombre de règles YARA, dernière analyse, résumé des versions de signatures (ClamAV + pack YARA).
+  - **Recommandations** : nettoyage disque et activité des analyses (historique 30 jours).
 
 ---
 
@@ -434,7 +453,7 @@ DÉMARRAGE (UI)
     ├─→ Protection temps réel : état selon **Options** (`ServiceContainer.RealTimeProtection`)
     └─→ Fenêtre principale + icône zone de notification (réduction possible sans quitter)
             │
-            ├─→ [VUE D'ENSEMBLE] — cartes d’action, statistiques 30 j., recommandations dynamiques, état antivirus / signatures
+            ├─→ [VUE D'ENSEMBLE] — hero (protection + dernière analyse), cartes d’action, statistiques 30 j., recommandations
             ├─→ [NETTOYER] — temporaires, caches navigateurs (Edge, Chrome, Firefox, Brave, **Opera**, **Vivaldi**, **Arc**), corbeille, journaux Windows
             ├─→ [ANTIVIRUS] — scans rapide/complet/dossier/fichier, quarantaine, historique de session, signatures
             ├─→ [HISTORIQUE] — sessions enregistrées ; exports **HTML** / **PDF**
@@ -537,13 +556,13 @@ optiSCAN_Setup_v7.0.0.exe
 
 ## 9. Langues de l’interface (fr-FR / en-US)
 
-Référence complète : **[docs/LOCALIZATION.md](docs/LOCALIZATION.md)**.
+Références : **[docs/LOCALIZATION.md](docs/LOCALIZATION.md)** · **[docs/README.md](docs/README.md)** (index doc).
 
 | Canal | Comportement |
 |-------|----------------|
 | **Installateur Inno** | Choix FR ou EN → `HKCU\Software\optiSCAN\UiCulture` |
 | **Options → Langue** | Français / English → confirmation → **redémarrage** de l’app |
-| **Ressources** | `UiStrings.resx` + `UiStrings.en.resx` (~170 clés chacune) |
+| **Ressources** | `UiStrings.resx` + `UiStrings.en.resx` (~530 clés, juin 2026) |
 | **Menu contextuel** | « Scanner avec optiSCAN » ou « Scan with optiSCAN » |
 
 Les deux langues sont **incluses dans le même binaire** (pas de pack de langue séparé). Les rapports PDF/HTML exportés et les journaux techniques ClamAV/YARA peuvent rester partiellement en français ou en anglais technique.
@@ -571,10 +590,18 @@ Les deux langues sont **incluses dans le même binaire** (pas de pack de langue 
 
 ### v7.0 — Lifting UI Donaby + identité visuelle
 
-- **Lifting apparence** — glassmorphism, fond mesh animé, cartes métriques, en-têtes de page unifiés
-- **Logo hero animé** — bouclier optiSCAN avec pulse (accueil), logo compact dans la sidebar
-- **Footer allégé** — attribution unique (© Dona By), version sans redondance
-- **Versioning unifié** — nom **v7.0** + build **7.0.0** (`Directory.Build.props`, Inno Setup, **LICENSE.txt**, manifeste, rapports PDF/HTML)
+- **Lifting apparence** — glassmorphism, fond mesh, cartes métriques, en-têtes unifiés
+- **Accueil v7** — hero `FontSize.Display`, dernière analyse détaillée, carte État de protection, stats/recommandations
+- **Typo & écriture** — Title Case, token Display, voix éditoriale ([LOCALIZATION.md](docs/LOCALIZATION.md))
+- **Onboarding** — parcours 3 étapes (MAJ signatures optionnelle)
+- **Logo hero** — bouclier optiSCAN (accueil), sidebar compacte
+- **Footer** — statut live + crédit Vanier (deux colonnes)
+- **Thèmes** — clair / sombre / contraste renforcé ; boutons sémantiques + hover grilles
+- **Services** — `SystemTrayHost`, `HistoryExportService`, `SignatureUpdateUiRunner`, `ScanLastScanDisplay`
+- **i18n** — exports PDF/HTML, MAJ signatures, ViewModel, runtime (~530 clés FR/EN)
+- **Options** — schtasks async, hints RTP/UAC honnêtes, limite nettoyage navigateurs documentée
+- **CI** — GitHub Actions ; **83** tests Release ; artefact publish + installateur Inno (main) + build Release (dev)
+- **Doc** — [AUDIT.md](docs/AUDIT.md), [THREAT-MODEL.md](docs/THREAT-MODEL.md), [RELEASE-CHECKLIST](docs/RELEASE-CHECKLIST.md)
 
 ### v6.0 — Version majeure (publication)
 
@@ -612,7 +639,7 @@ Les deux langues sont **incluses dans le même binaire** (pas de pack de langue 
 ### v3.0 — Donaby Design System + Stabilisation
 
 - **Donaby Design System complet** — refonte UI vers le thème clair Donaby Light par défaut
-- **OverviewControl** — 4 cartes d'action cliquables (Border + `MouseLeftButtonUp`, sans ControlTemplate) ; cercles d'icônes neutres (`SurfaceBg`) ; carte "État Antivirus" enrichie (ClamAV + YARA en temps réel)
+- **OverviewControl** — hero (titre + dernière analyse), 4 cartes d'action cliquables ; statistiques et recommandations (sans panneau ClamAV/YARA sur l'accueil)
 - **AntivirusView** — boutons d’analyse (rapide, complète, fichier, dossier) ; liste **cibles récentes** reliée à `UserPreferences`
 - **CleanControl** — Brave, **Opera**, **Vivaldi**, **Arc**, journaux Windows
 - **FreshclamUpdater** — `EnsureConfExists()` : résolution automatique du conf manquant (`x64\` → parent → `x86` → génération) ; `ResolveDbDir()` : résolution intelligente du dossier de base de données selon la hiérarchie clamav

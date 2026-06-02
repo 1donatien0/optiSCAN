@@ -11,6 +11,7 @@ namespace optiSCAN.Services
         private readonly int _baseline;
         private int _filesHigh;
         private int _threatsHigh;
+        private int _totalFilesHigh;
 
         public ScanProgressRelay(int filesBaseline = 0)
         {
@@ -36,13 +37,17 @@ namespace optiSCAN.Services
             if (p.ThreatsFound > 0)
                 _threatsHigh = Math.Max(_threatsHigh, p.ThreatsFound);
 
+            if (p.TotalFiles > 0)
+                _totalFilesHigh = Math.Max(_totalFilesHigh, p.TotalFiles);
+            if (_filesHigh > _totalFilesHigh)
+                _totalFilesHigh = _filesHigh;
+
             var r = p.Clone();
             r.FilesScanned = _filesHigh;
             if (_threatsHigh > 0)
                 r.ThreatsFound = Math.Max(r.ThreatsFound, _threatsHigh);
 
-            if (r.TotalFiles > 0 && r.FilesScanned > r.TotalFiles)
-                r.TotalFiles = 0;
+            r.TotalFiles = _totalFilesHigh;
 
             r.Message = ScanUserDisplay.SyncFileCountInMessage(p.Message, _filesHigh);
             return r;

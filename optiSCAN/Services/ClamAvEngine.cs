@@ -1,3 +1,4 @@
+using optiSCAN.Localization;
 using optiSCAN.Models;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -11,7 +12,7 @@ namespace optiSCAN.Services
     /// Détecte automatiquement clamav/x64 ou clamav/x86 selon l'architecture.
     /// Supporte : fichier, dossier, scan rapide, scan complet, annulation, progression.
     /// </summary>
-    public class ClamAvEngine
+    public class ClamAvEngine : IClamAvOrchestratorBackend
     {
         private readonly string _clamavDir;
         private readonly string _clamscanExe;
@@ -94,11 +95,13 @@ namespace optiSCAN.Services
 
         /// <summary>
         /// Retourne la version de ClamAV (première ligne de <c>clamscan --version</c>).
-        /// Retourne « Non installé » ou « Erreur » si l'exécutable est absent ou si une exception survient.
+        /// Retourne la clé localisée <c>Clam_NotInstalled</c> ou <c>Clam_VersionError</c>
+        /// si l'exécutable est absent ou si une exception survient.
         /// </summary>
         public async Task<string> GetVersionAsync()
         {
-            if (!File.Exists(_clamscanExe)) return "Non installé";
+            if (!File.Exists(_clamscanExe))
+                return LocalizationService.GetString("Clam_NotInstalled");
             try
             {
                 var (stdout, _) = await RunProcessAsync(_clamscanExe, "--version");
@@ -107,7 +110,7 @@ namespace optiSCAN.Services
             catch (Exception ex)
             {
                 AppLogger.Warn("ClamAvEngine", "GetVersionAsync", ex);
-                return "Erreur";
+                return LocalizationService.GetString("Clam_VersionError");
             }
         }
 
@@ -330,8 +333,7 @@ namespace optiSCAN.Services
                 var scannedPath = m.Success ? m.Groups["path"].Value.Trim() : string.Empty;
 
                 result.FilesScanned++;
-                const int pathUpdateEvery = 12;
-                if (result.FilesScanned % pathUpdateEvery == 0 || result.FilesScanned % 50 == 0)
+                if (ShouldReportScanProgress(result.FilesScanned))
                 {
                     progress?.Report(new ScanProgress
                     {
@@ -343,6 +345,16 @@ namespace optiSCAN.Services
                     });
                 }
             }
+        }
+
+        /// <summary>Évite de saturer l'UI tout en gardant une progression lisible (pas de bonds de +12).</summary>
+        private static bool ShouldReportScanProgress(int filesScanned)
+        {
+            if (filesScanned <= 25)
+                return true;
+            if (filesScanned % 5 == 0)
+                return true;
+            return filesScanned % 100 == 0;
         }
 
         private static void ParseStats(string line, ScanResult result)

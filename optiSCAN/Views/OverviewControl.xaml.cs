@@ -9,13 +9,11 @@ using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Media;
 using Brush = System.Windows.Media.Brush;
-using Brushes = System.Windows.Media.Brushes;
 
 namespace optiSCAN.Views
 {
     /// <summary>
-    /// Vue d'ensemble (tableau de bord) : état de la protection, dernière analyse,
-    /// statistiques et recommandations. Mise à jour via des méthodes publiques appelées par MainWindow.
+    /// Vue d'ensemble : hero (protection + dernière analyse), actions, statistiques et recommandations.
     /// </summary>
     public partial class OverviewControl : System.Windows.Controls.UserControl
     {
@@ -35,11 +33,9 @@ namespace optiSCAN.Views
             Dispatcher.InvokeAsync(() =>
             {
                 txtProtectionHeadline?.ClearValue(TextBlock.ForegroundProperty);
-                txtProtectionStatus?.ClearValue(TextBlock.ForegroundProperty);
                 txtOverviewClamAvStatus?.ClearValue(TextBlock.ForegroundProperty);
                 txtOverviewYaraCount?.ClearValue(TextBlock.ForegroundProperty);
 
-                // Effet hero : DynamicResource se réapplique au swap Donaby.*
                 if (shieldImage != null)
                 {
                     shieldImage.ClearValue(System.Windows.Controls.Image.EffectProperty);
@@ -48,7 +44,6 @@ namespace optiSCAN.Views
             });
         }
 
-        /// <summary>Met à jour le bloc « Statistiques de protection » depuis l'historique des scans.</summary>
         public void UpdateProtectionStatistics(IReadOnlyList<ScanSession> history)
         {
             Dispatcher.InvokeAsync(() =>
@@ -95,6 +90,15 @@ namespace optiSCAN.Views
             });
         }
 
+        public void UpdateLastScanSummary(ScanSession? lastSession)
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                if (txtLastScan == null) return;
+                txtLastScan.Text = ScanLastScanDisplay.FormatDetailed(lastSession);
+            });
+        }
+
         /// <summary>Met à jour le bloc YARA | ClamAV (version base + dernières MAJ).</summary>
         public void UpdateSignaturesSummary(string yaraPackVer, string yaraLastMaj, string clamDbVer, string clamLastMaj)
         {
@@ -105,7 +109,8 @@ namespace optiSCAN.Views
                 if (txtOverviewYaraPackMaj != null)
                     txtOverviewYaraPackMaj.Text = string.IsNullOrWhiteSpace(yaraLastMaj) ? "—" : yaraLastMaj;
                 if (txtOverviewClamDbVer != null)
-                    txtOverviewClamDbVer.Text = string.IsNullOrWhiteSpace(clamDbVer) || clamDbVer == "Inconnue" ? "—" : clamDbVer;
+                    txtOverviewClamDbVer.Text = VersionDisplayHelper.NormalizeForDisplay(
+                        string.IsNullOrWhiteSpace(clamDbVer) ? null : clamDbVer);
                 if (txtOverviewClamDbMaj != null)
                     txtOverviewClamDbMaj.Text = string.IsNullOrWhiteSpace(clamLastMaj) ? "—" : clamLastMaj;
             });
@@ -115,29 +120,12 @@ namespace optiSCAN.Views
         public void UpdateSignatureVersion(string version)
             => UpdateSignaturesSummary("—", "—", version, "—");
 
-        /// <summary>Met à jour la date/heure du dernier scan.</summary>
-        public void UpdateLastScanTime(DateTime? lastScan)
-        {
-            Dispatcher.InvokeAsync(() =>
-            {
-                if (txtLastScan == null) return;
-                txtLastScan.Text = lastScan.HasValue
-                    ? lastScan.Value.ToString("G", CultureInfo.CurrentCulture)
-                    : LocalizationService.GetString("Common_Never");
-            });
-        }
-
-        /// <summary>
-        /// severity : 0 = succès (vert), 1 = attention (or), 2 = neutre (surface).
-        /// </summary>
         public void UpdateRecommendations(
-            string signaturesLine, int signaturesSeverity,
             string hygieneLine, int hygieneSeverity,
             string activityLine, int activitySeverity)
         {
             Dispatcher.InvokeAsync(() =>
             {
-                ApplyRecommendationRow(brRecSignatures, txtRecSignatures, icRecSignatures, signaturesLine, signaturesSeverity);
                 ApplyRecommendationRow(brRecHygiene, txtRecHygiene, icRecHygiene, hygieneLine, hygieneSeverity);
                 ApplyRecommendationRow(brRecActivity, txtRecActivity, icRecActivity, activityLine, activitySeverity);
             });
@@ -179,35 +167,23 @@ namespace optiSCAN.Views
             }
         }
 
-        /// <summary>Met à jour le message de statut de protection.</summary>
-        public void UpdateProtectionStatus(bool isProtected, string? message = null, string? headline = null)
+        /// <summary>Met à jour le titre de protection affiché dans le hero.</summary>
+        public void UpdateProtectionHeadline(bool isProtected, string? headline = null)
         {
             Dispatcher.InvokeAsync(() =>
             {
-                if (txtProtectionStatus == null) return;
-                if (txtProtectionHeadline != null)
-                {
-                    txtProtectionHeadline.Text = string.IsNullOrWhiteSpace(headline)
-                        ? (isProtected
-                            ? LocalizationService.GetString("Overview_Protected")
-                            : LocalizationService.GetString("Overview_ProtectionIncomplete"))
-                        : headline!;
-                    txtProtectionHeadline.Foreground =
-                        ThemeUiBrushes.Get("TextDark", txtProtectionHeadline);
-                }
-                txtProtectionStatus.Text = message
-                    ?? (isProtected
-                        ? LocalizationService.GetString("Overview_DefsUpToDate")
-                        : LocalizationService.GetString("Overview_CheckSignatures"));
-
-                txtProtectionStatus.Foreground = isProtected
-                    ? ThemeUiBrushes.Get("SuccessGreen", txtProtectionStatus)
-                    : ThemeUiBrushes.Get("AlertGold", txtProtectionStatus)
-                      ?? ThemeUiBrushes.Get("TextMuted", txtProtectionStatus);
+                if (txtProtectionHeadline == null) return;
+                txtProtectionHeadline.Text = string.IsNullOrWhiteSpace(headline)
+                    ? (isProtected
+                        ? LocalizationService.GetString("Overview_Protected")
+                        : LocalizationService.GetString("Overview_ProtectionIncomplete"))
+                    : headline!;
+                txtProtectionHeadline.Foreground =
+                    ThemeUiBrushes.Get("TextDark", txtProtectionHeadline);
             });
         }
 
-        /// <summary>Met à jour la carte "État Antivirus" (ClamAV + nombre de règles YARA).</summary>
+        /// <summary>Met à jour la carte « État de protection » (ClamAV + règles YARA).</summary>
         public void UpdateAntivirusCardStatus(bool clamAvOk, int yaraRulesCount)
         {
             Dispatcher.InvokeAsync(() =>
@@ -240,12 +216,6 @@ namespace optiSCAN.Views
                 txtProtectionHeadline.Text = LocalizationService.GetString("Overview_Protected");
         }
 
-        // ── Bandeau élévation UAC ────────────────────────────────────────────
-
-        /// <summary>
-        /// Affiche ou masque le bandeau "Analyse partielle" selon le niveau d'élévation.
-        /// Appelé par MainWindow après initialisation.
-        /// </summary>
         public void ApplyElevationBanner()
         {
             Dispatcher.InvokeAsync(() =>
@@ -263,27 +233,21 @@ namespace optiSCAN.Views
                 System.Windows.Application.Current.Shutdown();
         }
 
-        // ── Cartes d'action → navigation ────────────────────────────────────
-        // Handler pour MouseLeftButtonUp sur les Borders des cartes d'action
-
-        private void ActionCard_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        private void ActionCard_Click(object sender, RoutedEventArgs e)
         {
-            // Le Tag est porté par le Border qui émet l'événement
             string? target = null;
-            if (sender is System.Windows.Controls.Border border && border.Tag is string t)
+            if (sender is FrameworkElement fe && fe.Tag is string t)
                 target = t;
 
             if (target == null) return;
 
-            // Navigation et actions via ServiceContainer (pas de cast vers MainWindow) :
-            // la vue reste utilisable en design-time et dans les tests.
             var container = Services.ServiceContainer.Default;
 
             if (target == OptiscanStrings.ActionIds.Update)
             {
                 container.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
                 container.RequestFocusAntivirusSignaturesTab();
-                container.TriggerSignatureUpdate(); // MainWindow écoute cet event
+                container.TriggerSignatureUpdate();
             }
             else
             {

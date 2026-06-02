@@ -49,7 +49,7 @@ namespace optiSCAN.Services
         public event EventHandler<UpdateResult>? UpdateCompleted;
 
         public DateTime? LastUpdateTime { get; private set; }
-        public string DatabaseVersion { get; private set; } = "Inconnue";
+        public string DatabaseVersion { get; private set; }
         public bool IsUpdating { get; private set; }
 
         // ── Constructeur ──────────────────────────────────────────────────────────
@@ -63,6 +63,7 @@ namespace optiSCAN.Services
             _freshclamConf = Path.Combine(dir, "freshclam.conf");
             _certsDir = Path.Combine(dir, "certs");
             _effectiveCvdCertsDir = _certsDir;
+            DatabaseVersion = VersionDisplayHelper.UnknownLabel;
         }
 
         // ── Mise à jour automatique ───────────────────────────────────────────────
@@ -239,7 +240,7 @@ namespace optiSCAN.Services
                 if (result.Success)
                 {
                     LastUpdateTime = DateTime.Now;
-                    DatabaseVersion = GetLocalDatabaseVersion();
+                    DatabaseVersion = await GetLocalDatabaseVersionAsync().ConfigureAwait(false);
                     result.Version = DatabaseVersion;
                 }
             }
@@ -259,7 +260,7 @@ namespace optiSCAN.Services
             }
             finally
             {
-                DatabaseVersion = GetLocalDatabaseVersion();
+                DatabaseVersion = await GetLocalDatabaseVersionAsync().ConfigureAwait(false);
                 lock (_ctsLock)
                 {
                     if (ReferenceEquals(_currentCts, internalCts))
@@ -275,12 +276,12 @@ namespace optiSCAN.Services
 
         // ── Version locale ─────────────────────────────────────────────────────────
 
-        public string GetLocalDatabaseVersion()
+        public async Task<string> GetLocalDatabaseVersionAsync()
         {
             try
             {
                 if (!Directory.Exists(_databaseDir))
-                    return "Inconnue";
+                    return VersionDisplayHelper.UnknownLabel;
 
                 string[] candidates = {
                     Path.Combine(_databaseDir, "daily.cld"),
@@ -311,14 +312,14 @@ namespace optiSCAN.Services
                 }
 
                 if (File.Exists(_freshclamExe))
-                    return GetVersionFromProcess();
+                    return await GetVersionFromProcessAsync().ConfigureAwait(false);
 
-                return "Inconnue";
+                return VersionDisplayHelper.UnknownLabel;
             }
             catch (Exception ex)
             {
                 AppLogger.Warn("FreshclamUpdater", "GetLocalDatabaseVersion", ex);
-                return "Inconnue";
+                return VersionDisplayHelper.UnknownLabel;
             }
         }
 
@@ -535,10 +536,11 @@ namespace optiSCAN.Services
             return System.Text.Encoding.ASCII.GetString(buf);
         }
 
-        private string GetVersionFromProcess()
+        private async Task<string> GetVersionFromProcessAsync()
         {
             try
             {
+                using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
                 using var proc = new Process
                 {
                     StartInfo = new ProcessStartInfo
@@ -547,17 +549,25 @@ namespace optiSCAN.Services
                         Arguments = "--version",
                         UseShellExecute = false,
                         RedirectStandardOutput = true,
+                        RedirectStandardError = true,  // drainer stderr pour éviter deadlock pipe
                         CreateNoWindow = true
-                    }
+                    },
+                    EnableRaisingEvents = true
                 };
                 proc.Start();
-                var output = proc.StandardOutput.ReadToEnd();
-                proc.WaitForExit(3000);
 
+                // Lire stdout et stderr en parallèle pour éviter le deadlock pipe
+                var stdoutTask = proc.StandardOutput.ReadToEndAsync(cts.Token);
+                var stderrTask = proc.StandardError.ReadToEndAsync(cts.Token);
+
+                await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
+                await proc.WaitForExitAsync(cts.Token).ConfigureAwait(false);
+
+                var output = stdoutTask.Result;
                 var m = Regex.Match(output, @"(?:ClamAV\s+[\d.]+/|version\s+)(\d{4,6})");
-                return m.Success ? m.Groups[1].Value : "Inconnue";
+                return m.Success ? m.Groups[1].Value : VersionDisplayHelper.UnknownLabel;
             }
-            catch { return "Inconnue"; }
+            catch { return VersionDisplayHelper.UnknownLabel; }
         }
 
         private bool HasUsableRootCert()

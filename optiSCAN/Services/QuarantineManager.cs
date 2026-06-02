@@ -27,7 +27,7 @@ namespace optiSCAN.Services
     /// Pagination : <see cref="GetEntriesPaged"/> pour les grosses listes.
     /// </summary>
     [SupportedOSPlatform("windows")]
-    public class QuarantineManager
+    public class QuarantineManager : IThreatStore
     {
         // ── Constantes format ────────────────────────────────────────────────────
         private const byte FormatVersion = 0x02;
@@ -64,7 +64,30 @@ namespace optiSCAN.Services
             EnsureDirectoryExists(_quarantineDir);
             _masterKey = LoadOrCreateMasterKey();
             _doc = LoadManifest();
+            MigrateUnsignedManifestIfNeeded();
             _ = Task.Run(EnsureQuarantineBlobLayout);
+        }
+
+        /// <summary>Legacy v1 : signe le manifeste au premier chargement. v2+ non signé : rejet.</summary>
+        private void MigrateUnsignedManifestIfNeeded()
+        {
+            if (!string.IsNullOrEmpty(_doc.Hmac))
+                return;
+
+            if (_doc.Entries.Count == 0)
+                return;
+
+            if (_doc.Version >= 2)
+            {
+                AppLogger.Fatal("QuarantineManager", "Manifeste v2 sans HMAC — entrées ignorées");
+                _doc = new QuarantineDocument { Version = 2 };
+                SaveManifest();
+                return;
+            }
+
+            AppLogger.Info("QuarantineManager", "Migration manifeste legacy (v1) → HMAC v2");
+            _doc.Version = 2;
+            SaveManifest();
         }
 
         // ── Clé maîtresse (DPAPI) ────────────────────────────────────────────────
@@ -113,26 +136,46 @@ namespace optiSCAN.Services
 
         public bool Quarantine(ThreatInfo threat)
         {
-            if (!File.Exists(threat.FilePath)) return false;
-
             try
             {
                 var id = Guid.NewGuid().ToString("N");
                 var qPath = Path.Combine(_quarantineDir, id + ".quar");
 
+                byte[] plaintext;
                 long len;
-                try { len = new FileInfo(threat.FilePath).Length; }
-                catch { return false; }
-
-                if (len > MaxQuarantinePlaintextBytes)
+                try
                 {
-                    AppLogger.Warn("QuarantineManager",
-                        $"Fichier trop volumineux pour la quarantaine ({len} octets > {MaxQuarantinePlaintextBytes}) : {threat.FilePath}");
+                    using var fs = new FileStream(
+                        threat.FilePath,
+                        FileMode.Open,
+                        FileAccess.Read,
+                        FileShare.Read);
+                    len = fs.Length;
+                    if (len > MaxQuarantinePlaintextBytes)
+                    {
+                        AppLogger.Warn("QuarantineManager",
+                            $"Fichier trop volumineux pour la quarantaine ({len} octets > {MaxQuarantinePlaintextBytes}) : {threat.FilePath}");
+                        return false;
+                    }
+
+                    plaintext = new byte[len];
+                    int offset = 0;
+                    while (offset < len)
+                    {
+                        int read = fs.Read(plaintext, offset, (int)(len - offset));
+                        if (read == 0)
+                            break;
+                        offset += read;
+                    }
+                }
+                catch (FileNotFoundException)
+                {
                     return false;
                 }
-
-                // 1. Lecture du fichier original.
-                byte[] plaintext = File.ReadAllBytes(threat.FilePath);
+                catch (DirectoryNotFoundException)
+                {
+                    return false;
+                }
 
                 // 2. Hash SHA-256 du plaintext (pour détecter une corruption à la
                 //    restauration et tracer l'identité du fichier).
@@ -300,12 +343,8 @@ namespace optiSCAN.Services
             }
         }
 
-        /// <summary>
-        /// Refuse la restauration vers les emplacements système critiques.
-        /// Liste blanche conservatrice : un attaquant ayant manipulé le manifest
-        /// (hors HMAC) ne peut pas écrire dans System32 via Restore.
-        /// </summary>
-        private static bool IsSensitivePath(string fullPath)
+        /// <summary>Refuse la restauration vers les emplacements système critiques (tests via InternalsVisibleTo).</summary>
+        internal static bool IsSensitivePath(string fullPath)
         {
             string[] forbidden =
             {
@@ -378,6 +417,18 @@ namespace optiSCAN.Services
                                 continue;
 
                             var plaintext = DecryptWithoutQuarantineHeader(raw);
+                            if (!string.IsNullOrEmpty(entry.Sha256))
+                            {
+                                var actual = Convert.ToHexString(SHA256.HashData(plaintext));
+                                if (!string.Equals(actual, entry.Sha256, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    AppLogger.Warn("QuarantineManager",
+                                        $"Migration blob legacy — SHA-256 invalide pour {entry.Id}");
+                                    CryptographicOperations.ZeroMemory(plaintext);
+                                    continue;
+                                }
+                            }
+
                             var blob = BuildV2QuarantineBlob(plaintext);
                             CryptographicOperations.ZeroMemory(plaintext);
                             AtomicFile.WriteAllBytes(entry.QuarantinePath, blob);
@@ -531,6 +582,12 @@ namespace optiSCAN.Services
                             throw new InvalidDataException("Manifest HMAC invalide");
                         }
                     }
+                    else if (doc.Entries.Count > 0 && doc.Version >= 2)
+                    {
+                        AppLogger.Fatal("QuarantineManager", "Manifeste v2 sans HMAC — refus de chargement");
+                        throw new InvalidDataException("Manifest unsigned");
+                    }
+
                     return doc;
                 },
                 fallbackValue: new QuarantineDocument());

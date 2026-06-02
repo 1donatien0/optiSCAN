@@ -16,8 +16,8 @@ namespace optiSCAN.Services
     /// </remarks>
     public class ScanOrchestrator
     {
-        private readonly ClamAvEngine _clamAv;
-        private readonly YaraEngine _yara;
+        private readonly IClamAvOrchestratorBackend _clamAv;
+        private readonly IYaraOrchestratorBackend _yara;
 
         // ── État ─────────────────────────────────────────────────────────────────
 
@@ -36,6 +36,11 @@ namespace optiSCAN.Services
         /// Crée un orchestrateur avec les moteurs fournis (ou de nouveaux si <c>null</c>).
         /// </summary>
         public ScanOrchestrator(ClamAvEngine? clamAv = null, YaraEngine? yara = null)
+            : this((IClamAvOrchestratorBackend?)clamAv, (IYaraOrchestratorBackend?)yara)
+        {
+        }
+
+        internal ScanOrchestrator(IClamAvOrchestratorBackend? clamAv = null, IYaraOrchestratorBackend? yara = null)
         {
             _clamAv = clamAv ?? new ClamAvEngine();
             _yara = yara ?? new YaraEngine();
@@ -306,8 +311,6 @@ namespace optiSCAN.Services
                     {
                         Message = $"{m.RuleName} — {m.FilePath}",
                         Phase = ScanPhase.ThreatFound,
-                        FilesScanned = total, // yara a tout itéré
-                        TotalFiles = total,
                         ThreatsFound = result.Threats.Count,
                         ThreatInfo = threat,
                         CurrentFilePath = m.FilePath,

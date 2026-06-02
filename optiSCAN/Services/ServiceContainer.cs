@@ -22,6 +22,8 @@ namespace optiSCAN.Services
 
         public static ServiceContainer Default => _default.Value;
 
+        private bool _shutdownDone;
+
         // ── Services singleton ───────────────────────────────────────────────────
         public ClamAvEngine ClamAv { get; }
         public YaraEngine Yara { get; }
@@ -57,7 +59,7 @@ namespace optiSCAN.Services
 
         /// <summary>
         /// Émis par une vue qui veut déclencher une mise à jour manuelle des
-        /// signatures (ex. OverviewControl, carte "Update"). Écouté par MainWindow.
+        /// signatures (ex. carte « Mise à jour » de l’accueil). Écouté par MainWindow.
         /// Évite que les vues appellent directement BtnManualUpdateSignatures_Click.
         /// </summary>
         public event EventHandler? RequestSignatureUpdate;
@@ -161,17 +163,6 @@ namespace optiSCAN.Services
         public void RequestExportScanHistoryHtml() =>
             _exportScanHistoryHtmlHandlers?.Invoke(this, EventArgs.Empty);
 
-        private EventHandler? _exportLastScanPdfHandlers;
-        /// <summary>Demande l’export PDF de la dernière analyse enregistrée.</summary>
-        public event EventHandler? ExportLastScanPdfRequested
-        {
-            add => _exportLastScanPdfHandlers += value;
-            remove => _exportLastScanPdfHandlers -= value;
-        }
-
-        public void RequestExportLastScanPdf() =>
-            _exportLastScanPdfHandlers?.Invoke(this, EventArgs.Empty);
-
         private EventHandler<Models.ScanSession>? _exportScanSessionPdfHandlers;
         /// <summary>Export PDF d'une session d'historique précise (pas seulement la dernière).</summary>
         public event EventHandler<Models.ScanSession>? ExportScanSessionPdfRequested
@@ -227,10 +218,12 @@ namespace optiSCAN.Services
         /// </summary>
         public void Shutdown()
         {
+            if (_shutdownDone)
+                return;
+            _shutdownDone = true;
             _focusAntivirusSignaturesHandlers = null;
             _scanHistoryViewsRefreshHandlers = null;
             _exportScanHistoryHtmlHandlers = null;
-            _exportLastScanPdfHandlers = null;
             _exportScanSessionPdfHandlers = null;
             try { RealTimeProtection.Dispose(); }
             catch (Exception ex) { AppLogger.Warn("ServiceContainer", "RealTimeProtection.Dispose", ex); }

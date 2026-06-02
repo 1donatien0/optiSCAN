@@ -36,8 +36,30 @@ public sealed class ScanProgressRelayTests
         Assert.All(reported, n => Assert.Equal(120, n));
     }
 
+    [Fact]
+    public void Relay_grows_total_when_scanned_exceeds_yara_estimate()
+    {
+        var reported = new List<ScanProgress>();
+        var relay = new ScanProgressRelay();
+        var progress = relay.ToParent(new CollectProgressFull(reported));
+        Assert.NotNull(progress);
+
+        progress.Report(new ScanProgress { TotalFiles = 100, FilesScanned = 0, Phase = ScanPhase.Starting });
+        progress.Report(new ScanProgress { FilesScanned = 50, Phase = ScanPhase.Scanning });
+        progress.Report(new ScanProgress { FilesScanned = 200, Phase = ScanPhase.Scanning });
+
+        var last = reported[^1];
+        Assert.Equal(200, last.FilesScanned);
+        Assert.Equal(200, last.TotalFiles);
+    }
+
     private sealed class CollectProgress(List<int> sink) : IProgress<ScanProgress>
     {
         public void Report(ScanProgress value) => sink.Add(value.FilesScanned);
+    }
+
+    private sealed class CollectProgressFull(List<ScanProgress> sink) : IProgress<ScanProgress>
+    {
+        public void Report(ScanProgress value) => sink.Add(value);
     }
 }
