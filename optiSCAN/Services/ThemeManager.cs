@@ -1,7 +1,8 @@
 using MaterialDesignThemes.Wpf;
 using Microsoft.Win32;
 using optiSCAN.Services;
-using System.Windows.Threading;
+using System.Windows;
+using WpfApp = System.Windows.Application;
 
 namespace optiSCAN
 {
@@ -9,12 +10,14 @@ namespace optiSCAN
     /// Gestionnaire de thèmes unifié.
     /// Permute MaterialDesign ET le dictionnaire Donaby personnalisé.
     /// Persistance via UserPreferences (JSON).
+    /// Détection automatique du thème Windows via SystemEvents (sans polling).
+    /// Détection automatique du mode Contraste Renforcé système.
     /// </summary>
     public static class ThemeManager
     {
-        private static bool _isDarkTheme = false; // Clair par défaut
+        private static bool _isDarkTheme = false;
         private static bool _highContrast;
-        private static DispatcherTimer? _windowsThemeWatchTimer;
+        private static bool _watchingSystemEvents;
         private static bool? _lastWindowsDarkTheme;
 
         public static event EventHandler<bool>? ThemeChanged;
@@ -37,12 +40,16 @@ namespace optiSCAN
 
         /// <summary>
         /// Charge et applique le thème sauvegardé dans UserPreferences.
-        /// À appeler une seule fois au démarrage.
+        /// À appeler une seule fois au démarrage (thread UI).
         /// </summary>
         public static void Initialize()
         {
             var prefs = UserPreferences.Current;
-            _highContrast = prefs.HighContrastEnabled;
+
+            // Détection HC système — priorité sur la préférence utilisateur
+            bool systemHc = SystemParameters.HighContrast;
+            _highContrast = systemHc || prefs.HighContrastEnabled;
+
             if (prefs.SyncWindowsTheme)
             {
                 bool dark = IsWindowsAppsDarkTheme();
@@ -50,14 +57,15 @@ namespace optiSCAN
                 ApplyTheme(dark);
                 prefs.DarkTheme = dark;
                 prefs.Save();
-                StartWindowsThemeWatcher();
             }
             else
             {
                 _isDarkTheme = prefs.DarkTheme;
                 ApplyTheme(prefs.DarkTheme);
-                StopWindowsThemeWatcher();
             }
+
+            // HC système + thème Windows : réaction immédiate via SystemEvents (sans polling).
+            StartSystemEventsWatcher();
         }
 
         /// <summary>Indique si Windows est en mode applications sombres (registre Personalize).</summary>
@@ -84,7 +92,7 @@ namespace optiSCAN
             var prefs = UserPreferences.Current;
             prefs.HighContrastEnabled = enabled;
             prefs.Save();
-            _highContrast = enabled;
+            _highContrast = enabled || SystemParameters.HighContrast;
             ApplyTheme(_isDarkTheme);
         }
 
@@ -93,7 +101,7 @@ namespace optiSCAN
         {
             var prefs = UserPreferences.Current;
             prefs.SyncWindowsTheme = false;
-            StopWindowsThemeWatcher();
+            prefs.Save();
             Apply(!IsDarkTheme);
         }
 
@@ -114,71 +122,76 @@ namespace optiSCAN
             if (sync)
             {
                 bool dark = IsWindowsAppsDarkTheme();
-                _isDarkTheme = dark;
-                ApplyTheme(dark);
-                prefs.DarkTheme = dark;
+                Apply(dark);
                 _lastWindowsDarkTheme = dark;
-                StartWindowsThemeWatcher();
             }
             else
             {
-                StopWindowsThemeWatcher();
+                Apply(prefs.DarkTheme);
             }
-            prefs.Save();
         }
 
-        private static void StartWindowsThemeWatcher()
+        // ── Abonnement à SystemEvents (zéro polling) ──────────────────────
+
+        private static void StartSystemEventsWatcher()
         {
-            var dispatcher = System.Windows.Application.Current?.Dispatcher;
-            if (dispatcher == null)
+            if (_watchingSystemEvents)
                 return;
-
-            if (!dispatcher.CheckAccess())
-            {
-                _ = dispatcher.InvokeAsync(StartWindowsThemeWatcher);
-                return;
-            }
-
-            _windowsThemeWatchTimer ??= new DispatcherTimer(
-                TimeSpan.FromSeconds(2),
-                DispatcherPriority.Background,
-                (_, _) => SyncWithWindowsIfChanged(),
-                dispatcher);
-
-            if (!_windowsThemeWatchTimer.IsEnabled)
-                _windowsThemeWatchTimer.Start();
+            SystemEvents.UserPreferenceChanged += OnUserPreferenceChanged;
+            _watchingSystemEvents = true;
         }
 
-        private static void StopWindowsThemeWatcher()
+        private static void StopSystemEventsWatcher()
         {
-            var dispatcher = System.Windows.Application.Current?.Dispatcher;
-            if (dispatcher == null)
+            if (!_watchingSystemEvents)
                 return;
-
-            if (!dispatcher.CheckAccess())
-            {
-                _ = dispatcher.InvokeAsync(StopWindowsThemeWatcher);
-                return;
-            }
-
-            _windowsThemeWatchTimer?.Stop();
+            SystemEvents.UserPreferenceChanged -= OnUserPreferenceChanged;
+            _watchingSystemEvents = false;
             _lastWindowsDarkTheme = null;
         }
 
-        private static void SyncWithWindowsIfChanged()
+        /// <summary>
+        /// Déclenché par Windows lors d'un changement de préférences utilisateur
+        /// (thème, couleurs, contraste renforcé). Exécuté sur un thread arbitraire
+        /// → dispatch vers le thread UI.
+        /// </summary>
+        private static void OnUserPreferenceChanged(object sender, UserPreferenceChangedEventArgs e)
         {
-            var prefs = UserPreferences.Current;
-            if (!prefs.SyncWindowsTheme)
+            if (e.Category != UserPreferenceCategory.General
+                && e.Category != UserPreferenceCategory.Color
+                && e.Category != UserPreferenceCategory.Accessibility)
                 return;
 
-            bool dark = IsWindowsAppsDarkTheme();
-            if (_lastWindowsDarkTheme.HasValue && _lastWindowsDarkTheme.Value == dark)
+            var dispatcher = WpfApp.Current?.Dispatcher;
+            if (dispatcher == null)
                 return;
 
-            _lastWindowsDarkTheme = dark;
-            IsDarkTheme = dark;
-            prefs.DarkTheme = dark;
-            prefs.Save();
+            _ = dispatcher.InvokeAsync(() =>
+            {
+                // 1. Contraste Renforcé système (priorité) — même sans SyncWindowsTheme
+                bool systemHc = SystemParameters.HighContrast;
+                bool newHc = systemHc || UserPreferences.Current.HighContrastEnabled;
+                bool hcChanged = _highContrast != newHc;
+                if (hcChanged)
+                {
+                    _highContrast = newHc;
+                    ApplyTheme(_isDarkTheme);
+                }
+
+                // 2. Thème clair/sombre (seulement si SyncWindowsTheme activé)
+                if (!UserPreferences.Current.SyncWindowsTheme)
+                    return;
+
+                bool dark = IsWindowsAppsDarkTheme();
+                if (_lastWindowsDarkTheme.HasValue && _lastWindowsDarkTheme.Value == dark && !hcChanged)
+                    return;
+
+                _lastWindowsDarkTheme = dark;
+                IsDarkTheme = dark;
+                var prefs = UserPreferences.Current;
+                prefs.DarkTheme = dark;
+                prefs.Save();
+            });
         }
 
         private static void ApplyTheme(bool isDark)
@@ -202,21 +215,14 @@ namespace optiSCAN
 
         /// <summary>
         /// Remplace le ResourceDictionary Donaby.*.xaml chargé dans App.Resources
-        /// par la variante clair ou sombre.
+        /// par la variante clair, sombre ou contraste renforcé.
         /// </summary>
         private static void SwapDonabyTheme(bool isDark)
         {
-            if (System.Windows.Application.Current?.Resources?.MergedDictionaries == null)
+            if (WpfApp.Current?.Resources?.MergedDictionaries == null)
                 return;
 
-            var merged = System.Windows.Application.Current.Resources.MergedDictionaries;
-            var existing = merged.FirstOrDefault(d =>
-                d.Source?.OriginalString.Contains("Donaby.") == true);
-
-            if (existing == null) return;
-
-            int idx = merged.IndexOf(existing);
-            merged.Remove(existing);
+            var merged = WpfApp.Current.Resources.MergedDictionaries;
 
             Uri uri;
             if (_highContrast)
@@ -226,7 +232,30 @@ namespace optiSCAN
                     ? new Uri("/Themes/Donaby.Dark.xaml", UriKind.Relative)
                     : new Uri("/Themes/Donaby.Light.xaml", UriKind.Relative);
 
-            merged.Insert(idx, new System.Windows.ResourceDictionary { Source = uri });
+            var existing = merged.FirstOrDefault(d =>
+                d.Source?.OriginalString.Contains("Donaby.", StringComparison.OrdinalIgnoreCase) == true);
+
+            if (existing != null)
+            {
+                int idx = merged.IndexOf(existing);
+                merged.Remove(existing);
+                merged.Insert(idx, new ResourceDictionary { Source = uri });
+                return;
+            }
+
+            // PaletteHelper.SetTheme peut retirer Donaby.* des merged dicts — réinsérer avant Controls.xaml.
+            int insertIdx = merged.Count;
+            for (int i = 0; i < merged.Count; i++)
+            {
+                var src = merged[i].Source?.OriginalString ?? string.Empty;
+                if (src.Contains("Controls.xaml", StringComparison.OrdinalIgnoreCase))
+                {
+                    insertIdx = i;
+                    break;
+                }
+            }
+
+            merged.Insert(insertIdx, new ResourceDictionary { Source = uri });
         }
     }
 }

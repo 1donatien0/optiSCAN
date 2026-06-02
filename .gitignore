@@ -17,8 +17,10 @@ packages/
 # Cache
 *.cache
 
-# Fichiers Word
+# Fichiers Word (audits / brouillons — source unique : docs/AUDIT.md)
 Audit_optiSCAN*.docx
+optiSCAN_Audit*.docx
+*Audit*.docx
 
 # Dossier output de l'installer
 installer/output/
