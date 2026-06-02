@@ -21,10 +21,14 @@ dotnet publish optiSCAN\optiSCAN.csproj -c Release -r win-x64 --self-contained t
 
 ## Navigation & UI
 
-- [ ] Accueil ↔ Antivirus ↔ Historique ×10 : fade + pas de freeze > 1 s
+- [ ] Accueil ↔ Antivirus ↔ Historique ×10 : fade ~180 ms + pas de freeze > 1 s
+- [ ] Footer : statut à gauche, crédit Vanier à droite — **pas de texte superposé**
 - [ ] Footer : scan en cours (spinner), MAJ signatures (icône refresh)
 - [ ] Tooltip bouton thème : « mode clair » en sombre, « mode sombre » en clair
-- [ ] Historique : filtres (menaces / recherche) et états vides
+- [ ] Historique : filtres (menaces / recherche), tooltips export FR/EN, états vides
+- [ ] Boutons Danger (rouge) / Warning (orange) / Success (vert) — pas violets
+- [ ] Cartes Accueil : clic avec retour visuel (hover / press)
+- [ ] Onglets Antivirus et Historique : transition de sélection visible
 
 ## Fonctionnel
 
@@ -36,6 +40,8 @@ dotnet publish optiSCAN\optiSCAN.csproj -c Release -r win-x64 --self-contained t
 - [ ] Premier lancement : assistant de bienvenue (une fois)
 - [ ] Bandeau UAC Accueil + relance administrateur si besoin
 - [ ] Quarantaine : ajout, restauration, refus chemins sensibles
+- [ ] Suppression menace / quarantaine : boîte de confirmation
+- [ ] Action antivirus → message dans la barre de statut (footer)
 
 ## Fichiers embarqués
 

@@ -167,9 +167,6 @@ namespace optiSCAN.Views
         private void BtnExportHtml_Click(object sender, RoutedEventArgs e) =>
             Services.ServiceContainer.Default.RequestExportScanHistoryHtml();
 
-        private void BtnExportPdf_Click(object sender, RoutedEventArgs e) =>
-            Services.ServiceContainer.Default.RequestExportLastScanPdf();
-
         private void BtnExportSelectedPdf_Click(object sender, RoutedEventArgs e)
         {
             if (dgScanHistory?.SelectedItem is ScanSession session)

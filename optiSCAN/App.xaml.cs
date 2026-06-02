@@ -149,6 +149,8 @@ namespace optiSCAN
                 _instanceMutex = null;
             }
             base.OnExit(e);
+            try { Services.ServiceContainer.Default.Shutdown(); }
+            catch (Exception ex) { Services.AppLogger.Warn("App", "ServiceContainer.Shutdown", ex); }
         }
     }
 

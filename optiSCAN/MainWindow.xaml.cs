@@ -45,7 +45,7 @@ namespace optiSCAN
 
         private readonly Services.NavigationService _navigationService = new();
         private Services.NavigationRefreshCoordinator? _navRefreshCoordinator;
-        private readonly SemaphoreSlim _manualSignatureUpdateLock = new(1, 1);
+        private readonly SignatureUpdateUiRunner _signatureUpdateRunner = new();
         private readonly RoutedCommand _quickScanShortcutCommand = new();
         private bool _isClosing = false;
         private bool _wasScanning;
@@ -97,17 +97,17 @@ namespace optiSCAN
                 _freshclamUpdater.UpdateOutput += (_, _) => Dispatcher.InvokeAsync(RefreshLiveFooter);
                 _rulesUpdater.UpdateOutput += (_, _) => Dispatcher.InvokeAsync(RefreshLiveFooter);
                 _freshclamUpdater.UpdateCompleted += (_, _) =>
-                    Dispatcher.InvokeAsync(() =>
+                    Dispatcher.InvokeAsync(async () =>
                     {
                         InvalidateSigCache();
-                        RefreshSignaturesDisplay(forceRefresh: true);
+                        await RefreshSignaturesDisplayAsync(forceRefresh: true);
                         RefreshLiveFooter();
                     });
                 _rulesUpdater.UpdateCompleted += (_, _) =>
-                    Dispatcher.InvokeAsync(() =>
+                    Dispatcher.InvokeAsync(async () =>
                     {
                         InvalidateSigCache();
-                        RefreshSignaturesDisplay(forceRefresh: true);
+                        await RefreshSignaturesDisplayAsync(forceRefresh: true);
                         RefreshLiveFooter();
                     });
 
@@ -129,12 +129,13 @@ namespace optiSCAN
                 c.RequestSignatureUpdate += SurDemandeMiseAJourSignatures;
                 c.ScanHistoryViewsRefreshRequested += SurDemandeRafraichissementHistorique;
                 c.ExportScanHistoryHtmlRequested += SurDemandeExportHistoriqueHtml;
-                c.ExportLastScanPdfRequested += SurDemandeExportDernierScanPdf;
                 c.ExportScanSessionPdfRequested += SurDemandeExportSessionScanPdf;
                 c.RealTimeProtection.ThreatDetected += SurMenaceTempsReelDetectee;
                 c.Notifications.ToastActivated -= SurActivationToast;
                 c.Notifications.ToastActivated += SurActivationToast;
                 c.Notifications.SyncFromUserPreferences();
+                c.Actions.ActionCompleted -= SurActionAntivirusTerminee;
+                c.Actions.ActionCompleted += SurActionAntivirusTerminee;
 
                 // Abonnement aux événements
                 this.Loaded += async (s, e) => await SurChargementFenetrePrincipale();
@@ -149,7 +150,7 @@ namespace optiSCAN
 
                 // Raccourcis Ctrl+1..Ctrl+5 : une seule RoutedCommand, le paramètre est le nom du panneau.
                 KeyboardShortcuts.Register(this,
-                    new[] { OptiscanStrings.PanelIds.Overview, OptiscanStrings.PanelIds.Antivirus, OptiscanStrings.PanelIds.Clean, OptiscanStrings.PanelIds.History, OptiscanStrings.PanelIds.Options },
+                    new[] { OptiscanStrings.PanelIds.Overview, OptiscanStrings.PanelIds.Clean, OptiscanStrings.PanelIds.Antivirus, OptiscanStrings.PanelIds.History, OptiscanStrings.PanelIds.Options },
                     SwitchPanel);
                 RegisterScanShortcuts();
             }
@@ -213,7 +214,7 @@ namespace optiSCAN
                 RefreshAntivirusStatus();
                 RefreshQuarantineList();
                 RefreshHistory();
-                RefreshSignaturesDisplay();
+                await RefreshSignaturesDisplayAsync();
                 // Bandeau élévation : affiché si optiSCAN tourne sans droits admin.
                 (panelOverview as Views.OverviewControl)?.ApplyElevationBanner();
                 try
@@ -263,10 +264,10 @@ namespace optiSCAN
             _navRefreshCoordinator = new Services.NavigationRefreshCoordinator(
                 _navigationService,
                 Dispatcher,
-                refreshHistory:         RefreshHistory,
-                refreshAntivirusStatus: RefreshAntivirusStatus,
-                refreshSignatures:      () => RefreshSignaturesDisplay(),
-                refreshAntivirusData:   RefreshAntivirusData);
+                refreshHistory:         RefreshHistoryAsync,
+                refreshAntivirusStatus: RefreshAntivirusStatusCoreAsync,
+                refreshSignatures:      () => RefreshSignaturesDisplayAsync(),
+                refreshAntivirusData:   RefreshAntivirusDataAsync);
 
             // SyncSidebarSelection reste dans MainWindow (manipulation UI directe).
             _navigationService.Navigated -= SurNavigationNaviguee;
@@ -347,11 +348,11 @@ namespace optiSCAN
             c.RequestSignatureUpdate -= SurDemandeMiseAJourSignatures;
             c.ScanHistoryViewsRefreshRequested -= SurDemandeRafraichissementHistorique;
             c.ExportScanHistoryHtmlRequested -= SurDemandeExportHistoriqueHtml;
-            c.ExportLastScanPdfRequested -= SurDemandeExportDernierScanPdf;
             c.ExportScanSessionPdfRequested -= SurDemandeExportSessionScanPdf;
             c.FocusAntivirusSignaturesRequested -= SurDemandeFocusSignaturesAntivirus;
             c.RealTimeProtection.ThreatDetected -= SurMenaceTempsReelDetectee;
             c.Notifications.ToastActivated -= SurActivationToast;
+            c.Actions.ActionCompleted -= SurActionAntivirusTerminee;
         }
 
         // ── Navigation ───────────────────────────────────────────────────────────
@@ -415,7 +416,12 @@ namespace optiSCAN
 
         private void RefreshAntivirusStatus()
         {
-            bool clamAvOk = _clamAvEngine?.IsClamAvInstalled() ?? false;
+            _ = RefreshAntivirusStatusCoreAsync();
+        }
+
+        private async Task RefreshAntivirusStatusCoreAsync()
+        {
+            bool clamAvOk = await Task.Run(() => _clamAvEngine?.IsClamAvInstalled() ?? false).ConfigureAwait(true);
             int yaraRules = _yaraEngine?.RulesCount ?? 0;
 
             if (txtSidebarClamAvBadge != null)
@@ -434,13 +440,18 @@ namespace optiSCAN
                     : ThemeUiBrushes.Get("DangerRed", icoSidebarClamAv);
             }
 
-            // Mettre à jour la carte État Antivirus dans la vue d'ensemble
             (panelOverview as Views.OverviewControl)?.UpdateAntivirusCardStatus(clamAvOk, yaraRules);
         }
 
         private void RefreshQuarantineList()
         {
             ViewModel?.RefreshQuarantineList();
+        }
+
+        private Task RefreshHistoryAsync()
+        {
+            RefreshHistory();
+            return Task.CompletedTask;
         }
 
         private void RefreshHistory()
@@ -457,9 +468,11 @@ namespace optiSCAN
         /// <summary>Synchronise « Dernière analyse » (vue d’ensemble + colonne Antivirus) avec l’historique réel.</summary>
         private void ApplyLastScanSummary(IReadOnlyList<ScanSession> sessions)
         {
-            DateTime? last = sessions.Count == 0 ? null : sessions.Max(s => s.StartedAt);
-            (panelOverview as Views.OverviewControl)?.UpdateLastScanTime(last);
-            (panelAntivirus as Views.AntivirusView)?.UpdateLastScanDisplay(last);
+            ScanSession? last = sessions.Count == 0
+                ? null
+                : sessions.OrderByDescending(s => s.StartedAt).First();
+            (panelOverview as Views.OverviewControl)?.UpdateLastScanSummary(last);
+            (panelAntivirus as Views.AntivirusView)?.UpdateLastScanDisplay(last?.StartedAt);
         }
 
         private void SurMenaceTempsReelDetectee(object? sender, ThreatInfo threat)
@@ -470,6 +483,19 @@ namespace optiSCAN
                 RefreshQuarantineList();
                 RefreshOverviewProtectionAndRecommendations();
             }), DispatcherPriority.Background);
+        }
+
+        private void SurActionAntivirusTerminee(object? sender, ActionResult result)
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                SetStatus(result.Message, isError: result.IsError, isWarning: result.IsWarning);
+                if (result.Success)
+                {
+                    RefreshQuarantineList();
+                    (panelAntivirus as Views.AntivirusView)?.RefreshAllData();
+                }
+            }, DispatcherPriority.Normal);
         }
 
         private void SurActivationToast(object? sender, ToastActivationEventArgs e)
@@ -549,11 +575,7 @@ namespace optiSCAN
             }
         }
 
-        /// <summary>Bannière + recommandations de la vue d’ensemble (données réelles).</summary>
-        /// <remarks>
-        /// Construit la synthèse en combinant l'état des moteurs (ClamAV/YARA) et l'historique
-        /// (proposition de nettoyage basé sur la date du dernier nettoyage).
-        /// </remarks>
+        /// <summary>Titre de protection, recommandations hygiène et activité (vue d’ensemble).</summary>
         private void RefreshOverviewProtectionAndRecommendations()
         {
             var overview = panelOverview as Views.OverviewControl;
@@ -564,25 +586,7 @@ namespace optiSCAN
             bool yaraAvail = _yaraEngine?.IsAvailable ?? false;
             bool protectedOk = clam && (!yaraAvail || yaraRules > 0);
 
-            var clamVer = _freshclamUpdater?.GetLocalDatabaseVersion() ?? "—";
-            var clamWhen = _freshclamUpdater?.GetLastSignatureChangeDisplay() ?? "—";
-            var yaraPack = _rulesUpdater?.GetRulesPackVersionDisplay() ?? "—";
-            var yaraWhen = _rulesUpdater?.GetRulesLastUpdateDisplay() ?? "—";
-
-            var statusSb = new StringBuilder();
-            if (clam)
-                statusSb.AppendLine(LocalizationService.Format("Rec_StatusClamOk", clamVer, clamWhen));
-            else
-                statusSb.AppendLine(LocalizationService.GetString("Rec_StatusClamMissing"));
-            statusSb.Append(LocalizationService.Format("Rec_StatusYara", yaraRules, yaraPack, yaraWhen));
-            overview.UpdateProtectionStatus(protectedOk, statusSb.ToString().Trim());
-
-            string sig = !clam
-                ? LocalizationService.GetString("Rec_SigClamMissing")
-                : (!yaraAvail || yaraRules == 0
-                    ? LocalizationService.GetString("Rec_SigNoYara")
-                    : LocalizationService.Format("Rec_SigReady", yaraRules));
-            int sigSev = !clam || !yaraAvail || yaraRules == 0 ? 1 : 0;
+            overview.UpdateProtectionHeadline(protectedOk);
 
             var cleanHist = _logManager?.GetCleanHistory() ?? Array.Empty<CleanSession>();
             DateTime? lastClean = cleanHist.Count > 0 ? cleanHist[0].StartedAt : null;
@@ -602,15 +606,15 @@ namespace optiSCAN
                     : LocalizationService.GetString("Rec_ActOk");
             int actSev = threats30 > 0 ? 1 : (sessions.Count == 0 ? 1 : 2);
 
-            overview.UpdateRecommendations(sig, sigSev, hyp, hypSev, act, actSev);
+            overview.UpdateRecommendations(hyp, hypSev, act, actSev);
         }
 
-        public void RefreshAntivirusData()
+        public async Task RefreshAntivirusDataAsync()
         {
             RefreshAntivirusStatus();
             RefreshQuarantineList();
             RefreshHistory();
-            RefreshSignaturesDisplay();
+            await RefreshSignaturesDisplayAsync();
         }
 
         /// <summary>
@@ -622,8 +626,8 @@ namespace optiSCAN
             _sigCache = null;
         }
 
-        /// <summary>Rafraîchit les blocs YARA | ClamAV (Signatures + Vue d'ensemble + VM).</summary>
-        private void RefreshSignaturesDisplay(bool forceRefresh = false)
+        /// <summary>Rafraîchit les versions de signatures (onglet Antivirus + ViewModel).</summary>
+        private async Task RefreshSignaturesDisplayAsync(bool forceRefresh = false)
         {
             // Cache TTL : on relit le disque seulement si le cache est expiré ou forcé.
             string clamVer, clamWhen, yaraVer, yaraWhen;
@@ -633,7 +637,9 @@ namespace optiSCAN
             }
             else
             {
-                clamVer  = _freshclamUpdater?.GetLocalDatabaseVersion()       ?? "—";
+                clamVer  = _freshclamUpdater != null
+                    ? await _freshclamUpdater.GetLocalDatabaseVersionAsync().ConfigureAwait(true)
+                    : "—";
                 clamWhen = _freshclamUpdater?.GetLastSignatureChangeDisplay()  ?? "—";
                 yaraVer  = _rulesUpdater?.GetRulesPackVersionDisplay()         ?? "—";
                 yaraWhen = _rulesUpdater?.GetRulesLastUpdateDisplay()          ?? "—";
@@ -666,9 +672,6 @@ namespace optiSCAN
         private void SurDemandeExportHistoriqueHtml(object? sender, EventArgs e) =>
             Dispatcher.BeginInvoke(new Action(TryExportScanReportHtml), DispatcherPriority.Background);
 
-        private void SurDemandeExportDernierScanPdf(object? sender, EventArgs e) =>
-            Dispatcher.BeginInvoke(new Action(TryExportLastScanPdf), DispatcherPriority.Background);
-
         private void SurDemandeExportSessionScanPdf(object? sender, ScanSession session) =>
             Dispatcher.BeginInvoke(new Action(() => TryExportScanSessionPdf(session)), DispatcherPriority.Background);
 
@@ -679,13 +682,6 @@ namespace optiSCAN
                 _logManager,
                 ViewModel?.Threats ?? Enumerable.Empty<ThreatInfo>(),
                 _quarantineManager?.GetEntries() ?? Array.Empty<QuarantineEntry>());
-            if (!result.WasCancelled && !string.IsNullOrEmpty(result.Message))
-                SetStatus(result.Message, isError: result.IsError);
-        }
-
-        private void TryExportLastScanPdf()
-        {
-            var result = _historyExport.TryExportLastScanPdf(this, _logManager);
             if (!result.WasCancelled && !string.IsNullOrEmpty(result.Message))
                 SetStatus(result.Message, isError: result.IsError);
         }
@@ -710,10 +706,7 @@ namespace optiSCAN
             Dispatcher.InvokeAsync(() =>
             {
                 UpdateThemeToggleTooltip(isDark);
-
-                // Synchronise la case « Thème sombre » dans Options
-                // (peut avoir changé via le bouton sidebar, pas la checkbox elle-même)
-                panelOptions.SyncDarkThemeCheckbox(isDark);
+                panelOptions.SyncThemeControls();
 
                 RefreshAntivirusStatus();
                 RefreshOverviewProtectionAndRecommendations();
@@ -948,12 +941,12 @@ namespace optiSCAN
         private void SurSortieMisesAJourRegles(object? sender, string line)
             => (panelAntivirus as Views.AntivirusView)?.AppendSignatureLog($"{LocalizationService.GetString("Status_SigLogRules")} {line}");
 
-        public async void BtnManualUpdateSignatures_Click(object sender, RoutedEventArgs e)
+        private async void BtnManualUpdateSignatures_Click(object sender, RoutedEventArgs e)
         {
             // Deux déclenchements rapprochés (carte Vue d'ensemble + bouton, ou double-clic)
             // lançaient un second flux qui voyait « déjà en cours » et dont le finally
             // remettait l'UI à l'état « terminé » pendant que le premier flux continuait.
-            if (!await _manualSignatureUpdateLock.WaitAsync(0))
+            if (!_signatureUpdateRunner.TryEnterUpdate())
             {
                 SetStatus(OptiscanStrings.StatusUpdates.SignaturesUpdateAlreadyRunning, isWarning: true);
                 return;
@@ -971,15 +964,13 @@ namespace optiSCAN
                 if (antivirusView != null)
                     antivirusView.SetSignatureUpdating(true);
 
-                // Travail réseau / sous-processus hors thread UI pour garder la fenêtre réactive.
-                completedOk = await Task.Run(async () =>
-                    await SignatureUpdateCoordinator.RunFullSignatureUpdateAsync(
-                        _freshclamUpdater,
-                        _rulesUpdater,
-                        line => antivirusView?.AppendSignatureLog(line)).ConfigureAwait(false)).ConfigureAwait(true);
+                completedOk = await _signatureUpdateRunner.RunFullUpdateAsync(
+                    _freshclamUpdater,
+                    _rulesUpdater,
+                    line => antivirusView?.AppendSignatureLog(line)).ConfigureAwait(true);
 
                 InvalidateSigCache();
-                RefreshSignaturesDisplay(forceRefresh: true);
+                await RefreshSignaturesDisplayAsync(forceRefresh: true);
             }
             catch (Exception ex)
             {
@@ -991,14 +982,14 @@ namespace optiSCAN
             finally
             {
                 antivirusView?.SetSignatureUpdating(false);
-                RefreshSignaturesDisplay(); // inclut désormais YaraRulesCount + YaraStatus
+                await RefreshSignaturesDisplayAsync(); // inclut désormais YaraRulesCount + YaraStatus
                 if (completedOk)
                     SetStatus(OptiscanStrings.StatusUpdates.FullSignaturesUpdateFinished);
                 else
                     SetStatus(OptiscanStrings.StatusUpdates.FullSignaturesUpdateFinishedWithErrors, isWarning: true);
 
                 RefreshLiveFooter();
-                _manualSignatureUpdateLock.Release();
+                _signatureUpdateRunner.ReleaseUpdate();
             }
         }
 
@@ -1020,17 +1011,5 @@ namespace optiSCAN
             antivirusView?.AppendSignatureLog(LocalizationService.GetString("Status_SigInterrupted"));
             antivirusView?.SetSignatureUpdating(false);
         }
-
-        // ── Accès aux services ───────────────────────────────────────────────────
-        /// <summary>Retourne le gestionnaire de quarantaine partagé.</summary>
-        public QuarantineManager? GetQuarantineManager() => _quarantineManager;
-        /// <summary>Retourne le gestionnaire de journaux de scan.</summary>
-        public ScanLogManager? GetLogManager() => _logManager;
-        /// <summary>Retourne l'orchestrateur ClamAV + YARA partagé.</summary>
-        public ScanOrchestrator? GetOrchestrator() => _antivirusOrchestrator;
-        /// <summary>Retourne le service de mise à jour des signatures ClamAV.</summary>
-        public FreshclamUpdater? GetFreshclamUpdater() => _freshclamUpdater;
-        /// <summary>Retourne le service de mise à jour des règles YARA.</summary>
-        public YaraForgeUpdater? GetRulesUpdater() => _rulesUpdater;
     }
 }

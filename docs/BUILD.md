@@ -89,6 +89,25 @@ Publish déjà fait :
 dotnet test .\optiSCAN.Tests\optiSCAN.Tests.csproj -c Release
 ```
 
+Attendu : **83 tests** réussis (Release). Couverture indicative : quarantaine, localisation, navigation, scan planifié, headless CLI, logs, dernière analyse Accueil, sécurité quarantaine, orchestrateur scan (fakes).
+
+## Intégration continue (GitHub)
+
+Workflow : [`.github/workflows/ci.yml`](../.github/workflows/ci.yml)
+
+| Branche / événement | Comportement |
+|---------------------|--------------|
+| `dev`, `develop`, PR | Build Debug + tests |
+| `main`, `master` (push) | + publish `win-x64` + `verify-runtime-deps` (artefact) |
+
+En local, reproduire la CI :
+
+```powershell
+dotnet restore optiSCAN.sln
+dotnet build optiSCAN.sln --configuration Debug --no-restore
+dotnet test optiSCAN.Tests\optiSCAN.Tests.csproj -c Release
+```
+
 ## Dépannage Inno
 
 | Erreur | Cause fréquente |

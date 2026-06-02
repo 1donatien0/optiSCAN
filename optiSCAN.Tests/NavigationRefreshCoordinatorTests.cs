@@ -38,19 +38,19 @@ public sealed class NavigationRefreshCoordinatorTests
         new(
             nav,
             System.Windows.Threading.Dispatcher.CurrentDispatcher,
-            () => c.History++,
-            () => c.Status++,
-            () => c.Signatures++,
-            () => c.AntivirusData++);
+            () => { c.History++; return Task.CompletedTask; },
+            () => { c.Status++; return Task.CompletedTask; },
+            () => { c.Signatures++; return Task.CompletedTask; },
+            () => { c.AntivirusData++; return Task.CompletedTask; });
 
     [Fact]
-    public void ApplyRefreshesForPanel_overview_invokes_history_status_and_signatures()
+    public async Task ApplyRefreshesForPanel_overview_invokes_history_status_and_signature_cache()
     {
         var nav = new FakeNavigationService();
         var c = new RefreshCounters();
         var coord = CreateCoordinator(nav, c);
 
-        coord.ApplyRefreshesForPanel(OptiscanStrings.PanelIds.Overview);
+        await coord.ApplyRefreshesForPanelAsync(OptiscanStrings.PanelIds.Overview);
 
         Assert.Equal(1, c.History);
         Assert.Equal(1, c.Status);
@@ -59,13 +59,13 @@ public sealed class NavigationRefreshCoordinatorTests
     }
 
     [Fact]
-    public void ApplyRefreshesForPanel_antivirus_invokes_antivirus_data_only()
+    public async Task ApplyRefreshesForPanel_antivirus_invokes_antivirus_data_only()
     {
         var nav = new FakeNavigationService();
         var c = new RefreshCounters();
         var coord = CreateCoordinator(nav, c);
 
-        coord.ApplyRefreshesForPanel(OptiscanStrings.PanelIds.Antivirus);
+        await coord.ApplyRefreshesForPanelAsync(OptiscanStrings.PanelIds.Antivirus);
 
         Assert.Equal(0, c.History);
         Assert.Equal(0, c.Status);
@@ -74,18 +74,37 @@ public sealed class NavigationRefreshCoordinatorTests
     }
 
     [Fact]
-    public void ApplyRefreshesForPanel_history_invokes_history_only()
+    public async Task ApplyRefreshesForPanel_history_invokes_history_only()
     {
         var nav = new FakeNavigationService();
         var c = new RefreshCounters();
         var coord = CreateCoordinator(nav, c);
 
-        coord.ApplyRefreshesForPanel(OptiscanStrings.PanelIds.History);
+        await coord.ApplyRefreshesForPanelAsync(OptiscanStrings.PanelIds.History);
 
         Assert.Equal(1, c.History);
         Assert.Equal(0, c.Status);
         Assert.Equal(0, c.Signatures);
         Assert.Equal(0, c.AntivirusData);
+    }
+
+    [Fact]
+    public async Task ApplyRefreshesForPanel_propagates_async_completion()
+    {
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var coord = new NavigationRefreshCoordinator(
+            new FakeNavigationService(),
+            System.Windows.Threading.Dispatcher.CurrentDispatcher,
+            () => Task.CompletedTask,
+            () => Task.CompletedTask,
+            () => tcs.Task,
+            () => Task.CompletedTask);
+
+        var pending = coord.ApplyRefreshesForPanelAsync(OptiscanStrings.PanelIds.Overview);
+        Assert.False(pending.IsCompleted);
+
+        tcs.SetResult();
+        await pending;
     }
 
     [Fact]

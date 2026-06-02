@@ -32,8 +32,15 @@ namespace optiSCAN.Views
             lstExclusions.ItemsSource = _exclusions;
             InitScheduleTimeComboBoxes();
             LoadPreferences();
-            Loaded += (_, _) => _ = LoadScheduledTaskStateAsync();
+            Loaded += (_, _) =>
+            {
+                ThemeManager.ThemeChanged += SurChangementTheme;
+                _ = LoadScheduledTaskStateAsync();
+            };
+            Unloaded += (_, _) => ThemeManager.ThemeChanged -= SurChangementTheme;
         }
+
+        private void SurChangementTheme(object? sender, bool isDark) => SyncThemeControls();
 
         private void InitScheduleTimeComboBoxes()
         {
@@ -55,17 +62,25 @@ namespace optiSCAN.Views
             return new TimeSpan(h, m, 0);
         }
 
-        /// <summary>
-        /// Synchronise la case « Thème sombre » avec l'état réel du thème.
-        /// À appeler depuis MainWindow quand le thème change via le bouton sidebar.
-        /// </summary>
-        public void SyncDarkThemeCheckbox(bool isDark)
+        /// <summary>Synchronise les cases thème avec ThemeManager et UserPreferences.</summary>
+        public void SyncThemeControls() => SyncThemeControls(ThemeManager.IsDarkTheme);
+
+        /// <summary>Alias conservé pour MainWindow.</summary>
+        public void SyncDarkThemeCheckbox(bool isDark) => SyncThemeControls(isDark);
+
+        private void SyncThemeControls(bool isDark)
         {
             _suppressPreferenceEvents = true;
             try
             {
+                var prefs = UserPreferences.Current;
+                if (chkSyncWindowsTheme != null)
+                    chkSyncWindowsTheme.IsChecked = prefs.SyncWindowsTheme;
                 if (chkDarkTheme != null)
+                {
                     chkDarkTheme.IsChecked = isDark;
+                    chkDarkTheme.IsEnabled = !prefs.SyncWindowsTheme;
+                }
             }
             finally
             {
@@ -214,8 +229,12 @@ namespace optiSCAN.Views
                     break;
 
                 case "DarkTheme":
-                    if (!prefs.SyncWindowsTheme)
-                        ThemeManager.Apply(isOn);
+                    if (prefs.SyncWindowsTheme)
+                    {
+                        prefs.SyncWindowsTheme = false;
+                        ThemeManager.SetSyncWithWindows(false);
+                    }
+                    ThemeManager.Apply(isOn);
                     break;
 
                 case "SyncWindowsTheme":
@@ -487,7 +506,7 @@ namespace optiSCAN.Views
         {
             using var dlg = new WinForms.FolderBrowserDialog
             {
-                Description = "Sélectionnez un dossier à exclure des analyses"
+                Description = LocalizationService.GetString("Opt_ExclFolderPickerDesc")
             };
 
             if (dlg.ShowDialog() == WinForms.DialogResult.OK)
