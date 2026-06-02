@@ -209,9 +209,9 @@ namespace optiSCAN.Views
                         AppendLog($"─────────────────────────");
                         AppendLog(LocalizationService.Format("Clean_LogFreedTotal", FormatSize(freed)));
                         AppendLog(LocalizationService.GetString("Clean_LogCleanEnd"));
-                        txtTempSize.Text = "0 Mo";
-                        txtBrowserSize.Text = "0 Mo";
-                        txtTotalSize.Text = "0 Mo";
+                        txtTempSize.Text = ByteSizeFormat.Format(0);
+                        txtBrowserSize.Text = ByteSizeFormat.Format(0);
+                        txtTotalSize.Text = ByteSizeFormat.Format(0);
                         _analysed = false;
                         btnCleanNow.IsEnabled = false;
 
@@ -433,13 +433,7 @@ namespace optiSCAN.Views
             return parts.Count == 0 ? "—" : string.Join(", ", parts);
         }
 
-        private static string FormatSize(long bytes)
-        {
-            if (bytes < 1024) return $"{bytes} o";
-            if (bytes < 1024 * 1024) return $"{bytes / 1024.0:F1} Ko";
-            if (bytes < 1024L * 1024 * 1024) return $"{bytes / (1024.0 * 1024):F1} Mo";
-            return $"{bytes / (1024.0 * 1024 * 1024):F2} Go";
-        }
+        private static string FormatSize(long bytes) => ByteSizeFormat.Format(bytes);
 
         [DllImport("Shell32.dll", CharSet = CharSet.Unicode)]
         private static extern int SHEmptyRecycleBin(IntPtr hwnd, string? pszRootPath, uint dwFlags);

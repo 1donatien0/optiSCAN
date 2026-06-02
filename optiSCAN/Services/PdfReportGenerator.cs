@@ -1,4 +1,6 @@
+using optiSCAN.Localization;
 using optiSCAN.Models;
+using System.Globalization;
 using System.Linq;
 using QuestPDF.Fluent;
 using QuestPDF.Helpers;
@@ -19,6 +21,20 @@ namespace optiSCAN.Services
         }
 
         /// <summary>
+        /// Remplace le profil utilisateur dans un chemin par %UserProfile%
+        /// pour éviter d'exposer le nom de compte dans les exports partagés.
+        /// </summary>
+        private static string RedactPath(string? path)
+        {
+            if (string.IsNullOrEmpty(path))
+                return string.Empty;
+            var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (!string.IsNullOrEmpty(profile) && path.StartsWith(profile, StringComparison.OrdinalIgnoreCase))
+                return "%UserProfile%" + path[profile.Length..];
+            return path;
+        }
+
+        /// <summary>
         /// Génère un rapport PDF et le sauvegarde au chemin indiqué.
         /// Retourne les octets du PDF généré.
         /// </summary>
@@ -26,6 +42,9 @@ namespace optiSCAN.Services
         {
             // AssessAll évalue TOUTES les menaces et retourne la plus sévère
             var riskAssessment = RiskScoringService.AssessAll(result.Threats);
+            var cult = CultureInfo.CurrentCulture;
+            static string L(string key) => LocalizationService.GetString(key);
+            var headerWhen = DateTime.Now.ToString("g", cult);
 
             var document = Document.Create(container =>
             {
@@ -49,7 +68,7 @@ namespace optiSCAN.Services
 
                             row.RelativeItem()
                                 .AlignRight()
-                                .Text($"Rapport d'analyse antivirus\n{DateTime.Now:dd/MM/yyyy HH:mm}")
+                                .Text(LocalizationService.Format("Export_Pdf_HeaderSubtitle", headerWhen))
                                 .FontSize(10)
                                 .FontColor(Colors.Grey.Medium);
                         });
@@ -63,7 +82,7 @@ namespace optiSCAN.Services
                             col.Item()
                                 .BorderBottom(1).BorderColor(Colors.Grey.Lighten2)
                                 .PaddingBottom(5)
-                                .Text("RÉSUMÉ DE L'ANALYSE")
+                                .Text(L("Export_Pdf_Summary"))
                                 .FontSize(14).Bold()
                                 .FontColor(Colors.Blue.Darken2);
 
@@ -76,16 +95,16 @@ namespace optiSCAN.Services
                                         cols.RelativeColumn();
                                     });
 
-                                    AddRow(table, "Type d'analyse", result.TypeDisplay);
-                                    AddRow(table, "Cible", result.TargetPath);
-                                    AddRow(table, "Date de début", result.StartedAt.ToString("dd/MM/yyyy HH:mm:ss"));
+                                    AddRow(table, L("Export_Pdf_RowType"), result.TypeDisplay);
+                                    AddRow(table, L("Export_Pdf_RowTarget"), RedactPath(result.TargetPath));
+                                    AddRow(table, L("Export_Pdf_RowStart"), result.StartedAt.ToString("G", cult));
                                     if (result.FinishedAt.HasValue)
-                                        AddRow(table, "Date de fin", result.FinishedAt.Value.ToString("dd/MM/yyyy HH:mm:ss"));
-                                    AddRow(table, "Durée", $"{result.Duration.TotalSeconds:F0} secondes");
-                                    AddRow(table, "Fichiers analysés", $"{result.FilesScanned:N0}");
+                                        AddRow(table, L("Export_Pdf_RowEnd"), result.FinishedAt.Value.ToString("G", cult));
+                                    AddRow(table, L("Export_Pdf_RowDuration"),
+                                        LocalizationService.Format("Export_Pdf_DurationSeconds", $"{result.Duration.TotalSeconds:F0}"));
+                                    AddRow(table, L("Export_Pdf_RowFiles"), result.FilesScanned.ToString("N0", cult));
 
-                                    // Menaces avec couleur conditionnelle
-                                    table.Cell().Text("Menaces détectées").FontSize(11).SemiBold();
+                                    table.Cell().Text(L("Export_Pdf_RowThreats")).FontSize(11).SemiBold();
                                     table.Cell().Text($"{result.ThreatsFound}")
                                         .FontSize(11)
                                         .FontColor(result.ThreatsFound > 0 ? Colors.Red.Medium : Colors.Green.Medium);
@@ -97,7 +116,7 @@ namespace optiSCAN.Services
                                 col.Item().PaddingTop(15)
                                     .BorderBottom(1).BorderColor(Colors.Grey.Lighten2)
                                     .PaddingBottom(5)
-                                    .Text("ÉVALUATION DU RISQUE")
+                                    .Text(L("Export_Pdf_RiskTitle"))
                                     .FontSize(14).Bold()
                                     .FontColor(Colors.Blue.Darken2);
 
@@ -113,7 +132,7 @@ namespace optiSCAN.Services
                                                 .FontSize(16).Bold();
                                             row.Spacing(20);
                                             row.AutoItem()
-                                                .Text($"Score : {riskAssessment.Score}/100")
+                                                .Text(LocalizationService.Format("Export_Pdf_Score", riskAssessment.Score))
                                                 .FontSize(12)
                                                 .FontColor(Colors.Grey.Darken1);
                                         });
@@ -136,7 +155,7 @@ namespace optiSCAN.Services
                                 col.Item().PaddingTop(15)
                                     .BorderBottom(1).BorderColor(Colors.Grey.Lighten2)
                                     .PaddingBottom(5)
-                                    .Text("MENACES DÉTECTÉES")
+                                    .Text(L("Export_Pdf_ThreatsTitle"))
                                     .FontSize(14).Bold()
                                     .FontColor(Colors.Blue.Darken2);
 
@@ -152,16 +171,16 @@ namespace optiSCAN.Services
 
                                         table.Header(header =>
                                         {
-                                            header.Cell().Text("Emplacement").FontSize(10).Bold();
-                                            header.Cell().Text("Menace").FontSize(10).Bold();
-                                            header.Cell().Text("Heure").FontSize(10).Bold();
+                                            header.Cell().Text(L("Export_Pdf_ColLocation")).FontSize(10).Bold();
+                                            header.Cell().Text(L("Export_Pdf_ColThreat")).FontSize(10).Bold();
+                                            header.Cell().Text(L("Export_Pdf_ColTime")).FontSize(10).Bold();
                                         });
 
                                         foreach (var threat in result.Threats)
                                         {
-                                            table.Cell().Text(threat.FilePath).FontSize(8);
+                                            table.Cell().Text(RedactPath(threat.FilePath)).FontSize(8);
                                             table.Cell().Text(threat.VirusName).FontSize(9).FontColor(Colors.Red.Medium);
-                                            table.Cell().Text(threat.DetectedAt.ToString("HH:mm:ss")).FontSize(9);
+                                            table.Cell().Text(threat.DetectedAt.ToString("T", cult)).FontSize(9);
                                         }
                                     });
                             }
@@ -171,7 +190,7 @@ namespace optiSCAN.Services
                                     .Background(Colors.Green.Lighten3)
                                     .Padding(10)
                                     .AlignCenter()
-                                    .Text("Aucune menace détectée")
+                                    .Text(L("Export_Pdf_NoThreats"))
                                     .FontSize(12)
                                     .FontColor(Colors.Green.Darken2);
                             }
@@ -183,7 +202,11 @@ namespace optiSCAN.Services
                         .DefaultTextStyle(s => s.FontSize(8).FontColor(Colors.Grey.Medium))
                         .Text(x =>
                         {
-                            x.Span($"optiSCAN {ProductVersionInfo.ReleaseLabel} ({ProductVersionInfo.SemVer}) — Rapport généré le {DateTime.Now:dd/MM/yyyy HH:mm:ss} — Page ");
+                            x.Span(LocalizationService.Format(
+                                "Export_Pdf_Footer",
+                                ProductVersionInfo.ReleaseLabel,
+                                ProductVersionInfo.SemVer,
+                                DateTime.Now.ToString("G", cult)));
                             x.CurrentPageNumber();
                             x.Span(" / ");
                             x.TotalPages();
@@ -232,8 +255,8 @@ namespace optiSCAN.Services
                     {
                         FilePath = path,
                         VirusName = session.ThreatsFound == 1
-                            ? "Menace détectée (détail non conservé dans l’historique)"
-                            : $"Menace {i + 1}/{session.ThreatsFound} (détail non conservé)",
+                            ? LocalizationService.GetString("Export_Pdf_ThreatLegacySingle")
+                            : LocalizationService.Format("Export_Pdf_ThreatLegacyMulti", i + 1, session.ThreatsFound),
                         DetectedAt = at,
                         DetectedBy = "historique"
                     });
@@ -243,14 +266,15 @@ namespace optiSCAN.Services
             return GenerateReport(result, outputPath);
         }
 
-        private static ScanType MapScanType(string typeDisplay) => typeDisplay switch
+        private static ScanType MapScanType(string typeDisplay)
         {
-            "Fichier" => ScanType.File,
-            "Dossier" => ScanType.Folder,
-            "Analyse complète" => ScanType.FullScan,
-            "Analyse rapide" => ScanType.QuickScan,
-            _ => ScanType.Folder
-        };
+            foreach (ScanType t in Enum.GetValues<ScanType>())
+            {
+                if (string.Equals(typeDisplay, LocalizationService.ScanTypeDisplay(t), StringComparison.OrdinalIgnoreCase))
+                    return t;
+            }
+            return ScanType.Folder;
+        }
 
         /// <summary>
         /// Génère et sauvegarde automatiquement dans %LocalAppData%\optiSCAN\Reports\

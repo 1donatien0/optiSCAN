@@ -16,10 +16,24 @@ namespace optiSCAN.Services
         private readonly YaraForgeUpdater _rules;
 
         public AntivirusActions(ServiceContainer container)
+            : this(container.Quarantine, container.FreshclamUpdater, container.RulesUpdater)
         {
-            _quarantine = container.Quarantine;
-            _freshclam = container.FreshclamUpdater;
-            _rules = container.RulesUpdater;
+        }
+
+        /// <summary>Constructeur de test (répertoire quarantaine isolé via <see cref="InternalsVisibleTo"/>).</summary>
+        internal AntivirusActions(QuarantineManager quarantine)
+            : this(quarantine, ServiceContainer.Default.FreshclamUpdater, ServiceContainer.Default.RulesUpdater)
+        {
+        }
+
+        private AntivirusActions(
+            QuarantineManager quarantine,
+            FreshclamUpdater freshclam,
+            YaraForgeUpdater rules)
+        {
+            _quarantine = quarantine;
+            _freshclam = freshclam;
+            _rules = rules;
         }
 
         public event EventHandler<ActionResult>? ActionCompleted;
@@ -87,8 +101,17 @@ namespace optiSCAN.Services
         {
             try
             {
+                // Refus identique à la restauration quarantaine : pas de suppression dans System32, Windows, etc.
+                if (QuarantineManager.IsSensitivePath(filePath))
+                    return Complete(false,
+                        LocalizationService.Format("Av_Action_DeleteSensitive", Path.GetFileName(filePath)),
+                        isError: true);
+
                 if (File.Exists(filePath))
                 {
+                    var attrs = File.GetAttributes(filePath);
+                    if (attrs.HasFlag(FileAttributes.ReadOnly))
+                        File.SetAttributes(filePath, attrs & ~FileAttributes.ReadOnly);
                     File.Delete(filePath);
                     return Complete(true,
                         LocalizationService.Format("Av_Action_DeleteOk", Path.GetFileName(filePath)));

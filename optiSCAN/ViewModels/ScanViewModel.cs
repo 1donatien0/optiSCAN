@@ -21,12 +21,12 @@ namespace optiSCAN.ViewModels
 
         // ── Services ─────────────────────────────────────────────────────────────
         private readonly ScanOrchestrator _orchestrator;
-        private readonly ClamAvEngine _clamAv;
         private readonly IScanEngine _scanEngine;
         private readonly FreshclamUpdater _updater;
         private readonly YaraForgeUpdater _rulesUpdater;
         private readonly QuarantineManager _quarantine;
         private readonly ScanLogManager _logger;
+        private readonly IUserConfirmService _confirm;
         private readonly YaraEngine _yara;
 
         private CancellationTokenSource? _cts;
@@ -110,7 +110,7 @@ namespace optiSCAN.ViewModels
             set { _clamAvVersion = value; OnPropertyChanged(); }
         }
 
-        private string _dbVersion = "Inconnue";
+        private string _dbVersion;
         public string DbVersion
         {
             get => _dbVersion;
@@ -138,7 +138,7 @@ namespace optiSCAN.ViewModels
             set { _rulesLastUpdateDisplay = value; OnPropertyChanged(); }
         }
 
-        private string _yaraStatus = "YARA : vérification…";
+        private string _yaraStatus = LocalizationService.GetString("Vm_Checking");
         public string YaraStatus
         {
             get => _yaraStatus;
@@ -268,10 +268,10 @@ namespace optiSCAN.ViewModels
             get
             {
                 if (QuarantineTotalCount == 0)
-                    return "Aucun fichier en quarantaine.";
+                    return LocalizationService.GetString("Vm_QuarantineEmpty");
                 if (!QuarantineHasMore)
-                    return $"Toutes les entrées sont affichées ({QuarantineTotalCount:N0}).";
-                return $"{QuarantineEntries.Count:N0} sur {QuarantineTotalCount:N0} affiché(s) — « Charger plus » pour la suite.";
+                    return LocalizationService.Format("Vm_QuarantineAllShown", QuarantineTotalCount);
+                return LocalizationService.Format("Vm_QuarantinePartial", QuarantineEntries.Count, QuarantineTotalCount);
             }
         }
 
@@ -307,7 +307,6 @@ namespace optiSCAN.ViewModels
 
         public ScanViewModel(ServiceContainer container)
         {
-            _clamAv = container.ClamAv;
             _scanEngine = container.ScanEngine;
             _yara = container.Yara;
             _orchestrator = container.Orchestrator;
@@ -315,6 +314,8 @@ namespace optiSCAN.ViewModels
             _rulesUpdater = container.RulesUpdater;
             _quarantine = container.Quarantine;
             _logger = container.Logger;
+            _confirm = new WpfUserConfirmService();
+            _dbVersion = VersionDisplayHelper.UnknownLabel;
 
             _updater.UpdateOutput += SurAjoutSortieMiseAJour;
             _updater.UpdateCompleted += SurTermineeMiseAJourSignatures;
@@ -375,9 +376,9 @@ namespace optiSCAN.ViewModels
                     ClamAvVersion = await _scanEngine.GetVersionAsync();
                 });
 
-                TryStep("Base de signatures", () =>
+                await TryStepAsync("Base de signatures", async () =>
                 {
-                    DbVersion = _updater.GetLocalDatabaseVersion();
+                    DbVersion = await _updater.GetLocalDatabaseVersionAsync().ConfigureAwait(false);
                     LastUpdateDisplay = _updater.LastUpdateTime?.ToString("dd/MM/yyyy HH:mm") ?? LocalizationService.GetString("Vm_Never");
                     RulesPackVersion = _rulesUpdater.GetRulesPackVersionDisplay();
                     RulesLastUpdateDisplay = _rulesUpdater.GetRulesLastUpdateDisplay();
@@ -395,7 +396,7 @@ namespace optiSCAN.ViewModels
 
                 TryStep("Statut ClamAV", () =>
                 {
-                    IsClamAvAvailable = _clamAv.IsClamAvInstalled();
+                    IsClamAvAvailable = _scanEngine.IsAvailable;
                     RefreshProtectionStatus();
                 });
 
@@ -546,7 +547,7 @@ namespace optiSCAN.ViewModels
                 }
 
                 StatusMessage = autoQuarantined > 0
-                    ? $"{result.SummaryDisplay} — {autoQuarantined} fichier(s) mis en quarantaine automatiquement."
+                    ? LocalizationService.Format("Vm_AutoQuarantineMsg", result.SummaryDisplay, autoQuarantined)
                     : result.SummaryDisplay;
                 FilesScanned = result.FilesScanned;
                 ThreatsFound = result.Threats.Count;
@@ -622,7 +623,7 @@ namespace optiSCAN.ViewModels
                         displayedFiles);
                 }
 
-                if (p.TotalFiles > 0 && displayedFiles > 0 && displayedFiles <= p.TotalFiles)
+                if (p.TotalFiles > 0 && displayedFiles > 0)
                 {
                     var pctVal = Math.Min(100.0, displayedFiles * 100.0 / p.TotalFiles);
                     ScanProgressDetail = LocalizationService.Format(
@@ -641,13 +642,14 @@ namespace optiSCAN.ViewModels
                     ScanProgressDetail = LocalizationService.GetString("Vm_ScanInProgress");
                 }
 
-                double pctForBar = p.TotalFiles > 0 && displayedFiles > 0 && displayedFiles <= p.TotalFiles
-                    ? Math.Min(100.0, displayedFiles * 100.0 / p.TotalFiles)
-                    : p.PercentComplete;
-                if (pctForBar >= 0)
+                if (p.TotalFiles > 0 && displayedFiles > 0)
                 {
                     IsIndeterminate = false;
-                    ProgressValue = Math.Max(ProgressValue, pctForBar);
+                    ProgressValue = Math.Min(100.0, displayedFiles * 100.0 / p.TotalFiles);
+                }
+                else if (displayedFiles > 0)
+                {
+                    IsIndeterminate = true;
                 }
 
                 if (p.Phase == ScanPhase.ThreatFound && p.ThreatInfo != null)
@@ -673,10 +675,10 @@ namespace optiSCAN.ViewModels
         {
             var d = WpfApp.Current?.Dispatcher;
             if (d == null) return;
-            _ = d.InvokeAsync(() =>
+            _ = d.InvokeAsync(async () =>
             {
                 StatusMessage = result.Message;
-                DbVersion = _updater.GetLocalDatabaseVersion();
+                DbVersion = await _updater.GetLocalDatabaseVersionAsync().ConfigureAwait(false);
                 LastUpdateDisplay = _updater.LastUpdateTime?.ToString("dd/MM/yyyy HH:mm") ?? LocalizationService.GetString("Vm_Never");
                 RulesPackVersion = _rulesUpdater.GetRulesPackVersionDisplay();
                 RulesLastUpdateDisplay = _rulesUpdater.GetRulesLastUpdateDisplay();
@@ -699,7 +701,7 @@ namespace optiSCAN.ViewModels
                 // Toujours rafraîchir : un rechargement peut avoir eu lieu même sans nouvelle version.
                 YaraRulesCount = _yara.RulesCount;
                 YaraStatus = _yara.IsAvailable
-                    ? $"Moteur de détection actif — {_yara.RulesCount} règle(s)"
+                    ? LocalizationService.Format("Vm_YaraEngineActive", _yara.RulesCount)
                     : result.Success
                         ? LocalizationService.GetString("Vm_SigEngineReloaded")
                         : LocalizationService.GetString("Vm_SigEngineUnavailable");
@@ -712,11 +714,9 @@ namespace optiSCAN.ViewModels
         private void QuarantineAllThreats()
         {
             if (Threats.Count == 0) return;
-            if (System.Windows.MessageBox.Show(
+            if (!_confirm.ConfirmYesNo(
                     OptiscanStrings.Confirmations.QuarantineAll(Threats.Count),
-                    OptiscanStrings.Confirmations.Title,
-                    System.Windows.MessageBoxButton.YesNo,
-                    System.Windows.MessageBoxImage.Warning) != System.Windows.MessageBoxResult.Yes)
+                    OptiscanStrings.Confirmations.Title))
                 return;
 
             int count = _quarantine.QuarantineAll(Threats);
@@ -747,11 +747,9 @@ namespace optiSCAN.ViewModels
         {
             int total = _quarantine.Count;
             if (total == 0) return;
-            if (System.Windows.MessageBox.Show(
+            if (!_confirm.ConfirmYesNo(
                     OptiscanStrings.Confirmations.PurgeQuarantine(total),
-                    OptiscanStrings.Confirmations.Title,
-                    System.Windows.MessageBoxButton.YesNo,
-                    System.Windows.MessageBoxImage.Warning) != System.Windows.MessageBoxResult.Yes)
+                    OptiscanStrings.Confirmations.Title))
                 return;
 
             int count = _quarantine.PurgeAll();
@@ -816,6 +814,24 @@ namespace optiSCAN.ViewModels
                 if (Threats.Any(t => string.Equals(t.FilePath, threat.FilePath, StringComparison.OrdinalIgnoreCase)))
                     return;
                 Threats.Add(threat);
+                ThreatsFound = Threats.Count;
+                OnPropertyChanged(nameof(SummaryDisplay));
+            });
+        }
+
+        /// <summary>Retire une menace de la grille après suppression ou quarantaine du fichier source.</summary>
+        public void RemoveDetectedThreat(string? filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath)) return;
+            WpfApp.Current?.Dispatcher.Invoke(() =>
+            {
+                var removed = Threats
+                    .Where(t => string.Equals(t.FilePath, filePath, StringComparison.OrdinalIgnoreCase))
+                    .ToList();
+                if (removed.Count == 0)
+                    return;
+                foreach (var t in removed)
+                    Threats.Remove(t);
                 ThreatsFound = Threats.Count;
                 OnPropertyChanged(nameof(SummaryDisplay));
             });

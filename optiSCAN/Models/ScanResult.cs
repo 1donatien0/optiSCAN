@@ -65,21 +65,22 @@ namespace optiSCAN.Models
             LocalizationService.ScanSummaryDisplay(
                 Status, FilesScanned, ThreatsFound, Duration, ErrorMessage);
 
-        /// <summary>Libellé lisible du type de scan (ex. « Analyse rapide »).</summary>
+        /// <summary>Libellé lisible du type de scan — localisé selon la culture UI active.</summary>
         public string TypeDisplay => LocalizationService.ScanTypeDisplay(Type);
 
-        /// <summary>Durée formatée en français (ex. « 2 min 34 s »).</summary>
+        /// <summary>Durée formatée selon la culture UI active.</summary>
         public string DurationDisplay => ScanDisplayFormatter.FormatDuration(Duration);
 
-        /// <summary>Badge d'état pour l'affichage dans les listes (ex. « Aucune menace » ou « Attention : 3 menaces »).</summary>
+        /// <summary>Badge d'état pour l'affichage dans les listes — localisé selon la culture UI active.</summary>
         public string ThreatsBadge => Status switch
         {
-            ScanStatus.Running => "En cours…",
-            ScanStatus.Cancelled => "Interrompu",
-            ScanStatus.Error => "Erreur",
+            ScanStatus.Running   => LocalizationService.GetString("Badge_Running"),
+            ScanStatus.Cancelled => LocalizationService.GetString("Badge_Cancelled"),
+            ScanStatus.Error     => LocalizationService.GetString("Badge_Error"),
             _ => ThreatsFound == 0
-                ? "Aucune menace"
-                : $"Attention : {ThreatsFound} menace{(ThreatsFound > 1 ? "s" : "")}"
+                ? LocalizationService.GetString("Badge_Clean")
+                : LocalizationService.Format("Badge_Threats", ThreatsFound,
+                    ThreatsFound > 1 ? "s" : "")
         };
     }
 

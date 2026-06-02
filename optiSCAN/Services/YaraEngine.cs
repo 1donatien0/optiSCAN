@@ -10,7 +10,7 @@ namespace optiSCAN.Services
     /// Moteur YARA — exécute yara64/yara32.exe en ligne de commande.
     /// Compile les règles avec yarac64/yarac32.exe pour accélérer les scans répétés.
     /// </summary>
-    public class YaraEngine
+    public class YaraEngine : IYaraOrchestratorBackend
     {
         private readonly string _yaraExe;     // yara64.exe / yara32.exe
         private readonly string _yaracExe;    // yarac64.exe / yarac32.exe (compilateur)

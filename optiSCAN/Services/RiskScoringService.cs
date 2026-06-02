@@ -1,3 +1,4 @@
+using optiSCAN.Localization;
 using optiSCAN.Models;
 using System.IO;
 
@@ -9,10 +10,8 @@ namespace optiSCAN.Services
     /// </summary>
     public static class RiskScoringService
     {
-        // Mots-clés associés à des niveaux de risque
         private static readonly Dictionary<string, RiskLevel> KeywordRiskMap = new(StringComparer.OrdinalIgnoreCase)
         {
-            // CRITIQUE
             { "ransom",          RiskLevel.Critical },
             { "ransomware",      RiskLevel.Critical },
             { "locky",           RiskLevel.Critical },
@@ -25,7 +24,6 @@ namespace optiSCAN.Services
             { "malware.ransom",  RiskLevel.Critical },
             { "worm.win32",      RiskLevel.Critical },
 
-            // MAJEUR
             { "trojan",          RiskLevel.Major },
             { "worm",            RiskLevel.Major },
             { "spy",             RiskLevel.Major },
@@ -37,7 +35,6 @@ namespace optiSCAN.Services
             { "infostealer",     RiskLevel.Major },
             { "banker",          RiskLevel.Major },
 
-            // MINEUR
             { "adware",          RiskLevel.Minor },
             { "pup",             RiskLevel.Minor },
             { "pua",             RiskLevel.Minor },
@@ -46,56 +43,48 @@ namespace optiSCAN.Services
             { "potentially",     RiskLevel.Minor },
             { "unsafe",          RiskLevel.Minor },
 
-            // INFORMATIONNEL
             { "suspicious",      RiskLevel.Informational },
             { "detected",        RiskLevel.Informational },
         };
 
-        // Extensions exécutables à risque élevé
         private static readonly HashSet<string> HighRiskExtensions = new(
             new[] { ".exe", ".dll", ".scr", ".bat", ".ps1", ".vbs", ".js", ".jar", ".msi" },
             StringComparer.OrdinalIgnoreCase);
 
-        // Documents Office avec macros
         private static readonly HashSet<string> MacroExtensions = new(
             new[] { ".docm", ".xlsm", ".pptm", ".dotm", ".xlam", ".ppam" },
             StringComparer.OrdinalIgnoreCase);
 
-        /// <summary>
-        /// Évalue complètement le niveau de risque d'une menace
-        /// </summary>
         public static RiskAssessment Assess(ThreatInfo threat)
         {
             var score = 0;
             var reasons = new List<string>();
 
-            // 1. Analyse du nom du virus
             var (level, reason) = AnalyzeVirusName(threat.VirusName);
             score += GetScore(level);
             reasons.Add(reason);
 
-            // 2. Analyse du fichier
             var fileLevel = AnalyzeFilePath(threat.FilePath);
             score += GetScore(fileLevel);
-            reasons.Add($"Fichier : {GetFileRiskReason(threat.FilePath, fileLevel)}");
+            reasons.Add(LocalizationService.Format(
+                "Risk_Reason_File",
+                GetFileRiskReason(threat.FilePath, fileLevel)));
 
-            // 3. Double détection (ClamAV + YARA)
             if (!string.IsNullOrEmpty(threat.DetectedBy) && threat.DetectedBy.Contains('+'))
             {
                 score += 20;
-                reasons.Add("Détection corroborée");
+                reasons.Add(LocalizationService.GetString("Risk_Reason_Corroborated"));
             }
 
-            // 4. Taille du fichier
-            if (threat.FileSize > 0 && threat.FileSize < 1024 * 1024) // < 1 Mo
+            if (threat.FileSize > 0 && threat.FileSize < 1024 * 1024)
             {
                 score += 10;
-                reasons.Add("Petite taille → potentiel payload malveillant");
+                reasons.Add(LocalizationService.GetString("Risk_Reason_SmallPayload"));
             }
-            else if (threat.FileSize > 50 * 1024 * 1024) // > 50 Mo
+            else if (threat.FileSize > 50 * 1024 * 1024)
             {
                 score -= 10;
-                reasons.Add("Grand fichier → risque plus faible");
+                reasons.Add(LocalizationService.GetString("Risk_Reason_LargeFile"));
             }
 
             var finalLevel = GetRiskLevelFromScore(score);
@@ -113,10 +102,6 @@ namespace optiSCAN.Services
             };
         }
 
-        /// <summary>
-        /// Évalue une liste de menaces et retourne l'évaluation la plus sévère.
-        /// Utilisé dans les rapports où plusieurs menaces peuvent être présentes.
-        /// </summary>
         public static RiskAssessment AssessAll(IEnumerable<ThreatInfo> threats)
         {
             RiskAssessment? worst = null;
@@ -128,67 +113,56 @@ namespace optiSCAN.Services
             }
             return worst ?? new RiskAssessment
             {
-                Severity = "AUCUNE MENACE",
+                Severity = LocalizationService.GetString("Risk_Severity_None"),
                 Color = PdfRiskPalette.GetSeverityColor(RiskLevel.Informational),
                 BrushKey = "RiskInformational",
                 IconKind = UiIconKinds.Success,
-                Recommendation = "Système sain."
+                Recommendation = LocalizationService.GetString("Risk_Rec_Healthy")
             };
         }
 
-        /// <summary>
-        /// Version simplifiée pour affichage rapide (badge de sévérité)
-        /// </summary>
         public static string GetSeverityLevel(ThreatInfo threat)
         {
             var (level, _) = AnalyzeVirusName(threat.VirusName);
             return GetSeverityString(level);
         }
 
-        // ── Analyse interne ──────────────────────────────────────────────────────
-
-        /// <summary>
-        /// Normalise un nom de menace ou un mot-clé pour la comparaison :
-        /// remplace '_' et '.' par un espace afin que "trojan.ransom" matche
-        /// "win_trojan_ransom_xyz" et réciproquement.
-        /// </summary>
         private static string NormalizeForMatch(string s)
             => s.Replace('_', ' ').Replace('.', ' ');
 
         private static (RiskLevel, string) AnalyzeVirusName(string virusName)
         {
             if (string.IsNullOrEmpty(virusName))
-                return (RiskLevel.Informational, "Nom de menace inconnu");
+                return (RiskLevel.Informational, LocalizationService.GetString("Risk_Reason_UnknownName"));
 
             var normalizedName = NormalizeForMatch(virusName);
 
             foreach (var kvp in KeywordRiskMap)
             {
-                // Correspondance directe (ex. ClamAV : "Trojan.GenericKD")
                 if (virusName.Contains(kvp.Key, StringComparison.OrdinalIgnoreCase))
-                    return (kvp.Value, $"Mot-clé '{kvp.Key}' détecté dans le nom");
+                    return (kvp.Value, LocalizationService.Format("Risk_Reason_Keyword", kvp.Key));
 
-                // Correspondance normalisée (ex. YARA : "win_trojan_ransom_xyz"
-                // → "win trojan ransom xyz" contient "trojan ransom")
                 var normalizedKey = NormalizeForMatch(kvp.Key);
                 if (normalizedName.Contains(normalizedKey, StringComparison.OrdinalIgnoreCase))
-                    return (kvp.Value, $"Mot-clé '{kvp.Key}' détecté dans le nom (normalisé)");
+                    return (kvp.Value, LocalizationService.Format("Risk_Reason_KeywordNormalized", kvp.Key));
             }
 
-            return (RiskLevel.Minor, "Menace générique");
+            return (RiskLevel.Minor, LocalizationService.GetString("Risk_Reason_GenericThreat"));
         }
 
         private static RiskLevel AnalyzeFilePath(string filePath)
         {
             var ext = Path.GetExtension(filePath);
 
-            if (filePath.Contains(@"\Windows\System32\") || filePath.Contains(@"\Windows\SysWOW64\"))
+            if (filePath.Contains(@"\Windows\System32\", StringComparison.OrdinalIgnoreCase)
+                || filePath.Contains(@"\Windows\SysWOW64\", StringComparison.OrdinalIgnoreCase))
                 return RiskLevel.Critical;
 
             if (HighRiskExtensions.Contains(ext) || MacroExtensions.Contains(ext))
                 return RiskLevel.Major;
 
-            if (filePath.Contains(@"\Temp\") || filePath.Contains(@"\AppData\Local\Temp"))
+            if (filePath.Contains(@"\Temp\", StringComparison.OrdinalIgnoreCase)
+                || filePath.Contains(@"\AppData\Local\Temp", StringComparison.OrdinalIgnoreCase))
                 return RiskLevel.Minor;
 
             return RiskLevel.Informational;
@@ -198,19 +172,21 @@ namespace optiSCAN.Services
         {
             var ext = Path.GetExtension(filePath);
 
-            if (filePath.Contains(@"\Windows\System32\"))
-                return "Fichier système critique → risque critique";
+            if (filePath.Contains(@"\Windows\System32\", StringComparison.OrdinalIgnoreCase)
+                || filePath.Contains(@"\Windows\SysWOW64\", StringComparison.OrdinalIgnoreCase))
+                return LocalizationService.GetString("Risk_File_SystemCritical");
 
             if (HighRiskExtensions.Contains(ext))
-                return $"Extension exécutable ({ext}) → risque majeur";
+                return LocalizationService.Format("Risk_File_Executable", ext);
 
             if (MacroExtensions.Contains(ext))
-                return $"Document avec macros ({ext}) → risque majeur";
+                return LocalizationService.Format("Risk_File_Macro", ext);
 
-            if (filePath.Contains(@"\Temp\"))
-                return "Fichier temporaire → risque modéré";
+            if (filePath.Contains(@"\Temp\", StringComparison.OrdinalIgnoreCase)
+                || filePath.Contains(@"\AppData\Local\Temp", StringComparison.OrdinalIgnoreCase))
+                return LocalizationService.GetString("Risk_File_Temp");
 
-            return "Fichier standard";
+            return LocalizationService.GetString("Risk_File_Standard");
         }
 
         private static int GetScore(RiskLevel level) => level switch
@@ -230,14 +206,12 @@ namespace optiSCAN.Services
             _ => RiskLevel.Informational
         };
 
-        // ── Helpers d'affichage ──────────────────────────────────────────────────
-
         private static string GetSeverityString(RiskLevel level) => level switch
         {
-            RiskLevel.Critical => "CRITIQUE",
-            RiskLevel.Major => "MAJEUR",
-            RiskLevel.Minor => "MINEUR",
-            _ => "INFORMATIONNEL"
+            RiskLevel.Critical => LocalizationService.GetString("Risk_Severity_Critical"),
+            RiskLevel.Major => LocalizationService.GetString("Risk_Severity_Major"),
+            RiskLevel.Minor => LocalizationService.GetString("Risk_Severity_Minor"),
+            _ => LocalizationService.GetString("Risk_Severity_Informational")
         };
 
         public static string GetSeverityBrushKey(RiskLevel level) => level switch
@@ -252,20 +226,20 @@ namespace optiSCAN.Services
 
         private static string GetSeverityIconKind(RiskLevel level) => UiIconKinds.ForRiskLevel(level);
 
-        private static string GetRecommendation(RiskLevel level, ThreatInfo threat) => level switch
+        private static string GetRecommendation(RiskLevel level, ThreatInfo threat)
         {
-            RiskLevel.Critical =>
-                $"ACTION IMMÉDIATE REQUISE : Mettez en quarantaine ou supprimez {threat.FileName} immédiatement.",
-            RiskLevel.Major =>
-                $"Action recommandée : Mettez en quarantaine {threat.FileName} dès que possible.",
-            RiskLevel.Minor =>
-                $"Action facultative : Surveillez {threat.FileName} ou mettez-le en quarantaine par précaution.",
-            _ =>
-                $"Information : {threat.VirusName} — aucune action immédiate requise."
-        };
+            var name = Path.GetFileName(threat.FilePath);
+            if (string.IsNullOrEmpty(name))
+                name = threat.FileName;
+            return level switch
+            {
+                RiskLevel.Critical => LocalizationService.Format("Risk_Rec_Critical", name),
+                RiskLevel.Major => LocalizationService.Format("Risk_Rec_Major", name),
+                RiskLevel.Minor => LocalizationService.Format("Risk_Rec_Minor", name),
+                _ => LocalizationService.Format("Risk_Rec_Info", threat.VirusName ?? name),
+            };
+        }
     }
-
-    // ── Modèles ──────────────────────────────────────────────────────────────────
 
     public enum RiskLevel
     {
@@ -281,9 +255,7 @@ namespace optiSCAN.Services
         public RiskLevel Level { get; set; }
         public string Severity { get; set; } = string.Empty;
         public string Color { get; set; } = string.Empty;
-        /// <summary>Clé DynamicResource Donaby (RiskCritical, RiskMajor, …).</summary>
         public string BrushKey { get; set; } = string.Empty;
-        /// <summary>Nom <see cref="MaterialDesignThemes.Wpf.PackIconKind"/> (ex. Alert, CheckCircle).</summary>
         public string IconKind { get; set; } = string.Empty;
         public string Recommendation { get; set; } = string.Empty;
         public List<string> Reasons { get; set; } = new();

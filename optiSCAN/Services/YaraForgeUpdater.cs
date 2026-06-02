@@ -3,6 +3,7 @@ using System.IO;
 using System.IO.Compression;
 using System.Net.Http;
 using System.Text.Json.Nodes;
+using optiSCAN.Localization;
 using optiSCAN.Strings;
 
 namespace optiSCAN.Services
@@ -164,7 +165,7 @@ namespace optiSCAN.Services
                 return new RulesUpdateResult
                 {
                     Success = false,
-                    Message = "Mise à jour des règles de détection déjà en cours."
+                    Message = LocalizationService.GetString("YaraForge_AlreadyRunning")
                 };
 
             IsUpdating = true;
@@ -179,7 +180,7 @@ namespace optiSCAN.Services
             try
             {
                 // ── 1. Récupération de la dernière version ─────────────────────
-                Report(progress, "Vérification des règles de détection…");
+                Report(progress, LocalizationService.GetString("SigUpd_VerifyingRules"));
 
                 string releaseJson;
                 try
@@ -189,21 +190,21 @@ namespace optiSCAN.Services
                 catch (Exception ex)
                 {
                     result.Success = false;
-                    result.Message = $"Impossible de contacter le serveur de mise à jour : {ex.Message}";
+                    result.Message = LocalizationService.Format("YaraForge_ContactError", ex.Message);
                     return result;
                 }
 
                 var release = JsonNode.Parse(releaseJson);
-                var tagName = release?["tag_name"]?.GetValue<string>() ?? "inconnue";
+                var tagName = release?["tag_name"]?.GetValue<string>() ?? LocalizationService.GetString("Common_Unknown");
 
-                Report(progress, $"Version disponible : {tagName}");
+                Report(progress, LocalizationService.Format("YaraForge_VersionAvailable", tagName));
 
                 // Déjà à jour ?
                 if (LastVersion != null && LastVersion == tagName)
                 {
                     result.Success = true;
                     result.AlreadyUpToDate = true;
-                    result.Message = "Les règles de détection sont déjà à jour.";
+                    result.Message = LocalizationService.GetString("YaraForge_AlreadyUpToDate");
                     return result;
                 }
 
@@ -227,12 +228,12 @@ namespace optiSCAN.Services
                 if (string.IsNullOrEmpty(downloadUrl))
                 {
                     result.Success = false;
-                    result.Message = "Paquet de règles de détection introuvable dans la dernière version.";
+                    result.Message = LocalizationService.GetString("YaraForge_PackageNotFound");
                     return result;
                 }
 
                 // ── 3. Téléchargement ─────────────────────────────────────────
-                Report(progress, "Téléchargement des règles de détection…");
+                Report(progress, LocalizationService.GetString("YaraForge_Downloading"));
 
                 byte[] zipBytes;
                 try
@@ -242,14 +243,14 @@ namespace optiSCAN.Services
                 catch (Exception ex)
                 {
                     result.Success = false;
-                    result.Message = $"Erreur lors du téléchargement : {ex.Message}";
+                    result.Message = LocalizationService.Format("YaraForge_DownloadError", ex.Message);
                     return result;
                 }
 
                 // ── 4. Extraction (I/O synchrone, centaines de fichiers) ─────
                 // Hors thread UI : UpdateAsync peut reprendre le dispatcher (ConfigureAwait(true))
                 // depuis MainWindow — extraire ici bloquait l'interface plusieurs secondes.
-                Report(progress, "Installation des règles de détection…");
+                Report(progress, LocalizationService.GetString("YaraForge_Installing"));
 
                 if (!Directory.Exists(_rulesDirectory))
                     Directory.CreateDirectory(_rulesDirectory);
@@ -269,20 +270,20 @@ namespace optiSCAN.Services
                 result.Version = tagName;
                 result.FilesInstalled = installed;
                 result.Message = installed > 0
-                    ? $"Règles de détection mises à jour — {installed} règle(s) installée(s) (version {tagName})."
-                    : "Mise à jour effectuée (aucun nouveau fichier de règles).";
+                    ? LocalizationService.Format("YaraForge_UpdateOk", installed, tagName)
+                    : LocalizationService.GetString("YaraForge_NoNewFiles");
 
                 Report(progress, result.Message);
             }
             catch (OperationCanceledException)
             {
                 result.Success = false;
-                result.Message = "Mise à jour des règles annulée.";
+                result.Message = LocalizationService.GetString("YaraForge_Cancelled");
             }
             catch (Exception ex)
             {
                 result.Success = false;
-                result.Message = $"Erreur inattendue lors de la mise à jour des règles : {ex.Message}";
+                result.Message = LocalizationService.Format("YaraForge_Error", ex.Message);
             }
             finally
             {

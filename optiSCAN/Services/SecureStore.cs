@@ -83,7 +83,15 @@ namespace optiSCAN.Services
                     }
                 }
 
-                return JsonSerializer.Deserialize<T>(envelope.Json);
+                // Enveloppe legacy sans HMAC (pre-v2) — re-sauvegarde signée une fois.
+                var unsigned = JsonSerializer.Deserialize<T>(envelope.Json);
+                if (unsigned != null)
+                {
+                    Save(path, unsigned);
+                    AppLogger.Info("SecureStore",
+                        $"Migration enveloppe non signée → HMAC : {Path.GetFileName(path)}");
+                }
+                return unsigned;
             }
             catch (CryptographicException ex)
             {

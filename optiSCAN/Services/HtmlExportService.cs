@@ -1,4 +1,6 @@
+using optiSCAN.Localization;
 using optiSCAN.Models;
+using System.Globalization;
 using System.IO;
 using System.Text;
 
@@ -6,15 +8,10 @@ namespace optiSCAN.Services
 {
     /// <summary>
     /// Génère un rapport HTML moderne à partir de l'historique des scans
-    /// et des menaces détectées.
+    /// et des menaces détectées (libellés selon la culture UI active).
     /// </summary>
     public sealed class HtmlExportService
     {
-        // ── API publique ──────────────────────────────────────────────────────────
-
-        /// <summary>
-        /// Génère un rapport HTML complet et le sauvegarde dans <paramref name="outputPath"/>.
-        /// </summary>
         public void ExportFullReport(
             IEnumerable<ScanSession> scanHistory,
             IEnumerable<ThreatInfo> activeThreats,
@@ -26,7 +23,19 @@ namespace optiSCAN.Services
             File.WriteAllText(outputPath, html, Encoding.UTF8);
         }
 
-        // ── Génération HTML ───────────────────────────────────────────────────────
+        /// <summary>
+        /// Remplace le profil utilisateur dans un chemin par %UserProfile%
+        /// pour éviter d'exposer le nom de compte dans les exports partagés.
+        /// </summary>
+        private static string RedactPath(string? path)
+        {
+            if (string.IsNullOrEmpty(path))
+                return string.Empty;
+            var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
+            if (!string.IsNullOrEmpty(profile) && path.StartsWith(profile, StringComparison.OrdinalIgnoreCase))
+                return "%UserProfile%" + path[profile.Length..];
+            return path;
+        }
 
         private static string BuildHtml(
             IEnumerable<ScanSession> scans,
@@ -34,20 +43,26 @@ namespace optiSCAN.Services
             IEnumerable<QuarantineEntry> quarantine,
             UserPreferences prefs)
         {
+            static string L(string key) => LocalizationService.GetString(key);
+
+            var cult = CultureInfo.CurrentCulture;
+            var lang = CultureInfo.CurrentUICulture.TwoLetterISOLanguageName;
             var now = DateTime.Now;
             var scanList = scans.Take(20).ToList();
             var threatList = threats.ToList();
             var quarList = quarantine.Take(50).ToList();
             var totalScans = scanList.Count;
             var totalThreats = scanList.Sum(s => s.ThreatsFound);
+            var dateShort = now.ToString("d", cult);
+            var generatedAt = now.ToString("f", cult);
 
             var sb = new StringBuilder();
             sb.AppendLine($@"<!DOCTYPE html>
-<html lang=""fr"">
+<html lang=""{lang}"">
 <head>
   <meta charset=""UTF-8"">
   <meta name=""viewport"" content=""width=device-width, initial-scale=1.0"">
-  <title>optiSCAN — Rapport du {now:dd/MM/yyyy}</title>
+  <title>{LocalizationService.Format("Export_Html_Title", dateShort)}</title>
   <style>
     :root {{
       --bg:       #0b1628;
@@ -148,43 +163,41 @@ namespace optiSCAN.Services
     </svg>
   </div>
   <div>
-    <h1>Rapport optiSCAN</h1>
-    <div class=""meta"">Généré le {now:dddd dd MMMM yyyy à HH:mm} · optiSCAN {ProductVersionInfo.ReleaseLabel} ({ProductVersionInfo.SemVer})</div>
+    <h1>{L("Export_Html_ReportTitle")}</h1>
+    <div class=""meta"">{LocalizationService.Format("Export_Html_GeneratedMeta", generatedAt, ProductVersionInfo.ReleaseLabel, ProductVersionInfo.SemVer)}</div>
   </div>
 </header>
 
-<!-- KPIs -->
 <div class=""grid-4"">
   <div class=""card"">
-    <div class=""card-label"">Scans effectués</div>
+    <div class=""card-label"">{L("Export_Html_KpiTotalScans")}</div>
     <div class=""card-value blue"">{prefs.TotalScansCount}</div>
   </div>
   <div class=""card"">
-    <div class=""card-label"">Scans (ce rapport)</div>
+    <div class=""card-label"">{L("Export_Html_KpiInReport")}</div>
     <div class=""card-value gold"">{totalScans}</div>
   </div>
   <div class=""card"">
-    <div class=""card-label"">Menaces détectées</div>
+    <div class=""card-label"">{L("Export_Html_KpiThreats")}</div>
     <div class=""card-value red"">{totalThreats}</div>
   </div>
   <div class=""card"">
-    <div class=""card-label"">En quarantaine</div>
+    <div class=""card-label"">{L("Export_Html_KpiQuarantine")}</div>
     <div class=""card-value green"">{quarList.Count}</div>
   </div>
 </div>
 
-<!-- Historique des scans -->
 <div class=""section"">
-  <h2>Historique des scans</h2>
+  <h2>{L("Export_Html_ScanHistory")}</h2>
   <table>
     <thead>
       <tr>
-        <th>Date</th>
-        <th>Type</th>
-        <th>Fichiers analysés</th>
-        <th>Menaces</th>
-        <th>Durée</th>
-        <th>Statut</th>
+        <th>{L("Export_Html_ColDate")}</th>
+        <th>{L("Export_Html_ColType")}</th>
+        <th>{L("Export_Html_ColFiles")}</th>
+        <th>{L("Export_Html_ColThreats")}</th>
+        <th>{L("Export_Html_ColDuration")}</th>
+        <th>{L("Export_Html_ColStatus")}</th>
       </tr>
     </thead>
     <tbody>");
@@ -192,86 +205,82 @@ namespace optiSCAN.Services
             foreach (var s in scanList)
             {
                 string badge = s.ThreatsFound == 0
-                    ? "<span class=\"badge badge-ok\">Propre</span>"
-                    : $"<span class=\"badge badge-err\">{s.ThreatsFound} menace(s)</span>";
+                    ? $"<span class=\"badge badge-ok\">{L("Export_Html_BadgeClean")}</span>"
+                    : $"<span class=\"badge badge-err\">{LocalizationService.Format("Export_Html_BadgeThreats", s.ThreatsFound)}</span>";
 
                 sb.AppendLine($@"      <tr>
-        <td>{s.StartedAt:dd/MM/yyyy HH:mm}</td>
-        <td>{s.TypeDisplay}</td>
-        <td>{s.FilesScanned:N0}</td>
+        <td>{s.StartedAt.ToString("g", cult)}</td>
+        <td>{System.Net.WebUtility.HtmlEncode(s.TypeDisplay)}</td>
+        <td>{s.FilesScanned.ToString("N0", cult)}</td>
         <td class=""{(s.ThreatsFound > 0 ? "red" : "green")}"">{s.ThreatsFound}</td>
-        <td>{s.DurationDisplay}</td>
+        <td>{System.Net.WebUtility.HtmlEncode(s.DurationDisplay)}</td>
         <td>{badge}</td>
       </tr>");
             }
 
             if (!scanList.Any())
-                sb.AppendLine("      <tr><td colspan=\"6\" style=\"text-align:center;color:var(--muted)\">Aucun scan enregistré</td></tr>");
+                sb.AppendLine($"      <tr><td colspan=\"6\" style=\"text-align:center;color:var(--muted)\">{L("Export_Html_NoScans")}</td></tr>");
 
             sb.AppendLine("    </tbody></table></div>");
 
-            // Menaces actives
             if (threatList.Any())
             {
-                sb.AppendLine(@"<div class=""section"">
-  <h2>Menaces actives (non traitées)</h2>
+                sb.AppendLine($@"<div class=""section"">
+  <h2>{L("Export_Html_ActiveThreats")}</h2>
   <table>
-    <thead><tr><th>Fichier</th><th>Virus détecté</th><th>Chemin</th><th>Statut</th></tr></thead>
+    <thead><tr><th>{L("Export_Html_ColFile")}</th><th>{L("Export_Html_ColVirus")}</th><th>{L("Export_Html_ColPath")}</th><th>{L("Export_Html_ColStatus")}</th></tr></thead>
     <tbody>");
                 foreach (var t in threatList)
                 {
                     sb.AppendLine($@"      <tr>
         <td>{System.Net.WebUtility.HtmlEncode(t.FileName)}</td>
         <td class=""red"">{System.Net.WebUtility.HtmlEncode(t.VirusName)}</td>
-        <td style=""font-size:11px;color:var(--muted)"">{System.Net.WebUtility.HtmlEncode(t.FilePath)}</td>
-        <td><span class=""badge badge-err"">Non traité</span></td>
+        <td style=""font-size:11px;color:var(--muted)"">{System.Net.WebUtility.HtmlEncode(RedactPath(t.FilePath))}</td>
+        <td><span class=""badge badge-err"">{L("Export_Html_Untreated")}</span></td>
       </tr>");
                 }
                 sb.AppendLine("    </tbody></table></div>");
             }
 
-            // Quarantaine
             if (quarList.Any())
             {
-                sb.AppendLine(@"<div class=""section"">
-  <h2>Quarantaine</h2>
+                sb.AppendLine($@"<div class=""section"">
+  <h2>{L("Export_Html_Quarantine")}</h2>
   <table>
-    <thead><tr><th>Fichier</th><th>Virus</th><th>Date quarantaine</th><th>Taille</th></tr></thead>
+    <thead><tr><th>{L("Export_Html_ColFile")}</th><th>{L("Export_Html_ColVirus")}</th><th>{L("Export_Html_ColQDate")}</th><th>{L("Export_Html_ColSize")}</th></tr></thead>
     <tbody>");
                 foreach (var q in quarList)
                 {
                     sb.AppendLine($@"      <tr>
         <td>{System.Net.WebUtility.HtmlEncode(q.FileName)}</td>
         <td class=""gold"">{System.Net.WebUtility.HtmlEncode(q.VirusName)}</td>
-        <td>{q.QuarantinedAt:dd/MM/yyyy HH:mm}</td>
-        <td>{q.SizeDisplay}</td>
+        <td>{q.QuarantinedAt.ToString("g", cult)}</td>
+        <td>{System.Net.WebUtility.HtmlEncode(q.SizeDisplay)}</td>
       </tr>");
                 }
                 sb.AppendLine("    </tbody></table></div>");
             }
 
-            // Cibles récentes
             if (prefs.RecentTargets.Any())
             {
-                sb.AppendLine(@"<div class=""section"">
-  <h2>Cibles récentes</h2>
+                sb.AppendLine($@"<div class=""section"">
+  <h2>{L("Export_Html_RecentTargets")}</h2>
   <table>
-    <thead><tr><th>Chemin</th><th>Type</th><th>Dernier scan</th></tr></thead>
+    <thead><tr><th>{L("Export_Html_ColPath")}</th><th>{L("Export_Html_ColType")}</th><th>{L("Export_Html_ColLastScan")}</th></tr></thead>
     <tbody>");
                 foreach (var r in prefs.RecentTargets)
                 {
                     sb.AppendLine($@"      <tr>
-        <td>{System.Net.WebUtility.HtmlEncode(r.Path)}</td>
-        <td>{r.ScanType}</td>
-        <td>{r.LastUsed:dd/MM/yyyy HH:mm}</td>
+        <td>{System.Net.WebUtility.HtmlEncode(RedactPath(r.Path))}</td>
+        <td>{System.Net.WebUtility.HtmlEncode(LocalizationService.ScanTypeDisplay(r.ScanType))}</td>
+        <td>{r.LastUsed.ToString("g", cult)}</td>
       </tr>");
                 }
                 sb.AppendLine("    </tbody></table></div>");
             }
 
             sb.AppendLine($@"<footer>
-  Rapport généré automatiquement par optiSCAN {ProductVersionInfo.ReleaseLabel} ({ProductVersionInfo.SemVer}) — {now:yyyy} ·
-  Les informations de ce rapport sont confidentielles.
+  {LocalizationService.Format("Export_Html_Footer", ProductVersionInfo.ReleaseLabel, ProductVersionInfo.SemVer, now.Year.ToString(cult))}
 </footer>
 </body>
 </html>");

@@ -4,24 +4,31 @@
 ; AppRelease = nom vM.m (v7.0) · AppVersion = semver / Directory.Build.props
 
 #define AppName        "optiSCAN"
-#define AppVersion     "1.0.0"
+#ifndef AppVersion
+#define AppVersion     "2.0.0"
+#endif
+#ifndef AppRelease
+#define AppRelease     "v2.0"
+#endif
 #define AppPublisher   "Dona By"
 #define AppURL         "https://sourceforge.net/projects/optiscan/"
 #define AppExeName     "optiSCAN.exe"
 #define AppId          "{{F3A2C1D0-5B6E-4F7A-8C9D-0E1F2A3B4C5D}"
-#define AppRelease     "v1.0"
 #define AppIconFile    "..\optiSCAN\optiSCAN.ico"
 
 ; ── ISPP : emplacement de publish (VS / dotnet peuvent sortir dans publish\win-x64\ ou publish\)
 ; Préférer win-x64 en premier : c'est la sortie d'un « dotnet publish -r win-x64 » / profil dossier,
 ; et un vieux optiSCAN.exe à la racine de publish\ ne doit pas masquer une publication RID récente.
 ; Le .csproj supprime win-x64 / win-x86 / publish avant chaque publish (cible CleanStalePublishOutput).
+; CI : /DAppPublishSource=..\publish\win-x64\*
+#ifndef AppPublishSource
 #if FileExists(AddBackslash(SourcePath) + "..\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\optiSCAN.exe")
   #define AppPublishSource "..\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\*"
 #elif FileExists(AddBackslash(SourcePath) + "..\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\optiSCAN.exe")
   #define AppPublishSource "..\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\*"
 #else
   #expr Error("optiSCAN.exe introuvable. Ouvrez optiSCAN.csproj puis menu Build > Publish (Release), ou en ligne de commande : dotnet publish -c Release -r win-x64")
+#endif
 #endif
 
 [Setup]

@@ -1,3 +1,4 @@
+using optiSCAN.Localization;
 using System.IO;
 using System.Text;
 
@@ -27,31 +28,31 @@ namespace optiSCAN.Services
             public string BuildSummaryLine()
             {
                 if (IsFullyReady)
-                    return "Moteurs ClamAV et YARA prêts.";
+                    return LocalizationService.GetString("Runtime_ReadySummary");
                 var missing = Items.Where(i => !i.IsReady).Select(i => i.Name).ToList();
                 return missing.Count == 0
-                    ? "Dépendances runtime incomplètes."
-                    : $"Manquant : {string.Join(", ", missing)}.";
+                    ? LocalizationService.GetString("Runtime_IncompleteSummary")
+                    : LocalizationService.Format("Runtime_MissingSummary", string.Join(", ", missing));
             }
 
             public string BuildDetailedMessage()
             {
                 var sb = new StringBuilder();
-                sb.AppendLine($"Répertoire d'exécution : {AppInstallPaths.GetInstallRoot()}");
+                sb.AppendLine(LocalizationService.Format("Runtime_ExecDirFormat", AppInstallPaths.GetInstallRoot()));
                 sb.AppendLine();
                 foreach (var item in Items)
                 {
                     sb.AppendLine(item.IsReady ? UiLogText.ReadyLine(item.Name) : UiLogText.MissingLine(item.Name));
-                    sb.AppendLine($"  Attendu : {item.ExpectedPath}");
+                    sb.AppendLine(LocalizationService.Format("Runtime_ExpectedPath", item.ExpectedPath));
                     if (!string.IsNullOrWhiteSpace(item.Detail))
                         sb.AppendLine($"  {item.Detail}");
                     sb.AppendLine();
                 }
                 if (!IsFullyReady)
                 {
-                    sb.AppendLine("En développement : copiez clamav/x64 et yara/ sous optiSCAN/,");
-                    sb.AppendLine("ou exécutez : .\\scripts\\verify-runtime-deps.ps1");
-                    sb.AppendLine("Voir README § 3 (ClamAV) et publication § 8.");
+                    sb.AppendLine(LocalizationService.GetString("Runtime_DevCopyHint"));
+                    sb.AppendLine(LocalizationService.GetString("Runtime_DevVerifyScript"));
+                    sb.AppendLine(LocalizationService.GetString("Runtime_DevReadmeRefs"));
                 }
                 return sb.ToString().TrimEnd();
             }
