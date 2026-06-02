@@ -280,6 +280,31 @@ namespace optiSCAN.Views
             }
         }
 
+        private async void BtnCheckReputation_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not System.Windows.Controls.Button btn || btn.Tag is not string filePath)
+                return;
+
+            btn.IsEnabled = false;
+            try
+            {
+                var result = await ServiceContainer.Default.ThreatReputation.LookupFileAsync(filePath);
+                var message = result.Summary;
+                if (!string.IsNullOrEmpty(result.Permalink))
+                    message += Environment.NewLine + result.Permalink;
+
+                System.Windows.MessageBox.Show(
+                    message,
+                    LocalizationService.GetString("Av_ReputationTitle"),
+                    MessageBoxButton.OK,
+                    result.IsError ? MessageBoxImage.Warning : MessageBoxImage.Information);
+            }
+            finally
+            {
+                btn.IsEnabled = true;
+            }
+        }
+
         private void BtnDeleteThreat_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not System.Windows.Controls.Button btn || btn.Tag is not string filePath)

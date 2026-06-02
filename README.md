@@ -1,9 +1,7 @@
-# Guide Complet — optiSCAN v7.0
+# Guide Complet — optiSCAN v8.0
 
-> **Version de référence.** Ce guide décrit l'architecture, les modules et les procédures
-> de la version **v7.0** du produit (build **7.0.0**, édition ClamAV). Architecture mono-fenêtre avec services avancés + Donaby Design System.
->
-> **Nomenclature (comme v1.0 … v6.0)** — **v7.0** : nom de release (documentation, CLUF). **7.0.0** : identifiant d’assembly et d’installateur (`Directory.Build.props`, Inno Setup).
+> **Version de référence.** Architecture mono-fenêtre, services avancés + Donaby Design System.  
+> **Nomenclature** — **v8.0** : nom de release (documentation, CLUF). **8.0.0** : assembly et installateur (`Directory.Build.props`, Inno Setup).
 >
 > **Design system : Donaby Design** — thème sombre/clair dynamique, tokens DynamicResource WPF.
 > Développé par **© 2026 Donatien Byakombe (Dona By)**.
@@ -23,8 +21,9 @@
 | **9** | Langues de l’interface (fr-FR / en-US) |
 | **10** | Dépendances et licences |
 | **11** | Historique des versions produit |
-| **12** | Crédits |
-| — | Voir aussi : [docs/](docs/README.md) (index) · [BUILD](docs/BUILD.md) · [LOCALIZATION](docs/LOCALIZATION.md) · [RELEASE-CHECKLIST](docs/RELEASE-CHECKLIST.md) · [AUDIT](docs/AUDIT.md) |
+| **12** | Audit et qualité |
+| **13** | Sécurité (posture /100, modèle de menace) |
+| **14** | Crédits |
 
 ---
 
@@ -47,12 +46,8 @@
 (racine du dépôt optiSCAN)
 ├── README.md                          ← Ce fichier (guide complet)
 ├── docs/
-│   ├── README.md                      ← Index documentation
-│   ├── AUDIT.md                       ← Audit unique synthétisé (QA / release)
-│   ├── BUILD.md                       ← Publish, nettoyage, Inno, CI
-│   ├── LOCALIZATION.md                ← Français / English (utilisateur + dev)
-│   └── RELEASE-CHECKLIST.md           ← Contrôles avant installateur
-├── .github/workflows/ci.yml           ← Build, tests (83), publish + installateur (main)
+│   └── README.md                      ← Renvoi vers ce README (sections 8–13)
+├── .github/workflows/ci.yml           ← Build, tests (116), publish (main)
 ├── scripts/
 │   ├── clean-before-publish.ps1       ← Nettoyage bin/obj avant release
 │   └── verify-runtime-deps.ps1        ← Vérifie clamav + yara + rules
@@ -214,7 +209,7 @@ https://www.clamav.net/downloads#otherversions
 ```
 <racine du dépôt>/optiSCAN/clamav/x64/
     ├── clamscan.exe
-    ├── clamd.exe              ← binaire optionnel (non utilisé par l’app UI ; scans = clamscan)
+    ├── clamd.exe              ← daemon ClamAV optionnel (TCP 127.0.0.1:3310 si « Moteur clamd » activé)
     ├── freshclam.exe
     ...
 ```
@@ -257,7 +252,7 @@ après la date textuelle (le premier champ est une date lisible, pas un entier).
 
 ---
 
-## 4. Architecture mono-fenêtre (v7.0)
+## 4. Architecture mono-fenêtre (v8.0)
 
 Les sous-sections **4.1** à **4.11** suivent une lecture « produit » : navigation et panneaux, détail du panneau Antivirus, menaces et pipeline, options techniques (MAJ, exclusions, quarantaine, logs), exports, puis contenu de la vue d’ensemble.
 
@@ -311,16 +306,18 @@ En bas du tableau, le bouton **Tout mettre en quarantaine** (`BtnQuarantineAll_C
 
 ### 4.5 Pipeline de détection en parallèle
 
-Les scans interactifs passent par `ScanViewModel.StartScanAsync` → `ScanOrchestrator` : pour chaque cible, **ClamAV** (`clamscan.exe`) et **YARA** tournent en parallèle (`Task.WhenAll`), puis fusion. Les scans **multi-dossiers** passent par `MultiTargetScanAggregator` (déduplication : même fichier + même nom de menace). Le **dossier d’installation** d’optiSCAN est exclu automatiquement (`AppInstallPaths` + `ExclusionSettings`). **`RiskScoringService`** alimente la colonne **Risque**, les toasts et le PDF (pas une étape de fusion dans l’orchestrateur).
+Les scans interactifs passent par `ScanViewModel.StartScanAsync` → `ScanOrchestrator` : pour chaque cible, **ClamAV** (daemon **clamd** ou repli **clamscan.exe**) et **YARA** tournent en parallèle (`Task.WhenAll`), puis fusion. Les scans **multi-dossiers** passent par `MultiTargetScanAggregator`. Le **dossier d’installation** est exclu (`AppInstallPaths` + `ExclusionSettings`). **`RiskScoringService`** alimente la colonne **Risque**, les toasts et le PDF.
 
-> **clamd** — le binaire `clamd.exe` peut être livré sous `clamav/x64/`, mais **aucun client C#** n’est branché : tous les scans UI utilisent **`clamscan.exe`**.
+> **clamd** — si `clamd.exe` est présent et l’option **Moteur clamd** est activée (Options), les scans utilisent le daemon TCP (`127.0.0.1:3310`) ; sinon repli sur **`clamscan.exe`**. Note posture Accueil : [§13 Sécurité](#13-sécurité-posture-et-menaces).
 
 ```
-ScanViewModel → ScanOrchestrator (+ ExclusionSettings + AppInstallPaths)
-    │   ├─→ ClamAvEngine (clamscan.exe)  ─┐
-    │   └─→ YaraEngine (.yarc + stamp)   ├── Task.WhenAll → fusion / dédup
-    └─→ Progress<ScanProgress> → UI (AntivirusView)
+ScanViewModel → ScanOrchestrator
+    │   ├─→ CompositeClamAvBackend (clamd → clamscan)  ─┐
+    │   └─→ YaraEngine (.yarc + stamp)                 ├── Task.WhenAll → fusion
+    └─→ Progress<ScanProgress> → UI
 ```
+
+**v8.0** ajoute aussi : note de **posture sécurité** (Accueil), **réputation VirusTotal** (hash SHA-256, clé API Options), **mode jeu** (toasts / scans headless atténués).
 
 **Identifiant menace** — `ThreatInfo.Id` : hash **SHA-256** déterministe (`FilePath|VirusName|DetectedAt`) — stable entre redémarrages (pas `string.GetHashCode()`).
 
@@ -439,7 +436,7 @@ Instance unique : **`ServiceContainer.Default.ScheduledScan`** (partagée avec *
 
 ---
 
-## 6. Workflow utilisateur optiSCAN v7.0
+## 6. Workflow utilisateur optiSCAN v8.0
 
 ```
 DÉMARRAGE (UI)
@@ -503,9 +500,7 @@ Add-MpPreference -ExclusionPath "C:\Program Files\optiSCAN\clamav\database"
 
 ---
 
-## 8. Packaging final (v7.0)
-
-Guide détaillé : **[docs/BUILD.md](docs/BUILD.md)**.
+## 8. Packaging final (v8.0)
 
 Exécuter depuis la **racine du dépôt** (dossier contenant `optiSCAN.sln`). La sortie du profil **FolderProfile** est `optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\` (chemin attendu par `installer\setup.iss`).
 
@@ -534,7 +529,7 @@ $pub = ".\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64"
 & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" .\installer\setup.iss
 ```
 
-Sortie typique : `installer\output\optiSCAN_Setup_v7.0.0.exe` (versions dans `#define` de `setup.iss`).
+Sortie typique : `installer\output\optiSCAN_Setup_v8.0.0.exe` (versions dans `#define` de `setup.iss`).
 
 **Variante tout-en-un** : `.\installer\build-release-setup.ps1` (nettoie, publie, lance ISCC).
 
@@ -543,7 +538,7 @@ Sortie typique : `installer\output\optiSCAN_Setup_v7.0.0.exe` (versions dans `#d
 **Contenu de l'installateur (~260 Mo avec signatures initiales) :**
 
 ```
-optiSCAN_Setup_v7.0.0.exe
+optiSCAN_Setup_v8.0.0.exe
     ├── optiSCAN.exe
     ├── optiSCAN.ico
     ├── *.dll (runtime .NET 8)
@@ -552,20 +547,53 @@ optiSCAN_Setup_v7.0.0.exe
     └── rules/               ← Règles de détection initiales
 ```
 
+### Tests et CI
+
+```powershell
+dotnet test .\optiSCAN.Tests\optiSCAN.Tests.csproj -c Release   # 134 tests
+```
+
+Pipeline : [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — build Release/Debug, tests avec couverture Cobertura, publish + Inno sur `main`.
+
+### Checklist release (avant installateur)
+
+- [ ] `.\scripts\clean-before-publish.ps1 -IncludeObj` puis `verify-runtime-deps.ps1`
+- [ ] `dotnet test` Release — 134 tests OK
+- [ ] Installateur FR/EN, sidebar **v8.0**, accueil posture /100
+- [ ] **clamd**, VirusTotal, mode jeu, mutex headless, quarantaine
+- [ ] `clamav\x64` (clamscan, freshclam, **clamd**) + `yara64.exe` + règles
+
+### Signature Authenticode (optionnelle)
+
+Windows affiche « Éditeur inconnu » sans certificat. Utile pour release publique ; nécessite un `.pfx` et des secrets CI (`CODESIGN_PFX`). Exemple : [`installer/setup.iss.signing.example`](installer/setup.iss.signing.example). Voir commandes `signtool` dans l’historique des commits ou signer manuellement `optiSCAN.exe` + `optiSCAN_Setup_v8.0.0.exe`.
+
 ---
 
 ## 9. Langues de l’interface (fr-FR / en-US)
-
-Références : **[docs/LOCALIZATION.md](docs/LOCALIZATION.md)** · **[docs/README.md](docs/README.md)** (index doc).
 
 | Canal | Comportement |
 |-------|----------------|
 | **Installateur Inno** | Choix FR ou EN → `HKCU\Software\optiSCAN\UiCulture` |
 | **Options → Langue** | Français / English → confirmation → **redémarrage** de l’app |
-| **Ressources** | `UiStrings.resx` + `UiStrings.en.resx` (~530 clés, juin 2026) |
+| **Ressources** | `UiStrings.resx` + `UiStrings.en.resx` (**575** clés FR/EN, parité vérifiée en CI) |
 | **Menu contextuel** | « Scanner avec optiSCAN » ou « Scan with optiSCAN » |
 
 Les deux langues sont **incluses dans le même binaire** (pas de pack de langue séparé). Les rapports PDF/HTML exportés et les journaux techniques ClamAV/YARA peuvent rester partiellement en français ou en anglais technique.
+
+### Développeurs et traducteurs
+
+| Fichier | Culture |
+|---------|---------|
+| `optiSCAN/Resources/UiStrings.resx` | Français (défaut) |
+| `optiSCAN/Resources/UiStrings.en.resx` | Anglais (en-US) |
+
+Ajouter une clé : même nom dans les deux `.resx` → XAML `{loc:Loc Key=...}` ou C# `LocalizationService.GetString` / `Format`.
+
+```powershell
+dotnet test optiSCAN.Tests\optiSCAN.Tests.csproj -c Release --filter Localization
+```
+
+Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de menaces, chemins, marques ClamAV/YARA.
 
 ---
 
@@ -588,26 +616,34 @@ Les deux langues sont **incluses dans le même binaire** (pas de pack de langue 
 
 ## 11. Historique des versions produit
 
+### v8.0 — Clamd, posture, réputation cloud
+
+- **clamd** — `CompositeClamAvBackend`, TCP `127.0.0.1:3310`, protocole `CONTSCAN`, repli `clamscan.exe`
+- **Posture /100** — `ISecurityPostureService`, `IWindowsUpdateProbe`, pare-feu 3 profils — [§13](#13-sécurité-posture-et-menaces)
+- **VirusTotal** — réputation par hash SHA-256, cache 6 h, lien GUI (clé API utilisateur)
+- **Mode jeu** — toasts / scans headless atténués si plein écran
+- **Tests** — **134** tests Release — [§12](#12-audit-et-qualité)
+
 ### v7.0 — Lifting UI Donaby + identité visuelle
 
 - **Lifting apparence** — glassmorphism, fond mesh, cartes métriques, en-têtes unifiés
-- **Accueil v7** — hero `FontSize.Display`, dernière analyse détaillée, carte État de protection, stats/recommandations
-- **Typo & écriture** — Title Case, token Display, voix éditoriale ([LOCALIZATION.md](docs/LOCALIZATION.md))
+- **Accueil** — hero `FontSize.Display`, dernière analyse détaillée, carte État de protection, stats/recommandations
+- **Typo & écriture** — Title Case, token Display, voix éditoriale ([§9](#9-langues-de-linterface-fr-fr--en-us))
 - **Onboarding** — parcours 3 étapes (MAJ signatures optionnelle)
 - **Logo hero** — bouclier optiSCAN (accueil), sidebar compacte
 - **Footer** — statut live + crédit Vanier (deux colonnes)
 - **Thèmes** — clair / sombre / contraste renforcé ; boutons sémantiques + hover grilles
 - **Services** — `SystemTrayHost`, `HistoryExportService`, `SignatureUpdateUiRunner`, `ScanLastScanDisplay`
-- **i18n** — exports PDF/HTML, MAJ signatures, ViewModel, runtime (~530 clés FR/EN)
+- **i18n** — exports PDF/HTML, MAJ signatures, ViewModel, runtime (**568** clés FR/EN)
 - **Options** — schtasks async, hints RTP/UAC honnêtes, limite nettoyage navigateurs documentée
-- **CI** — GitHub Actions ; **83** tests Release ; artefact publish + installateur Inno (main) + build Release (dev)
-- **Doc** — [AUDIT.md](docs/AUDIT.md), [THREAT-MODEL.md](docs/THREAT-MODEL.md), [RELEASE-CHECKLIST](docs/RELEASE-CHECKLIST.md)
+- **CI** — GitHub Actions ; tests Release ; artefact publish + installateur Inno (main)
+- **Doc** — guide unique `README.md` (sections 8–13)
 
 ### v6.0 — Version majeure (publication)
 
 - **Versioning unifié** — nom **v6.0** + build **6.0.0** (`Directory.Build.props`, Inno Setup, **LICENSE.txt**, manifeste, rapports PDF/HTML)
 - **Interface bilingue** — français et anglais embarqués (`LocalizationService`, `UiStrings` / `UiStrings.en`) ; installateur et Options avec redémarrage ; menu contextuel Explorateur localisé
-- **Documentation** — `README.md`, `docs/BUILD.md`, `docs/LOCALIZATION.md` ; scripts `clean-before-publish.ps1` et `build-release-setup.ps1`
+- **Documentation** — `README.md` ; scripts `clean-before-publish.ps1` et `build-release-setup.ps1`
 - **Expérience d’analyse** — libellés utilisateur unifiés (`ScanUserDisplay`) ; progression monotone (`ScanProgressRelay`) ; fusion menaces (`ScanThreatMerger`) ; tests unitaires étendus
 - **Antivirus** — analyse par boutons (rapide, complète, fichier, dossier) ; suppression du glisser-déposer
 
@@ -653,7 +689,7 @@ Les deux langues sont **incluses dans le même binaire** (pas de pack de langue 
 - Icône **system tray** (expérimental dans les versions précédentes ; l’UI actuelle reste fenêtre principale uniquement)
 - **Nettoyer par menace** — boutons Quarantaine + Supprimer par ligne dans le tableau des menaces
 - Correction affichage **version signatures ClamAV** (regex `ClamAV-VDB:[^:]+:(\d+):`)
-- Binaire **clamd** livré sous `clamav/` (non utilisé par le pipeline UI actuel)
+- Binaire **clamd** livré sous `clamav/` — utilisé lorsque l’option **Moteur clamd** est activée (sinon repli `clamscan.exe`)
 - **Protection en temps réel** (FileSystemWatcher, 3 workers simultanés)
 - **Tâche planifiée Windows** — API `schtasks` (`ScheduledScanService`) ; case **Options** + headless `--fullscan` opérationnel
 - **Notifications toast** Windows natives (`Microsoft.Toolkit.Uwp.Notifications`)
@@ -673,7 +709,53 @@ Les deux langues sont **incluses dans le même binaire** (pas de pack de langue 
 
 ---
 
-## 12. Crédits
+## 12. Audit et qualité
+
+**Verdict (v8.0)** : produit publiable après installateur validé sur machine propre.
+
+| Domaine | Note | Commentaire |
+|---------|:----:|-------------|
+| Architecture | 8/10 | `CompositeClamAvBackend`, posture injectable |
+| Sécurité locale | 8/10 | Quarantaine AES-GCM ; historique JSON en clair |
+| UI / Donaby | 8/10 | Accueil posture ; VT optionnel |
+| Tests & CI | 8/10 | **134** tests ; coverage Cobertura |
+| Release Inno | 7/10 | Pipeline CI OK |
+
+**Dettes ouvertes (résumé)** : `scan_history.json` en clair ; `MainWindow` volumineux ; tests intégration clamd/schtasks réels ; signature Authenticode optionnelle.
+
+```powershell
+dotnet test optiSCAN.Tests\optiSCAN.Tests.csproj -c Release
+```
+
+---
+
+## 13. Sécurité (posture et menaces)
+
+### Note posture /100 (Accueil)
+
+| Id | Poids | Source |
+|----|-------|--------|
+| `firewall` | 15 | Domain / Standard / Public (`EnableFirewall`) |
+| `uac` | 10 | `EnableLUA` |
+| `wupdate` | 15 | `IWindowsUpdateProbe` (registre, WMI, WUA) |
+| `shares` | 10 | Partages SMB (`REG_MULTI_SZ`) |
+| `optiscan` | 25 | ClamAV + YARA + RTP |
+| `scan` | 15 | Dernière analyse &lt; 7 jours |
+| `sigauto` | 10 | MAJ signatures auto |
+
+Limite : les trois profils pare-feu sont lus au registre, pas le profil réseau « actif » en temps réel.
+
+### Modèle de menace (périmètre local)
+
+**Actifs** : fichiers analysés, quarantaine, prefs/exclusions (`%LocalAppData%\optiSCAN`), clé VT optionnelle.
+
+**Contrôles** : quarantaine AES-GCM + HMAC ; exclusions avec frontière `\` ; UAC pour scan complet ; RTP ; clamd sur `127.0.0.1`.
+
+**Limites** : malware admin peut neutraliser l’AV local ; pas d’AMSI v8 ; VT envoie le hash ; `scan_history.json` et journal partiellement en clair.
+
+---
+
+## 14. Crédits
 
 Développé par **© 2026 Donatien Byakombe**  
 Design system : **Donaby Design**

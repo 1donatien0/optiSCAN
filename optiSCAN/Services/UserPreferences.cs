@@ -83,6 +83,15 @@ namespace optiSCAN.Services
         /// <summary>Thème à contraste renforcé (lisibilité accrue).</summary>
         public bool HighContrastEnabled { get; set; }
 
+        /// <summary>Préférer le daemon clamd (repli automatique sur clamscan.exe).</summary>
+        public bool UseClamdEngine { get; set; } = true;
+
+        /// <summary>Mode jeu : réduit notifications et reports scans headless si plein écran / jeu.</summary>
+        public bool GameModeAutoEnabled { get; set; } = true;
+
+        /// <summary>Clé API VirusTotal (optionnelle, stockée chiffrée via SecureStore).</summary>
+        public string VirusTotalApiKey { get; set; } = string.Empty;
+
         // ── Méthodes ──────────────────────────────────────────────────────────────
 
         /// <summary>

@@ -563,7 +563,7 @@ namespace optiSCAN.Services
                 await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
                 await proc.WaitForExitAsync(cts.Token).ConfigureAwait(false);
 
-                var output = stdoutTask.Result;
+                var output = await stdoutTask.ConfigureAwait(false);
                 var m = Regex.Match(output, @"(?:ClamAV\s+[\d.]+/|version\s+)(\d{4,6})");
                 return m.Success ? m.Groups[1].Value : VersionDisplayHelper.UnknownLabel;
             }

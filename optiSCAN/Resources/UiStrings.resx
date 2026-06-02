@@ -173,6 +173,7 @@
   <data name="Overview_LastScanClean" xml:space="preserve"><value>aucune menace</value></data>
   <data name="Overview_LastScanThreats" xml:space="preserve"><value>{0} menace(s)</value></data>
   <data name="Overview_ClamActive" xml:space="preserve"><value>Actif</value></data>
+  <data name="Overview_ClamEngine" xml:space="preserve"><value>Actif ({0})</value></data>
   <data name="Overview_ClamMissing" xml:space="preserve"><value>Non installé</value></data>
   <data name="Overview_YaraLoaded" xml:space="preserve"><value>{0:N0} règles</value></data>
   <data name="Overview_YaraMissing" xml:space="preserve"><value>Non chargé</value></data>
@@ -348,6 +349,30 @@
   <data name="Overview_StatsTitle" xml:space="preserve"><value>Statistiques de protection</value></data>
   <data name="Overview_StatsSub" xml:space="preserve"><value>Synthèse textuelle — 30 derniers jours</value></data>
   <data name="Overview_StatsLoading" xml:space="preserve"><value>Chargement des statistiques…</value></data>
+  <data name="Posture_Title" xml:space="preserve"><value>Note de sécurité</value></data>
+  <data name="Posture_AllGood" xml:space="preserve"><value>Tous les contrôles essentiels sont au vert.</value></data>
+  <data name="Posture_Firewall" xml:space="preserve"><value>Pare-feu Windows actif</value></data>
+  <data name="Posture_Uac" xml:space="preserve"><value>Contrôle de compte (UAC)</value></data>
+  <data name="Posture_WindowsUpdate" xml:space="preserve"><value>Mises à jour Windows récentes</value></data>
+  <data name="Posture_Shares" xml:space="preserve"><value>Partages réseau non exposés</value></data>
+  <data name="Posture_Optiscan" xml:space="preserve"><value>Protection optiSCAN active</value></data>
+  <data name="Posture_RecentScan" xml:space="preserve"><value>Analyse récente (&lt; 7 jours)</value></data>
+  <data name="Posture_SigAuto" xml:space="preserve"><value>MAJ signatures automatiques</value></data>
+  <data name="Posture_Fix" xml:space="preserve"><value>Corriger</value></data>
+  <data name="Clamd_NotReady" xml:space="preserve"><value>Le service clamd n'est pas disponible.</value></data>
+  <data name="Opt_UseClamd" xml:space="preserve"><value>Moteur clamd (rapide)</value></data>
+  <data name="Opt_UseClamdSub" xml:space="preserve"><value>Daemon ClamAV en mémoire ; repli sur clamscan si indisponible.</value></data>
+  <data name="Opt_GameMode" xml:space="preserve"><value>Mode jeu / Ne pas déranger</value></data>
+  <data name="Opt_GameModeSub" xml:space="preserve"><value>Réduit les notifications et reporte les scans planifiés en plein écran.</value></data>
+  <data name="Opt_VirusTotal" xml:space="preserve"><value>Clé API VirusTotal (optionnel)</value></data>
+  <data name="Opt_VirusTotalSub" xml:space="preserve"><value>Envoie uniquement le hash SHA-256 du fichier pour la réputation cloud.</value></data>
+  <data name="VT_NoApiKey" xml:space="preserve"><value>Ajoutez une clé API VirusTotal dans Options.</value></data>
+  <data name="VT_HashFailed" xml:space="preserve"><value>Impossible de calculer le hash du fichier.</value></data>
+  <data name="VT_HttpError" xml:space="preserve"><value>VirusTotal a répondu HTTP {0}.</value></data>
+  <data name="VT_Summary" xml:space="preserve"><value>Détections : {0} malveillants, {1} suspects, {2} sains, {3} non détectés.</value></data>
+  <data name="VT_Error" xml:space="preserve"><value>Erreur : {0}</value></data>
+  <data name="Av_ReputationTitle" xml:space="preserve"><value>Réputation cloud</value></data>
+  <data name="Av_Tooltip_Reputation" xml:space="preserve"><value>Vérifier sur VirusTotal (hash SHA-256)</value></data>
   <data name="Overview_Recommendations" xml:space="preserve"><value>Recommandations</value></data>
   <data name="Overview_RecHygiene" xml:space="preserve"><value>Nettoyage disque</value></data>
   <data name="Overview_RecScans" xml:space="preserve"><value>Analyses</value></data>
@@ -424,6 +449,13 @@
   <data name="Runtime_DevCopyHint" xml:space="preserve"><value>En développement : copiez clamav/x64 et yara/ sous optiSCAN/,</value></data>
   <data name="Runtime_DevVerifyScript" xml:space="preserve"><value>ou exécutez : .\scripts\verify-runtime-deps.ps1</value></data>
   <data name="Runtime_DevReadmeRefs" xml:space="preserve"><value>Voir README § 3 (ClamAV) et publication § 8.</value></data>
+  <data name="Runtime_ClamBothDetected" xml:space="preserve"><value>clamscan + freshclam détectés.</value></data>
+  <data name="Runtime_ClamNoFreshclam" xml:space="preserve"><value>clamscan OK ; freshclam.exe absent (MAJ signatures limitées).</value></data>
+  <data name="Runtime_ClamMissing" xml:space="preserve"><value>Téléchargez ClamAV win.x64 et copiez les binaires (README § 3.2).</value></data>
+  <data name="Runtime_YaraReady" xml:space="preserve"><value>{0} fichier(s) .yar, {1} présent.</value></data>
+  <data name="Runtime_YaraBinMissing" xml:space="preserve"><value>Copiez yara{0}.exe et yarac{0}.exe dans yara/.</value></data>
+  <data name="Runtime_YaraNoRules" xml:space="preserve"><value>Aucune règle .yar dans rules/ ({0}).</value></data>
+  <data name="Runtime_YaracMissing" xml:space="preserve"><value> yarac absent — compilation au premier scan.</value></data>
   <data name="Opt_AppUpdateTitle" xml:space="preserve"><value>Mise à jour applicative</value></data>
   <data name="Opt_AppUpdateCheckError" xml:space="preserve"><value>Erreur lors du contrôle : {0}</value></data>
   <data name="Upd_NotConfigured" xml:space="preserve"><value>Version installée : {0} ({1})&#x0D;&#x0A;&#x0D;&#x0A;optiSCAN ne télécharge pas encore les mises à jour du programme en arrière-plan.&#x0D;&#x0A;&#x0D;&#x0A;• Signatures ClamAV et règles YARA : Antivirus → onglet Signatures.&#x0D;&#x0A;• Nouvelle version du programme : {2}&#x0D;&#x0A;&#x0D;&#x0A;Dossier de préparation local : {3}</value></data>

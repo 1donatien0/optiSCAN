@@ -32,6 +32,18 @@ namespace optiSCAN
             var headlessMode = HeadlessScanArguments.ParseMode(e.Args);
             if (headlessMode != HeadlessScanArguments.Mode.None)
             {
+                bool createdHeadless;
+                _instanceMutex = new Mutex(true, MutexName, out createdHeadless);
+                if (!createdHeadless)
+                {
+                    try { new ScanLogManager().WriteToLog("[Headless] Instance déjà active — scan ignoré."); }
+                    catch { /* ignore */ }
+                    _instanceMutex.Close();
+                    _instanceMutex = null;
+                    Shutdown();
+                    return;
+                }
+
                 ShutdownMode = ShutdownMode.OnExplicitShutdown;
                 base.OnStartup(e);
                 await RunHeadlessAsync(headlessMode, HeadlessScanArguments.IsQuiet(e.Args));
@@ -70,13 +82,20 @@ namespace optiSCAN
         {
             try
             {
-                var clamAv = new ClamAvEngine();
-                var yara = new YaraEngine();
-                var orchestrator = new ScanOrchestrator(clamAv, yara);
-                var quarantine = new QuarantineManager();
-                var logger = new ScanLogManager();
+                var container = ServiceContainer.Default;
+                var orchestrator = container.Orchestrator;
+                var quarantine = container.Quarantine;
+                var logger = container.Logger;
 
                 logger.WriteToLog($"[Headless] Démarrage — mode {mode}, quiet={quiet}");
+
+                DistractionFreeMonitor.Start();
+                if (UserPreferences.Current.GameModeAutoEnabled
+                    && DistractionFreeMonitor.ShouldSuppressNotifications())
+                {
+                    logger.WriteToLog("[Headless] Scan reporté — mode jeu / plein écran actif.");
+                    return;
+                }
 
                 if (mode == HeadlessScanArguments.Mode.FullScan && !ElevationHelper.IsRunningElevated())
                     logger.WriteToLog("[Headless] Analyse complète sans élévation — dossiers système partiels.");

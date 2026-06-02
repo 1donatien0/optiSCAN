@@ -69,7 +69,7 @@ namespace optiSCAN.Services
 
         public void ShowThreatDetected(ThreatInfo threat)
         {
-            if (!_toastsEnabled) return;
+            if (!ShouldShowToast()) return;
 
             try
             {
@@ -106,9 +106,12 @@ namespace optiSCAN.Services
             }
         }
 
+        internal bool ShouldShowToast() =>
+            _toastsEnabled && !DistractionFreeMonitor.ShouldSuppressNotifications();
+
         public void ShowQuarantined(ThreatInfo threat)
         {
-            if (!_toastsEnabled) return;
+            if (!ShouldShowToast()) return;
 
             try
             {
@@ -129,7 +132,7 @@ namespace optiSCAN.Services
 
         public void ShowScanCompleted(int threatsFound, int filesScanned)
         {
-            if (!_toastsEnabled) return;
+            if (!ShouldShowToast()) return;
 
             try
             {
@@ -171,7 +174,7 @@ namespace optiSCAN.Services
 
         public void ShowUpdateAvailable(string version)
         {
-            if (!_toastsEnabled) return;
+            if (!ShouldShowToast()) return;
 
             try
             {
@@ -192,7 +195,7 @@ namespace optiSCAN.Services
 
         public void ShowRealTimeProtectionStarted()
         {
-            if (!_toastsEnabled) return;
+            if (!ShouldShowToast()) return;
 
             try
             {

@@ -233,6 +233,57 @@
                             </StackPanel>
                         </StackPanel>
 
+                        <!-- Moteur clamd -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                            <CheckBox x:Name="chkUseClamd"
+                                      IsChecked="True"
+                                      VerticalAlignment="Top"
+                                      Margin="0,2,16,0"
+                                      Checked="CheckOption_Changed"
+                                      Unchecked="CheckOption_Changed"
+                                      Tag="UseClamd"/>
+                            <StackPanel>
+                                <TextBlock Text="{loc:Loc Key=Opt_UseClamd}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextDark}"/>
+                                <TextBlock Text="{loc:Loc Key=Opt_UseClamdSub}"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                           Margin="0,3,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Mode jeu -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                            <CheckBox x:Name="chkGameMode"
+                                      IsChecked="True"
+                                      VerticalAlignment="Top"
+                                      Margin="0,2,16,0"
+                                      Checked="CheckOption_Changed"
+                                      Unchecked="CheckOption_Changed"
+                                      Tag="GameMode"/>
+                            <StackPanel>
+                                <TextBlock Text="{loc:Loc Key=Opt_GameMode}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextDark}"/>
+                                <TextBlock Text="{loc:Loc Key=Opt_GameModeSub}"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                           Margin="0,3,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- VirusTotal -->
+                        <StackPanel Margin="0,0,0,20">
+                            <TextBlock Text="{loc:Loc Key=Opt_VirusTotal}"
+                                       FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextDark}"/>
+                            <PasswordBox x:Name="pwdVirusTotalApiKey"
+                                         Margin="0,6,0,0" Height="32" MaxWidth="360" HorizontalAlignment="Left"
+                                         PasswordChanged="PwdVirusTotalApiKey_Changed"/>
+                            <TextBlock Text="{loc:Loc Key=Opt_VirusTotalSub}"
+                                       FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                       Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+
                         <!-- Mise à jour auto -->
                         <StackPanel Orientation="Horizontal">
                             <CheckBox x:Name="chkAutoUpdate"

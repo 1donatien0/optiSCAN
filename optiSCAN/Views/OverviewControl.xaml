@@ -334,6 +334,33 @@
                                    FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
                                    Foreground="{DynamicResource TextDark}" Margin="0,0,0,10"/>
 
+                        <Border Background="{DynamicResource SurfaceBg}"
+                                CornerRadius="8" Padding="12,10" Margin="0,0,0,10">
+                            <StackPanel>
+                                <TextBlock Text="{loc:Loc Key=Posture_Title}"
+                                           FontSize="{DynamicResource FontSize.Small}" FontWeight="Bold"
+                                           Foreground="{DynamicResource TextMuted}"/>
+                                <StackPanel Orientation="Horizontal" Margin="0,6,0,4">
+                                    <TextBlock x:Name="txtSecurityScore"
+                                               Text="—"
+                                               FontSize="32" FontWeight="Bold"
+                                               Foreground="{DynamicResource TextAccent}"
+                                               VerticalAlignment="Center"/>
+                                    <TextBlock Text="/100"
+                                               FontSize="{DynamicResource FontSize.Body}"
+                                               Foreground="{DynamicResource TextMuted}"
+                                               VerticalAlignment="Bottom" Margin="4,0,0,6"/>
+                                </StackPanel>
+                                <TextBlock x:Name="txtPostureSummary"
+                                           TextWrapping="Wrap"
+                                           FontSize="{DynamicResource FontSize.Caption}"
+                                           Foreground="{DynamicResource TextDark}"
+                                           LineHeight="16"
+                                           Visibility="Collapsed"/>
+                                <StackPanel x:Name="postureIssuesPanel"/>
+                            </StackPanel>
+                        </Border>
+
                         <Border x:Name="brRecHygiene" Background="{DynamicResource AlertBg}"
                                 CornerRadius="8" Padding="12,10" Margin="0,0,0,8">
                             <Grid>

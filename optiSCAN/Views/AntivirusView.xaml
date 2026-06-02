@@ -482,10 +482,17 @@
                                     </DataGridTextColumn>
                                     <DataGridTextColumn Header="{loc:Loc Key=Av_ColTime}" Binding="{Binding DetectedAt, StringFormat='HH:mm:ss'}" Width="60"/>
                                     <DataGridTextColumn Header="{loc:Loc Key=Av_ColStatus}" Binding="{Binding Status}" Width="70"/>
-                                    <DataGridTemplateColumn Header="{loc:Loc Key=Av_ColClean}" Width="270">
+                                    <DataGridTemplateColumn Header="{loc:Loc Key=Av_ColClean}" Width="330">
                                         <DataGridTemplateColumn.CellTemplate>
                                             <DataTemplate>
                                                 <StackPanel Orientation="Horizontal" Margin="2,1">
+                                                    <Button Margin="0,0,4,0" Tag="{Binding FilePath}"
+                                                            Style="{StaticResource SecondaryButton}"
+                                                            Click="BtnCheckReputation_Click"
+                                                            FontSize="{DynamicResource FontSize.Caption}" Padding="6,4" Cursor="Hand"
+                                                            ToolTip="{loc:Loc Key=Av_Tooltip_Reputation}">
+                                                        <md:PackIcon Kind="CloudSearch" Width="12" Height="12"/>
+                                                    </Button>
                                                     <Button Margin="0,0,4,0" Tag="{Binding FilePath}"
                                                             Style="{StaticResource PrimaryButton}"
                                                             Click="BtnQuarantineThreat_Click"

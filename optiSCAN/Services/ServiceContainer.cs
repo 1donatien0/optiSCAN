@@ -26,6 +26,12 @@ namespace optiSCAN.Services
 
         // ── Services singleton ───────────────────────────────────────────────────
         public ClamAvEngine ClamAv { get; }
+
+        /// <summary>Moteur Clam effectif (clamd avec repli clamscan).</summary>
+        internal CompositeClamAvBackend ClamAvBackend { get; }
+
+        /// <summary><c>clamd</c> ou <c>clamscan</c> selon le dernier scan.</summary>
+        public string ClamActiveEngine => ClamAvBackend.ActiveEngine;
         public YaraEngine Yara { get; }
         public ScanOrchestrator Orchestrator { get; }
         public FreshclamUpdater FreshclamUpdater { get; }
@@ -44,6 +50,10 @@ namespace optiSCAN.Services
 
         /// <summary>Actions UI antivirus (quarantaine, suppression, stop updates).</summary>
         public AntivirusActions Actions { get; }
+
+        public ThreatReputationService ThreatReputation { get; }
+
+        public ISecurityPostureService SecurityPosture { get; }
 
         // Navigation entre panneaux. Initialisé par MainWindow.OnLoaded une fois
         // que tous les UserControls sont créés (RegisterPanel a besoin de leur
@@ -123,6 +133,20 @@ namespace optiSCAN.Services
                 RealTimeProtection.Start();
             else
                 RealTimeProtection.Stop();
+
+            if (UserPreferences.Current.GameModeAutoEnabled)
+                DistractionFreeMonitor.Start();
+            else
+                DistractionFreeMonitor.Stop();
+
+            if (UserPreferences.Current.UseClamdEngine)
+            {
+                _ = Task.Run(async () =>
+                {
+                    try { await ClamdHost.Shared.EnsureRunningAsync().ConfigureAwait(false); }
+                    catch (Exception ex) { AppLogger.Warn("ServiceContainer", "Préchauffage clamd", ex); }
+                });
+            }
         }
 
         // Demandes UI (export, onglet Signatures, etc.) : événements nommés plutôt que des
@@ -178,6 +202,8 @@ namespace optiSCAN.Services
         {
             // Ordre de construction : du plus indépendant au plus dépendant.
             ClamAv = new ClamAvEngine();
+            var clamdEngine = new ClamdEngine();
+            ClamAvBackend = new CompositeClamAvBackend(clamdEngine, ClamAv);
             Yara = new YaraEngine();
             FreshclamUpdater = new FreshclamUpdater();
             RulesUpdater = new YaraForgeUpdater();
@@ -185,9 +211,11 @@ namespace optiSCAN.Services
             Logger = new ScanLogManager();
             Notifications = new NotificationService();
 
-            Orchestrator = new ScanOrchestrator(ClamAv, Yara);
+            Orchestrator = new ScanOrchestrator(ClamAvBackend, Yara);
             ScanEngine = new ClamAvScanEngineAdapter(ClamAv);
             Actions = new AntivirusActions(this);
+            ThreatReputation = new ThreatReputationService();
+            SecurityPosture = new SecurityPostureService();
             RealTimeProtection = new RealTimeProtection(Orchestrator, Quarantine, Notifications);
             ScheduledScan = new ScheduledScanService();
 
@@ -231,6 +259,10 @@ namespace optiSCAN.Services
             catch (Exception ex) { AppLogger.Warn("ServiceContainer", "FreshclamUpdater.DisableAutoUpdate", ex); }
             try { RulesUpdater.DisableAutoUpdate(); }
             catch (Exception ex) { AppLogger.Warn("ServiceContainer", "RulesUpdater.DisableAutoUpdate", ex); }
+            try { ClamdHost.Shared.Stop(); }
+            catch (Exception ex) { AppLogger.Warn("ServiceContainer", "ClamdHost.Stop", ex); }
+            try { DistractionFreeMonitor.Stop(); }
+            catch (Exception ex) { AppLogger.Warn("ServiceContainer", "DistractionFreeMonitor.Stop", ex); }
             (ClamAv as IDisposable)?.Dispose();
             (Yara as IDisposable)?.Dispose();
             AppLogger.Info("ServiceContainer", "Services fermés");

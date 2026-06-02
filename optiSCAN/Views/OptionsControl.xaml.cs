@@ -129,6 +129,13 @@ namespace optiSCAN.Views
                 if (chkAutoUpdate != null)
                     chkAutoUpdate.IsChecked = prefs.SignatureAutoUpdateEnabled;
 
+                if (chkUseClamd != null)
+                    chkUseClamd.IsChecked = prefs.UseClamdEngine;
+                if (chkGameMode != null)
+                    chkGameMode.IsChecked = prefs.GameModeAutoEnabled;
+                if (pwdVirusTotalApiKey != null)
+                    pwdVirusTotalApiKey.Password = prefs.VirusTotalApiKey ?? string.Empty;
+
                 if (chkHighContrast != null)
                     chkHighContrast.IsChecked = prefs.HighContrastEnabled;
 
@@ -218,6 +225,28 @@ namespace optiSCAN.Views
 
                 case "AutoUpdate":
                     c.ApplySignatureAutoUpdate(isOn);
+                    break;
+
+                case "UseClamd":
+                    prefs.UseClamdEngine = isOn;
+                    prefs.Save();
+                    if (isOn)
+                    {
+                        _ = Task.Run(async () =>
+                        {
+                            try { await ClamdHost.Shared.EnsureRunningAsync(); }
+                            catch (Exception ex) { AppLogger.Warn("Options", "clamd", ex); }
+                        });
+                    }
+                    else
+                        ClamdHost.Shared.Stop();
+                    break;
+
+                case "GameMode":
+                    prefs.GameModeAutoEnabled = isOn;
+                    prefs.Save();
+                    if (isOn) DistractionFreeMonitor.Start();
+                    else DistractionFreeMonitor.Stop();
                     break;
 
                 case "RealtimeProtection":
@@ -527,6 +556,13 @@ namespace optiSCAN.Views
                 _exclusions.Remove(path);
                 ExclusionSettings.Current.RemoveFolder(path);
             }
+        }
+
+        private void PwdVirusTotalApiKey_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressPreferenceEvents) return;
+            UserPreferences.Current.VirusTotalApiKey = pwdVirusTotalApiKey?.Password ?? string.Empty;
+            UserPreferences.Current.Save();
         }
     }
 }

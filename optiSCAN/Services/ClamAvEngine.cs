@@ -18,19 +18,6 @@ namespace optiSCAN.Services
         private readonly string _clamscanExe;
         private readonly object _parseLock = new();
 
-        // Regex : "C:\path\file.exe: Win.Trojan.Generic-123 FOUND"
-        private static readonly Regex InfectedRegex =
-            new Regex(@"^(.+):\s+(.+)\s+FOUND\s*$", RegexOptions.Compiled);
-
-        // Lignes de scan : "C:\path\file.exe: OK" ou "...: ... FOUND"
-        private static readonly Regex ScannedFileLineRegex =
-            new(@"^(?<path>.+):\s+(?<verdict>OK|FOUND|Empty file|Excluded|Symbolic link)\s*$",
-                RegexOptions.Compiled | RegexOptions.IgnoreCase);
-
-        // Regex statistiques finales : "Scanned files: 123"
-        private static readonly Regex StatsRegex =
-            new Regex(@"^([\w\s]+):\s+(\d+)", RegexOptions.Compiled);
-
         // ── Construction ─────────────────────────────────────────────────────────
 
         public ClamAvEngine(string? clamavDir = null)
@@ -267,108 +254,8 @@ namespace optiSCAN.Services
         }
 
         private void ParseScanLineCore(
-            string line, ScanResult result, IProgress<ScanProgress>? progress)
-        {
-            var infectedMatch = InfectedRegex.Match(line);
-            if (infectedMatch.Success)
-            {
-                var filePath = infectedMatch.Groups[1].Value.Trim();
-                var virusName = infectedMatch.Groups[2].Value.Trim();
-
-                if (ExclusionSettings.Current.IsFileExcluded(filePath))
-                    return;
-
-                long fileSize = -1;
-                try { fileSize = new FileInfo(filePath).Length; }
-                catch (Exception ex)
-                {
-                    AppLogger.Warn("ClamAvEngine", $"Taille fichier indisponible : {filePath}", ex);
-                }
-
-                var threat = new ThreatInfo
-                {
-                    FilePath = filePath,
-                    VirusName = virusName,
-                    DetectedAt = DateTime.Now,
-                    Status = ThreatStatus.Detected,
-                    FileSize = fileSize,
-                    DetectedBy = "ClamAV"
-                };
-                result.Threats.Add(threat);
-
-                progress?.Report(new ScanProgress
-                {
-                    Message = $"{threat.VirusName} — {filePath}",
-                    Phase = ScanPhase.ThreatFound,
-                    ThreatInfo = threat,
-                    FilesScanned = result.FilesScanned,
-                    ThreatsFound = result.ThreatsFound,
-                    CurrentFilePath = filePath,
-                });
-                return;
-            }
-
-            if (line.StartsWith("Scanned files:") || line.StartsWith("Data scanned:"))
-            {
-                ParseStats(line, result);
-                // Mise à jour finale du compteur depuis les stats officielles de
-                // clamscan (autorité absolue) — remplace l'estimation incrémentale.
-                progress?.Report(new ScanProgress
-                {
-                    Message = $"{result.FilesScanned:N0} fichiers analysés.",
-                    Phase = ScanPhase.Scanning,
-                    FilesScanned = result.FilesScanned,
-                    ThreatsFound = result.ThreatsFound,
-                });
-                return;
-            }
-
-            // Comptage strict : seules les lignes au format "<chemin>: <verdict>"
-            // sont comptabilisées. L'ancienne heuristique (line.Contains(":"))
-            // captait aussi les lignes de stats, warnings et lettres de lecteur,
-            // donnant un compteur systématiquement faux.
-            if (ScannedFileLineRegex.IsMatch(line))
-            {
-                var m = ScannedFileLineRegex.Match(line);
-                var scannedPath = m.Success ? m.Groups["path"].Value.Trim() : string.Empty;
-
-                result.FilesScanned++;
-                if (ShouldReportScanProgress(result.FilesScanned))
-                {
-                    progress?.Report(new ScanProgress
-                    {
-                        Message = $"{result.FilesScanned:N0} fichiers analysés…",
-                        Phase = ScanPhase.Scanning,
-                        FilesScanned = result.FilesScanned,
-                        ThreatsFound = result.ThreatsFound,
-                        CurrentFilePath = string.IsNullOrEmpty(scannedPath) ? null : scannedPath,
-                    });
-                }
-            }
-        }
-
-        /// <summary>Évite de saturer l'UI tout en gardant une progression lisible (pas de bonds de +12).</summary>
-        private static bool ShouldReportScanProgress(int filesScanned)
-        {
-            if (filesScanned <= 25)
-                return true;
-            if (filesScanned % 5 == 0)
-                return true;
-            return filesScanned % 100 == 0;
-        }
-
-        private static void ParseStats(string line, ScanResult result)
-        {
-            var m = StatsRegex.Match(line);
-            if (!m.Success) return;
-            var key = m.Groups[1].Value.Trim().ToLower();
-            var value = long.Parse(m.Groups[2].Value);
-            switch (key)
-            {
-                case "scanned files": result.FilesScanned = (int)value; break;
-                case "data scanned": result.TotalBytesScanned = value * 1024; break;
-            }
-        }
+            string line, ScanResult result, IProgress<ScanProgress>? progress) =>
+            ClamScanLineParser.ProcessLine(line, result, progress);
 
         // ── Helpers ──────────────────────────────────────────────────────────────
 

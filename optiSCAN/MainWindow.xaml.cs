@@ -440,7 +440,8 @@ namespace optiSCAN
                     : ThemeUiBrushes.Get("DangerRed", icoSidebarClamAv);
             }
 
-            (panelOverview as Views.OverviewControl)?.UpdateAntivirusCardStatus(clamAvOk, yaraRules);
+            var clamMode = ServiceContainer.Default.ClamActiveEngine;
+            (panelOverview as Views.OverviewControl)?.UpdateAntivirusCardStatus(clamAvOk, yaraRules, clamMode);
         }
 
         private void RefreshQuarantineList()
@@ -607,6 +608,22 @@ namespace optiSCAN
             int actSev = threats30 > 0 ? 1 : (sessions.Count == 0 ? 1 : 2);
 
             overview.UpdateRecommendations(hyp, hypSev, act, actSev);
+
+            var lastScan = sessions.Count > 0 ? sessions[0].StartedAt : (DateTime?)null;
+            bool rtpOn = ExclusionSettings.Current.RealTimeEnabled;
+            bool rtpRun = ServiceContainer.Default.RealTimeProtection.IsEnabled;
+
+            var posture = ServiceContainer.Default.SecurityPosture.Evaluate(new SecurityPostureContext
+            {
+                ClamInstalled = clam,
+                YaraAvailable = yaraAvail,
+                YaraRulesCount = yaraRules,
+                RealTimeProtectionEnabled = rtpOn,
+                RealTimeProtectionRunning = rtpRun,
+                LastScanAt = lastScan,
+                SignatureAutoUpdateEnabled = UserPreferences.Current.SignatureAutoUpdateEnabled,
+            });
+            overview.UpdateSecurityPosture(posture);
         }
 
         public async Task RefreshAntivirusDataAsync()
@@ -854,7 +871,7 @@ namespace optiSCAN
 
         private void ApplyVersionLabels()
         {
-            // Nomenclature : vM.m (README, v7.0) + M.m.p (assembly / installateur).
+            // Nomenclature : vM.m (README, v8.0) + M.m.p (assembly / installateur).
             var release = ProductVersionInfo.ReleaseLabel;
             var semver = ProductVersionInfo.SemVer;
             if (txtSidebarVersion != null)

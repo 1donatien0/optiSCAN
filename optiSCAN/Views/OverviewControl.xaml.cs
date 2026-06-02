@@ -2,11 +2,14 @@ using MaterialDesignThemes.Wpf;
 using optiSCAN.Localization;
 using optiSCAN.Models;
 using optiSCAN.Services;
+using System.Diagnostics;
+using System.Linq;
 using optiSCAN.Strings;
 using System.Globalization;
 using System.Text;
 using System.Windows;
 using System.Windows.Controls;
+using System.Windows.Documents;
 using System.Windows.Media;
 using Brush = System.Windows.Media.Brush;
 
@@ -120,6 +123,86 @@ namespace optiSCAN.Views
         public void UpdateSignatureVersion(string version)
             => UpdateSignaturesSummary("—", "—", version, "—");
 
+        public void UpdateSecurityPosture(SecurityPostureReport report)
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                if (txtSecurityScore != null)
+                    txtSecurityScore.Text = report.Score.ToString(CultureInfo.CurrentCulture);
+
+                if (postureIssuesPanel == null) return;
+                postureIssuesPanel.Children.Clear();
+
+                var failed = report.Checks.Where(c => !c.Passed).Take(4).ToList();
+                if (failed.Count == 0)
+                {
+                    postureIssuesPanel.Children.Add(new TextBlock
+                    {
+                        Text = LocalizationService.GetString("Posture_AllGood"),
+                        TextWrapping = TextWrapping.Wrap,
+                        FontSize = (double)FindResource("FontSize.Caption"),
+                        Foreground = (Brush)FindResource("TextDark"),
+                    });
+                    return;
+                }
+
+                foreach (var check in failed)
+                {
+                    var row = new StackPanel { Orientation = System.Windows.Controls.Orientation.Horizontal, Margin = new Thickness(0, 0, 0, 4) };
+                    row.Children.Add(new TextBlock
+                    {
+                        Text = "• " + check.Title,
+                        TextWrapping = TextWrapping.Wrap,
+                        FontSize = (double)FindResource("FontSize.Caption"),
+                        Foreground = (Brush)FindResource("TextDark"),
+                        VerticalAlignment = VerticalAlignment.Center,
+                    });
+
+                    if (!string.IsNullOrWhiteSpace(check.FixUri))
+                    {
+                        var fix = new Hyperlink(new Run(LocalizationService.GetString("Posture_Fix")))
+                        {
+                            Tag = check.FixUri,
+                            Foreground = (Brush)FindResource("TextAccent"),
+                        };
+                        fix.Click += PostureFix_Click;
+                        row.Children.Add(new TextBlock
+                        {
+                            Margin = new Thickness(8, 0, 0, 0),
+                            VerticalAlignment = VerticalAlignment.Center,
+                            Inlines = { fix },
+                        });
+                    }
+
+                    postureIssuesPanel.Children.Add(row);
+                }
+            });
+        }
+
+        private void PostureFix_Click(object sender, RoutedEventArgs e)
+        {
+            if (sender is not Hyperlink link || link.Tag is not string uri)
+                return;
+
+            if (uri.StartsWith("optiscan://panel/", StringComparison.OrdinalIgnoreCase))
+            {
+                var panel = uri.EndsWith("/antivirus", StringComparison.OrdinalIgnoreCase)
+                    ? OptiscanStrings.PanelIds.Antivirus
+                    : OptiscanStrings.PanelIds.Options;
+                ServiceContainer.Default.Navigation?.NavigateTo(panel);
+                return;
+            }
+
+            try
+            {
+                Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("OverviewControl", "PostureFix", ex);
+            }
+        }
+
         public void UpdateRecommendations(
             string hygieneLine, int hygieneSeverity,
             string activityLine, int activitySeverity)
@@ -184,15 +267,24 @@ namespace optiSCAN.Views
         }
 
         /// <summary>Met à jour la carte « État de protection » (ClamAV + règles YARA).</summary>
-        public void UpdateAntivirusCardStatus(bool clamAvOk, int yaraRulesCount)
+        public void UpdateAntivirusCardStatus(bool clamAvOk, int yaraRulesCount, string? clamEngineMode = null)
         {
             Dispatcher.InvokeAsync(() =>
             {
                 if (txtOverviewClamAvStatus != null)
                 {
-                    txtOverviewClamAvStatus.Text = clamAvOk
-                        ? LocalizationService.GetString("Overview_ClamActive")
-                        : LocalizationService.GetString("Overview_ClamMissing");
+                    if (clamAvOk && !string.IsNullOrWhiteSpace(clamEngineMode))
+                    {
+                        txtOverviewClamAvStatus.Text = LocalizationService.Format(
+                            "Overview_ClamEngine",
+                            clamEngineMode);
+                    }
+                    else
+                    {
+                        txtOverviewClamAvStatus.Text = clamAvOk
+                            ? LocalizationService.GetString("Overview_ClamActive")
+                            : LocalizationService.GetString("Overview_ClamMissing");
+                    }
                     txtOverviewClamAvStatus.Foreground = clamAvOk
                         ? ThemeUiBrushes.Get("SuccessGreen", txtOverviewClamAvStatus)
                         : ThemeUiBrushes.Get("DangerRed", txtOverviewClamAvStatus);
