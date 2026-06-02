@@ -6,6 +6,7 @@ Index de la documentation technique et release pour **optiSCAN v7.0** (build **7
 |----------|--------|---------|
 | [../README.md](../README.md) | Développeurs, contributeurs | Architecture, ClamAV/YARA, panneaux, services |
 | [AUDIT.md](AUDIT.md) | QA, release, direction | **Audit unique** synthétisé (v7.0, juin 2026) |
+| [THREAT-MODEL.md](THREAT-MODEL.md) | Sécurité, release | Périmètre local v7 (synthèse) |
 | [BUILD.md](BUILD.md) | Release, packaging | Publish, nettoyage, Inno Setup, dépannage |
 | [LOCALIZATION.md](LOCALIZATION.md) | Traducteurs, dev UI | FR/EN, `.resx`, périmètre i18n |
 | [RELEASE-CHECKLIST.md](RELEASE-CHECKLIST.md) | Release | Checklist manuelle avant installateur |

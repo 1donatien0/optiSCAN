@@ -1,17 +1,12 @@
+using optiSCAN.Localization;
+
 namespace optiSCAN.Services
 {
-    /// <summary>
-    /// Orchestre la mise à jour manuelle ClamAV (freshclam) puis les règles YARA (YaraForge).
-    /// Logique extraite de <see cref="optiSCAN.MainWindow"/> pour isoler le flux métier du code-behind WPF.
-    /// </summary>
+    /// <summary>Journal utilisateur pour la mise à jour manuelle des signatures.</summary>
     public static class SignatureUpdateCoordinator
     {
         private static readonly TimeSpan FullUpdateTimeout = TimeSpan.FromMinutes(5);
 
-        /// <summary>
-        /// Exécute freshclam puis la mise à jour des règles. Les logs passent par <paramref name="appendLog"/> (thread UI ou background).
-        /// </summary>
-        /// <returns><c>true</c> si les deux étapes ont réussi (ou ont été ignorées avec succès).</returns>
         public static async Task<bool> RunFullSignatureUpdateAsync(
             FreshclamUpdater? freshclam,
             YaraForgeUpdater? rules,
@@ -22,8 +17,8 @@ namespace optiSCAN.Services
             timeoutCts.CancelAfter(FullUpdateTimeout);
             var ct = timeoutCts.Token;
 
-            appendLog("=== MISE À JOUR COMPLÈTE ===");
-            appendLog("1. Mise à jour des signatures ClamAV…");
+            appendLog(LocalizationService.GetString("SigUpd_HeaderStart"));
+            appendLog(LocalizationService.GetString("SigUpd_StepClam"));
 
             var ok = true;
 
@@ -31,28 +26,28 @@ namespace optiSCAN.Services
             {
                 var clam = await freshclam.UpdateAsync(ct).ConfigureAwait(false);
                 appendLog(clam.Success
-                    ? UiLogText.Ok($"ClamAV : {clam.Message}")
-                    : UiLogText.Error($"ClamAV : {clam.Message}"));
+                    ? UiLogText.Ok($"{LocalizationService.GetString("SigUpd_LabelClam")} : {clam.Message}")
+                    : UiLogText.Error($"{LocalizationService.GetString("SigUpd_LabelClam")} : {clam.Message}"));
                 if (!clam.Success)
                     ok = false;
             }
 
             appendLog("");
-            appendLog("2. Mise à jour des règles de détection…");
+            appendLog(LocalizationService.GetString("SigUpd_StepRules"));
 
             if (rules != null)
             {
                 var progress = new Progress<string>(appendLog);
                 var rulesResult = await rules.UpdateAsync(progress, ct).ConfigureAwait(false);
                 appendLog(rulesResult.Success
-                    ? UiLogText.Ok($"Règles : {rulesResult.Message}")
-                    : UiLogText.Error($"Règles : {rulesResult.Message}"));
+                    ? UiLogText.Ok($"{LocalizationService.GetString("SigUpd_LabelRules")} : {rulesResult.Message}")
+                    : UiLogText.Error($"{LocalizationService.GetString("SigUpd_LabelRules")} : {rulesResult.Message}"));
                 if (!rulesResult.Success)
                     ok = false;
             }
 
             appendLog("");
-            appendLog("=== MISE À JOUR TERMINÉE ===");
+            appendLog(LocalizationService.GetString("SigUpd_HeaderDone"));
             return ok;
         }
     }

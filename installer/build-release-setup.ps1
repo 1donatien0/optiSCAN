@@ -4,7 +4,8 @@
 
 [CmdletBinding()]
 param(
-    [switch] $SkipPublish
+    [switch] $SkipPublish,
+    [string] $PublishDir
 )
 
 $ErrorActionPreference = 'Stop'
@@ -35,8 +36,24 @@ $iscc = @(
 ) | Where-Object { Test-Path $_ } | Select-Object -First 1
 
 if (-not $iscc) { throw 'ISCC.exe introuvable. Installez Inno Setup 6.' }
-Write-Host "Inno Setup : $iscc" -ForegroundColor Cyan
-& $iscc $iss
+
+$propsPath = Join-Path $root 'Directory.Build.props'
+[xml]$propsXml = Get-Content -LiteralPath $propsPath
+$appVersion = ($propsXml.Project.PropertyGroup.Version | Select-Object -First 1).'#text'
+if ([string]::IsNullOrWhiteSpace($appVersion)) { $appVersion = '7.0.0' }
+$parts = $appVersion.Split('.')
+$appRelease = if ($parts.Length -ge 2) { "v$($parts[0]).$($parts[1])" } else { "v$appVersion" }
+
+Write-Host "Inno Setup : $iscc (AppVersion=$appVersion, AppRelease=$appRelease)" -ForegroundColor Cyan
+$isccArgs = @("/DAppVersion=$appVersion", "/DAppRelease=$appRelease")
+if (-not [string]::IsNullOrWhiteSpace($PublishDir)) {
+    $resolvedPublish = (Resolve-Path -LiteralPath $PublishDir).Path.TrimEnd('\', '/')
+    $relative = [System.IO.Path]::GetRelativePath($PSScriptRoot, $resolvedPublish)
+    $publishGlob = ($relative -replace '/', '\') + '\*'
+    $isccArgs += "/DAppPublishSource=$publishGlob"
+    Write-Host "Publish source (override) : $publishGlob" -ForegroundColor DarkGray
+}
+& $iscc @isccArgs $iss
 if ($LASTEXITCODE -ne 0) { throw "ISCC a échoué (code $LASTEXITCODE)." }
 
 $outDir = Join-Path $PSScriptRoot 'output'

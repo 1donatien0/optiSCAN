@@ -26,11 +26,11 @@ jobs:
       - name: Restore NuGet packages
         run: dotnet restore optiSCAN.sln
 
-      - name: Build (Debug)
-        run: dotnet build optiSCAN.sln --configuration Debug --no-restore
+      - name: Build (Release)
+        run: dotnet build optiSCAN.sln --configuration Release --no-restore
 
-      - name: Run tests
-        run: dotnet test optiSCAN.Tests/optiSCAN.Tests.csproj --configuration Debug --no-build --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
+      - name: Run tests (Release)
+        run: dotnet test optiSCAN.Tests/optiSCAN.Tests.csproj --configuration Release --no-build --logger "trx;LogFileName=test-results.trx" --results-directory TestResults
 
       - name: Upload test results
         if: always()
@@ -38,6 +38,17 @@ jobs:
         with:
           name: test-results
           path: TestResults/*.trx
+
+      - name: Build (Debug)
+        run: dotnet build optiSCAN.sln --configuration Debug --no-restore
+
+      - name: Upload Release build (dev branches)
+        if: github.ref == 'refs/heads/dev' || github.ref == 'refs/heads/develop'
+        uses: actions/upload-artifact@v4
+        with:
+          name: optiSCAN-Release-build-${{ github.sha }}
+          path: optiSCAN/bin/Release/
+          retention-days: 7
 
   publish:
     name: Publish win-x64 (Release)
@@ -70,9 +81,23 @@ jobs:
         shell: pwsh
         run: pwsh -File scripts/verify-runtime-deps.ps1 -PublishDir publish/win-x64
 
+      - name: Install Inno Setup 6
+        run: choco install innosetup -y --no-progress
+
+      - name: Build installer (Inno Setup)
+        shell: pwsh
+        run: pwsh -File installer/build-release-setup.ps1 -SkipPublish -PublishDir publish/win-x64
+
       - name: Upload publish artifact
         uses: actions/upload-artifact@v4
         with:
           name: optiSCAN-win-x64-${{ github.sha }}
           path: publish/win-x64/
+          retention-days: 14
+
+      - name: Upload installer artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: optiSCAN-setup-${{ github.sha }}
+          path: installer/output/*.exe
           retention-days: 14

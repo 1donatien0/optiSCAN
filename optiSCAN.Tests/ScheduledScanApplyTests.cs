@@ -10,7 +10,7 @@ public sealed class ScheduledScanApplyTests
         public TimeSpan? LastTime;
         public bool CreateResult = true;
         public bool DeleteResult = true;
-        public bool Exists;
+        public bool Exists { get; set; }
         public int CreateCalls;
         public int DeleteCalls;
 

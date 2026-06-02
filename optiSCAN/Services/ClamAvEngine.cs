@@ -1,3 +1,4 @@
+using optiSCAN.Localization;
 using optiSCAN.Models;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -11,7 +12,7 @@ namespace optiSCAN.Services
     /// Détecte automatiquement clamav/x64 ou clamav/x86 selon l'architecture.
     /// Supporte : fichier, dossier, scan rapide, scan complet, annulation, progression.
     /// </summary>
-    public class ClamAvEngine
+    public class ClamAvEngine : IClamAvOrchestratorBackend
     {
         private readonly string _clamavDir;
         private readonly string _clamscanExe;
@@ -94,11 +95,13 @@ namespace optiSCAN.Services
 
         /// <summary>
         /// Retourne la version de ClamAV (première ligne de <c>clamscan --version</c>).
-        /// Retourne « Non installé » ou « Erreur » si l'exécutable est absent ou si une exception survient.
+        /// Retourne la clé localisée <c>Clam_NotInstalled</c> ou <c>Clam_VersionError</c>
+        /// si l'exécutable est absent ou si une exception survient.
         /// </summary>
         public async Task<string> GetVersionAsync()
         {
-            if (!File.Exists(_clamscanExe)) return "Non installé";
+            if (!File.Exists(_clamscanExe))
+                return LocalizationService.GetString("Clam_NotInstalled");
             try
             {
                 var (stdout, _) = await RunProcessAsync(_clamscanExe, "--version");
@@ -107,7 +110,7 @@ namespace optiSCAN.Services
             catch (Exception ex)
             {
                 AppLogger.Warn("ClamAvEngine", "GetVersionAsync", ex);
-                return "Erreur";
+                return LocalizationService.GetString("Clam_VersionError");
             }
         }
 

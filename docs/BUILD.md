@@ -89,7 +89,7 @@ Publish déjà fait :
 dotnet test .\optiSCAN.Tests\optiSCAN.Tests.csproj -c Release
 ```
 
-Attendu : **67 tests** réussis (Release). Couverture indicative : quarantaine, localisation, navigation, scan planifié, headless CLI, logs.
+Attendu : **83 tests** réussis (Release). Couverture indicative : quarantaine, localisation, navigation, scan planifié, headless CLI, logs, dernière analyse Accueil, sécurité quarantaine, orchestrateur scan (fakes).
 
 ## Intégration continue (GitHub)
 

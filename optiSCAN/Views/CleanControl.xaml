@@ -5,7 +5,7 @@
              xmlns:loc="clr-namespace:optiSCAN.Localization">
 
     <DockPanel Background="Transparent">
-        <Rectangle DockPanel.Dock="Top" Height="2" Margin="32,0,32,0" Opacity="0.55"
+        <Rectangle DockPanel.Dock="Top" Height="2" Margin="48,0,48,0" Opacity="0.55"
                    Fill="{DynamicResource AccentLineGradient}"/>
         <Border DockPanel.Dock="Top" Style="{StaticResource PageHeaderBandDense}">
             <Grid>
@@ -122,7 +122,8 @@
                     <Button x:Name="btnAnalyze"
                             Click="btnAnalyze_Click"
                             Style="{StaticResource SecondaryButton}"
-                            Height="36" Width="140" Margin="0,0,10,0">
+                            Height="36" Width="140" Margin="0,0,10,0"
+                            AutomationProperties.Name="{loc:Loc Key=Clean_Analyze}">
                         <StackPanel Orientation="Horizontal">
                             <md:PackIcon Kind="Magnify" Width="15" Height="15"
                                          VerticalAlignment="Center"/>
@@ -134,7 +135,8 @@
                             Click="btnCleanNow_Click"
                             Style="{StaticResource GradientPrimaryButton}"
                             IsEnabled="False"
-                            Height="36" Width="190">
+                            Height="36" Width="190"
+                            AutomationProperties.Name="{loc:Loc Key=Clean_Run}">
                         <StackPanel Orientation="Horizontal">
                             <md:PackIcon Kind="AutoFix" Width="15" Height="15"
                                          VerticalAlignment="Center"/>

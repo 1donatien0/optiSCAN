@@ -72,7 +72,8 @@
                             BorderBrush="{DynamicResource BorderColor}"
                             BorderThickness="1"
                             Cursor="Hand"
-                            ToolTip="{loc:Loc Key=Nav_TooltipWebsite}">
+                            ToolTip="{loc:Loc Key=Nav_TooltipWebsite}"
+                            AutomationProperties.Name="{loc:Loc Key=Nav_TooltipWebsite}">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="bg" CornerRadius="8"
@@ -99,7 +100,8 @@
                             Width="48" Height="36" Margin="0,3"
                             Background="{DynamicResource ThemeToggleBg}"
                             BorderThickness="0"
-                            Cursor="Hand">
+                            Cursor="Hand"
+                            AutomationProperties.Name="{loc:Loc Key=Nav_TooltipThemeDark}">
                         <Button.Template>
                             <ControlTemplate TargetType="Button">
                                 <Border x:Name="bg" CornerRadius="8"
@@ -152,7 +154,8 @@
                                  Tag="{x:Static strings:OptiscanStrings+PanelIds.Overview}"
                                  Checked="NavItem_Checked"
                                  IsTabStop="True"
-                                 ToolTip="{loc:Loc Key=Nav_TooltipHome}">
+                                 ToolTip="{loc:Loc Key=Nav_TooltipHome}"
+                                 AutomationProperties.Name="{loc:Loc Key=Nav_TooltipHome}">
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                             <md:PackIcon Kind="Monitor" Width="22" Height="22"
                                          HorizontalAlignment="Center"
@@ -168,7 +171,8 @@
                                  Tag="{x:Static strings:OptiscanStrings+PanelIds.Clean}"
                                  Checked="NavItem_Checked"
                                  IsTabStop="True"
-                                 ToolTip="{loc:Loc Key=Nav_TooltipClean}">
+                                 ToolTip="{loc:Loc Key=Nav_TooltipClean}"
+                                 AutomationProperties.Name="{loc:Loc Key=Nav_TooltipClean}">
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                             <md:PackIcon Kind="Broom" Width="22" Height="22"
                                          HorizontalAlignment="Center"
@@ -184,7 +188,8 @@
                                  Tag="{x:Static strings:OptiscanStrings+PanelIds.Antivirus}"
                                  Checked="NavItem_Checked"
                                  IsTabStop="True"
-                                 ToolTip="{loc:Loc Key=Nav_TooltipAntivirus}">
+                                 ToolTip="{loc:Loc Key=Nav_TooltipAntivirus}"
+                                 AutomationProperties.Name="{loc:Loc Key=Nav_TooltipAntivirus}">
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                             <Grid HorizontalAlignment="Center">
                                 <md:PackIcon Kind="ShieldCheck" Width="22" Height="22"
@@ -212,7 +217,8 @@
                                  Tag="{x:Static strings:OptiscanStrings+PanelIds.History}"
                                  Checked="NavItem_Checked"
                                  IsTabStop="True"
-                                 ToolTip="{loc:Loc Key=Nav_TooltipHistory}">
+                                 ToolTip="{loc:Loc Key=Nav_TooltipHistory}"
+                                 AutomationProperties.Name="{loc:Loc Key=Nav_TooltipHistory}">
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                             <md:PackIcon Kind="History" Width="22" Height="22"
                                          HorizontalAlignment="Center"
@@ -228,7 +234,8 @@
                                  Tag="{x:Static strings:OptiscanStrings+PanelIds.Options}"
                                  Checked="NavItem_Checked"
                                  IsTabStop="True"
-                                 ToolTip="{loc:Loc Key=Nav_TooltipOptions}">
+                                 ToolTip="{loc:Loc Key=Nav_TooltipOptions}"
+                                 AutomationProperties.Name="{loc:Loc Key=Nav_TooltipOptions}">
                         <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
                             <md:PackIcon Kind="Cog" Width="22" Height="22"
                                          HorizontalAlignment="Center"

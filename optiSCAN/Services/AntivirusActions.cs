@@ -87,6 +87,12 @@ namespace optiSCAN.Services
         {
             try
             {
+                // Refus identique à la restauration quarantaine : pas de suppression dans System32, Windows, etc.
+                if (QuarantineManager.IsSensitivePath(filePath))
+                    return Complete(false,
+                        LocalizationService.Format("Av_Action_DeleteSensitive", Path.GetFileName(filePath)),
+                        isError: true);
+
                 if (File.Exists(filePath))
                 {
                     File.Delete(filePath);

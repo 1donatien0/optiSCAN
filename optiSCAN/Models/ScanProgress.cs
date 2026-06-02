@@ -1,4 +1,6 @@
-﻿namespace optiSCAN.Models
+﻿using optiSCAN.Localization;
+
+namespace optiSCAN.Models
 {
     /// <summary>
     /// Phases possibles du scan.
@@ -135,13 +137,13 @@
         }
 
         /// <summary>
-        /// Crée une progression initiale.
+        /// Crée une progression initiale avec le message localisé <c>Scan_Starting</c>.
         /// </summary>
-        public static ScanProgress Starting(string message = "Démarrage du scan...")
+        public static ScanProgress Starting(string? message = null)
         {
             return new ScanProgress
             {
-                Message = message,
+                Message = message ?? LocalizationService.GetString("Scan_Starting"),
                 Phase = ScanPhase.Starting
             };
         }

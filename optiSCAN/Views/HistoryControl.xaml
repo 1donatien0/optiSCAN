@@ -30,16 +30,19 @@
                             Click="BtnExportHtml_Click"
                             Style="{StaticResource ExportButton}"
                             Margin="0,0,8,0"
-                            ToolTip="{loc:Loc Key=Hist_TooltipExportHtml}"/>
+                            ToolTip="{loc:Loc Key=Hist_TooltipExportHtml}"
+                            AutomationProperties.Name="{loc:Loc Key=Hist_ExportHtml}"/>
 
                     <Button Content="{loc:Loc Key=Hist_ExportPdf}"
                             Click="BtnExportSelectedPdf_Click"
                             Style="{StaticResource ExportButton}"
                             Margin="0,0,8,0"
-                            ToolTip="{loc:Loc Key=Hist_TooltipExportPdf}"/>
+                            ToolTip="{loc:Loc Key=Hist_TooltipExportPdf}"
+                            AutomationProperties.Name="{loc:Loc Key=Hist_ExportPdf}"/>
 
                     <Button Click="BtnOpenAntivirus_Click"
-                            Style="{StaticResource ExportButton}">
+                            Style="{StaticResource ExportButton}"
+                            AutomationProperties.Name="{loc:Loc Key=Hist_OpenAv}">
                         <Button.Content>
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
                                 <md:PackIcon Kind="ShieldCheck" Width="15" Height="15"

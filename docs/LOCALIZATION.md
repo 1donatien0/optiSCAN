@@ -35,7 +35,20 @@ Si une copie précédente avait déjà enregistré **fr-FR**, une réinstallatio
 
 ### Premier lancement
 
-Un message d’**accueil** (signatures, scan rapide F5, exclusions, limite UAC) s’affiche une fois (`OnboardingService`).
+Parcours **3 étapes** (`OnboardingService`) : accueil → proposition MAJ signatures → rappel analyse rapide (F5).
+
+### Voix éditoriale (v7)
+
+| Zone | Ton | Exemple |
+|------|-----|---------|
+| **Accueil** | Calme, rassurant | « Votre ordinateur est protégé » + dernière analyse uniquement sous le hero |
+| **Cartes / sections** | Title Case, pas de MAJUSCULES criardes | « Nettoyer », « Antivirus » |
+| **Options** | Technique mais clair | RTP, planification, UAC |
+| **Logs Clean / moteurs** | Brut, monospace (Consolas) | `=== ANALYSE EN COURS ===` |
+| **Exports PDF/HTML** | Neutre pro | Segoe UI, clés `Export_*` |
+
+- **FR** : vouvoiement ; préférer *analyse* à *scan* dans l’UI.
+- **EN** : *scan* / *analysis* selon le contexte utilisateur.
 
 ---
 
@@ -50,13 +63,13 @@ Un message d’**accueil** (signatures, scan rapide F5, exclusions, limite UAC) 
 
 Les clés doivent être **identiques** dans les deux fichiers (parité FR/EN obligatoire).
 
-Volume indicatif : **~400 clés** (juin 2026).
+Volume indicatif : **~530 clés** (juin 2026).
 
 ### Préfixes de clés (convention)
 
 | Préfixe | Usage |
 |---------|--------|
-| `Overview_`, `Av_`, `Hist_`, `Clean_`, `Opt_` | Panneaux principaux |
+| `Overview_`, `Av_`, `Hist_`, `Clean_`, `Opt_` | Panneaux principaux (`Overview_` : hero + dernière analyse + carte État de protection) |
 | `Main_`, `Nav_`, `Status_`, `Vm_` | Fenêtre, navigation, statut, ViewModel |
 | `Freshclam_` | MAJ signatures (UI + logs utilisateur) |
 | `Av_Action_`, `Confirm_`, `Notif_` | Actions antivirus, dialogues, toasts |

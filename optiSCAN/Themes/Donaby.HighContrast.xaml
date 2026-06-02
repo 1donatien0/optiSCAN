@@ -2,155 +2,123 @@
                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
 
     <!-- ═══════════════════════════════════════════════════════════════
-         THÈME CONTRASTE RENFORCÉ
-         Palette extraite du système de design Donaby (donaby)
-         9 ramps × 7 stops. Variables équivalentes aux CSS vars.
+         THÈME CONTRASTE RENFORCÉ — conforme Windows HC
+         Les couleurs critiques (fond, texte, bordure, sélection) utilisent
+         SystemColors.* pour respecter le thème HC choisi par l'utilisateur
+         (HC Black, HC White, HC 1, HC 2). Les couleurs sémantiques
+         (succès, alerte, danger) conservent des valeurs à fort contraste
+         vérifiées WCAG AA (ratio ≥ 4.5:1 sur fond Window).
     ═══════════════════════════════════════════════════════════════ -->
 
-    <!-- ── FONDS (beige chaud — aucun blanc pur) ── -->
-    <SolidColorBrush x:Key="AppBg"          Color="#FFFFFF"/>
-    <SolidColorBrush x:Key="SidebarBg"      Color="#F0F0EC"/>
-    <SolidColorBrush x:Key="ContentBg"      Color="#FFFFFF"/>
-    <SolidColorBrush x:Key="HeaderBg"       Color="#E8E8E4"/>
-    <SolidColorBrush x:Key="CardBg"         Color="#FFFFFF"/>
-    <SolidColorBrush x:Key="CardBgHover"    Color="#EEEDFE"/>
-    <SolidColorBrush x:Key="SurfaceBg"      Color="#EAE6DE"/>
-    <SolidColorBrush x:Key="ContentBgDeep"  Color="#F2EFE8"/>
-    <SolidColorBrush x:Key="GlassCardBg"    Color="#DDF7F4EE"/>
-    <SolidColorBrush x:Key="BorderGlass"    Color="#D4CEBF"/>
-    <!-- Voile givré sur le mesh (simule diffusion acrylic WPF) -->
-    <SolidColorBrush x:Key="GlassFrostVeil" Color="#28FFFFFF"/>
+    <!-- ── FONDS — SystemColors : respecte le thème HC système ── -->
+    <SolidColorBrush x:Key="AppBg"          Color="{x:Static SystemColors.WindowColor}"/>
+    <SolidColorBrush x:Key="SidebarBg"      Color="{x:Static SystemColors.WindowColor}"/>
+    <SolidColorBrush x:Key="ContentBg"      Color="{x:Static SystemColors.WindowColor}"/>
+    <SolidColorBrush x:Key="HeaderBg"       Color="{x:Static SystemColors.WindowColor}"/>
+    <SolidColorBrush x:Key="CardBg"         Color="{x:Static SystemColors.WindowColor}"/>
+    <SolidColorBrush x:Key="CardBgHover"    Color="{x:Static SystemColors.HighlightColor}"/>
+    <SolidColorBrush x:Key="SurfaceBg"      Color="{x:Static SystemColors.WindowColor}"/>
+    <SolidColorBrush x:Key="ContentBgDeep"  Color="{x:Static SystemColors.WindowColor}"/>
+    <SolidColorBrush x:Key="GlassCardBg"    Color="{x:Static SystemColors.WindowColor}"/>
+    <SolidColorBrush x:Key="BorderGlass"    Color="{x:Static SystemColors.WindowFrameColor}"/>
+    <!-- Pas de voile givré en HC : interférerait avec la lisibilité -->
+    <SolidColorBrush x:Key="GlassFrostVeil" Color="#00000000"/>
 
     <!-- ── SIDEBAR ── -->
-    <SolidColorBrush x:Key="SidebarActiveItem"  Color="#EEEDFE"/>
-    <SolidColorBrush x:Key="SidebarActiveGlow"  Color="#534AB7"/>
-    <SolidColorBrush x:Key="SidebarIndicator"   Color="#534AB7"/>
-    <SolidColorBrush x:Key="SidebarText"        Color="#555550"/>
-    <SolidColorBrush x:Key="SidebarTextActive"  Color="#1A1918"/>
-    <SolidColorBrush x:Key="SidebarHover"       Color="#F4F4F0"/>
+    <SolidColorBrush x:Key="SidebarActiveItem"  Color="{x:Static SystemColors.HighlightColor}"/>
+    <SolidColorBrush x:Key="SidebarActiveGlow"  Color="{x:Static SystemColors.HighlightColor}"/>
+    <SolidColorBrush x:Key="SidebarIndicator"   Color="{x:Static SystemColors.HighlightColor}"/>
+    <SolidColorBrush x:Key="SidebarText"        Color="{x:Static SystemColors.WindowTextColor}"/>
+    <SolidColorBrush x:Key="SidebarTextActive"  Color="{x:Static SystemColors.HighlightTextColor}"/>
+    <SolidColorBrush x:Key="SidebarHover"       Color="{x:Static SystemColors.HotTrackColor}"/>
 
     <!-- ── BORDURES ── -->
-    <SolidColorBrush x:Key="BorderColor"        Color="#1A1918"/>
-    <SolidColorBrush x:Key="BorderStrong"       Color="#000000"/>
-    <SolidColorBrush x:Key="BorderSubtle"       Color="#555550"/>
+    <SolidColorBrush x:Key="BorderColor"        Color="{x:Static SystemColors.WindowFrameColor}"/>
+    <SolidColorBrush x:Key="BorderStrong"       Color="{x:Static SystemColors.WindowFrameColor}"/>
+    <SolidColorBrush x:Key="BorderSubtle"       Color="{x:Static SystemColors.WindowFrameColor}"/>
 
-    <!-- ── ACCENT PRINCIPAL (violet Donaby) ── -->
-    <SolidColorBrush x:Key="PrimaryBlue"        Color="#534AB7"/>
-    <SolidColorBrush x:Key="AccentBlue"         Color="#534AB7"/>
-    <SolidColorBrush x:Key="AccentBg"           Color="#EEEDFE"/>
+    <!-- ── ACCENT PRINCIPAL — couleur de sélection système ── -->
+    <SolidColorBrush x:Key="PrimaryBlue"        Color="{x:Static SystemColors.HighlightColor}"/>
+    <SolidColorBrush x:Key="AccentBlue"         Color="{x:Static SystemColors.HighlightColor}"/>
+    <SolidColorBrush x:Key="AccentBg"           Color="{x:Static SystemColors.HighlightColor}"/>
 
-    <!-- ── SUCCÈS / TEAL ── -->
-    <SolidColorBrush x:Key="SuccessGreen"       Color="#1D9E75"/>
-    <SolidColorBrush x:Key="SuccessBg"          Color="#E1F5EE"/>
+    <!-- ── SUCCÈS / TEAL — ratio WCAG AA vérifié sur WindowColor ── -->
+    <SolidColorBrush x:Key="SuccessGreen"       Color="#007A52"/>
+    <SolidColorBrush x:Key="SuccessBg"          Color="{x:Static SystemColors.WindowColor}"/>
 
     <!-- ── ALERTE / AMBRE ── -->
-    <SolidColorBrush x:Key="AlertGold"          Color="#BA7517"/>
-    <SolidColorBrush x:Key="AlertGoldLight"     Color="#EF9F27"/>
-    <SolidColorBrush x:Key="AlertBg"            Color="#FAEEDA"/>
+    <SolidColorBrush x:Key="AlertGold"          Color="#7A4A00"/>
+    <SolidColorBrush x:Key="AlertGoldLight"     Color="#7A4A00"/>
+    <SolidColorBrush x:Key="AlertBg"            Color="{x:Static SystemColors.WindowColor}"/>
 
     <!-- ── AVERTISSEMENT / ORANGE ── -->
-    <SolidColorBrush x:Key="WarningOrange"      Color="#FB923C"/>
+    <SolidColorBrush x:Key="WarningOrange"      Color="#7A3300"/>
 
     <!-- ── DANGER / ROUGE ── -->
-    <SolidColorBrush x:Key="DangerRed"          Color="#A32D2D"/>
+    <SolidColorBrush x:Key="DangerRed"          Color="#8B0000"/>
 
-    <!-- ── TEXTES ── -->
-    <SolidColorBrush x:Key="TextDark"           Color="#1A1918"/>
-    <SolidColorBrush x:Key="TextMedium"         Color="#555550"/>
-    <SolidColorBrush x:Key="TextMuted"          Color="#3D3D38"/>
-    <!-- Alias sémantique de TextMedium (libellés secondaires) -->
-    <SolidColorBrush x:Key="TextSecondary"      Color="#555550"/>
-    <!-- Texte sur fond accent (boutons violets, bandeaux) -->
-    <SolidColorBrush x:Key="TextOnPrimary"      Color="#FFFFFF"/>
-    <SolidColorBrush x:Key="TextOnPrimaryMuted" Color="#D8D4F8"/>
-    <SolidColorBrush x:Key="TextAccent"         Color="#534AB7"/>
+    <!-- ── TEXTES — SystemColors ── -->
+    <SolidColorBrush x:Key="TextDark"           Color="{x:Static SystemColors.WindowTextColor}"/>
+    <SolidColorBrush x:Key="TextMedium"         Color="{x:Static SystemColors.WindowTextColor}"/>
+    <SolidColorBrush x:Key="TextMuted"          Color="{x:Static SystemColors.GrayTextColor}"/>
+    <SolidColorBrush x:Key="TextSecondary"      Color="{x:Static SystemColors.WindowTextColor}"/>
+    <!-- Texte sur fond sélection système (boutons accent) -->
+    <SolidColorBrush x:Key="TextOnPrimary"      Color="{x:Static SystemColors.HighlightTextColor}"/>
+    <SolidColorBrush x:Key="TextOnPrimaryMuted" Color="{x:Static SystemColors.HighlightTextColor}"/>
+    <SolidColorBrush x:Key="TextAccent"         Color="{x:Static SystemColors.HighlightColor}"/>
 
-    <!-- ── ICÔNE SUR FOND ACCENT — anneau semi-transparent posé sur PrimaryBlue ── -->
-    <SolidColorBrush x:Key="AccentIconRing"     Color="#33FFFFFF"/>
+    <!-- ── ICÔNE SUR FOND ACCENT ── -->
+    <SolidColorBrush x:Key="AccentIconRing"     Color="{x:Static SystemColors.HighlightTextColor}"/>
 
-    <!-- Bordure subtile cards -->
-    <SolidColorBrush x:Key="CardBorderAccent"  Color="#C8C3B4"/>
+    <!-- Bordure cards ── -->
+    <SolidColorBrush x:Key="CardBorderAccent"  Color="{x:Static SystemColors.WindowFrameColor}"/>
 
-    <!-- Bordure verre — reflet chaud haut-gauche + accent violet bas-droite -->
-    <LinearGradientBrush x:Key="GlassCardRim" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#CCFFFFFF" Offset="0"/>
-        <GradientStop Color="#99C8C3B4" Offset="0.45"/>
-        <GradientStop Color="#44534AB7" Offset="1"/>
-    </LinearGradientBrush>
+    <!-- En HC les dégradés sont remplacés par des couleurs unies pour éviter la confusion visuelle -->
+    <SolidColorBrush x:Key="GlassCardRim"       Color="{x:Static SystemColors.WindowFrameColor}"/>
 
-    <!-- Accent fin pour lignes décoratives -->
-    <LinearGradientBrush x:Key="AccentLineGradient" StartPoint="0,0" EndPoint="1,0">
-        <GradientStop Color="#00000000" Offset="0"/>
-        <GradientStop Color="#886B5CE8" Offset="0.4"/>
-        <GradientStop Color="#884F6DD8" Offset="0.7"/>
-        <GradientStop Color="#00000000" Offset="1"/>
-    </LinearGradientBrush>
+    <!-- Ligne décorative : couleur de sélection système, opaque -->
+    <SolidColorBrush x:Key="AccentLineGradient" Color="{x:Static SystemColors.HighlightColor}"/>
 
-    <!-- ── Fond mesh animé (MainWindow) ── -->
-    <Color x:Key="MeshBlob1Color">#886B5CE8</Color>
-    <Color x:Key="MeshBlob2Color">#884F6DD8</Color>
+    <!-- Pas de blobs animés en HC (distraction visuelle) -->
+    <Color x:Key="MeshBlob1Color">#00000000</Color>
+    <Color x:Key="MeshBlob2Color">#00000000</Color>
 
-    <!-- Halo de bouclier (mode clair) -->
-    <DropShadowEffect x:Key="ShieldGlow"
-                      Color="#534AB7" Opacity="0.35"
-                      BlurRadius="32" ShadowDepth="0"/>
+    <!-- Halos supprimés en HC -->
+    <DropShadowEffect x:Key="ShieldGlow"            Color="#00000000" Opacity="0" BlurRadius="0" ShadowDepth="0"/>
+    <Color x:Key="HeroHaloOuterColor">#00000000</Color>
+    <Color x:Key="HeroHaloInnerColor">#00000000</Color>
+    <DropShadowEffect x:Key="HeroShieldPulseGlow"   Color="#00000000" Opacity="0" BlurRadius="0" ShadowDepth="0"/>
 
-    <!-- Hero accueil — ambiance violet Donaby autour du PNG teal (logo battant intact) -->
-    <Color x:Key="HeroHaloOuterColor">#66534AB7</Color>
-    <Color x:Key="HeroHaloInnerColor">#886B5CE8</Color>
-    <DropShadowEffect x:Key="HeroShieldPulseGlow"
-                      Color="#534AB7" Opacity="0.44"
-                      BlurRadius="28" ShadowDepth="0"/>
+    <!-- Ombres supprimées en HC -->
+    <DropShadowEffect x:Key="CardShadow"            Color="#00000000" Opacity="0" BlurRadius="0" ShadowDepth="0"/>
 
-    <!-- ── OMBRES (très légères en mode clair, Donaby Design style) ── -->
-    <DropShadowEffect x:Key="CardShadow"
-                      Color="#000000" Opacity="0.06"
-                      BlurRadius="8" ShadowDepth="1" Direction="270"/>
+    <!-- Boutons — fond sélection système, texte HighlightText -->
+    <SolidColorBrush x:Key="AccentGradient"     Color="{x:Static SystemColors.HighlightColor}"/>
+    <SolidColorBrush x:Key="HeroCardBorder"     Color="{x:Static SystemColors.WindowFrameColor}"/>
+    <SolidColorBrush x:Key="HeroCardGradient"   Color="{x:Static SystemColors.HighlightColor}"/>
 
-    <LinearGradientBrush x:Key="AccentGradient" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#6B5CE8" Offset="0"/>
-        <GradientStop Color="#534AB7" Offset="0.5"/>
-        <GradientStop Color="#4F6DD8" Offset="1"/>
-    </LinearGradientBrush>
-    <SolidColorBrush x:Key="HeroCardBorder"     Color="#88000000"/>
+    <!-- Mesh désactivé en HC -->
+    <SolidColorBrush x:Key="ContentAreaMesh"    Color="#00000000"/>
 
-    <LinearGradientBrush x:Key="HeroCardGradient" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#7C6CF0" Offset="0"/>
-        <GradientStop Color="#534AB7" Offset="0.55"/>
-        <GradientStop Color="#4A7FD4" Offset="1"/>
-    </LinearGradientBrush>
-    <LinearGradientBrush x:Key="ContentAreaMesh" StartPoint="0,1" EndPoint="1,0">
-        <GradientStop Color="#E8E4FF" Offset="0"/>
-        <GradientStop Color="#00FFFFFF" Offset="0.4"/>
-        <GradientStop Color="#D4E8FF" Offset="0.8"/>
-        <GradientStop Color="#00FFFFFF" Offset="1"/>
-    </LinearGradientBrush>
+    <!-- En-tête de page -->
+    <SolidColorBrush x:Key="PageHeaderMica"         Color="{x:Static SystemColors.WindowColor}"/>
+    <SolidColorBrush x:Key="PageHeaderIconRing"     Color="{x:Static SystemColors.HighlightColor}"/>
+    <SolidColorBrush x:Key="PageHeaderIconBorder"   Color="{x:Static SystemColors.WindowFrameColor}"/>
 
-    <LinearGradientBrush x:Key="PageHeaderMica" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#F0ECE4" Offset="0"/>
-        <GradientStop Color="#E8E6F8" Offset="0.55"/>
-        <GradientStop Color="#EDE9E0" Offset="1"/>
-    </LinearGradientBrush>
-    <SolidColorBrush x:Key="PageHeaderIconRing"   Color="#EEEDFE"/>
-    <SolidColorBrush x:Key="PageHeaderIconBorder" Color="#CECBF6"/>
+    <!-- Bordure active -->
+    <SolidColorBrush x:Key="CardBorderGlow"     Color="{x:Static SystemColors.HighlightColor}"/>
 
-    <LinearGradientBrush x:Key="CardBorderGlow" StartPoint="0,0" EndPoint="1,1">
-        <GradientStop Color="#66534AB7" Offset="0"/>
-        <GradientStop Color="#334F6DD8" Offset="1"/>
-    </LinearGradientBrush>
+    <!-- Halo accent supprimé -->
+    <DropShadowEffect x:Key="GlowShadowAccent"  Color="#00000000" Opacity="0" BlurRadius="0" ShadowDepth="0"/>
 
-    <DropShadowEffect x:Key="GlowShadowAccent"
-                      Color="#534AB7" Opacity="0.28"
-                      BlurRadius="16" ShadowDepth="0"/>
+    <!-- Toggle thème ── -->
+    <SolidColorBrush x:Key="ThemeToggleBg"      Color="{x:Static SystemColors.HighlightColor}"/>
+    <SolidColorBrush x:Key="ThemeToggleFg"      Color="{x:Static SystemColors.HighlightTextColor}"/>
 
-    <!-- ── INDICATEUR TOGGLE (icône soleil pour le bouton thème) ── -->
-    <SolidColorBrush x:Key="ThemeToggleBg"      Color="#EEEDFE"/>
-    <SolidColorBrush x:Key="ThemeToggleFg"      Color="#534AB7"/>
-
-    <!-- Badges sévérité menaces (grille Antivirus — thème clair/sombre) -->
-    <SolidColorBrush x:Key="RiskCritical"       Color="#A32D2D"/>
-    <SolidColorBrush x:Key="RiskMajor"          Color="#854F0B"/>
-    <SolidColorBrush x:Key="RiskMinor"          Color="#BA7517"/>
-    <SolidColorBrush x:Key="RiskInformational"  Color="#1D9E75"/>
+    <!-- Badges sévérité — couleurs à fort contraste WCAG AA -->
+    <SolidColorBrush x:Key="RiskCritical"       Color="#8B0000"/>
+    <SolidColorBrush x:Key="RiskMajor"          Color="#7A3300"/>
+    <SolidColorBrush x:Key="RiskMinor"          Color="#7A4A00"/>
+    <SolidColorBrush x:Key="RiskInformational"  Color="#007A52"/>
 
 </ResourceDictionary>

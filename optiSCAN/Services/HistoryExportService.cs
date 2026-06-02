@@ -41,23 +41,6 @@ namespace optiSCAN.Services
             }
         }
 
-        public HistoryExportResult TryExportLastScanPdf(Window owner, ScanLogManager? logManager)
-        {
-            var sessions = logManager?.GetHistory() ?? Array.Empty<ScanSession>();
-            if (sessions.Count == 0)
-            {
-                System.Windows.MessageBox.Show(
-                    owner,
-                    LocalizationService.GetString("Status_ExportNoHistory"),
-                    LocalizationService.GetString("Hist_ExportPdfTitle"),
-                    System.Windows.MessageBoxButton.OK,
-                    System.Windows.MessageBoxImage.Information);
-                return HistoryExportResult.UserCancelled;
-            }
-
-            return TryExportSessionPdf(owner, sessions[0]);
-        }
-
         public HistoryExportResult TryExportSessionPdf(Window owner, ScanSession session)
         {
             try

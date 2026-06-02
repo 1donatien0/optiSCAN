@@ -52,7 +52,7 @@
 │   ├── BUILD.md                       ← Publish, nettoyage, Inno, CI
 │   ├── LOCALIZATION.md                ← Français / English (utilisateur + dev)
 │   └── RELEASE-CHECKLIST.md           ← Contrôles avant installateur
-├── .github/workflows/ci.yml           ← Build, tests (67), publish main
+├── .github/workflows/ci.yml           ← Build, tests (83), publish + installateur (main)
 ├── scripts/
 │   ├── clean-before-publish.ps1       ← Nettoyage bin/obj avant release
 │   └── verify-runtime-deps.ps1        ← Vérifie clamav + yara + rules
@@ -363,19 +363,18 @@ Stockage : `%LOCALAPPDATA%\optiSCAN\Quarantine\` — `{guid}.quar` + `manifest.j
 
 ### 4.10 Exports PDF et HTML
 
-- **PDF** — `PdfReportGenerator` : déclenché via `ServiceContainer` (`ExportLastScanPdfRequested`, `ExportScanSessionPdfRequested` → `MainWindow.TryExportScanSessionPdf`). Boutons **Historique** : dernier scan ou **PDF (sélection)** sur la ligne choisie.
+- **PDF** — `PdfReportGenerator` : déclenché via `ServiceContainer` (`ExportScanSessionPdfRequested` → `MainWindow.TryExportScanSessionPdf`). Bouton **Historique** : **PDF (sélection)** sur la ligne choisie dans Scan Antivirus.
 - **HTML** — `HtmlExportService` : `RequestExportScanHistoryHtml()` depuis **Historique**.
 
 ### 4.11 Vue d'ensemble (dashboard)
 
 Le panneau **Vue d'ensemble** (`OverviewControl`, clé `Overview`) regroupe :
 
-- **Bannière** : état de protection (ClamAV / YARA / signatures) ; rafraîchie à chaque navigation **Overview** (`RefreshAntivirusStatus` + `UpdateAntivirusCardStatus`, signatures via `RefreshSignaturesDisplay`).
+- **Hero** : titre de protection (« Votre ordinateur est protégé » ou « Protection incomplète » selon les moteurs) et **dernière analyse** uniquement ; pas de détail ClamAV/YARA sur cet écran (voir onglet **Antivirus**).
 - **Quatre cartes d'action** : Nettoyer, Antivirus, Historique, mise à jour des signatures (navigation via `ServiceContainer` / `INavigationService`).
-- **Trois colonnes** sous les cartes :
+- **Deux colonnes** sous les cartes :
   - **Statistiques de protection** : synthèse textuelle sur **30 jours** (analyses, fichiers parcourus, menaces) à partir de l’historique persisté ; horodatage de dernière actualisation.
-  - **Recommandations** : trois encarts (signatures / hygiène disque / activité analyses) mis à jour dynamiquement selon l’état réel des moteurs, du nettoyage et de l’historique.
-  - **Cartes d'information** : état ClamAV et nombre de règles YARA, dernière analyse, résumé des versions de signatures (ClamAV + pack YARA).
+  - **Recommandations** : nettoyage disque et activité des analyses (historique 30 jours).
 
 ---
 
@@ -454,7 +453,7 @@ DÉMARRAGE (UI)
     ├─→ Protection temps réel : état selon **Options** (`ServiceContainer.RealTimeProtection`)
     └─→ Fenêtre principale + icône zone de notification (réduction possible sans quitter)
             │
-            ├─→ [VUE D'ENSEMBLE] — cartes d’action, statistiques 30 j., recommandations dynamiques, état antivirus / signatures
+            ├─→ [VUE D'ENSEMBLE] — hero (protection + dernière analyse), cartes d’action, statistiques 30 j., recommandations
             ├─→ [NETTOYER] — temporaires, caches navigateurs (Edge, Chrome, Firefox, Brave, **Opera**, **Vivaldi**, **Arc**), corbeille, journaux Windows
             ├─→ [ANTIVIRUS] — scans rapide/complet/dossier/fichier, quarantaine, historique de session, signatures
             ├─→ [HISTORIQUE] — sessions enregistrées ; exports **HTML** / **PDF**
@@ -563,7 +562,7 @@ Références : **[docs/LOCALIZATION.md](docs/LOCALIZATION.md)** · **[docs/READM
 |-------|----------------|
 | **Installateur Inno** | Choix FR ou EN → `HKCU\Software\optiSCAN\UiCulture` |
 | **Options → Langue** | Français / English → confirmation → **redémarrage** de l’app |
-| **Ressources** | `UiStrings.resx` + `UiStrings.en.resx` (~170 clés chacune) |
+| **Ressources** | `UiStrings.resx` + `UiStrings.en.resx` (~530 clés, juin 2026) |
 | **Menu contextuel** | « Scanner avec optiSCAN » ou « Scan with optiSCAN » |
 
 Les deux langues sont **incluses dans le même binaire** (pas de pack de langue séparé). Les rapports PDF/HTML exportés et les journaux techniques ClamAV/YARA peuvent rester partiellement en français ou en anglais technique.
@@ -592,14 +591,17 @@ Les deux langues sont **incluses dans le même binaire** (pas de pack de langue 
 ### v7.0 — Lifting UI Donaby + identité visuelle
 
 - **Lifting apparence** — glassmorphism, fond mesh, cartes métriques, en-têtes unifiés
+- **Accueil v7** — hero `FontSize.Display`, dernière analyse détaillée, carte État de protection, stats/recommandations
+- **Typo & écriture** — Title Case, token Display, voix éditoriale ([LOCALIZATION.md](docs/LOCALIZATION.md))
+- **Onboarding** — parcours 3 étapes (MAJ signatures optionnelle)
 - **Logo hero** — bouclier optiSCAN (accueil), sidebar compacte
 - **Footer** — statut live + crédit Vanier (deux colonnes)
-- **Thèmes** — clair / sombre / contraste renforcé ; boutons Danger/Warning/Success corrigés
-- **Services** — `SystemTrayHost`, `NavigationRefreshCoordinator`, `HistoryExportService`, `AntivirusActions` i18n
-- **Options** — schtasks async, onboarding, hint UAC, filtres historique
-- **CI** — GitHub Actions ; **67** tests unitaires
-- **Versioning** — **v7.0** + build **7.0.0** (`Directory.Build.props`, Inno, LICENSE, PDF/HTML)
-- **Doc** — [docs/AUDIT.md](docs/AUDIT.md), [RELEASE-CHECKLIST](docs/RELEASE-CHECKLIST.md)
+- **Thèmes** — clair / sombre / contraste renforcé ; boutons sémantiques + hover grilles
+- **Services** — `SystemTrayHost`, `HistoryExportService`, `SignatureUpdateUiRunner`, `ScanLastScanDisplay`
+- **i18n** — exports PDF/HTML, MAJ signatures, ViewModel, runtime (~530 clés FR/EN)
+- **Options** — schtasks async, hints RTP/UAC honnêtes, limite nettoyage navigateurs documentée
+- **CI** — GitHub Actions ; **83** tests Release ; artefact publish + installateur Inno (main) + build Release (dev)
+- **Doc** — [AUDIT.md](docs/AUDIT.md), [THREAT-MODEL.md](docs/THREAT-MODEL.md), [RELEASE-CHECKLIST](docs/RELEASE-CHECKLIST.md)
 
 ### v6.0 — Version majeure (publication)
 
@@ -637,7 +639,7 @@ Les deux langues sont **incluses dans le même binaire** (pas de pack de langue 
 ### v3.0 — Donaby Design System + Stabilisation
 
 - **Donaby Design System complet** — refonte UI vers le thème clair Donaby Light par défaut
-- **OverviewControl** — 4 cartes d'action cliquables (Border + `MouseLeftButtonUp`, sans ControlTemplate) ; cercles d'icônes neutres (`SurfaceBg`) ; carte "État Antivirus" enrichie (ClamAV + YARA en temps réel)
+- **OverviewControl** — hero (titre + dernière analyse), 4 cartes d'action cliquables ; statistiques et recommandations (sans panneau ClamAV/YARA sur l'accueil)
 - **AntivirusView** — boutons d’analyse (rapide, complète, fichier, dossier) ; liste **cibles récentes** reliée à `UserPreferences`
 - **CleanControl** — Brave, **Opera**, **Vivaldi**, **Arc**, journaux Windows
 - **FreshclamUpdater** — `EnsureConfExists()` : résolution automatique du conf manquant (`x64\` → parent → `x86` → génération) ; `ResolveDbDir()` : résolution intelligente du dossier de base de données selon la hiérarchie clamav

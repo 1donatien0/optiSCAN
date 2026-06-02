@@ -1,9 +1,12 @@
+using optiSCAN.Localization;
 using optiSCAN.Services;
 
 namespace optiSCAN.Tests;
 
 public sealed class RuntimeDependenciesTests
 {
+    public RuntimeDependenciesTests() => LocalizationService.ApplyCulture("fr-FR");
+
     [Fact]
     public void Evaluate_returns_clamav_and_yara_items()
     {
@@ -21,7 +24,9 @@ public sealed class RuntimeDependenciesTests
         var report = RuntimeDependencies.Evaluate();
         var text = report.BuildDetailedMessage();
 
-        Assert.Contains("Répertoire d'exécution", text);
+        Assert.Contains(
+            LocalizationService.Format("Runtime_ExecDirFormat", AppInstallPaths.GetInstallRoot()),
+            text);
         foreach (var item in report.Items)
             Assert.False(string.IsNullOrWhiteSpace(item.ExpectedPath));
     }

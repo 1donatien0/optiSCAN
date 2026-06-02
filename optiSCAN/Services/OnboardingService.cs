@@ -4,7 +4,7 @@ using MessageBox = System.Windows.MessageBox;
 
 namespace optiSCAN.Services
 {
-    /// <summary>Premier lancement : rappel des actions essentielles (une fois).</summary>
+    /// <summary>Premier lancement : parcours court en 3 étapes (v7).</summary>
     public static class OnboardingService
     {
         public static void ShowIfNeeded(Window owner)
@@ -13,7 +13,6 @@ namespace optiSCAN.Services
             if (prefs.OnboardingCompleted)
                 return;
 
-            // Utilisateur existant (déjà des scans) : ne pas afficher.
             if (prefs.TotalScansCount > 0)
             {
                 prefs.OnboardingCompleted = true;
@@ -21,18 +20,40 @@ namespace optiSCAN.Services
                 return;
             }
 
-            var result = MessageBox.Show(
-                owner,
-                LocalizationService.GetString("Onboarding_Body"),
-                LocalizationService.GetString("Onboarding_Title"),
-                System.Windows.MessageBoxButton.OK,
-                System.Windows.MessageBoxImage.Information);
+            var title = LocalizationService.GetString("Onboarding_Title");
 
-            if (result == MessageBoxResult.OK)
+            var step1 = MessageBox.Show(
+                owner,
+                LocalizationService.GetString("Onboarding_Step1"),
+                title,
+                MessageBoxButton.OKCancel,
+                MessageBoxImage.Information);
+            if (step1 != MessageBoxResult.OK)
+                return;
+
+            var step2 = MessageBox.Show(
+                owner,
+                LocalizationService.GetString("Onboarding_Step2"),
+                title,
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Question);
+            if (step2 == MessageBoxResult.Yes)
             {
-                prefs.OnboardingCompleted = true;
-                prefs.Save();
+                var c = ServiceContainer.Default;
+                c.Navigation?.NavigateTo(Strings.OptiscanStrings.PanelIds.Antivirus);
+                c.RequestFocusAntivirusSignaturesTab();
+                c.TriggerSignatureUpdate();
             }
+
+            MessageBox.Show(
+                owner,
+                LocalizationService.GetString("Onboarding_Step3"),
+                title,
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+
+            prefs.OnboardingCompleted = true;
+            prefs.Save();
         }
     }
 }

@@ -1,3 +1,4 @@
+using optiSCAN.Localization;
 using System.Linq;
 using System.Text.Json.Serialization;
 
@@ -18,8 +19,28 @@ namespace optiSCAN.Models
         /// <summary>Date et heure de fin du scan (<c>null</c> si non encore terminé).</summary>
         public DateTime? FinishedAt { get; set; }
 
-        /// <summary>Libellé du type de scan (ex. « Analyse rapide »), tel que stocké dans l'historique.</summary>
-        public string TypeDisplay { get; set; } = string.Empty;
+        /// <summary>
+        /// Type de scan — source de vérité pour le libellé affiché.
+        /// Stocké dans le JSON depuis v7.1 ; les anciennes entrées ont <see cref="TypeDisplayLegacy"/> à la place.
+        /// </summary>
+        public ScanType ScanTypeValue { get; set; } = ScanType.QuickScan;
+
+        /// <summary>
+        /// Libellé brut stocké par les versions antérieures à v7.1 (chaîne localisée au moment du scan).
+        /// Conservé pour la rétrocompatibilité JSON uniquement — ne pas utiliser dans l'UI.
+        /// </summary>
+        [JsonPropertyName("typeDisplay")]
+        public string TypeDisplayLegacy { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Libellé localisé du type de scan, calculé selon la culture UI active.
+        /// Si <see cref="ScanTypeValue"/> est défini (v7.1+), il est utilisé ; sinon repli sur <see cref="TypeDisplayLegacy"/>.
+        /// </summary>
+        [JsonIgnore]
+        public string TypeDisplay =>
+            ScanTypeValue != default
+                ? LocalizationService.ScanTypeDisplay(ScanTypeValue)
+                : TypeDisplayLegacy;
 
         /// <summary>Chemin ou identifiant de la cible analysée.</summary>
         public string TargetPath { get; set; } = string.Empty;
@@ -30,7 +51,7 @@ namespace optiSCAN.Models
         /// <summary>Nombre de menaces détectées.</summary>
         public int ThreatsFound { get; set; }
 
-        /// <summary>Libellé du statut final (ex. « Completed », « Cancelled »).</summary>
+        /// <summary>Statut final du scan (valeur enum <see cref="ScanStatus"/> sérialisée en string).</summary>
         public string StatusDisplay { get; set; } = string.Empty;
 
         /// <summary>Message d'erreur si le scan s'est terminé en échec.</summary>
@@ -42,34 +63,36 @@ namespace optiSCAN.Models
         /// <summary>Menaces détectées (chemins et noms conservés pour l'historique et les exports).</summary>
         public List<ThreatInfo> Threats { get; set; } = new();
 
-        /// <summary>Durée formatée en français (ex. « 2 min 34 s ») ; « — » si la session n'est pas terminée.</summary>
+        /// <summary>Durée formatée selon la culture UI active ; « — » si la session n'est pas terminée.</summary>
         [JsonIgnore]
         public string DurationDisplay =>
             FinishedAt.HasValue
                 ? ScanDisplayFormatter.FormatDuration(FinishedAt.Value - StartedAt)
                 : "—";
 
-        /// <summary>Badge d'état (ex. « Aucune menace » ou « Attention : 2 menaces »).</summary>
+        /// <summary>Badge d'état localisé selon la culture UI active.</summary>
         [JsonIgnore]
         public string ThreatsBadge =>
             ThreatsFound == 0
-                ? "Aucune menace"
-                : $"Attention : {ThreatsFound} menace{(ThreatsFound > 1 ? "s" : "")}";
+                ? LocalizationService.GetString("Badge_Clean")
+                : LocalizationService.Format("Badge_Threats", ThreatsFound,
+                    ThreatsFound > 1 ? "s" : "");
 
         /// <summary>Convertit un <see cref="ScanResult"/> complet en entrée d'historique légère.</summary>
         public static ScanSession FromResult(ScanResult result) => new ScanSession
         {
-            SessionId = result.SessionId,
-            StartedAt = result.StartedAt,
-            FinishedAt = result.FinishedAt,
-            TypeDisplay = result.TypeDisplay,
-            TargetPath = result.TargetPath,
-            FilesScanned = result.FilesScanned,
-            ThreatsFound = result.ThreatsFound,
-            StatusDisplay = result.Status.ToString(),
-            ErrorMessage = result.ErrorMessage,
-            FilesSkipped = result.FilesSkipped,
-            Threats = result.Threats.Select(t => t.Clone()).ToList()
+            SessionId        = result.SessionId,
+            StartedAt        = result.StartedAt,
+            FinishedAt       = result.FinishedAt,
+            ScanTypeValue    = result.Type,
+            TypeDisplayLegacy = result.TypeDisplay, // rétrocompat lectures par ancien code
+            TargetPath       = result.TargetPath,
+            FilesScanned     = result.FilesScanned,
+            ThreatsFound     = result.ThreatsFound,
+            StatusDisplay    = result.Status.ToString(),
+            ErrorMessage     = result.ErrorMessage,
+            FilesSkipped     = result.FilesSkipped,
+            Threats          = result.Threats.Select(t => t.Clone()).ToList()
         };
     }
 }

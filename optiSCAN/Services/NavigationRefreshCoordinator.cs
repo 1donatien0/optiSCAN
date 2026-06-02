@@ -8,19 +8,18 @@ namespace optiSCAN.Services
     /// Extrait de MainWindow pour améliorer la testabilité et réduire la taille de la fenêtre principale.
     ///
     /// Pattern : <see cref="INavigationService.Navigated"/> → dispatch sur le Dispatcher WPF →
-    /// appel des actions de rafraîchissement correspondantes.
+    /// await des callbacks injectés (<see cref="Func{Task}"/>).
     /// </summary>
     public sealed class NavigationRefreshCoordinator
     {
         private readonly INavigationService _navigation;
         private readonly Dispatcher _dispatcher;
 
-        // Actions de rafraîchissement injectées par MainWindow.
-        // Chaque action correspond à un bloc de données à recharger.
-        private readonly Action _refreshHistory;
-        private readonly Action _refreshAntivirusStatus;
-        private readonly Action _refreshSignatures;
-        private readonly Action _refreshAntivirusData;
+        // Callbacks async injectés par MainWindow (un par bloc de données à recharger).
+        private readonly Func<Task> _refreshHistory;
+        private readonly Func<Task> _refreshAntivirusStatus;
+        private readonly Func<Task> _refreshSignatures;
+        private readonly Func<Task> _refreshAntivirusData;
 
         /// <summary>
         /// Initialise le coordinateur et s'abonne à l'événement <see cref="INavigationService.Navigated"/>.
@@ -31,13 +30,17 @@ namespace optiSCAN.Services
         /// <param name="refreshAntivirusStatus">Recharge le statut ClamAV / YARA sidebar.</param>
         /// <param name="refreshSignatures">Recharge les versions de signatures (avec cache TTL).</param>
         /// <param name="refreshAntivirusData">Recharge l'ensemble des données Antivirus.</param>
+        /// <remarks>
+        /// Passer des méthodes <c>async Task</c> ou des lambdas retournant <see cref="Task"/>.
+        /// Ne pas assigner de lambda <c>async</c> à un <see cref="Action"/> (async void implicite).
+        /// </remarks>
         public NavigationRefreshCoordinator(
             INavigationService navigation,
             Dispatcher dispatcher,
-            Action refreshHistory,
-            Action refreshAntivirusStatus,
-            Action refreshSignatures,
-            Action refreshAntivirusData)
+            Func<Task> refreshHistory,
+            Func<Task> refreshAntivirusStatus,
+            Func<Task> refreshSignatures,
+            Func<Task> refreshAntivirusData)
         {
             _navigation            = navigation;
             _dispatcher            = dispatcher;
@@ -54,30 +57,42 @@ namespace optiSCAN.Services
 
         private void OnNavigated(object? sender, string panelName)
         {
-            _dispatcher.BeginInvoke(() => ApplyRefreshes(panelName), DispatcherPriority.Background);
+            _ = _dispatcher.InvokeAsync(() => ApplyRefreshesAsync(panelName), DispatcherPriority.Background);
         }
 
         /// <summary>Exposé aux tests unitaires (sans passer par le Dispatcher).</summary>
-        internal void ApplyRefreshesForPanel(string panelName) => ApplyRefreshes(panelName);
+        internal Task ApplyRefreshesForPanelAsync(string panelName) => ApplyRefreshesAsync(panelName);
 
-        private void ApplyRefreshes(string panelName)
+        private async Task ApplyRefreshesAsync(string panelName)
         {
             switch (panelName)
             {
                 case OptiscanStrings.PanelIds.Overview:
-                    _refreshHistory();
-                    _refreshAntivirusStatus();
-                    _refreshSignatures();
+                    await InvokeRefreshAsync(_refreshHistory, nameof(_refreshHistory)).ConfigureAwait(true);
+                    await InvokeRefreshAsync(_refreshAntivirusStatus, nameof(_refreshAntivirusStatus)).ConfigureAwait(true);
+                    await InvokeRefreshAsync(_refreshSignatures, nameof(_refreshSignatures)).ConfigureAwait(true);
                     break;
 
                 case OptiscanStrings.PanelIds.Antivirus:
-                    _refreshAntivirusData();
+                    await InvokeRefreshAsync(_refreshAntivirusData, nameof(_refreshAntivirusData)).ConfigureAwait(true);
                     break;
 
                 case OptiscanStrings.PanelIds.History:
-                    _refreshHistory();
+                    await InvokeRefreshAsync(_refreshHistory, nameof(_refreshHistory)).ConfigureAwait(true);
                     break;
                 // Clean et Options : aucun rafraîchissement nécessaire à la navigation.
+            }
+        }
+
+        private static async Task InvokeRefreshAsync(Func<Task> refresh, string name)
+        {
+            try
+            {
+                await refresh().ConfigureAwait(true);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("NavigationRefreshCoordinator", name, ex);
             }
         }
     }

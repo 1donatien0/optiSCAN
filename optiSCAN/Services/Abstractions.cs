@@ -5,6 +5,23 @@ namespace optiSCAN.Services
     // Interfaces pour tests (mocks) et pour découpler les couches UI des implémentations.
     // Les services concrets sont des singletons exposés par ServiceContainer.
 
+    /// <summary>Contrat ClamAV utilisé par <see cref="ScanOrchestrator"/> (tests via InternalsVisibleTo).</summary>
+    internal interface IClamAvOrchestratorBackend
+    {
+        bool IsClamAvInstalled();
+        Task<ScanResult> ScanFileAsync(string filePath, IProgress<ScanProgress>? progress = null, CancellationToken ct = default);
+        Task<ScanResult> ScanFolderAsync(string folderPath, IProgress<ScanProgress>? progress = null, CancellationToken ct = default);
+    }
+
+    /// <summary>Contrat YARA utilisé par <see cref="ScanOrchestrator"/> (tests via InternalsVisibleTo).</summary>
+    internal interface IYaraOrchestratorBackend
+    {
+        bool IsAvailable { get; }
+        int RulesCount { get; }
+        Task<List<YaraMatch>> ScanFileAsync(string filePath, CancellationToken ct = default);
+        Task<List<YaraMatch>> ScanFolderAsync(string folderPath, IProgress<string>? progress = null, CancellationToken ct = default);
+    }
+
     /// <summary>
     /// Moteur de scan antivirus (ClamAV, ou alternatif).
     /// </summary>

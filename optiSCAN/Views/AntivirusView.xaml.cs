@@ -182,8 +182,11 @@ namespace optiSCAN.Views
         public void UpdateSignatureInfo(string version, string date)
             => UpdateSignaturesPanel("—", "—", version, date);
 
-        public void RefreshAllData() => Win?.RefreshAntivirusData();
-
+        public void RefreshAllData()
+        {
+            if (Win != null)
+                _ = Win.RefreshAntivirusDataAsync();
+        }
         private void SelectTab(int tabIndex)
         {
             Dispatcher.InvokeAsync(() =>
@@ -216,9 +219,7 @@ namespace optiSCAN.Views
         private static void SetDisplayText(System.Windows.Controls.TextBlock? block, string value)
         {
             if (block == null) return;
-            block.Text = string.IsNullOrWhiteSpace(value) || value is "Inconnue" or "—"
-                ? "—"
-                : value;
+            block.Text = VersionDisplayHelper.NormalizeForDisplay(value);
         }
 
         private void BrowseFolder_Click(object sender, RoutedEventArgs e)
