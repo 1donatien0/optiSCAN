@@ -266,15 +266,27 @@ namespace optiSCAN.Services
                 });
 
                 // Single-process : un seul yara64.exe avec --recursive.
-                // 10 à 50× plus rapide que l'ancienne approche un-process-par-fichier.
-                // filesYara compte synthétiquement les fichiers traités via les messages
-                // de progression YARA (un message ≈ un fichier) pour animer la ProgressBar.
+                // YARA émet un message tous les ~20 lignes stdout (matches), pas par fichier.
+                // Si total > 0, on répartit les N messages reçus uniformément sur [0, total]
+                // pour une barre de progression fidèle au nombre de fichiers.
+                // Si total = 0 (inconnu / >100k), on laisse le compteur libre (ProgressBar indéterminée).
                 int filesYara = 0;
+                int msgCount = 0;
                 var yaraProgress = new Progress<string>(msg =>
                 {
-                    var n = System.Threading.Interlocked.Increment(ref filesYara);
-                    if (total > 0 && n > total)
-                        n = total;
+                    var msgs = System.Threading.Interlocked.Increment(ref msgCount);
+                    int n;
+                    if (total > 0)
+                    {
+                        // YaraEngine émet ~1 message par YaraProgressInterval (~20) lignes traitées.
+                        // On interpole : chaque message ≈ YaraProgressInterval fichiers parcourus.
+                        n = Math.Min(msgs * YaraEngine.YaraProgressInterval, total);
+                        System.Threading.Interlocked.Exchange(ref filesYara, n);
+                    }
+                    else
+                    {
+                        n = System.Threading.Interlocked.Increment(ref filesYara);
+                    }
                     progress?.Report(new ScanProgress
                     {
                         Message = msg,

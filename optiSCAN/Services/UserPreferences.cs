@@ -92,6 +92,18 @@ namespace optiSCAN.Services
         /// <summary>Clé API VirusTotal (optionnelle, stockée chiffrée via SecureStore).</summary>
         public string VirusTotalApiKey { get; set; } = string.Empty;
 
+        /// <summary>
+        /// Seuil (jours) au-delà duquel une suggestion de nettoyage est affichée sur l'accueil.
+        /// Valeur par défaut : <see cref="RecommendationThresholds.CleanSuggestThresholdDays"/>.
+        /// </summary>
+        public int CleanSuggestThresholdDays { get; set; } = RecommendationThresholds.CleanSuggestThresholdDays;
+
+        /// <summary>
+        /// Seuil (jours) au-delà duquel les signatures ClamAV sont considérées obsolètes.
+        /// Valeur par défaut : <see cref="RecommendationThresholds.SignatureStaleThresholdDays"/>.
+        /// </summary>
+        public int SignatureStaleThresholdDays { get; set; } = RecommendationThresholds.SignatureStaleThresholdDays;
+
         // ── Méthodes ──────────────────────────────────────────────────────────────
 
         /// <summary>

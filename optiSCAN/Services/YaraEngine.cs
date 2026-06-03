@@ -13,6 +13,13 @@ namespace optiSCAN.Services
     /// </summary>
     public class YaraEngine : IYaraOrchestratorBackend
     {
+        /// <summary>
+        /// Fréquence d'émission des messages de progression dans RunYaraScanRecursiveAsync :
+        /// un message est émis toutes les N lignes stdout traitées.
+        /// Exposé pour que ScanOrchestrator puisse interpoler le compteur de fichiers.
+        /// </summary>
+        public const int YaraProgressInterval = 20;
+
         private readonly string _yaraExe;     // yara64.exe / yara32.exe
         private readonly string _yaracExe;    // yarac64.exe / yarac32.exe (compilateur)
         private readonly string _rulesDirectory;
@@ -344,7 +351,6 @@ namespace optiSCAN.Services
         {
             var matches = new List<YaraMatch>();
             var stdoutLines = 0;
-            const int progressEveryLines = 20;
 
             var psi = new ProcessStartInfo
             {
@@ -370,7 +376,7 @@ namespace optiSCAN.Services
                     cap.SurLigneYara(e.Data, MaxYaraStdoutCaptureChars);
                     if (string.IsNullOrEmpty(e.Data)) return;
                     var n = System.Threading.Interlocked.Increment(ref stdoutLines);
-                    if (progress != null && (n == 1 || n % progressEveryLines == 0))
+                    if (progress != null && (n == 1 || n % YaraProgressInterval == 0))
                         progress.Report(e.Data);
                 };
                 process.ErrorDataReceived += (_, e) => { if (e.Data != null) stderrLines.AppendLine(e.Data); };

@@ -332,6 +332,11 @@
   <data name="Opt_AutoQuarSub" xml:space="preserve"><value>Toute menace détectée (analyse manuelle, temps réel ou planifiée) est mise en quarantaine — jamais supprimée automatiquement</value></data>
   <data name="Opt_AutoSig" xml:space="preserve"><value>Mise à jour automatique des signatures (toutes les 4h)</value></data>
   <data name="Opt_AutoSigSub" xml:space="preserve"><value>freshclam.exe est lancé en arrière-plan périodiquement</value></data>
+  <data name="Opt_RecThresholds" xml:space="preserve"><value>Seuils des recommandations</value></data>
+  <data name="Opt_RecThresholdsSub" xml:space="preserve"><value>Délais au-delà desquels une recommandation s'affiche sur l'accueil</value></data>
+  <data name="Opt_CleanThreshold" xml:space="preserve"><value>Suggérer nettoyage après</value></data>
+  <data name="Opt_SigThreshold" xml:space="preserve"><value>Signatures obsolètes après</value></data>
+  <data name="Opt_Days" xml:space="preserve"><value>jours</value></data>
   <data name="Opt_Scheduled" xml:space="preserve"><value>Analyse complète planifiée (quotidienne)</value></data>
   <data name="Opt_ScheduledSub" xml:space="preserve"><value>Tâche « optiSCAN_DailyScan » (--fullscan --quiet). Droits administrateur recommandés pour les dossiers système.</value></data>
   <data name="Opt_ScheduleTime" xml:space="preserve"><value>Heure :</value></data>
@@ -394,6 +399,8 @@
   <data name="Rec_ClamMissing" xml:space="preserve"><value>ClamAV non installé — les analyses antivirus sont désactivées. Installez ClamAV via l'onglet Antivirus.</value></data>
   <data name="Rec_SigAutoOff" xml:space="preserve"><value>Mise à jour automatique des signatures désactivée — vos définitions peuvent devenir obsolètes. Activez-la dans Options.</value></data>
   <data name="Rec_SigStale" xml:space="preserve"><value>Signatures ClamAV datant de plus de {0} jours — lancez une mise à jour (Antivirus ou Options).</value></data>
+  <data name="Rec_SigNeverUpdated" xml:space="preserve"><value>Signatures ClamAV jamais mises à jour — lancez une première mise à jour via l'onglet Antivirus.</value></data>
+  <data name="Rec_SigStaleAction" xml:space="preserve"><value>Mettre à jour maintenant →</value></data>
   <data name="Hist_ColDate" xml:space="preserve"><value>Date</value></data>
   <data name="Hist_ColType" xml:space="preserve"><value>Type</value></data>
   <data name="Hist_ColTarget" xml:space="preserve"><value>Cible</value></data>

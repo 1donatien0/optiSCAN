@@ -303,6 +303,58 @@
                             </StackPanel>
                         </StackPanel>
 
+                        <!-- Seuils de recommandations -->
+                        <StackPanel Margin="0,16,0,0">
+                            <TextBlock Text="{loc:Loc Key=Opt_RecThresholds}"
+                                       FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextDark}"/>
+                            <TextBlock Text="{loc:Loc Key=Opt_RecThresholdsSub}"
+                                       FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                       Margin="0,3,0,8"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <!-- Seuil nettoyage -->
+                                <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                    <TextBlock Text="{loc:Loc Key=Opt_CleanThreshold}"
+                                               FontSize="{DynamicResource FontSize.Body}"
+                                               Foreground="{DynamicResource TextDark}" Margin="0,0,0,4"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBox x:Name="txtCleanThreshold"
+                                                 Width="60" TextAlignment="Center"
+                                                 Text="14"
+                                                 PreviewTextInput="NumericOnly_PreviewTextInput"
+                                                 LostFocus="ThresholdBox_LostFocus"
+                                                 Tag="CleanThreshold"/>
+                                        <TextBlock Text="{loc:Loc Key=Opt_Days}"
+                                                   FontSize="{DynamicResource FontSize.Small}"
+                                                   Foreground="{DynamicResource TextMuted}"
+                                                   VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <!-- Seuil signatures -->
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="{loc:Loc Key=Opt_SigThreshold}"
+                                               FontSize="{DynamicResource FontSize.Body}"
+                                               Foreground="{DynamicResource TextDark}" Margin="0,0,0,4"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBox x:Name="txtSigThreshold"
+                                                 Width="60" TextAlignment="Center"
+                                                 Text="7"
+                                                 PreviewTextInput="NumericOnly_PreviewTextInput"
+                                                 LostFocus="ThresholdBox_LostFocus"
+                                                 Tag="SigThreshold"/>
+                                        <TextBlock Text="{loc:Loc Key=Opt_Days}"
+                                                   FontSize="{DynamicResource FontSize.Small}"
+                                                   Foreground="{DynamicResource TextMuted}"
+                                                   VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
+                        </StackPanel>
+
                         <!-- Scan planifié (schtasks) -->
                         <StackPanel Margin="0,16,0,0">
                             <StackPanel Orientation="Horizontal">

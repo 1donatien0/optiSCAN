@@ -193,44 +193,81 @@ namespace optiSCAN.Views
                 return;
             }
 
-            try
+            // Format FixUri : "primaire|repli" ou "uri" simple.
+            // Le repli est tenté si le primaire lève une exception (ex. ms-settings inconnu sur Win10).
+            var candidates = uri.Split('|');
+            Exception? lastEx = null;
+            foreach (var candidate in candidates)
             {
-                // FixUri posture : ms-settings:* (ex. advancedsharing). Fallback control.exe si besoin.
-                if (uri.StartsWith("control.exe", StringComparison.OrdinalIgnoreCase))
+                try
                 {
-                    var parts = uri.Split(' ', 2);
-                    Process.Start(new ProcessStartInfo(parts[0])
-                    {
-                        UseShellExecute = true,
-                        Arguments = parts.Length > 1 ? parts[1] : string.Empty,
-                    });
+                    LaunchFixUri(candidate.Trim());
+                    return; // succès — on s'arrête
                 }
-                else
+                catch (Exception ex)
                 {
-                    Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
+                    lastEx = ex;
                 }
             }
-            catch (Exception ex)
+            if (lastEx != null)
+                AppLogger.Warn("OverviewControl", $"PostureFix — tous les replis ont échoué ({uri})", lastEx);
+        }
+
+        private static void LaunchFixUri(string uri)
+        {
+            if (uri.StartsWith("control.exe", StringComparison.OrdinalIgnoreCase))
             {
-                AppLogger.Warn("OverviewControl", "PostureFix", ex);
+                var parts = uri.Split(' ', 2);
+                Process.Start(new ProcessStartInfo(parts[0])
+                {
+                    UseShellExecute = true,
+                    Arguments = parts.Length > 1 ? parts[1] : string.Empty,
+                });
+            }
+            else
+            {
+                Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
             }
         }
 
         public void UpdateRecommendations(
             string hygieneLine, int hygieneSeverity,
-            string activityLine, int activitySeverity)
+            string activityLine, int activitySeverity,
+            bool showSigUpdateLink = false)
         {
             Dispatcher.InvokeAsync(() =>
             {
-                ApplyRecommendationRow(brRecHygiene, txtRecHygiene, icRecHygiene, hygieneLine, hygieneSeverity);
+                ApplyRecommendationRow(brRecHygiene, txtRecHygiene, icRecHygiene, hygieneLine, hygieneSeverity, showSigUpdateLink);
                 ApplyRecommendationRow(brRecActivity, txtRecActivity, icRecActivity, activityLine, activitySeverity);
             });
         }
 
-        private static void ApplyRecommendationRow(Border? border, TextBlock? text, PackIcon? icon, string line, int severity)
+        private static void ApplyRecommendationRow(Border? border, TextBlock? text, PackIcon? icon, string line, int severity, bool showUpdateLink = false)
         {
             if (border == null || text == null) return;
-            text.Text = line;
+
+            // Si lien demandé : utiliser Inlines pour intercaler texte + hyperlien.
+            // Sinon : Text simple (efface tout lien précédent).
+            text.Inlines.Clear();
+            if (showUpdateLink)
+            {
+                text.Inlines.Add(new Run(line + " "));
+                var link = new Hyperlink(new Run(LocalizationService.GetString("Rec_SigStaleAction")))
+                {
+                    Foreground = text.TryFindResource("TextAccent") as Brush
+                                 ?? text.TryFindResource("AlertGold") as Brush,
+                };
+                link.Click += (_, _) =>
+                {
+                    ServiceContainer.Default.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
+                    ServiceContainer.Default.TriggerSignatureUpdate();
+                };
+                text.Inlines.Add(link);
+            }
+            else
+            {
+                text.Inlines.Add(new Run(line));
+            }
             Brush? bg = null, fg = null, ifg = null;
             PackIconKind kind = PackIconKind.InformationOutline;
             switch (severity)

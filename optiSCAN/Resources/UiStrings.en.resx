@@ -332,6 +332,11 @@
   <data name="Opt_AutoQuarSub" xml:space="preserve"><value>Any detected threat (manual scan, real-time, or scheduled) is quarantined — never deleted automatically</value></data>
   <data name="Opt_AutoSig" xml:space="preserve"><value>Automatic signature updates (every 4 hours)</value></data>
   <data name="Opt_AutoSigSub" xml:space="preserve"><value>freshclam.exe runs periodically in the background</value></data>
+  <data name="Opt_RecThresholds" xml:space="preserve"><value>Recommendation thresholds</value></data>
+  <data name="Opt_RecThresholdsSub" xml:space="preserve"><value>Delays after which a recommendation appears on the home screen</value></data>
+  <data name="Opt_CleanThreshold" xml:space="preserve"><value>Suggest cleanup after</value></data>
+  <data name="Opt_SigThreshold" xml:space="preserve"><value>Signatures stale after</value></data>
+  <data name="Opt_Days" xml:space="preserve"><value>days</value></data>
   <data name="Opt_Scheduled" xml:space="preserve"><value>Scheduled full scan (daily)</value></data>
   <data name="Opt_ScheduledSub" xml:space="preserve"><value>Task « optiSCAN_DailyScan » (--fullscan --quiet). Administrator rights recommended for system folders.</value></data>
   <data name="Opt_ScheduleTime" xml:space="preserve"><value>Time:</value></data>
@@ -394,6 +399,8 @@
   <data name="Rec_ClamMissing" xml:space="preserve"><value>ClamAV not installed — antivirus scans are disabled. Install ClamAV via the Antivirus tab.</value></data>
   <data name="Rec_SigAutoOff" xml:space="preserve"><value>Automatic signature updates disabled — your definitions may become outdated. Enable in Options.</value></data>
   <data name="Rec_SigStale" xml:space="preserve"><value>ClamAV signatures older than {0} days — run an update (Antivirus or Options).</value></data>
+  <data name="Rec_SigNeverUpdated" xml:space="preserve"><value>ClamAV signatures have never been updated — run a first update via the Antivirus tab.</value></data>
+  <data name="Rec_SigStaleAction" xml:space="preserve"><value>Update now →</value></data>
   <data name="Hist_ColDate" xml:space="preserve"><value>Date</value></data>
   <data name="Hist_ColType" xml:space="preserve"><value>Type</value></data>
   <data name="Hist_ColTarget" xml:space="preserve"><value>Target</value></data>

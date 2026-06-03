@@ -592,7 +592,7 @@ namespace optiSCAN
             var cleanHist = _logManager?.GetCleanHistory() ?? Array.Empty<CleanSession>();
             DateTime? lastClean = cleanHist.Count > 0 ? cleanHist[0].StartedAt : null;
             bool suggestClean = !lastClean.HasValue
-                || (DateTime.Now - lastClean.Value).TotalDays > RecommendationThresholds.CleanSuggestThresholdDays;
+                || (DateTime.Now - lastClean.Value).TotalDays > UserPreferences.Current.CleanSuggestThresholdDays;
             string hyp = suggestClean
                 ? LocalizationService.GetString("Rec_CleanSuggest")
                 : LocalizationService.Format("Rec_CleanRecent", lastClean!.Value.ToString("d", LocalizationService.CurrentCulture));
@@ -622,19 +622,28 @@ namespace optiSCAN
                 actSev = 2; // tout va bien
             }
 
-            // Hygiène : ClamAV manquant > signatures obsolètes > MAJ auto désactivée > nettoyage.
+            // Hygiène : ClamAV manquant > jamais mis à jour > signatures obsolètes > MAJ auto désactivée > nettoyage.
+            bool showSigUpdateLink = false;
             if (!clam)
             {
                 hyp = LocalizationService.GetString("Rec_ClamMissing");
                 hypSev = 1;
             }
+            else if (_freshclamUpdater?.LastUpdateTime is null)
+            {
+                // freshclam n'a jamais été lancé — signatures potentiellement absentes ou initiales.
+                hyp = LocalizationService.GetString("Rec_SigNeverUpdated");
+                hypSev = 1;
+                showSigUpdateLink = true;
+            }
             else if (_freshclamUpdater?.LastUpdateTime is { } sigAt
-                && (DateTime.Now - sigAt).TotalDays > RecommendationThresholds.SignatureStaleThresholdDays)
+                && (DateTime.Now - sigAt).TotalDays > UserPreferences.Current.SignatureStaleThresholdDays)
             {
                 hyp = LocalizationService.Format(
                     "Rec_SigStale",
-                    RecommendationThresholds.SignatureStaleThresholdDays);
+                    UserPreferences.Current.SignatureStaleThresholdDays);
                 hypSev = 1;
+                showSigUpdateLink = true;
             }
             else if (!UserPreferences.Current.SignatureAutoUpdateEnabled)
             {
@@ -642,7 +651,7 @@ namespace optiSCAN
                 hypSev = 3;
             }
 
-            overview.UpdateRecommendations(hyp, hypSev, act, actSev);
+            overview.UpdateRecommendations(hyp, hypSev, act, actSev, showSigUpdateLink);
 
             var lastScan = sessions.Count > 0 ? sessions[0].StartedAt : (DateTime?)null;
             bool rtpOn = ExclusionSettings.Current.RealTimeEnabled;

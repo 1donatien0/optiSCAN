@@ -136,6 +136,11 @@ namespace optiSCAN.Views
                 if (pwdVirusTotalApiKey != null)
                     pwdVirusTotalApiKey.Password = prefs.VirusTotalApiKey ?? string.Empty;
 
+                if (txtCleanThreshold != null)
+                    txtCleanThreshold.Text = prefs.CleanSuggestThresholdDays.ToString();
+                if (txtSigThreshold != null)
+                    txtSigThreshold.Text = prefs.SignatureStaleThresholdDays.ToString();
+
                 if (chkHighContrast != null)
                     chkHighContrast.IsChecked = prefs.HighContrastEnabled;
 
@@ -563,6 +568,41 @@ namespace optiSCAN.Views
             if (_suppressPreferenceEvents) return;
             UserPreferences.Current.VirusTotalApiKey = pwdVirusTotalApiKey?.Password ?? string.Empty;
             UserPreferences.Current.Save();
+        }
+
+        /// <summary>N'autorise que les chiffres dans les TextBox de seuils.</summary>
+        private void NumericOnly_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
+        {
+            e.Handled = !e.Text.All(char.IsDigit);
+        }
+
+        /// <summary>Sauvegarde la valeur d'un seuil quand le TextBox perd le focus.</summary>
+        private void ThresholdBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (_suppressPreferenceEvents) return;
+            if (sender is not System.Windows.Controls.TextBox box) return;
+
+            if (!int.TryParse(box.Text, out int value) || value < 1 || value > 365)
+            {
+                // Valeur invalide : réinitialiser au défaut
+                var tag = box.Tag as string;
+                value = tag == "CleanThreshold"
+                    ? RecommendationThresholds.CleanSuggestThresholdDays
+                    : RecommendationThresholds.SignatureStaleThresholdDays;
+                box.Text = value.ToString();
+            }
+
+            var prefs = UserPreferences.Current;
+            switch (box.Tag as string)
+            {
+                case "CleanThreshold":
+                    prefs.CleanSuggestThresholdDays = value;
+                    break;
+                case "SigThreshold":
+                    prefs.SignatureStaleThresholdDays = value;
+                    break;
+            }
+            prefs.Save();
         }
     }
 }
