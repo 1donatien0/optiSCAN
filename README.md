@@ -45,14 +45,6 @@ Le dépôt **1donatien0/optiSCAN-stable** n’utilise que **deux** branches, par
 
 Après une release, `main` et `dev` peuvent pointer sur le **même commit** (normal). Les prochains commits repartent sur `dev` jusqu’au prochain merge.
 
-**Branches interdites** sur `origin` : `master`, `develop`, `release/*`, etc. Pour lister et supprimer une branche distante obsolète :
-
-```powershell
-git fetch origin --prune
-git branch -r
-# Exemple : git push origin --delete nom-branche-obsolete
-```
-
 Branche par défaut GitHub : **`main`**. CI : uniquement `main` et `dev` (voir [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 
 ---
@@ -77,7 +69,7 @@ Branche par défaut GitHub : **`main`**. CI : uniquement `main` et `dev` (voir [
 ├── README.md                          ← Ce fichier (guide complet)
 ├── docs/
 │   ├── README.md                      ← Index doc
-│   └── RELEASE-v8.md                  ← Calendrier publication J-10
+│   └── RELEASE-v8.md                  ← Checklist release (optionnel, équipe)
 ├── .github/workflows/ci.yml           ← Build, tests (134), publish (main)
 ├── scripts/
 │   ├── fetch-runtime-deps.ps1         ← Télécharge ClamAV + YARA (CI / dev)
@@ -239,8 +231,6 @@ https://www.clamav.net/downloads#otherversions
 > .\scripts\fetch-runtime-deps.ps1 -RunFreshclam   # bases signatures (~200+ Mo, long)
 > .\scripts\verify-runtime-deps.ps1                # après dotnet publish
 > ```
->
-> **Publication v8 (J-10)** : calendrier et checklist → [docs/RELEASE-v8.md](docs/RELEASE-v8.md).
 >
 > Au démarrage, optiSCAN journalise aussi l’état via `RuntimeDependencies` (`optiscan-*.log`).
 
@@ -540,9 +530,7 @@ Add-MpPreference -ExclusionPath "C:\Program Files\optiSCAN\clamav\database"
 
 ## 8. Packaging final (v8.0)
 
-> **Sortie prévue dans ~10 jours** — suivi détaillé : [docs/RELEASE-v8.md](docs/RELEASE-v8.md).
-
-**Tout-en-un (recommandé avant release)** :
+**Tout-en-un (recommandé)** :
 
 ```powershell
 .\scripts\prepare-release-v8.ps1
@@ -553,7 +541,7 @@ Exécuter depuis la **racine du dépôt** (dossier contenant `optiSCAN.sln`). La
 **Étape 0 — nettoyage (recommandé)**
 
 ```powershell
-.\scripts\clean-before-publish.ps1 -IncludeObj
+.\scripts\clean-before-publish.ps1 -IncludeObj -IncludeInstallerOutput -IncludeCiPublish
 ```
 
 **Étape A — publication .NET**
@@ -577,7 +565,7 @@ $pub = ".\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64"
 
 Sortie typique : `installer\output\optiSCAN_Setup_v8.0.0.exe` (versions dans `#define` de `setup.iss`).
 
-**Variante tout-en-un** : `.\installer\build-release-setup.ps1` (nettoie, publie, lance ISCC).
+**Chaîne locale** : `.\installer\build-release-setup.ps1` (nettoie, publie, lance ISCC — source `publish\win-x64` forcée).
 
 **Installateur** : assistant **bilingue** (français / English) ; langue choisie → `UiCulture` en registre pour le premier lancement de l’app.
 
@@ -602,8 +590,6 @@ dotnet test .\optiSCAN.Tests\optiSCAN.Tests.csproj -c Release   # 134 tests
 Pipeline : [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — build Release/Debug, tests avec couverture Cobertura, publish + Inno sur `main`.
 
 ### Checklist release (avant installateur)
-
-Voir [docs/RELEASE-v8.md](docs/RELEASE-v8.md) (calendrier J-10).
 
 - [ ] `.\scripts\prepare-release-v8.ps1` ou étapes manuelles ci-dessus
 - [ ] `.\scripts\fetch-runtime-deps.ps1` (+ `-RunFreshclam` pour l’installateur final)
@@ -760,7 +746,7 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 
 ## 12. Audit et qualité
 
-**Verdict (v8.0)** : produit publiable après installateur validé sur machine propre.
+**Verdict (v8.0)** : produit stable ; valider l’installateur sur une machine propre avant diffusion large.
 
 | Domaine | Note | Commentaire |
 |---------|:----:|-------------|

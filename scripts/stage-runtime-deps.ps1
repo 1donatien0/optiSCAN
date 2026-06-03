@@ -37,5 +37,13 @@ Copy-Tree 'clamav\x64'
 Copy-Tree 'clamav\x86'
 Copy-Tree 'clamav\database'
 Copy-Tree 'clamav\certs'
+# freshclam / libclamav sur Windows attend aussi des certs a cote des binaires x64
+$srcX64Certs = Join-Path $src 'clamav\x64\certs'
+$pubX64Certs = Join-Path $pub 'clamav\x64\certs'
+if (Test-Path -LiteralPath $srcX64Certs) {
+    New-Item -ItemType Directory -Force -Path $pubX64Certs | Out-Null
+    Copy-Item -LiteralPath (Join-Path $srcX64Certs '*') -Destination $pubX64Certs -Recurse -Force
+    Write-Host "  Copie clamav\x64\certs" -ForegroundColor DarkGray
+}
 Copy-Tree 'yara'
 Copy-Tree 'rules'

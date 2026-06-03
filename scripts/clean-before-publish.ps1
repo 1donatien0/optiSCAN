@@ -77,7 +77,7 @@ Stop-ProcessesLockingPublish $binDir
 
 $removed = 0
 
-# Publish residuel (prioritaire — evite le fallback Inno setup.iss publish\*.exe)
+# Publish residuel (prioritaire - evite le fallback Inno setup.iss publish\*.exe)
 if (Remove-PathIfExists $publishWinX64 'publish\win-x64 (Inno / FolderProfile)') { $removed++ }
 if (Remove-PathIfExists $publishRoot 'publish\ (racine, exe plat obsolete)') { $removed++ }
 

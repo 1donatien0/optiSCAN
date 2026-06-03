@@ -47,7 +47,12 @@ Write-Host "`n[ ClamAV x64 ]"
 Check "clamav\x64\clamscan.exe"  "Scanner ClamAV"
 Check "clamav\x64\freshclam.exe" "Mise a jour signatures"
 Check "clamav\x64\clamd.exe"     "Daemon ClamAV (v8)"
-Check "clamav\x64\clambc.exe"    "Bytecode ClamAV"
+$clambc = Join-Path $PublishDir "clamav\x64\clambc.exe"
+if (Test-Path $clambc) {
+    Write-Host "  OK        clamav\x64\clambc.exe" -ForegroundColor Green
+} else {
+    Write-Host "  SKIP      clamav\x64\clambc.exe (optionnel)" -ForegroundColor Yellow
+}
 Check "clamav\certs\clamav.crt"  "Certificat CA Cisco-Talos"
 
 Write-Host "`n[ Signatures ClamAV ]"

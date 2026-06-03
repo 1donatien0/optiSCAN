@@ -84,11 +84,11 @@ jobs:
       - name: Restore NuGet packages
         run: dotnet restore optiSCAN.sln
 
-      - name: Fetch ClamAV and YARA (win x64)
+      - name: Clean publish folders
         shell: pwsh
-        run: pwsh -File scripts/fetch-runtime-deps.ps1
+        run: pwsh -File scripts/clean-before-publish.ps1 -IncludeObj -IncludeCiPublish
 
-      - name: Update ClamAV signatures (freshclam)
+      - name: Fetch ClamAV, YARA and signatures (freshclam)
         shell: pwsh
         run: pwsh -File scripts/fetch-runtime-deps.ps1 -RunFreshclam -FreshclamTimeoutMinutes 45
 

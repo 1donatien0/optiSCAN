@@ -1,6 +1,6 @@
-# Publication optiSCAN v8.0 — calendrier J-10
+# Checklist publication optiSCAN v8.0
 
-> **Date cible** : dans **10 jours** · **Version** : 8.0.0 (`Directory.Build.props`) · **Branche** : `dev` → merge → `main` → artefacts CI / installateur.
+> **Version** : 8.0.0 (`Directory.Build.props`) · **Branche** : `dev` → merge → `main` → artefacts CI / installateur (usage équipe).
 
 ## Prérequis machine de build
 
@@ -17,21 +17,15 @@
 
 Équivalent manuel : `clean-before-publish` → `fetch-runtime-deps -RunFreshclam` → `dotnet test` → `dotnet publish` → `verify-runtime-deps` → `build-release-setup.ps1`.
 
-## Calendrier suggéré
+## Ordre recommandé
 
-| Jour | Objectif | Actions |
-|------|----------|---------|
-| **J-10** | Gel fonctionnel | `dotnet test` Release (134 tests) ; plus de feature majeure ; `dev` à jour |
-| **J-9** | Dépendances | `.\scripts\fetch-runtime-deps.ps1` ; vérifier `clamav\x64` + `yara\` + `rules\` |
-| **J-8** | Publish local | `prepare-release-v8.ps1 -SkipFreshclam` puis avec `-RunFreshclam` une fois |
-| **J-7** | VM propre | Installer `optiSCAN_Setup_v8.0.0.exe` sur VM sans SDK ; scan, RTP, clamd, posture, FR/EN |
-| **J-6** | CI verte | Push `dev` ; corriger CI si échec publish (logs `verify-runtime-deps`) |
-| **J-5** | Merge `main` | `git checkout main` → `git merge dev` → `git push origin main` → job **Publish win-x64** |
-| **J-4** | Artefacts | Télécharger depuis Actions : `optiSCAN-setup-<sha>.exe` ; test identique à J-7 |
-| **J-3** | Signature (opt.) | Authenticode `.pfx` — voir `installer/setup.iss.signing.example` |
-| **J-2** | Communication | README §11, release GitHub, capture accueil posture /100 |
-| **J-1** | Tag | `git tag v8.0.0` sur `main` ; notes de version |
-| **J0** | Publication | Installateur sur SourceForge / site ; annonce |
+1. Gel fonctionnel : `dotnet test` Release (134 tests).
+2. Dépendances : `.\scripts\fetch-runtime-deps.ps1` (+ `-RunFreshclam` pour l’installateur).
+3. Publish local : `.\scripts\prepare-release-v8.ps1`.
+4. VM propre : installer `optiSCAN_Setup_v8.0.0.exe` ; scan, RTP, clamd, posture, FR/EN.
+5. CI : push `main` → job **Publish win-x64** ; artefact `optiSCAN-setup-<sha>.exe`.
+6. Signature (opt.) : Authenticode — `installer/setup.iss.signing.example`.
+7. Tag / distribution : `git tag v8.0.0`, release GitHub, SourceForge ou site.
 
 ## Checklist binaire (bloquant)
 
