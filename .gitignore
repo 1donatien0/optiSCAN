@@ -28,6 +28,9 @@ artifacts/
 # Binaires ClamAV / YARA (téléchargés via scripts/fetch-runtime-deps.ps1)
 optiSCAN/clamav/x64/*.exe
 optiSCAN/clamav/x64/*.dll
+optiSCAN/clamav/x64/freshclam.conf
+optiSCAN/clamav/x86/freshclam.conf
+optiSCAN/clamav/database/freshclam-ci.log
 optiSCAN/clamav/x86/*.exe
 optiSCAN/clamav/x86/*.dll
 optiSCAN/clamav/database/*.cvd
