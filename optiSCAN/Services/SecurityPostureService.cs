@@ -15,6 +15,14 @@ namespace optiSCAN.Services
         /// <summary>Navigation in-app (Overview → Options).</summary>
         public const string FixNavigateOptions = "optiscan://panel/options";
 
+        /// <summary>Ouvre les paramètres UAC (primaire) ; repli Panneau de configuration.</summary>
+        public const string FixUac =
+            "UserAccountControlSettings.exe|control.exe /name Microsoft.UserAccountControl";
+
+        /// <summary>Pare-feu Windows : page dédiée Win11, accueil Sécurité Windows, puis MMC.</summary>
+        public const string FixFirewall =
+            "ms-settings:windowsdefender-firewall|ms-settings:windowsdefender|WF.msc";
+
         private readonly IWindowsUpdateProbe _windowsUpdate;
 
         public SecurityPostureService(IWindowsUpdateProbe? windowsUpdateProbe = null)
@@ -56,7 +64,7 @@ namespace optiSCAN.Services
                 Title = LocalizationService.GetString("Posture_Firewall"),
                 Passed = ok,
                 Weight = 15,
-                FixUri = "ms-settings:windowsdefender",
+                FixUri = FixFirewall,
             };
         }
 
@@ -77,7 +85,7 @@ namespace optiSCAN.Services
                 Title = LocalizationService.GetString("Posture_Uac"),
                 Passed = ok,
                 Weight = 10,
-                FixUri = "ms-settings:developers",
+                FixUri = FixUac,
             };
         }
 

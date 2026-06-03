@@ -54,6 +54,132 @@ public sealed class SecurityPostureServiceTests
         Assert.False(SecurityPostureService.ShareRegistryValueIndicatesUserPath(null));
     }
 
+    // ── Checks individuels ────────────────────────────────────────────────────
+
+    [Fact]
+    public void Check_scan_passes_when_scan_within_7_days()
+    {
+        var svc = new SecurityPostureService(new FakeWindowsUpdateProbe(DateTime.UtcNow));
+        var report = svc.Evaluate(MakeContext(lastScanAt: DateTime.Now.AddDays(-3)));
+        Assert.True(report.Checks.First(c => c.Id == "scan").Passed);
+    }
+
+    [Fact]
+    public void Check_scan_fails_when_no_scan_or_older_than_7_days()
+    {
+        var svc = new SecurityPostureService(new FakeWindowsUpdateProbe(DateTime.UtcNow));
+
+        var noScan = svc.Evaluate(MakeContext(lastScanAt: null)).Checks.First(c => c.Id == "scan");
+        var oldScan = svc.Evaluate(MakeContext(lastScanAt: DateTime.Now.AddDays(-10))).Checks.First(c => c.Id == "scan");
+
+        Assert.False(noScan.Passed);
+        Assert.False(oldScan.Passed);
+    }
+
+    [Fact]
+    public void Check_optiscan_passes_when_clam_yara_and_rtp_all_active()
+    {
+        var svc = new SecurityPostureService(new FakeWindowsUpdateProbe(DateTime.UtcNow));
+        var ctx = new SecurityPostureContext
+        {
+            ClamInstalled = true,
+            YaraAvailable = true,
+            YaraRulesCount = 5,
+            RealTimeProtectionEnabled = true,
+            RealTimeProtectionRunning = true,
+            LastScanAt = DateTime.Now,
+            SignatureAutoUpdateEnabled = true,
+        };
+        var check = svc.Evaluate(ctx).Checks.First(c => c.Id == "optiscan");
+        Assert.True(check.Passed);
+    }
+
+    [Fact]
+    public void Check_optiscan_fails_when_clam_missing()
+    {
+        var svc = new SecurityPostureService(new FakeWindowsUpdateProbe(DateTime.UtcNow));
+        var check = svc.Evaluate(MakeContext(clamInstalled: false)).Checks.First(c => c.Id == "optiscan");
+        Assert.False(check.Passed);
+    }
+
+    [Fact]
+    public void Check_sigauto_passes_when_enabled()
+    {
+        var svc = new SecurityPostureService(new FakeWindowsUpdateProbe(DateTime.UtcNow));
+        var check = svc.Evaluate(MakeContext(signatureAutoUpdate: true)).Checks.First(c => c.Id == "sigauto");
+        Assert.True(check.Passed);
+    }
+
+    [Fact]
+    public void Check_sigauto_fails_when_disabled()
+    {
+        var svc = new SecurityPostureService(new FakeWindowsUpdateProbe(DateTime.UtcNow));
+        var check = svc.Evaluate(MakeContext(signatureAutoUpdate: false)).Checks.First(c => c.Id == "sigauto");
+        Assert.False(check.Passed);
+    }
+
+    // ── FixUri ────────────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Uac_check_FixUri_uses_user_account_control_settings_not_developers()
+    {
+        var svc = new SecurityPostureService(new FakeWindowsUpdateProbe(DateTime.UtcNow));
+        var check = svc.Evaluate(MakeContext()).Checks.First(c => c.Id == "uac");
+
+        Assert.Contains("UserAccountControlSettings.exe", check.FixUri, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("|", check.FixUri);
+        Assert.DoesNotContain("developers", check.FixUri, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Firewall_check_FixUri_prefers_firewall_settings_with_fallbacks()
+    {
+        var svc = new SecurityPostureService(new FakeWindowsUpdateProbe(DateTime.UtcNow));
+        var check = svc.Evaluate(MakeContext()).Checks.First(c => c.Id == "firewall");
+
+        Assert.Contains("windowsdefender-firewall", check.FixUri, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("WF.msc", check.FixUri, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Shares_check_FixUri_contains_advancedsharing_as_primary()
+    {
+        var svc = new SecurityPostureService(new FakeWindowsUpdateProbe(DateTime.UtcNow));
+        var check = svc.Evaluate(MakeContext()).Checks.First(c => c.Id == "shares");
+
+        Assert.Contains("advancedsharing", check.FixUri, StringComparison.OrdinalIgnoreCase);
+        // Doit aussi contenir le repli control.exe après le séparateur |
+        Assert.Contains("control.exe", check.FixUri, StringComparison.OrdinalIgnoreCase);
+        Assert.Contains("|", check.FixUri);
+    }
+
+    [Fact]
+    public void All_checks_have_non_empty_FixUri()
+    {
+        var svc = new SecurityPostureService(new FakeWindowsUpdateProbe(DateTime.UtcNow));
+        var checks = svc.Evaluate(MakeContext()).Checks;
+
+        foreach (var c in checks)
+            Assert.False(string.IsNullOrWhiteSpace(c.FixUri), $"Check '{c.Id}' has no FixUri");
+    }
+
+    // ── Score maximal ─────────────────────────────────────────────────────────
+
+    [Fact]
+    public void Score_weights_sum_to_100()
+    {
+        var svc = new SecurityPostureService(new FakeWindowsUpdateProbe(DateTime.UtcNow));
+        var checks = svc.Evaluate(MakeContext()).Checks;
+        Assert.Equal(100, checks.Sum(c => c.Weight));
+    }
+
+    [Fact]
+    public void ShareRegistryValueIndicatesUserPath_handles_single_string()
+    {
+        Assert.True(SecurityPostureService.ShareRegistryValueIndicatesUserPath("Path=C:\\Users\\Public\\Share"));
+        Assert.False(SecurityPostureService.ShareRegistryValueIndicatesUserPath("Security=0x1"));
+    }
+
     private static SecurityPostureContext MakeContext(
         bool clamInstalled = true,
         int yaraRulesCount = 5,

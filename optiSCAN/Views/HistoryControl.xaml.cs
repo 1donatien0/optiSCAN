@@ -11,10 +11,13 @@ namespace optiSCAN.Views
 {
     /// <summary>
     /// Vue historique — affiche les sessions de scan et de nettoyage passées,
-    /// et permet d'exporter les rapports en HTML ou PDF.
+    /// permet de traiter les menaces enregistrées et d'exporter les rapports.
     /// </summary>
     public partial class HistoryControl : System.Windows.Controls.UserControl
     {
+        private readonly AntivirusActions _actions = ServiceContainer.Default.Actions;
+        private readonly ScanLogManager _logger = ServiceContainer.Default.Logger;
+
         private List<ScanSession> _allScanSessions = new();
         private List<CleanSession> _allCleanSessions = new();
         private bool _filterUiReady;
@@ -124,17 +127,126 @@ namespace optiSCAN.Views
         private void UpdateScanDetail()
         {
             if (txtScanDetail == null) return;
+
             if (dgScanHistory?.SelectedItem is not ScanSession session)
             {
                 txtScanDetail.Text = LocalizationService.GetString("Hist_DetailSelectScan");
+                BindThreatsPanel(null);
                 return;
             }
 
-            var text = ScanLogManager.FormatScanDetail(session);
-            if (session.ThreatsFound > 0 && session.Threats.Count == 0)
-                text += Environment.NewLine + Environment.NewLine
-                    + LocalizationService.GetString("Hist_DetailThreatsLegacy");
-            txtScanDetail.Text = text;
+            txtScanDetail.Text = ScanLogManager.FormatScanDetail(session);
+            BindThreatsPanel(session);
+        }
+
+        private void BindThreatsPanel(ScanSession? session)
+        {
+            var hasStoredThreats = session?.Threats.Count > 0;
+            var legacyOnly = session != null && session.ThreatsFound > 0 && session.Threats.Count == 0;
+
+            if (dgHistoryThreats != null)
+            {
+                dgHistoryThreats.ItemsSource = hasStoredThreats ? session!.Threats : null;
+                dgHistoryThreats.Visibility = hasStoredThreats ? Visibility.Visible : Visibility.Collapsed;
+            }
+
+            if (txtHistThreatsLegacy != null)
+                txtHistThreatsLegacy.Visibility = legacyOnly ? Visibility.Visible : Visibility.Collapsed;
+
+            var canTreat = hasStoredThreats;
+            if (btnTreatInAntivirus != null)
+                btnTreatInAntivirus.IsEnabled = canTreat;
+            if (btnHistQuarantineAll != null)
+                btnHistQuarantineAll.IsEnabled = canTreat;
+        }
+
+        private ScanSession? SelectedScanSession =>
+            dgScanHistory?.SelectedItem as ScanSession;
+
+        private static ThreatInfo? ThreatFromSender(object sender) =>
+            sender is System.Windows.Controls.Button { Tag: ThreatInfo threat } ? threat : null;
+
+        private void BtnTreatInAntivirus_Click(object sender, RoutedEventArgs e)
+        {
+            if (SelectedScanSession is not { Threats.Count: > 0 } session)
+                return;
+            ServiceContainer.Default.RequestReviewHistorySession(session);
+        }
+
+        private void BtnHistQuarantineAll_Click(object sender, RoutedEventArgs e)
+        {
+            if (SelectedScanSession is not ScanSession session || session.Threats.Count == 0)
+                return;
+
+            if (System.Windows.MessageBox.Show(
+                    OptiscanStrings.Confirmations.QuarantineAll(session.Threats.Count),
+                    OptiscanStrings.Confirmations.Title,
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Question) != MessageBoxResult.Yes)
+                return;
+
+            foreach (var threat in session.Threats.ToList())
+            {
+                var result = _actions.QuarantineThreat(threat.Clone());
+                if (result.Success)
+                    _logger.TryRemoveThreatFromSession(session.SessionId, threat.FilePath);
+            }
+
+            session.ThreatsFound = session.Threats.Count;
+            BindThreatsPanel(session);
+            UpdateScanDetail();
+            ApplyScanFilters();
+            ServiceContainer.Default.RequestScanHistoryViewsRefresh();
+        }
+
+        private void BtnHistQuarantine_Click(object sender, RoutedEventArgs e)
+        {
+            var threat = ThreatFromSender(sender);
+            if (threat == null) return;
+
+            var result = _actions.QuarantineThreat(threat.Clone());
+            if (result.Success)
+                OnHistoryThreatHandled(threat.FilePath);
+        }
+
+        private void BtnHistIgnore_Click(object sender, RoutedEventArgs e)
+        {
+            var threat = ThreatFromSender(sender);
+            if (threat == null) return;
+
+            var result = _actions.IgnoreThreat(threat.FilePath);
+            if (result.Success)
+                OnHistoryThreatHandled(threat.FilePath);
+        }
+
+        private void BtnHistDelete_Click(object sender, RoutedEventArgs e)
+        {
+            var threat = ThreatFromSender(sender);
+            if (threat == null) return;
+
+            if (System.Windows.MessageBox.Show(
+                    LocalizationService.GetString("Av_ConfirmDeleteFile"),
+                    OptiscanStrings.Confirmations.Title,
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning) != MessageBoxResult.Yes)
+                return;
+
+            var result = _actions.DeleteThreatFile(threat.FilePath);
+            if (result.Success)
+                OnHistoryThreatHandled(threat.FilePath);
+        }
+
+        private void OnHistoryThreatHandled(string filePath)
+        {
+            if (SelectedScanSession is not ScanSession session || string.IsNullOrWhiteSpace(filePath))
+                return;
+
+            _logger.TryRemoveThreatFromSession(session.SessionId, filePath);
+            session.ThreatsFound = session.Threats.Count;
+            BindThreatsPanel(session);
+            UpdateScanDetail();
+            ApplyScanFilters();
+            ServiceContainer.Default.RequestScanHistoryViewsRefresh();
         }
 
         private void UpdateCleanDetail()

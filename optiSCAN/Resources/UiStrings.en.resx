@@ -296,7 +296,7 @@
   <data name="Clean_EmptyTitle" xml:space="preserve"><value>Nothing to free</value></data>
   <data name="Clean_EmptySub" xml:space="preserve"><value>No recoverable files were found during analysis.</value></data>
   <data name="Hist_Title" xml:space="preserve"><value>History</value></data>
-  <data name="Hist_Sub" xml:space="preserve"><value>View and export your scan and cleanup reports.</value></data>
+  <data name="Hist_Sub" xml:space="preserve"><value>Review scans, remediate detected threats, and export reports.</value></data>
   <data name="Hist_ExportHtml" xml:space="preserve"><value>Export HTML</value></data>
   <data name="Hist_ExportPdf" xml:space="preserve"><value>Export PDF (selection)</value></data>
   <data name="Hist_OpenAv" xml:space="preserve"><value>Open antivirus</value></data>
@@ -423,7 +423,12 @@
   <data name="Hist_SearchScan" xml:space="preserve"><value>Search (target or type)…</value></data>
   <data name="Hist_SearchClean" xml:space="preserve"><value>Search (targets)…</value></data>
   <data name="Hist_DetailSelectClean" xml:space="preserve"><value>Select a cleanup to view the operation log.</value></data>
-  <data name="Hist_DetailThreatsLegacy" xml:space="preserve"><value>(Older session: threat paths and names were not stored.)</value></data>
+  <data name="Hist_DetailThreatsLegacy" xml:space="preserve"><value>(Session saved under v7: threat paths were not stored. v8 scans keep full details.)</value></data>
+  <data name="Hist_ThreatsTitle" xml:space="preserve"><value>Session detections</value></data>
+  <data name="Hist_TreatInAv" xml:space="preserve"><value>Treat in Scan</value></data>
+  <data name="Hist_TooltipTreatInAv" xml:space="preserve"><value>Opens the Scan tab with this session's threats so you can quarantine, ignore, or delete them.</value></data>
+  <data name="Hist_QuarantineAll" xml:space="preserve"><value>Quarantine all</value></data>
+  <data name="Hist_TooltipQuarantineAll" xml:space="preserve"><value>Quarantines every threat listed for this session.</value></data>
   <data name="Hist_DetailCleanSummary" xml:space="preserve"><value>Targets: {0}&#x0a;Freed: {1} — Duration: {2}&#x0a;&#x0a;(Older session: operation log was not stored.)</value></data>
   <data name="Hist_ExportPdfSelect" xml:space="preserve"><value>Select a row on the Antivirus Scan tab, then click Export PDF (selection).</value></data>
   <data name="Hist_ExportPdfTitle" xml:space="preserve"><value>Export PDF</value></data>
@@ -471,6 +476,7 @@
   <data name="Upd_NotConfigured" xml:space="preserve"><value>Installed version: {0} ({1})&#x0D;&#x0A;&#x0D;&#x0A;optiSCAN does not download program updates in the background yet.&#x0D;&#x0A;&#x0D;&#x0A;• ClamAV signatures and YARA rules: Antivirus → Signatures tab.&#x0D;&#x0A;• New program version: {2}&#x0D;&#x0A;&#x0D;&#x0A;Local staging folder: {3}</value></data>
   <data name="Upd_StagingError" xml:space="preserve"><value>Installed version: {0} ({1})&#x0D;&#x0A;&#x0D;&#x0A;Could not prepare the update folder:&#x0D;&#x0A;{2}&#x0D;&#x0A;&#x0D;&#x0A;Signatures: Antivirus → Signatures tab.&#x0D;&#x0A;Program: {3}</value></data>
   <data name="Vm_QuarantineBatch" xml:space="preserve"><value>{0} file(s) moved to quarantine.</value></data>
+  <data name="Vm_HistReviewLoaded" xml:space="preserve"><value>Session from {0:dd/MM/yyyy HH:mm} — {1} threat(s) loaded for remediation.</value></data>
   <data name="Vm_RestoreOk" xml:space="preserve"><value>File restored.</value></data>
   <data name="Vm_RestoreFail" xml:space="preserve"><value>Could not restore the file.</value></data>
   <data name="Vm_DeleteOk" xml:space="preserve"><value>File permanently deleted.</value></data>

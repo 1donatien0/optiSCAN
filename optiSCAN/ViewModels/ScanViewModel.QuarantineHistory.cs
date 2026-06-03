@@ -136,6 +136,23 @@ namespace optiSCAN.ViewModels
             RefreshRecentTargets();
         }
 
+        /// <summary>Recharge la liste des menaces depuis une session d'historique pour traitement dans Analyse.</summary>
+        public void LoadThreatsFromHistorySession(ScanSession session)
+        {
+            if (session == null) return;
+            WpfApp.Current?.Dispatcher.Invoke(() =>
+            {
+                Threats.Clear();
+                foreach (var t in session.Threats)
+                    Threats.Add(t.Clone());
+                ThreatsFound = Threats.Count;
+                OnPropertyChanged(nameof(SummaryDisplay));
+                StatusMessage = ThreatsFound > 0
+                    ? LocalizationService.Format("Vm_HistReviewLoaded", session.StartedAt, ThreatsFound)
+                    : LocalizationService.GetString("Scan_Ready");
+            });
+        }
+
         public void RefreshRecentTargets()
         {
             WpfApp.Current?.Dispatcher.Invoke(() =>

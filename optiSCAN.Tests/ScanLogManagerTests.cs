@@ -1,5 +1,8 @@
 using optiSCAN.Models;
 using optiSCAN.Services;
+using System.Collections.Generic;
+using System.Runtime.Versioning;
+using System.Text.Json;
 
 namespace optiSCAN.Tests;
 
@@ -23,15 +26,7 @@ public sealed class ScanLogManagerTests : IDisposable
     public void SaveScanResult_caps_history_at_100_entries()
     {
         for (int i = 0; i < 105; i++)
-        {
-            _manager.SaveScanResult(new ScanResult
-            {
-                Type = ScanType.QuickScan,
-                TargetPath = $"target-{i}",
-                Status = ScanStatus.Completed,
-                FilesScanned = i,
-            });
-        }
+            _manager.SaveScanResult(new ScanResult { Type = ScanType.QuickScan, TargetPath = $"t-{i}", Status = ScanStatus.Completed, FilesScanned = i });
 
         Assert.Equal(100, _manager.GetHistory().Count);
         Assert.Equal(104, _manager.GetHistory()[0].FilesScanned);
@@ -42,14 +37,8 @@ public sealed class ScanLogManagerTests : IDisposable
     {
         _manager.SaveScanResult(new ScanResult
         {
-            Type = ScanType.File,
-            TargetPath = @"C:\test.exe",
-            Status = ScanStatus.Completed,
-            FilesScanned = 1,
-            Threats =
-            {
-                ThreatInfo.FromClamAv(@"C:\infected.dll", "Test.Virus", 1024)
-            }
+            Type = ScanType.File, TargetPath = @"C:\test.exe", Status = ScanStatus.Completed, FilesScanned = 1,
+            Threats = { ThreatInfo.FromClamAv(@"C:\infected.dll", "Test.Virus", 1024) }
         });
 
         var session = _manager.GetHistory()[0];
@@ -59,10 +48,104 @@ public sealed class ScanLogManagerTests : IDisposable
     }
 
     [Fact]
+    public void TryRemoveThreatFromSession_updates_count_and_persists()
+    {
+        var sessionId = Guid.NewGuid();
+        _manager.SaveScanResult(new ScanResult
+        {
+            SessionId = sessionId, Type = ScanType.File, TargetPath = @"C:\folder", Status = ScanStatus.Completed,
+            Threats = { ThreatInfo.FromClamAv(@"C:\a.exe", "A", 1), ThreatInfo.FromClamAv(@"C:\b.exe", "B", 1) }
+        });
+
+        Assert.Equal(2, _manager.GetHistory().First(s => s.SessionId == sessionId).ThreatsFound);
+        Assert.True(_manager.TryRemoveThreatFromSession(sessionId, @"C:\a.exe"));
+
+        var session = _manager.GetHistory().First(s => s.SessionId == sessionId);
+        Assert.Single(session.Threats);
+        Assert.Equal(1, session.ThreatsFound);
+        Assert.DoesNotContain(session.Threats, t => t.FilePath == @"C:\a.exe");
+    }
+
+    [Fact]
     public void WriteToLog_and_ReadLastLogLines_roundtrip()
     {
         _manager.WriteToLog("ligne de test optiSCAN");
         var lines = _manager.ReadLastLogLines(10);
         Assert.Contains(lines, l => l.Contains("ligne de test optiSCAN", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    [SupportedOSPlatform("windows")]
+    public void History_persisted_as_encrypted_dat_not_plaintext_json()
+    {
+        _manager.SaveScanResult(new ScanResult
+        {
+            Type = ScanType.QuickScan, TargetPath = @"C:\secret\folder", Status = ScanStatus.Completed, FilesScanned = 10,
+            Threats = { ThreatInfo.FromClamAv(@"C:\secret\malware.exe", "Evil.Trojan", 512) }
+        });
+
+        var datPath = Path.Combine(_logDir, "scan_history.dat");
+        var jsonPath = Path.Combine(_logDir, "scan_history.json");
+
+        Assert.True(File.Exists(datPath), "scan_history.dat devrait exister");
+        Assert.False(File.Exists(jsonPath), "scan_history.json ne doit plus etre cree");
+
+        var raw = File.ReadAllText(datPath);
+        Assert.DoesNotContain(@"C:\secret", raw, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain("Evil.Trojan", raw, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    [SupportedOSPlatform("windows")]
+    public void History_survives_reload_after_encryption()
+    {
+        var sessionId = Guid.NewGuid();
+        _manager.SaveScanResult(new ScanResult
+        {
+            SessionId = sessionId, Type = ScanType.QuickScan, TargetPath = @"C:\test",
+            Status = ScanStatus.Completed, FilesScanned = 42,
+            Threats = { ThreatInfo.FromClamAv(@"C:\test\bad.exe", "Test.Malware", 100) }
+        });
+
+        var reloaded = new ScanLogManager(_logDir);
+        var history = reloaded.GetHistory();
+
+        Assert.Single(history);
+        Assert.Equal(sessionId, history[0].SessionId);
+        Assert.Equal(42, history[0].FilesScanned);
+        Assert.Single(history[0].Threats);
+        Assert.Equal(@"C:\test\bad.exe", history[0].Threats[0].FilePath);
+        Assert.Equal("Test.Malware", history[0].Threats[0].VirusName);
+    }
+
+    [Fact]
+    [SupportedOSPlatform("windows")]
+    public void History_migrates_legacy_plaintext_json_on_first_load()
+    {
+        var legacySessions = new List<ScanSession>
+        {
+            new ScanSession
+            {
+                SessionId = Guid.NewGuid(), StartedAt = DateTime.Now.AddDays(-1),
+                FinishedAt = DateTime.Now.AddDays(-1).AddMinutes(5),
+                TargetPath = @"C:\Users\Bob\Documents", FilesScanned = 500, ThreatsFound = 1,
+                StatusDisplay = "Completed",
+                Threats = { ThreatInfo.FromClamAv(@"C:\Users\Bob\Documents\bad.doc", "Doc.Macro", 2048) }
+            }
+        };
+
+        var jsonPath = Path.Combine(_logDir, "scan_history.json");
+        File.WriteAllText(jsonPath, JsonSerializer.Serialize(legacySessions));
+
+        var mgr = new ScanLogManager(_logDir);
+        var history = mgr.GetHistory();
+
+        Assert.Single(history);
+        Assert.Equal(@"C:\Users\Bob\Documents", history[0].TargetPath);
+        Assert.Equal(@"C:\Users\Bob\Documents\bad.doc", history[0].Threats[0].FilePath);
+
+        Assert.False(File.Exists(jsonPath), "scan_history.json devrait etre renomme en .legacy");
+        Assert.True(File.Exists(jsonPath + ".legacy"), "scan_history.json.legacy devrait exister");
+        Assert.True(File.Exists(Path.Combine(_logDir, "scan_history.dat")));
     }
 }

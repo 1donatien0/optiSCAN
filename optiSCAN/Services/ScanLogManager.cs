@@ -1,18 +1,39 @@
 using optiSCAN.Models;
+using System.Linq;
 using System.IO;
+using System.Runtime.Versioning;
 using System.Text;
-using System.Text.Json;
 
 namespace optiSCAN.Services
 {
     /// <summary>
-    /// Gère l'historique des scans et des nettoyages système (JSON) et le journal texte.
+    /// Gère l'historique des scans et des nettoyages système et le journal texte.
+    ///
+    /// Persistance sécurisée (v8) :
+    ///   - <c>scan_history.dat</c>  / <c>clean_history.dat</c> — chiffrés DPAPI + HMAC-SHA256
+    ///     (même format que UserPreferences et ExclusionSettings).
+    ///   - Migration transparente depuis les anciens <c>.json</c> en clair au premier chargement ;
+    ///     le fichier clair est renommé en <c>.legacy</c> après migration réussie.
+    ///
+    /// Sessions scan v8 : liste <see cref="Models.ThreatInfo"/> (chemin + nom) ;
+    /// entrées v7 : compteur de menaces sans chemins persistés.
+    ///
+    /// <c>optiSCAN.log</c> : journal texte volontairement non chiffré ; les lignes de détail scan
+    /// utilisent <see cref="PathRedaction.RedactPath"/> (pas de chemins complets à l'écriture).
     /// </summary>
+    [SupportedOSPlatform("windows")]
     public class ScanLogManager
     {
         private readonly string _logDir;
+
+        // Nouveaux chemins chiffrés
         private readonly string _historyPath;
         private readonly string _cleanHistoryPath;
+
+        // Anciens chemins JSON en clair (migration uniquement)
+        private readonly string _historyLegacyPath;
+        private readonly string _cleanHistoryLegacyPath;
+
         private readonly string _textLogPath;
 
         private List<ScanSession> _history;
@@ -25,8 +46,10 @@ namespace optiSCAN.Services
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     "optiSCAN", "Logs");
 
-            _historyPath = Path.Combine(_logDir, "scan_history.json");
-            _cleanHistoryPath = Path.Combine(_logDir, "clean_history.json");
+            _historyPath      = Path.Combine(_logDir, "scan_history.dat");
+            _cleanHistoryPath = Path.Combine(_logDir, "clean_history.dat");
+            _historyLegacyPath      = Path.Combine(_logDir, "scan_history.json");
+            _cleanHistoryLegacyPath = Path.Combine(_logDir, "clean_history.json");
             _textLogPath = Path.Combine(_logDir, "optiSCAN.log");
 
             EnsureDirectory(_logDir);
@@ -57,6 +80,28 @@ namespace optiSCAN.Services
         /// Retourne l'historique complet (plus récent en premier).
         /// </summary>
         public IReadOnlyList<ScanSession> GetHistory() => _history.AsReadOnly();
+
+        /// <summary>
+        /// Retire une menace traitée d'une session persistée (quarantaine, suppression, exclusion).
+        /// </summary>
+        public bool TryRemoveThreatFromSession(Guid sessionId, string filePath)
+        {
+            if (sessionId == Guid.Empty || string.IsNullOrWhiteSpace(filePath))
+                return false;
+
+            var session = _history.FirstOrDefault(s => s.SessionId == sessionId);
+            if (session == null)
+                return false;
+
+            var removed = session.Threats.RemoveAll(t =>
+                string.Equals(t.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
+            if (removed == 0)
+                return false;
+
+            session.ThreatsFound = session.Threats.Count;
+            PersistHistory();
+            return true;
+        }
 
         // ── Historique des nettoyages système (vue Historique → Nettoyages) ───────
 
@@ -185,7 +230,7 @@ namespace optiSCAN.Services
             {
                 sb.AppendLine("  Détails menaces :");
                 foreach (var t in threats)
-                    sb.AppendLine($"    • {PathRedaction.RedactPath(t.FilePath)} → {t.VirusName} ({t.DetectedBy})");
+                    sb.AppendLine($"    • {PathRedaction.RedactPath(t.FilePath)} → {t.VirusName}");
             }
 
             return sb.ToString().TrimEnd();
@@ -193,19 +238,33 @@ namespace optiSCAN.Services
 
         private List<ScanSession> LoadHistory()
         {
-            return AtomicFile.ReadWithBackup(
-                _historyPath,
-                json => JsonSerializer.Deserialize<List<ScanSession>>(json) ?? new List<ScanSession>(),
-                fallbackValue: new List<ScanSession>());
+            // 1. Fichier chiffré présent → chargement direct
+            if (File.Exists(_historyPath))
+            {
+                var loaded = SecureStore.Load<List<ScanSession>>(_historyPath);
+                if (loaded != null) return loaded;
+            }
+
+            // 2. Migration depuis le JSON en clair (une seule fois)
+            if (File.Exists(_historyLegacyPath))
+            {
+                var migrated = SecureStore.MigrateFromPlaintext<List<ScanSession>>(
+                    _historyLegacyPath, _historyPath);
+                if (migrated != null)
+                {
+                    AppLogger.Info("ScanLogManager", "scan_history.json migré vers format chiffré");
+                    return migrated;
+                }
+            }
+
+            return new List<ScanSession>();
         }
 
         private void PersistHistory()
         {
             try
             {
-                var json = JsonSerializer.Serialize(_history,
-                    new JsonSerializerOptions { WriteIndented = true });
-                AtomicFile.WriteAllText(_historyPath, json);
+                SecureStore.Save(_historyPath, _history);
             }
             catch (Exception ex)
             {
@@ -215,19 +274,33 @@ namespace optiSCAN.Services
 
         private List<CleanSession> LoadCleanHistory()
         {
-            return AtomicFile.ReadWithBackup(
-                _cleanHistoryPath,
-                json => JsonSerializer.Deserialize<List<CleanSession>>(json) ?? new List<CleanSession>(),
-                fallbackValue: new List<CleanSession>());
+            // 1. Fichier chiffré présent → chargement direct
+            if (File.Exists(_cleanHistoryPath))
+            {
+                var loaded = SecureStore.Load<List<CleanSession>>(_cleanHistoryPath);
+                if (loaded != null) return loaded;
+            }
+
+            // 2. Migration depuis le JSON en clair (une seule fois)
+            if (File.Exists(_cleanHistoryLegacyPath))
+            {
+                var migrated = SecureStore.MigrateFromPlaintext<List<CleanSession>>(
+                    _cleanHistoryLegacyPath, _cleanHistoryPath);
+                if (migrated != null)
+                {
+                    AppLogger.Info("ScanLogManager", "clean_history.json migré vers format chiffré");
+                    return migrated;
+                }
+            }
+
+            return new List<CleanSession>();
         }
 
         private void PersistCleanHistory()
         {
             try
             {
-                var json = JsonSerializer.Serialize(_cleanHistory,
-                    new JsonSerializerOptions { WriteIndented = true });
-                AtomicFile.WriteAllText(_cleanHistoryPath, json);
+                SecureStore.Save(_cleanHistoryPath, _cleanHistory);
             }
             catch (Exception ex)
             {

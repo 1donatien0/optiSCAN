@@ -187,14 +187,8 @@ namespace optiSCAN.Views
             if (sender is not Hyperlink link || link.Tag is not string uri)
                 return;
 
-            if (uri.StartsWith("optiscan://panel/", StringComparison.OrdinalIgnoreCase))
-            {
-                var panel = uri.EndsWith("/antivirus", StringComparison.OrdinalIgnoreCase)
-                    ? OptiscanStrings.PanelIds.Antivirus
-                    : OptiscanStrings.PanelIds.Options;
-                ServiceContainer.Default.Navigation?.NavigateTo(panel);
+            if (TryNavigatePosturePanel(uri))
                 return;
-            }
 
             // Format FixUri : "primaire|repli" ou "uri" simple.
             // Le repli est tenté si le primaire lève une exception (ex. ms-settings inconnu sur Win10).
@@ -216,6 +210,37 @@ namespace optiSCAN.Views
                 AppLogger.Warn("OverviewControl", $"PostureFix — tous les replis ont échoué ({uri})", lastEx);
         }
 
+        private static bool TryNavigatePosturePanel(string uri)
+        {
+            const string prefix = "optiscan://panel/";
+            if (!uri.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            var segment = uri[prefix.Length..].Trim().TrimEnd('/');
+            var slash = segment.IndexOfAny(['/', '?', '#']);
+            if (slash >= 0)
+                segment = segment[..slash];
+
+            var panelId = segment.ToLowerInvariant() switch
+            {
+                "antivirus" => OptiscanStrings.PanelIds.Antivirus,
+                "options" => OptiscanStrings.PanelIds.Options,
+                "history" => OptiscanStrings.PanelIds.History,
+                "clean" => OptiscanStrings.PanelIds.Clean,
+                "overview" => OptiscanStrings.PanelIds.Overview,
+                _ => null,
+            };
+
+            if (panelId == null)
+            {
+                AppLogger.Warn("OverviewControl", $"PostureFix — panneau inconnu : optiscan://panel/{segment}");
+                panelId = OptiscanStrings.PanelIds.Overview;
+            }
+
+            ServiceContainer.Default.Navigation?.NavigateTo(panelId);
+            return true;
+        }
+
         private static void LaunchFixUri(string uri)
         {
             if (uri.StartsWith("control.exe", StringComparison.OrdinalIgnoreCase))
@@ -226,11 +251,29 @@ namespace optiSCAN.Views
                     UseShellExecute = true,
                     Arguments = parts.Length > 1 ? parts[1] : string.Empty,
                 });
+                return;
             }
-            else
+
+            if (uri.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
             {
-                Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
+                var space = uri.IndexOf(' ', StringComparison.Ordinal);
+                var file = space >= 0 ? uri[..space] : uri;
+                var args = space >= 0 ? uri[(space + 1)..] : string.Empty;
+                Process.Start(new ProcessStartInfo(file)
+                {
+                    UseShellExecute = true,
+                    Arguments = args,
+                });
+                return;
             }
+
+            Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
+        }
+
+        private void RecHygieneSigUpdate_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            e.Handled = true;
+            NavigateToSignaturesAndUpdate();
         }
 
         public void UpdateRecommendations(
@@ -245,7 +288,7 @@ namespace optiSCAN.Views
             });
         }
 
-        private static void ApplyRecommendationRow(Border? border, TextBlock? text, PackIcon? icon, string line, int severity, bool showUpdateLink = false)
+        private void ApplyRecommendationRow(Border? border, TextBlock? text, PackIcon? icon, string line, int severity, bool showUpdateLink = false)
         {
             if (border == null || text == null) return;
 
@@ -297,14 +340,14 @@ namespace optiSCAN.Views
                     ifg = icon?.TryFindResource("AlertGoldLight") as Brush;
                     break;
                 case 2:
-                    // Tout va bien, activité normale → vert
+                    // Tout va bien, activite normale -> vert
                     kind = PackIconKind.CheckCircle;
                     bg = border.TryFindResource("SuccessBg") as Brush;
                     fg = text.TryFindResource("SuccessGreen") as Brush;
                     ifg = icon?.TryFindResource("SuccessGreen") as Brush;
                     break;
                 default:
-                    // Severity 3 = conseil préventif (info) → bleu neutre
+                    // Severity 3 = conseil preventif (info) -> bleu neutre
                     kind = PackIconKind.InformationOutline;
                     bg = border.TryFindResource("InfoBg") as Brush ?? border.TryFindResource("SurfaceBg") as Brush;
                     fg = text.TryFindResource("TextAccent") as Brush ?? text.TryFindResource("TextMedium") as Brush;
@@ -320,7 +363,7 @@ namespace optiSCAN.Views
             }
         }
 
-        /// <summary>Met à jour le titre de protection affiché dans le hero.</summary>
+        /// <summary>Met a jour le titre de protection affiche dans le hero.</summary>
         public void UpdateProtectionHeadline(bool isProtected, string? headline = null)
         {
             Dispatcher.InvokeAsync(() =>
@@ -336,7 +379,7 @@ namespace optiSCAN.Views
             });
         }
 
-        /// <summary>Met à jour la carte « État de protection » (ClamAV + règles YARA).</summary>
+        /// <summary>Met a jour la carte Etat de protection (ClamAV + regles YARA).</summary>
         public void UpdateAntivirusCardStatus(bool clamAvOk, int yaraRulesCount, string? clamEngineMode = null)
         {
             Dispatcher.InvokeAsync(() =>
@@ -345,9 +388,7 @@ namespace optiSCAN.Views
                 {
                     if (clamAvOk && !string.IsNullOrWhiteSpace(clamEngineMode))
                     {
-                        txtOverviewClamAvStatus.Text = LocalizationService.Format(
-                            "Overview_ClamEngine",
-                            clamEngineMode);
+                        txtOverviewClamAvStatus.Text = LocalizationService.Format("Overview_ClamEngine", clamEngineMode);
                     }
                     else
                     {
@@ -395,21 +436,6 @@ namespace optiSCAN.Views
                 System.Windows.Application.Current.Shutdown();
         }
 
-        private static void RecHygieneSigUpdate_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
-        {
-            NavigateToSignaturesAndUpdate();
-            e.Handled = true;
-        }
-
-        /// <summary>Accueil → Antivirus, onglet Signatures, puis lance la MAJ (progression visible).</summary>
-        private static void NavigateToSignaturesAndUpdate()
-        {
-            var container = ServiceContainer.Default;
-            container.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
-            container.RequestFocusAntivirusSignaturesTab();
-            container.TriggerSignatureUpdate();
-        }
-
         private void ActionCard_Click(object sender, RoutedEventArgs e)
         {
             string? target = null;
@@ -422,12 +448,22 @@ namespace optiSCAN.Views
 
             if (target == OptiscanStrings.ActionIds.Update)
             {
-                NavigateToSignaturesAndUpdate();
+                container.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
+                container.RequestFocusAntivirusSignaturesTab();
+                container.TriggerSignatureUpdate();
             }
             else
             {
                 container.Navigation?.NavigateTo(target);
             }
+        }
+
+        private static void NavigateToSignaturesAndUpdate()
+        {
+            var container = Services.ServiceContainer.Default;
+            container.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
+            container.RequestFocusAntivirusSignaturesTab();
+            container.TriggerSignatureUpdate();
         }
     }
 }

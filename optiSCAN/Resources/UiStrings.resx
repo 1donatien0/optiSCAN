@@ -296,7 +296,7 @@
   <data name="Clean_EmptyTitle" xml:space="preserve"><value>Rien à libérer</value></data>
   <data name="Clean_EmptySub" xml:space="preserve"><value>Aucun fichier récupérable détecté lors de l'analyse.</value></data>
   <data name="Hist_Title" xml:space="preserve"><value>Historique</value></data>
-  <data name="Hist_Sub" xml:space="preserve"><value>Consultez et exportez vos rapports d'analyse et de nettoyage.</value></data>
+  <data name="Hist_Sub" xml:space="preserve"><value>Consultez vos analyses, traitez les menaces détectées et exportez vos rapports.</value></data>
   <data name="Hist_ExportHtml" xml:space="preserve"><value>Exporter HTML</value></data>
   <data name="Hist_ExportPdf" xml:space="preserve"><value>Exporter PDF (sélection)</value></data>
   <data name="Hist_OpenAv" xml:space="preserve"><value>Ouvrir l'antivirus</value></data>
@@ -423,7 +423,12 @@
   <data name="Hist_SearchScan" xml:space="preserve"><value>Rechercher (cible ou type)…</value></data>
   <data name="Hist_SearchClean" xml:space="preserve"><value>Rechercher (cibles)…</value></data>
   <data name="Hist_DetailSelectClean" xml:space="preserve"><value>Sélectionnez un nettoyage pour afficher le journal d'opérations.</value></data>
-  <data name="Hist_DetailThreatsLegacy" xml:space="preserve"><value>(Session antérieure : chemins et noms des menaces non enregistrés.)</value></data>
+  <data name="Hist_DetailThreatsLegacy" xml:space="preserve"><value>(Session enregistrée sous v7 : chemins des menaces non conservés. Les analyses v8 enregistrent le détail.)</value></data>
+  <data name="Hist_ThreatsTitle" xml:space="preserve"><value>Détections de la session</value></data>
+  <data name="Hist_TreatInAv" xml:space="preserve"><value>Traiter dans Analyse</value></data>
+  <data name="Hist_TooltipTreatInAv" xml:space="preserve"><value>Ouvre l'onglet Analyse avec les menaces de cette session pour les traiter comme après un scan.</value></data>
+  <data name="Hist_QuarantineAll" xml:space="preserve"><value>Tout mettre en quarantaine</value></data>
+  <data name="Hist_TooltipQuarantineAll" xml:space="preserve"><value>Met en quarantaine toutes les menaces listées pour cette session.</value></data>
   <data name="Hist_DetailCleanSummary" xml:space="preserve"><value>Cibles : {0}&#x0a;Libéré : {1} — Durée : {2}&#x0a;&#x0a;(Session antérieure : journal d'opérations non enregistré.)</value></data>
   <data name="Hist_ExportPdfSelect" xml:space="preserve"><value>Sélectionnez une ligne dans l'onglet « Scan Antivirus », puis cliquez sur Exporter PDF (sélection).</value></data>
   <data name="Hist_ExportPdfTitle" xml:space="preserve"><value>Export PDF</value></data>
@@ -471,6 +476,7 @@
   <data name="Upd_NotConfigured" xml:space="preserve"><value>Version installée : {0} ({1})&#x0D;&#x0A;&#x0D;&#x0A;optiSCAN ne télécharge pas encore les mises à jour du programme en arrière-plan.&#x0D;&#x0A;&#x0D;&#x0A;• Signatures ClamAV et règles YARA : Antivirus → onglet Signatures.&#x0D;&#x0A;• Nouvelle version du programme : {2}&#x0D;&#x0A;&#x0D;&#x0A;Dossier de préparation local : {3}</value></data>
   <data name="Upd_StagingError" xml:space="preserve"><value>Version installée : {0} ({1})&#x0D;&#x0A;&#x0D;&#x0A;Impossible de préparer le dossier de mises à jour :&#x0D;&#x0A;{2}&#x0D;&#x0A;&#x0D;&#x0A;Signatures : onglet Antivirus → Signatures.&#x0D;&#x0A;Programme : {3}</value></data>
   <data name="Vm_QuarantineBatch" xml:space="preserve"><value>{0} fichier(s) placé(s) en quarantaine.</value></data>
+  <data name="Vm_HistReviewLoaded" xml:space="preserve"><value>Session du {0:dd/MM/yyyy HH:mm} — {1} menace(s) chargée(s) pour traitement.</value></data>
   <data name="Vm_RestoreOk" xml:space="preserve"><value>Fichier restauré.</value></data>
   <data name="Vm_RestoreFail" xml:space="preserve"><value>Impossible de restaurer le fichier.</value></data>
   <data name="Vm_DeleteOk" xml:space="preserve"><value>Fichier supprimé définitivement.</value></data>

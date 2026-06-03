@@ -2,7 +2,15 @@
              xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
-             xmlns:loc="clr-namespace:optiSCAN.Localization">
+             xmlns:loc="clr-namespace:optiSCAN.Localization"
+             xmlns:c="clr-namespace:optiSCAN.Converters"
+             xmlns:services="clr-namespace:optiSCAN.Services">
+
+    <UserControl.Resources>
+        <c:ThreatRiskLevelConverter x:Key="ThreatRiskLevel"/>
+        <c:ThreatRiskSeverityConverter x:Key="ThreatRiskSeverity"/>
+        <c:ThreatRiskIconConverter x:Key="ThreatRiskIcon"/>
+    </UserControl.Resources>
 
     <DockPanel Background="Transparent">
         <Rectangle DockPanel.Dock="Top" Height="2" Margin="48,0,48,0" Opacity="0.55"
@@ -72,9 +80,9 @@
                 <TabItem Header="{loc:Loc Key=Hist_TabScans}">
                     <Grid>
                         <Grid.RowDefinitions>
-                            <RowDefinition Height="2*"/>
+                            <RowDefinition Height="1.6*"/>
                             <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
+                            <RowDefinition Height="1.4*"/>
                         </Grid.RowDefinitions>
 
                         <Grid Grid.Row="0">
@@ -179,22 +187,158 @@
                             </Grid>
                         </Grid>
 
-                        <TextBlock Grid.Row="1" Text="{loc:Loc Key=Hist_DetailTitle}"
-                                   FontSize="{DynamicResource FontSize.Small}" FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextMuted}"
-                                   Margin="12,8,12,4"/>
+                        <Grid Grid.Row="1" Margin="12,8,12,4">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*"/>
+                                <ColumnDefinition Width="Auto"/>
+                            </Grid.ColumnDefinitions>
+                            <TextBlock Grid.Column="0" Text="{loc:Loc Key=Hist_ThreatsTitle}"
+                                       FontSize="{DynamicResource FontSize.Small}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       VerticalAlignment="Center"/>
+                            <StackPanel Grid.Column="1" Orientation="Horizontal">
+                                <Button x:Name="btnTreatInAntivirus"
+                                        Click="BtnTreatInAntivirus_Click"
+                                        Style="{StaticResource PrimaryButton}"
+                                        Padding="10,5" Margin="0,0,8,0"
+                                        ToolTip="{loc:Loc Key=Hist_TooltipTreatInAv}"
+                                        AutomationProperties.Name="{loc:Loc Key=Hist_TreatInAv}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <md:PackIcon Kind="ShieldSearch" Width="14" Height="14"
+                                                     VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBlock Text="{loc:Loc Key=Hist_TreatInAv}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="btnHistQuarantineAll"
+                                        Click="BtnHistQuarantineAll_Click"
+                                        Style="{StaticResource WarningButton}"
+                                        Padding="10,5"
+                                        ToolTip="{loc:Loc Key=Hist_TooltipQuarantineAll}"
+                                        AutomationProperties.Name="{loc:Loc Key=Hist_QuarantineAll}">
+                                    <TextBlock Text="{loc:Loc Key=Hist_QuarantineAll}" VerticalAlignment="Center"/>
+                                </Button>
+                            </StackPanel>
+                        </Grid>
 
-                        <Border Grid.Row="2" Margin="12,0,12,12"
-                                Style="{StaticResource LogConsolePanel}"
-                                MinHeight="88" MaxHeight="200" Padding="0">
-                            <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10,8">
-                                <TextBlock x:Name="txtScanDetail"
+                        <Grid Grid.Row="2" Margin="12,0,12,12">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" MaxHeight="110"/>
+                                <RowDefinition Height="*"/>
+                            </Grid.RowDefinitions>
+
+                            <Border Grid.Row="0" Style="{StaticResource LogConsolePanel}"
+                                    Margin="0,0,0,8" Padding="0">
+                                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="10,8">
+                                    <TextBlock x:Name="txtScanDetail"
+                                               TextWrapping="Wrap"
+                                               FontFamily="Consolas"
+                                               FontSize="{DynamicResource FontSize.Small}"
+                                               Foreground="{DynamicResource TextDark}"/>
+                                </ScrollViewer>
+                            </Border>
+
+                            <Grid Grid.Row="1">
+                                <DataGrid x:Name="dgHistoryThreats"
+                                          AutoGenerateColumns="False"
+                                          IsReadOnly="True"
+                                          CanUserAddRows="False"
+                                          GridLinesVisibility="Horizontal"
+                                          HorizontalGridLinesBrush="{DynamicResource BorderSubtle}"
+                                          Background="Transparent"
+                                          BorderThickness="0"
+                                          ColumnHeaderStyle="{DynamicResource DgHeader}"
+                                          RowStyle="{DynamicResource DgRow}"
+                                          Visibility="Collapsed"
+                                          MinHeight="100">
+                                    <DataGrid.Columns>
+                                        <DataGridTemplateColumn Header="{loc:Loc Key=Av_ColRisk}" Width="90">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <Border CornerRadius="4" Padding="5,2" Margin="2,0">
+                                                        <Border.Style>
+                                                            <Style TargetType="Border">
+                                                                <Setter Property="Background" Value="{DynamicResource RiskInformational}"/>
+                                                                <Style.Triggers>
+                                                                    <DataTrigger Binding="{Binding Converter={StaticResource ThreatRiskLevel}}"
+                                                                                 Value="{x:Static services:RiskLevel.Critical}">
+                                                                        <Setter Property="Background" Value="{DynamicResource RiskCritical}"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Converter={StaticResource ThreatRiskLevel}}"
+                                                                                 Value="{x:Static services:RiskLevel.Major}">
+                                                                        <Setter Property="Background" Value="{DynamicResource RiskMajor}"/>
+                                                                    </DataTrigger>
+                                                                    <DataTrigger Binding="{Binding Converter={StaticResource ThreatRiskLevel}}"
+                                                                                 Value="{x:Static services:RiskLevel.Minor}">
+                                                                        <Setter Property="Background" Value="{DynamicResource RiskMinor}"/>
+                                                                    </DataTrigger>
+                                                                </Style.Triggers>
+                                                            </Style>
+                                                        </Border.Style>
+                                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                                            <md:PackIcon Width="11" Height="11" Foreground="{DynamicResource TextOnPrimary}"
+                                                                         Kind="{Binding Converter={StaticResource ThreatRiskIcon}}"/>
+                                                            <TextBlock Text="{Binding Converter={StaticResource ThreatRiskSeverity}}"
+                                                                       FontSize="{DynamicResource FontSize.Caption}" FontWeight="Bold"
+                                                                       Foreground="{DynamicResource TextOnPrimary}" Margin="4,0,0,0"/>
+                                                        </StackPanel>
+                                                    </Border>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                        <DataGridTextColumn Header="{loc:Loc Key=Av_ColPath}" Binding="{Binding FilePath}" Width="2*">
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource DgCellTextEllipsis}">
+                                                    <Setter Property="ToolTip" Value="{Binding FilePath}"/>
+                                                </Style>
+                                            </DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+                                        <DataGridTextColumn Header="{loc:Loc Key=Av_ColThreat}" Binding="{Binding VirusName}" Width="1.2*">
+                                            <DataGridTextColumn.ElementStyle>
+                                                <Style TargetType="TextBlock" BasedOn="{StaticResource DgCellTextEllipsis}">
+                                                    <Setter Property="ToolTip" Value="{Binding VirusName}"/>
+                                                </Style>
+                                            </DataGridTextColumn.ElementStyle>
+                                        </DataGridTextColumn>
+                                        <DataGridTemplateColumn Header="{loc:Loc Key=Av_ColClean}" Width="300">
+                                            <DataGridTemplateColumn.CellTemplate>
+                                                <DataTemplate>
+                                                    <StackPanel Orientation="Horizontal" Margin="2,1">
+                                                        <Button Margin="0,0,4,0" Tag="{Binding}"
+                                                                Style="{StaticResource PrimaryButton}"
+                                                                Click="BtnHistQuarantine_Click"
+                                                                FontSize="{DynamicResource FontSize.Caption}" Padding="7,4">
+                                                            <TextBlock Text="{loc:Loc Key=Av_QuarantineBtn}"/>
+                                                        </Button>
+                                                        <Button Margin="0,0,4,0" Tag="{Binding}"
+                                                                Style="{StaticResource WarningButton}"
+                                                                Click="BtnHistIgnore_Click"
+                                                                FontSize="{DynamicResource FontSize.Caption}" Padding="7,4">
+                                                            <TextBlock Text="{loc:Loc Key=Av_IgnoreBtn}"/>
+                                                        </Button>
+                                                        <Button Tag="{Binding}"
+                                                                Style="{StaticResource DangerButton}"
+                                                                Click="BtnHistDelete_Click"
+                                                                FontSize="{DynamicResource FontSize.Caption}" Padding="7,4">
+                                                            <TextBlock Text="{loc:Loc Key=Av_DeleteBtn}"/>
+                                                        </Button>
+                                                    </StackPanel>
+                                                </DataTemplate>
+                                            </DataGridTemplateColumn.CellTemplate>
+                                        </DataGridTemplateColumn>
+                                    </DataGrid.Columns>
+                                </DataGrid>
+
+                                <TextBlock x:Name="txtHistThreatsLegacy"
+                                           Visibility="Collapsed"
+                                           Text="{loc:Loc Key=Hist_DetailThreatsLegacy}"
                                            TextWrapping="Wrap"
-                                           FontFamily="Consolas"
-                                           FontSize="{DynamicResource FontSize.Small}"
-                                           Foreground="{DynamicResource TextDark}"/>
-                            </ScrollViewer>
-                        </Border>
+                                           FontSize="{DynamicResource FontSize.Body}"
+                                           Foreground="{DynamicResource TextMuted}"
+                                           VerticalAlignment="Center"
+                                           HorizontalAlignment="Center"
+                                           Margin="16"/>
+                            </Grid>
+                        </Grid>
                     </Grid>
                 </TabItem>
 

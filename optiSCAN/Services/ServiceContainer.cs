@@ -198,6 +198,17 @@ namespace optiSCAN.Services
         public void RequestExportScanSessionPdf(Models.ScanSession session) =>
             _exportScanSessionPdfHandlers?.Invoke(this, session);
 
+        private EventHandler<Models.ScanSession>? _reviewHistorySessionHandlers;
+        /// <summary>Charge les menaces d'une session historique dans Analyse (écouteur : MainWindow).</summary>
+        public event EventHandler<Models.ScanSession>? ReviewHistorySessionRequested
+        {
+            add => _reviewHistorySessionHandlers += value;
+            remove => _reviewHistorySessionHandlers -= value;
+        }
+
+        public void RequestReviewHistorySession(Models.ScanSession session) =>
+            _reviewHistorySessionHandlers?.Invoke(this, session);
+
         private ServiceContainer()
         {
             // Ordre de construction : du plus indépendant au plus dépendant.

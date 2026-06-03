@@ -329,14 +329,24 @@ namespace optiSCAN.Services
         }
 
         /// <summary>
+        /// Dernière MAJ réussie via freshclam dans cette session, sinon date des bases .cvd/.cld locales
+        /// (installateur, CI, fetch-runtime-deps). Aligné avec <see cref="GetLastSignatureChangeDisplay"/>.
+        /// </summary>
+        public DateTime? GetLastSignatureUpdateTime()
+        {
+            if (LastUpdateTime.HasValue)
+                return LastUpdateTime.Value;
+            var utc = GetLatestLocalDatabaseWriteTime();
+            return utc?.ToLocalTime();
+        }
+
+        /// <summary>
         /// Date du dernier succès freshclam, sinon dernière modification des bases .cld/.cvd.
         /// </summary>
         public string GetLastSignatureChangeDisplay()
         {
-            if (LastUpdateTime.HasValue)
-                return LastUpdateTime.Value.ToString("dd/MM/yyyy HH:mm");
-            var t = GetLatestLocalDatabaseWriteTime();
-            return t.HasValue ? t.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm") : "—";
+            var t = GetLastSignatureUpdateTime();
+            return t.HasValue ? t.Value.ToString("dd/MM/yyyy HH:mm") : "—";
         }
 
         private DateTime? GetLatestLocalDatabaseWriteTime()
