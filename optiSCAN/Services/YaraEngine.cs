@@ -329,7 +329,7 @@ namespace optiSCAN.Services
             }
 
             progress?.Report(LocalizationService.Format("Scan_Yara_Recursive", Path.GetFileName(folderPath)));
-            return await RunYaraScanRecursiveAsync(args, ct);
+            return await RunYaraScanRecursiveAsync(args, ct, progress);
         }
 
         /// <summary>
@@ -337,9 +337,14 @@ namespace optiSCAN.Services
         /// est au format "RuleName /chemin/absolu/fichier" — chaque ligne est un
         /// match indépendant, avec un fichier potentiellement différent.
         /// </summary>
-        private async Task<List<YaraMatch>> RunYaraScanRecursiveAsync(IEnumerable<string> args, CancellationToken ct)
+        private async Task<List<YaraMatch>> RunYaraScanRecursiveAsync(
+            IEnumerable<string> args,
+            CancellationToken ct,
+            IProgress<string>? progress = null)
         {
             var matches = new List<YaraMatch>();
+            var stdoutLines = 0;
+            const int progressEveryLines = 20;
 
             var psi = new ProcessStartInfo
             {
@@ -360,7 +365,14 @@ namespace optiSCAN.Services
 
                 var cap = new YaraStdoutCapture();
                 var stderrLines = new StringBuilder();
-                process.OutputDataReceived += (_, e) => cap.SurLigneYara(e.Data, MaxYaraStdoutCaptureChars);
+                process.OutputDataReceived += (_, e) =>
+                {
+                    cap.SurLigneYara(e.Data, MaxYaraStdoutCaptureChars);
+                    if (string.IsNullOrEmpty(e.Data)) return;
+                    var n = System.Threading.Interlocked.Increment(ref stdoutLines);
+                    if (progress != null && (n == 1 || n % progressEveryLines == 0))
+                        progress.Report(e.Data);
+                };
                 process.ErrorDataReceived += (_, e) => { if (e.Data != null) stderrLines.AppendLine(e.Data); };
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();

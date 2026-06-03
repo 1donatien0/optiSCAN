@@ -59,10 +59,7 @@ namespace optiSCAN.Services
                 merged.FilesSkipped += sub.FilesSkipped;
                 merged.TotalBytesScanned += sub.TotalBytesScanned;
                 foreach (var t in sub.Threats)
-                {
-                    if (!merged.Threats.Any(existing => ThreatsMatch(existing, t)))
-                        merged.Threats.Add(t);
-                }
+                    ScanThreatMerger.AddOrMergeThreat(merged.Threats, t);
 
                 if (progress != null)
                 {
@@ -82,8 +79,5 @@ namespace optiSCAN.Services
             return merged;
         }
 
-        private static bool ThreatsMatch(ThreatInfo a, ThreatInfo b) =>
-            string.Equals(a.FilePath, b.FilePath, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(a.VirusName, b.VirusName, StringComparison.OrdinalIgnoreCase);
     }
 }

@@ -238,6 +238,7 @@ namespace optiSCAN.Services
                 // indéterminée et on affiche "100k+ fichiers" plutôt qu'un total
                 // potentiellement faux.
                 const int CountCap = 100_000;
+                const int UnknownTotalFiles = 0; // ProgressBar indéterminée (voir TotalFiles)
                 int total = 0;
                 try
                 {
@@ -246,7 +247,7 @@ namespace optiSCAN.Services
                         if (ct.IsCancellationRequested) break;
                         if (ExclusionSettings.Current.IsFileExcluded(file))
                             continue;
-                        if (++total >= CountCap) { total = 0; break; } // 0 = inconnu
+                        if (++total >= CountCap) { total = UnknownTotalFiles; break; }
                     }
                 }
                 catch (Exception ex)
@@ -271,13 +272,16 @@ namespace optiSCAN.Services
                 int filesYara = 0;
                 var yaraProgress = new Progress<string>(msg =>
                 {
-                    System.Threading.Interlocked.Increment(ref filesYara);
+                    var n = System.Threading.Interlocked.Increment(ref filesYara);
+                    if (total > 0 && n > total)
+                        n = total;
                     progress?.Report(new ScanProgress
                     {
                         Message = msg,
                         Phase = ScanPhase.Scanning,
                         TotalFiles = total,
-                        FilesScanned = filesYara,
+                        FilesScanned = n,
+                        YaraFilesScanned = n,
                         CurrentFilePath = folderPath,
                     });
                 });
@@ -326,9 +330,19 @@ namespace optiSCAN.Services
                     });
                 }
 
-                result.FilesScanned = total;
+                result.FilesScanned = total > 0 ? total : Math.Max(filesYara, 1);
                 result.Status = ct.IsCancellationRequested ? ScanStatus.Cancelled : ScanStatus.Completed;
                 result.FinishedAt = DateTime.Now;
+
+                progress?.Report(new ScanProgress
+                {
+                    Message = $"{result.FilesScanned:N0} fichiers analysés.",
+                    Phase = ScanPhase.Completed,
+                    FilesScanned = result.FilesScanned,
+                    YaraFilesScanned = result.FilesScanned,
+                    TotalFiles = total,
+                    ThreatsFound = result.Threats.Count,
+                });
             }
             catch (OperationCanceledException)
             {

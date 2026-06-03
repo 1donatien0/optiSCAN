@@ -224,6 +224,7 @@ namespace optiSCAN.Services
                 Message = result.SummaryDisplay,
                 Phase = ScanPhase.Completed,
                 FilesScanned = result.FilesScanned,
+                ClamFilesScanned = result.FilesScanned,
                 ThreatsFound = result.ThreatsFound
             });
 

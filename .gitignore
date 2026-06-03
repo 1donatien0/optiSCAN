@@ -29,6 +29,7 @@ artifacts/
 optiSCAN/clamav/x64/*.exe
 optiSCAN/clamav/x64/*.dll
 optiSCAN/clamav/x64/freshclam.conf
+optiSCAN/clamav/x64/certs/
 optiSCAN/clamav/x86/freshclam.conf
 optiSCAN/clamav/database/freshclam-ci.log
 optiSCAN/clamav/x86/*.exe
