@@ -591,7 +591,8 @@ namespace optiSCAN
 
             var cleanHist = _logManager?.GetCleanHistory() ?? Array.Empty<CleanSession>();
             DateTime? lastClean = cleanHist.Count > 0 ? cleanHist[0].StartedAt : null;
-            bool suggestClean = !lastClean.HasValue || (DateTime.Now - lastClean.Value).TotalDays > 14;
+            bool suggestClean = !lastClean.HasValue
+                || (DateTime.Now - lastClean.Value).TotalDays > RecommendationThresholds.CleanSuggestThresholdDays;
             string hyp = suggestClean
                 ? LocalizationService.GetString("Rec_CleanSuggest")
                 : LocalizationService.Format("Rec_CleanRecent", lastClean!.Value.ToString("d", LocalizationService.CurrentCulture));
@@ -600,12 +601,46 @@ namespace optiSCAN
             var sessions = _logManager?.GetHistory() ?? Array.Empty<ScanSession>();
             var cutoff = DateTime.Now.AddDays(-30);
             int threats30 = sessions.Where(s => s.StartedAt >= cutoff).Sum(s => s.ThreatsFound);
-            string act = sessions.Count == 0
-                ? LocalizationService.GetString("Rec_ActNone")
-                : threats30 > 0
-                    ? LocalizationService.Format("Rec_ActThreats", threats30)
-                    : LocalizationService.GetString("Rec_ActOk");
-            int actSev = threats30 > 0 ? 1 : (sessions.Count == 0 ? 1 : 2);
+
+            // Severity distincte : 1 (orange) = menaces réelles, 3 (bleu info) = aucun scan,
+            // 2 (vert) = activité normale sans menace.
+            string act;
+            int actSev;
+            if (sessions.Count == 0)
+            {
+                act = LocalizationService.GetString("Rec_ActNone");
+                actSev = 3; // conseil préventif — info, pas alerte
+            }
+            else if (threats30 > 0)
+            {
+                act = LocalizationService.Format("Rec_ActThreats", threats30);
+                actSev = 1; // alerte réelle
+            }
+            else
+            {
+                act = LocalizationService.GetString("Rec_ActOk");
+                actSev = 2; // tout va bien
+            }
+
+            // Hygiène : ClamAV manquant > signatures obsolètes > MAJ auto désactivée > nettoyage.
+            if (!clam)
+            {
+                hyp = LocalizationService.GetString("Rec_ClamMissing");
+                hypSev = 1;
+            }
+            else if (_freshclamUpdater?.LastUpdateTime is { } sigAt
+                && (DateTime.Now - sigAt).TotalDays > RecommendationThresholds.SignatureStaleThresholdDays)
+            {
+                hyp = LocalizationService.Format(
+                    "Rec_SigStale",
+                    RecommendationThresholds.SignatureStaleThresholdDays);
+                hypSev = 1;
+            }
+            else if (!UserPreferences.Current.SignatureAutoUpdateEnabled)
+            {
+                hyp = LocalizationService.GetString("Rec_SigAutoOff");
+                hypSev = 3;
+            }
 
             overview.UpdateRecommendations(hyp, hypSev, act, actSev);
 

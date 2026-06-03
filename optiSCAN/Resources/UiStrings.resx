@@ -391,6 +391,9 @@
   <data name="Rec_ActNone" xml:space="preserve"><value>Aucune analyse dans l'historique — lancez une analyse rapide (Antivirus).</value></data>
   <data name="Rec_ActThreats" xml:space="preserve"><value>30 derniers jours : {0} menace(s) signalée(s) — consultez Historique / onglet Analyse.</value></data>
   <data name="Rec_ActOk" xml:space="preserve"><value>Historique d'analyses disponible — ouvrez l'onglet Historique pour le détail.</value></data>
+  <data name="Rec_ClamMissing" xml:space="preserve"><value>ClamAV non installé — les analyses antivirus sont désactivées. Installez ClamAV via l'onglet Antivirus.</value></data>
+  <data name="Rec_SigAutoOff" xml:space="preserve"><value>Mise à jour automatique des signatures désactivée — vos définitions peuvent devenir obsolètes. Activez-la dans Options.</value></data>
+  <data name="Rec_SigStale" xml:space="preserve"><value>Signatures ClamAV datant de plus de {0} jours — lancez une mise à jour (Antivirus ou Options).</value></data>
   <data name="Hist_ColDate" xml:space="preserve"><value>Date</value></data>
   <data name="Hist_ColType" xml:space="preserve"><value>Type</value></data>
   <data name="Hist_ColTarget" xml:space="preserve"><value>Cible</value></data>

@@ -391,6 +391,9 @@
   <data name="Rec_ActNone" xml:space="preserve"><value>No scans in history — run a quick scan (Antivirus).</value></data>
   <data name="Rec_ActThreats" xml:space="preserve"><value>Last 30 days: {0} threat(s) reported — see History / Scan tab.</value></data>
   <data name="Rec_ActOk" xml:space="preserve"><value>Scan history available — open the History tab for details.</value></data>
+  <data name="Rec_ClamMissing" xml:space="preserve"><value>ClamAV not installed — antivirus scans are disabled. Install ClamAV via the Antivirus tab.</value></data>
+  <data name="Rec_SigAutoOff" xml:space="preserve"><value>Automatic signature updates disabled — your definitions may become outdated. Enable in Options.</value></data>
+  <data name="Rec_SigStale" xml:space="preserve"><value>ClamAV signatures older than {0} days — run an update (Antivirus or Options).</value></data>
   <data name="Hist_ColDate" xml:space="preserve"><value>Date</value></data>
   <data name="Hist_ColType" xml:space="preserve"><value>Type</value></data>
   <data name="Hist_ColTarget" xml:space="preserve"><value>Target</value></data>

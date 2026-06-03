@@ -195,7 +195,21 @@ namespace optiSCAN.Views
 
             try
             {
-                Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
+                // Certains FixUri sont des commandes (ex. "control.exe /name ..."),
+                // pas des URI shell. On détecte le cas pour passer FileName + Arguments.
+                if (uri.StartsWith("control.exe", StringComparison.OrdinalIgnoreCase))
+                {
+                    var parts = uri.Split(' ', 2);
+                    Process.Start(new ProcessStartInfo(parts[0])
+                    {
+                        UseShellExecute = true,
+                        Arguments = parts.Length > 1 ? parts[1] : string.Empty,
+                    });
+                }
+                else
+                {
+                    Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
+                }
             }
             catch (Exception ex)
             {
@@ -234,11 +248,19 @@ namespace optiSCAN.Views
                     fg = text.TryFindResource("AlertGold") as Brush;
                     ifg = icon?.TryFindResource("AlertGoldLight") as Brush;
                     break;
-                default:
-                    kind = PackIconKind.History;
-                    bg = border.TryFindResource("SurfaceBg") as Brush;
-                    fg = text.TryFindResource("TextMedium") as Brush;
+                case 2:
+                    // Tout va bien, activité normale → vert
+                    kind = PackIconKind.CheckCircle;
+                    bg = border.TryFindResource("SuccessBg") as Brush;
+                    fg = text.TryFindResource("SuccessGreen") as Brush;
                     ifg = icon?.TryFindResource("SuccessGreen") as Brush;
+                    break;
+                default:
+                    // Severity 3 = conseil préventif (info) → bleu neutre
+                    kind = PackIconKind.InformationOutline;
+                    bg = border.TryFindResource("InfoBg") as Brush ?? border.TryFindResource("SurfaceBg") as Brush;
+                    fg = text.TryFindResource("TextAccent") as Brush ?? text.TryFindResource("TextMedium") as Brush;
+                    ifg = icon?.TryFindResource("TextAccent") as Brush;
                     break;
             }
             if (bg != null) border.Background = bg;
