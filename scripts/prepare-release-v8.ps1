@@ -14,7 +14,8 @@ param(
     [switch] $SkipFreshclam,
     [switch] $SkipInstaller,
     [switch] $SkipClean,
-    [switch] $SelfContained
+    [switch] $SelfContained,
+    [switch] $IncludeInstallerOutput
 )
 
 $ErrorActionPreference = 'Stop'
@@ -37,7 +38,11 @@ function Invoke-Step([string] $label, [scriptblock] $action) {
 }
 
 if (-not $SkipClean) {
-    Invoke-Step 'Nettoyage' { & (Join-Path $root 'scripts\clean-before-publish.ps1') -IncludeObj }
+    Invoke-Step 'Nettoyage' {
+        $cleanArgs = @{ IncludeObj = $true; IncludeCiPublish = $true }
+        if ($IncludeInstallerOutput) { $cleanArgs['IncludeInstallerOutput'] = $true }
+        & (Join-Path $root 'scripts\clean-before-publish.ps1') @cleanArgs
+    }
 }
 
 if (-not $SkipFetch) {

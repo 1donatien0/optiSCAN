@@ -18,16 +18,29 @@ $cleanScript = Join-Path $root 'scripts\clean-before-publish.ps1'
 if (-not (Test-Path -LiteralPath $csproj)) { throw "Introuvable : $csproj" }
 if (-not (Test-Path -LiteralPath $iss)) { throw "Introuvable : $iss" }
 
+$publishExe = Join-Path $publishDir 'optiSCAN.exe'
+$staleFlatPublish = Join-Path (Split-Path $publishDir -Parent) 'optiSCAN.exe'
+
 if (-not $SkipPublish) {
-  if (-not (Test-Path -LiteralPath $cleanScript)) { throw "Introuvable : $cleanScript" }
-  & $cleanScript
-  Write-Host 'dotnet publish (Release, FolderProfile -> publish\win-x64)...' -ForegroundColor Cyan
+    if (-not (Test-Path -LiteralPath $cleanScript)) { throw "Introuvable : $cleanScript" }
+    & $cleanScript -Configuration Release -IncludeObj -IncludeCiPublish
+    Write-Host 'dotnet publish (Release, FolderProfile -> publish\win-x64)...' -ForegroundColor Cyan
     dotnet publish $csproj -c Release /p:PublishProfile=FolderProfile
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish a échoué (code $LASTEXITCODE)." }
-
-    if (-not (Test-Path -LiteralPath (Join-Path $publishDir 'optiSCAN.exe'))) {
-        throw "Publication introuvable : $publishDir\optiSCAN.exe"
+} else {
+    # Inno seul : refuser un publish plat obsolete (setup.iss fallback dangereux).
+    if ((Test-Path -LiteralPath $staleFlatPublish) -and -not (Test-Path -LiteralPath $publishExe)) {
+        throw @"
+Publication win-x64 absente mais ancien publish\optiSCAN.exe detecte.
+Relancez d'abord :
+  .\scripts\clean-before-publish.ps1 -IncludeObj -IncludeCiPublish
+  dotnet publish $csproj -c Release /p:PublishProfile=FolderProfile
+"@
     }
+}
+
+if (-not (Test-Path -LiteralPath $publishExe)) {
+    throw "Publication introuvable : $publishExe (faites dotnet publish avant Inno)."
 }
 
 $iscc = @(
@@ -45,14 +58,20 @@ $parts = $appVersion.Split('.')
 $appRelease = if ($parts.Length -ge 2) { "v$($parts[0]).$($parts[1])" } else { "v$appVersion" }
 
 Write-Host "Inno Setup : $iscc (AppVersion=$appVersion, AppRelease=$appRelease)" -ForegroundColor Cyan
-$isccArgs = @("/DAppVersion=$appVersion", "/DAppRelease=$appRelease")
-if (-not [string]::IsNullOrWhiteSpace($PublishDir)) {
-    $resolvedPublish = (Resolve-Path -LiteralPath $PublishDir).Path.TrimEnd('\', '/')
-    $relative = [System.IO.Path]::GetRelativePath($PSScriptRoot, $resolvedPublish)
-    $publishGlob = ($relative -replace '/', '\') + '\*'
-    $isccArgs += "/DAppPublishSource=$publishGlob"
-    Write-Host "Publish source (override) : $publishGlob" -ForegroundColor DarkGray
+$resolvedPublish = if (-not [string]::IsNullOrWhiteSpace($PublishDir)) {
+    (Resolve-Path -LiteralPath $PublishDir).Path.TrimEnd('\', '/')
+} else {
+    (Resolve-Path -LiteralPath $publishDir).Path.TrimEnd('\', '/')
 }
+$relative = [System.IO.Path]::GetRelativePath($PSScriptRoot, $resolvedPublish)
+$publishGlob = ($relative -replace '/', '\') + '\*'
+$isccArgs = @(
+    "/DAppVersion=$appVersion",
+    "/DAppRelease=$appRelease",
+    "/DAppPublishSource=$publishGlob"
+)
+Write-Host "Publish source (force win-x64) : $publishGlob" -ForegroundColor DarkGray
+Write-Host "  optiSCAN.exe : $(Get-Item -LiteralPath (Join-Path $resolvedPublish 'optiSCAN.exe') | ForEach-Object { $_.LastWriteTime.ToString('u') })" -ForegroundColor DarkGray
 & $iscc @isccArgs $iss
 if ($LASTEXITCODE -ne 0) { throw "ISCC a échoué (code $LASTEXITCODE)." }
 

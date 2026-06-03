@@ -1,15 +1,17 @@
 # Vide les sorties Release avant publication / Inno Setup.
+# Supprime TOUS les dossiers publish (win-x64 ET racine publish\) pour qu'Inno
+# ne reprenne jamais un optiSCAN.exe residuel (setup.iss fallback publish\*).
 # Usage (racine du depot) :
-#   .\scripts\clean-before-publish.ps1
 #   .\scripts\clean-before-publish.ps1 -IncludeObj
-#   .\scripts\clean-before-publish.ps1 -IncludeInstallerOutput
+#   .\scripts\clean-before-publish.ps1 -IncludeObj -IncludeInstallerOutput
 
 [CmdletBinding()]
 param(
     [ValidateSet('Release', 'Debug')]
     [string] $Configuration = 'Release',
     [switch] $IncludeObj,
-    [switch] $IncludeInstallerOutput
+    [switch] $IncludeInstallerOutput,
+    [switch] $IncludeCiPublish
 )
 
 $ErrorActionPreference = 'Stop'
@@ -17,7 +19,9 @@ $root = Split-Path -Parent $PSScriptRoot
 $tfm = 'net8.0-windows10.0.17763.0'
 $binDir = Join-Path $root "optiSCAN\bin\$Configuration\$tfm"
 $objDir = Join-Path $root "optiSCAN\obj\$Configuration\$tfm"
-$publishDir = Join-Path $binDir 'publish'
+$publishRoot = Join-Path $binDir 'publish'
+$publishWinX64 = Join-Path $publishRoot 'win-x64'
+$ciPublishRoot = Join-Path $root 'publish'
 $testsBin = Join-Path $root 'optiSCAN.Tests\bin'
 $testsObj = Join-Path $root 'optiSCAN.Tests\obj'
 $installerOut = Join-Path $root 'installer\output'
@@ -72,8 +76,16 @@ Write-Host "Nettoyage avant publication ($Configuration)..." -ForegroundColor Cy
 Stop-ProcessesLockingPublish $binDir
 
 $removed = 0
+
+# Publish residuel (prioritaire — evite le fallback Inno setup.iss publish\*.exe)
+if (Remove-PathIfExists $publishWinX64 'publish\win-x64 (Inno / FolderProfile)') { $removed++ }
+if (Remove-PathIfExists $publishRoot 'publish\ (racine, exe plat obsolete)') { $removed++ }
+
+if ($IncludeCiPublish) {
+    if (Remove-PathIfExists $ciPublishRoot 'publish\ a la racine du depot (CI)') { $removed++ }
+}
+
 if (Remove-PathIfExists $binDir "Dossier bin complet ($Configuration)") { $removed++ }
-elseif (Remove-PathIfExists $publishDir "Ancien dossier publish (partiel)") { $removed++ }
 
 if ($Configuration -eq 'Release') {
     if (Remove-PathIfExists $testsBin 'optiSCAN.Tests\bin') { $removed++ }
@@ -107,9 +119,12 @@ if ($IncludeInstallerOutput) {
 }
 
 Write-Host ""
-Write-Host "Nettoyage termine." -ForegroundColor Green
-Write-Host "Etapes suivantes (manuel) :" -ForegroundColor Yellow
-Write-Host "  1. dotnet publish .\optiSCAN\optiSCAN.csproj -c Release /p:PublishProfile=FolderProfile"
-Write-Host "  2. ISCC.exe .\installer\setup.iss"
 Write-Host ""
-Write-Host "Ou tout-en-un : .\installer\build-release-setup.ps1"
+Write-Host "Nettoyage termine ($removed operation(s))." -ForegroundColor Green
+Write-Host "Ordre obligatoire avant Inno (sans publish frais = installateur obsolete) :" -ForegroundColor Yellow
+Write-Host "  1. .\scripts\clean-before-publish.ps1 -IncludeObj [-IncludeInstallerOutput]"
+Write-Host "  2. dotnet publish .\optiSCAN\optiSCAN.csproj -c Release /p:PublishProfile=FolderProfile"
+Write-Host "  3. .\scripts\verify-runtime-deps.ps1"
+Write-Host "  4. .\installer\build-release-setup.ps1 -SkipPublish   # ou ISCC avec AppPublishSource win-x64"
+Write-Host ""
+Write-Host "Tout-en-un : .\scripts\prepare-release-v8.ps1  ou  .\installer\build-release-setup.ps1"
