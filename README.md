@@ -76,11 +76,15 @@ Branche par défaut GitHub : **`main`**. CI : uniquement `main` et `dev` (voir [
 (racine du dépôt optiSCAN)
 ├── README.md                          ← Ce fichier (guide complet)
 ├── docs/
-│   └── README.md                      ← Renvoi vers ce README (sections 8–13)
-├── .github/workflows/ci.yml           ← Build, tests (116), publish (main)
+│   ├── README.md                      ← Index doc
+│   └── RELEASE-v8.md                  ← Calendrier publication J-10
+├── .github/workflows/ci.yml           ← Build, tests (134), publish (main)
 ├── scripts/
+│   ├── fetch-runtime-deps.ps1         ← Télécharge ClamAV + YARA (CI / dev)
+│   ├── prepare-release-v8.ps1         ← Chaîne complète release v8
 │   ├── clean-before-publish.ps1       ← Nettoyage bin/obj avant release
-│   └── verify-runtime-deps.ps1        ← Vérifie clamav + yara + rules
+│   ├── verify-runtime-deps.ps1        ← Vérifie clamav + clamd + yara + rules
+│   └── runtime-versions.json          ← Versions URL ClamAV / YARA
 ├── optiSCAN.sln                       ← Solution Visual Studio
 ├── optiSCAN.Tests/                    ← Tests unitaires (xUnit)
 ├── installer/
@@ -228,11 +232,15 @@ https://www.clamav.net/downloads#otherversions
 
 ### 3.2 Placer les binaires dans le projet
 
-> **Clone git seul** — les binaires ClamAV et YARA ne sont pas versionnés (`bin/` est ignoré). Sans eux, l’application démarre mais ne peut pas analyser. Vérification :
+> **Clone git seul** — les binaires ClamAV et YARA ne sont pas versionnés dans Git. Les récupérer automatiquement :
 >
 > ```powershell
-> .\scripts\verify-runtime-deps.ps1
+> .\scripts\fetch-runtime-deps.ps1
+> .\scripts\fetch-runtime-deps.ps1 -RunFreshclam   # bases signatures (~200+ Mo, long)
+> .\scripts\verify-runtime-deps.ps1                # après dotnet publish
 > ```
+>
+> **Publication v8 (J-10)** : calendrier et checklist → [docs/RELEASE-v8.md](docs/RELEASE-v8.md).
 >
 > Au démarrage, optiSCAN journalise aussi l’état via `RuntimeDependencies` (`optiscan-*.log`).
 
@@ -532,6 +540,14 @@ Add-MpPreference -ExclusionPath "C:\Program Files\optiSCAN\clamav\database"
 
 ## 8. Packaging final (v8.0)
 
+> **Sortie prévue dans ~10 jours** — suivi détaillé : [docs/RELEASE-v8.md](docs/RELEASE-v8.md).
+
+**Tout-en-un (recommandé avant release)** :
+
+```powershell
+.\scripts\prepare-release-v8.ps1
+```
+
 Exécuter depuis la **racine du dépôt** (dossier contenant `optiSCAN.sln`). La sortie du profil **FolderProfile** est `optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\` (chemin attendu par `installer\setup.iss`).
 
 **Étape 0 — nettoyage (recommandé)**
@@ -550,7 +566,7 @@ dotnet publish .\optiSCAN\optiSCAN.csproj -c Release /p:PublishProfile=FolderPro
 
 ```powershell
 $pub = ".\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64"
-& "$pub\clamav\x64\freshclam.exe" --datadir="$pub\clamav\x64\database"
+& "$pub\clamav\x64\freshclam.exe" --datadir="$pub\clamav\database"
 ```
 
 **Étape C — compilateur Inno Setup**
@@ -587,7 +603,10 @@ Pipeline : [`.github/workflows/ci.yml`](.github/workflows/ci.yml) — build Rele
 
 ### Checklist release (avant installateur)
 
-- [ ] `.\scripts\clean-before-publish.ps1 -IncludeObj` puis `verify-runtime-deps.ps1`
+Voir [docs/RELEASE-v8.md](docs/RELEASE-v8.md) (calendrier J-10).
+
+- [ ] `.\scripts\prepare-release-v8.ps1` ou étapes manuelles ci-dessus
+- [ ] `.\scripts\fetch-runtime-deps.ps1` (+ `-RunFreshclam` pour l’installateur final)
 - [ ] `dotnet test` Release — 134 tests OK
 - [ ] Installateur FR/EN, sidebar **v8.0**, accueil posture /100
 - [ ] **clamd**, VirusTotal, mode jeu, mutex headless, quarantaine

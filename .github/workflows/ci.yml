@@ -5,6 +5,7 @@ on:
     branches: [ main, dev ]
   pull_request:
     branches: [ main, dev ]
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -69,6 +70,7 @@ jobs:
     runs-on: windows-latest
     needs: build-test
     if: github.ref == 'refs/heads/main'
+    timeout-minutes: 90
 
     steps:
       - name: Checkout
@@ -82,6 +84,14 @@ jobs:
       - name: Restore NuGet packages
         run: dotnet restore optiSCAN.sln
 
+      - name: Fetch ClamAV and YARA (win x64)
+        shell: pwsh
+        run: pwsh -File scripts/fetch-runtime-deps.ps1
+
+      - name: Update ClamAV signatures (freshclam)
+        shell: pwsh
+        run: pwsh -File scripts/fetch-runtime-deps.ps1 -RunFreshclam -FreshclamTimeoutMinutes 45
+
       - name: Publish win-x64 (self-contained)
         run: >
           dotnet publish optiSCAN/optiSCAN.csproj
@@ -90,6 +100,10 @@ jobs:
           --self-contained true
           -p:PublishSingleFile=false
           --output publish/win-x64
+
+      - name: Stage runtime deps into publish folder
+        shell: pwsh
+        run: pwsh -File scripts/stage-runtime-deps.ps1 -PublishDir publish/win-x64
 
       - name: Verify runtime dependencies (ClamAV + YARA)
         shell: pwsh

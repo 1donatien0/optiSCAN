@@ -11,9 +11,18 @@
 #>
 
 param (
-    [Parameter(Mandatory = $true)]
-    [string] $PublishDir
+    [string] $PublishDir,
+    [switch] $AllowMissingSignatures
 )
+
+if ([string]::IsNullOrWhiteSpace($PublishDir)) {
+    $repo = Split-Path -Parent $PSScriptRoot
+    $PublishDir = Join-Path $repo 'optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64'
+    if (-not (Test-Path (Join-Path $PublishDir 'optiSCAN.exe'))) {
+        $PublishDir = Join-Path $repo 'publish\win-x64'
+    }
+}
+$PublishDir = (Resolve-Path -LiteralPath $PublishDir).Path
 
 $ErrorActionPreference = 'Stop'
 $failed = @()
@@ -37,6 +46,7 @@ Check "optiSCAN.exe" "Executable principal"
 Write-Host "`n[ ClamAV x64 ]"
 Check "clamav\x64\clamscan.exe"  "Scanner ClamAV"
 Check "clamav\x64\freshclam.exe" "Mise a jour signatures"
+Check "clamav\x64\clamd.exe"     "Daemon ClamAV (v8)"
 Check "clamav\x64\clambc.exe"    "Bytecode ClamAV"
 Check "clamav\certs\clamav.crt"  "Certificat CA Cisco-Talos"
 
@@ -46,8 +56,12 @@ if ($sigFiles.Count -eq 0) {
     $sigFiles = Get-ChildItem -Path (Join-Path $PublishDir "clamav\database") -Filter "*.cld" -ErrorAction SilentlyContinue
 }
 if ($sigFiles.Count -eq 0) {
-    Write-Host "  MANQUANT  clamav\database\*.cvd / *.cld  (base de signatures)" -ForegroundColor Red
-    $failed += "clamav\database\*.cvd"
+    if ($AllowMissingSignatures) {
+        Write-Host "  SKIP      clamav\database (AllowMissingSignatures)" -ForegroundColor Yellow
+    } else {
+        Write-Host "  MANQUANT  clamav\database\*.cvd / *.cld  (lancer freshclam ou prepare-release-v8 -RunFreshclam)" -ForegroundColor Red
+        $failed += "clamav\database\*.cvd"
+    }
 } else {
     foreach ($f in $sigFiles) {
         Write-Host "  OK        clamav\database\$($f.Name)" -ForegroundColor Green
@@ -56,7 +70,12 @@ if ($sigFiles.Count -eq 0) {
 
 Write-Host "`n[ YARA ]"
 Check "yara\yara64.exe" "YARA engine x64"
-Check "yara\yara32.exe" "YARA engine x86"
+$yara32 = Join-Path $PublishDir "yara\yara32.exe"
+if (Test-Path $yara32) {
+    Write-Host "  OK        yara\yara32.exe" -ForegroundColor Green
+} else {
+    Write-Host "  SKIP      yara\yara32.exe (optionnel si processus x64 uniquement)" -ForegroundColor Yellow
+}
 
 $yaraRules = Get-ChildItem -Path (Join-Path $PublishDir "rules") -Filter "*.yar" -Recurse -ErrorAction SilentlyContinue
 if ($yaraRules.Count -eq 0) {

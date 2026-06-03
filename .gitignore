@@ -25,6 +25,17 @@ packages/
 test-*.txt
 artifacts/
 
+# Binaires ClamAV / YARA (téléchargés via scripts/fetch-runtime-deps.ps1)
+optiSCAN/clamav/x64/*.exe
+optiSCAN/clamav/x64/*.dll
+optiSCAN/clamav/x86/*.exe
+optiSCAN/clamav/x86/*.dll
+optiSCAN/clamav/database/*.cvd
+optiSCAN/clamav/database/*.cld
+optiSCAN/clamav/database/*.cud
+optiSCAN/yara/*.exe
+publish/
+
 # Dossier output de l'installer
 installer/output/
 
