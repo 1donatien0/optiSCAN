@@ -161,12 +161,14 @@
   <data name="Overview_HistorySub" xml:space="preserve"><value>View history</value></data>
   <data name="Overview_UpdateTitle" xml:space="preserve"><value>Update</value></data>
   <data name="Overview_UpdateSub" xml:space="preserve"><value>Antivirus signatures</value></data>
-  <data name="Overview_StatsNone30" xml:space="preserve"><value>• No scans recorded in the last 30 days.</value></data>
+  <data name="Overview_StatsNoHistory" xml:space="preserve"><value>• No scans recorded — run a scan from Antivirus.</value></data>
+  <data name="Overview_StatsNone30" xml:space="preserve"><value>• No scans in the last 30 days (older sessions: History tab).</value></data>
+  <data name="Overview_StatsTreatHint" xml:space="preserve"><value>• Threats to remediate: History or Scan tab.</value></data>
   <data name="Overview_StatsScans" xml:space="preserve"><value>• Scans recorded: {0}</value></data>
   <data name="Overview_StatsFiles" xml:space="preserve"><value>• Files scanned (total): {0}</value></data>
   <data name="Overview_StatsThreats" xml:space="preserve"><value>• Threats detected (total): {0}</value></data>
-  <data name="Overview_StatsLifetime" xml:space="preserve"><value>Lifetime scans: {0}. See History for details.</value></data>
-  <data name="Overview_StatsHistoryHint" xml:space="preserve"><value>Per-session details are available on the History tab.</value></data>
+  <data name="Overview_StatsLifetime" xml:space="preserve"><value>Lifetime scans: {0}.</value></data>
+  <data name="Overview_StatsHistoryHint" xml:space="preserve"><value>Per-session details: History tab.</value></data>
   <data name="Overview_UpdatedAt" xml:space="preserve"><value>Updated: {0}</value></data>
   <data name="Overview_LastScan" xml:space="preserve"><value>Last scan</value></data>
   <data name="Overview_LastScanLine" xml:space="preserve"><value>{0} — {1} · {2}</value></data>
@@ -420,6 +422,10 @@
   <data name="Hist_FilterAll" xml:space="preserve"><value>All scans</value></data>
   <data name="Hist_FilterWithThreats" xml:space="preserve"><value>With threats</value></data>
   <data name="Hist_FilterNoThreats" xml:space="preserve"><value>No threats</value></data>
+  <data name="Hist_ChipAll" xml:space="preserve"><value>All</value></data>
+  <data name="Hist_ChipThreats" xml:space="preserve"><value>Threats</value></data>
+  <data name="Hist_ChipClean" xml:space="preserve"><value>Clean scans</value></data>
+  <data name="Hist_ChipSweep" xml:space="preserve"><value>Cleanups</value></data>
   <data name="Hist_SearchScan" xml:space="preserve"><value>Search (target or type)…</value></data>
   <data name="Hist_SearchClean" xml:space="preserve"><value>Search (targets)…</value></data>
   <data name="Hist_DetailSelectClean" xml:space="preserve"><value>Select a cleanup to view the operation log.</value></data>
@@ -428,6 +434,12 @@
   <data name="Hist_TreatInAv" xml:space="preserve"><value>Treat in Scan</value></data>
   <data name="Hist_TooltipTreatInAv" xml:space="preserve"><value>Opens the Scan tab with this session's threats so you can quarantine, ignore, or delete them.</value></data>
   <data name="Hist_QuarantineAll" xml:space="preserve"><value>Quarantine all</value></data>
+  <data name="Hist_SelectScanHint" xml:space="preserve"><value>Select an entry above to view details.</value></data>
+  <data name="Hist_NoThreatsInSession" xml:space="preserve"><value>No threats detected in this scan.</value></data>
+  <data name="Hist_ThreatsLegacy" xml:space="preserve"><value>Threats detected (paths not stored — v7 session). Run a new scan for details.</value></data>
+  <data name="Hist_InfoFiles" xml:space="preserve"><value>{0} files</value></data>
+  <data name="Hist_InfoThreats" xml:space="preserve"><value>{0} threat(s)</value></data>
+  <data name="Hist_InfoClean" xml:space="preserve"><value>No threats</value></data>
   <data name="Hist_TooltipQuarantineAll" xml:space="preserve"><value>Quarantines every threat listed for this session.</value></data>
   <data name="Hist_DetailCleanSummary" xml:space="preserve"><value>Targets: {0}&#x0a;Freed: {1} — Duration: {2}&#x0a;&#x0a;(Older session: operation log was not stored.)</value></data>
   <data name="Hist_ExportPdfSelect" xml:space="preserve"><value>Select a row on the Antivirus Scan tab, then click Export PDF (selection).</value></data>

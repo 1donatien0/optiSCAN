@@ -18,12 +18,21 @@ namespace optiSCAN.Services
     /// Sessions scan v8 : liste <see cref="Models.ThreatInfo"/> (chemin + nom) ;
     /// entrées v7 : compteur de menaces sans chemins persistés.
     ///
+    /// Rétention implicite (scans et nettoyages) : la liste regrosse jusqu'à 100 entrées,
+    /// puis les 50 plus anciennes sont supprimées (50 restantes), et le cycle reprend.
+    ///
     /// <c>optiSCAN.log</c> : journal texte volontairement non chiffré ; les lignes de détail scan
     /// utilisent <see cref="PathRedaction.RedactPath"/> (pas de chemins complets à l'écriture).
     /// </summary>
     [SupportedOSPlatform("windows")]
     public class ScanLogManager
     {
+        /// <summary>Seuil : au-delà, on retire les entrées les plus anciennes par lot.</summary>
+        private const int HistoryHighWaterMark = 100;
+
+        /// <summary>Nombre d'entrées conservées après purge (les 50 plus récentes restent).</summary>
+        private const int HistoryRetainCount = 50;
+
         private readonly string _logDir;
 
         // Nouveaux chemins chiffrés
@@ -66,11 +75,7 @@ namespace optiSCAN.Services
         {
             var session = ScanSession.FromResult(result);
             _history.Insert(0, session); // plus récent en premier
-
-            // Limiter à 100 entrées
-            if (_history.Count > 100)
-                _history.RemoveRange(100, _history.Count - 100);
-
+            TrimNewestFirstList(_history);
             PersistHistory();
 
             WriteToLog(FormatScanDetail(result));
@@ -105,17 +110,31 @@ namespace optiSCAN.Services
 
         // ── Historique des nettoyages système (vue Historique → Nettoyages) ───────
 
-        /// <summary>Enregistre un nettoyage terminé (plus récent en tête, max 100).</summary>
+        /// <summary>Enregistre un nettoyage terminé (plus récent en tête ; rotation 100 → 50).</summary>
         public void SaveCleanSession(CleanSession session)
         {
             _cleanHistory.Insert(0, session);
-            if (_cleanHistory.Count > 100)
-                _cleanHistory.RemoveRange(100, _cleanHistory.Count - 100);
+            TrimNewestFirstList(_cleanHistory);
             PersistCleanHistory();
             WriteToLog($"Nettoyage système — {session.BytesDisplay} libéré(s) — {session.TargetsSummary}");
         }
 
         public IReadOnlyList<CleanSession> GetCleanHistory() => _cleanHistory.AsReadOnly();
+
+        /// <summary>
+        /// Retourne la timeline d'activité unifiée (scans + nettoyages), triée par date décroissante.
+        /// C'est la source de vérité pour <see cref="Views.HistoryControl"/>.
+        /// </summary>
+        public IReadOnlyList<Models.ActivityEntry> GetActivityFeed()
+        {
+            var feed = new List<Models.ActivityEntry>(_history.Count + _cleanHistory.Count);
+            foreach (var s in _history)
+                feed.Add(Models.ActivityEntry.FromScan(s));
+            foreach (var c in _cleanHistory)
+                feed.Add(Models.ActivityEntry.FromClean(c));
+            feed.Sort((a, b) => b.StartedAt.CompareTo(a.StartedAt));
+            return feed.AsReadOnly();
+        }
 
         /// <summary>
         /// Efface tout l'historique.
@@ -125,6 +144,17 @@ namespace optiSCAN.Services
             _history.Clear();
             PersistHistory();
             WriteToLog("Historique effacé par l'utilisateur.");
+        }
+
+        /// <summary>
+        /// Liste triée « plus récent en premier » : à partir de <see cref="HistoryHighWaterMark"/>
+        /// entrées, supprime les <see cref="HistoryRetainCount"/> plus anciennes (il en reste 50),
+        /// puis la liste peut regrossir jusqu'à 100 avant une nouvelle purge.
+        /// </summary>
+        private static void TrimNewestFirstList<T>(List<T> list)
+        {
+            if (list.Count < HistoryHighWaterMark) return;
+            list.RemoveRange(HistoryRetainCount, list.Count - HistoryRetainCount);
         }
 
         // ── Journal texte ───────────────────────────────────────────────────────

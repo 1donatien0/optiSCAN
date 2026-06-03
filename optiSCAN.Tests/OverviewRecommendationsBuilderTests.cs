@@ -1,4 +1,3 @@
-using optiSCAN.Models;
 using optiSCAN.Services;
 
 namespace optiSCAN.Tests;
@@ -38,18 +37,13 @@ public sealed class OverviewRecommendationsBuilderTests : IDisposable
     private static OverviewRecommendationsBuilder.Context BaseContext(
         bool clam = true,
         DateTime? lastFreshclam = null,
-        DateTime? lastClean = null,
-        IReadOnlyList<ScanSession>? sessions = null) =>
+        DateTime? lastClean = null) =>
         new()
         {
             ClamInstalled = clam,
             LastFreshclamUpdate = lastFreshclam,
             LastCleanAt = lastClean,
-            ScanSessions = sessions ?? Array.Empty<ScanSession>(),
         };
-
-    private static ScanSession Session(int daysAgo, int threats = 0) =>
-        new() { StartedAt = DateTime.Now.AddDays(-daysAgo), ThreatsFound = threats, FilesScanned = 100 };
 
     // ── Hygiène : ClamAV manquant ─────────────────────────────────────────────
 
@@ -184,52 +178,6 @@ public sealed class OverviewRecommendationsBuilderTests : IDisposable
 
         Assert.Equal(0, r.HygieneSeverity);
         Assert.False(r.ShowSigUpdateLink);
-    }
-
-    // ── Activité : aucun scan ─────────────────────────────────────────────────
-
-    [Fact]
-    public void Activity_ActNone_when_no_scan_history()
-    {
-        var r = OverviewRecommendationsBuilder.Build(BaseContext(sessions: Array.Empty<ScanSession>()));
-
-        Assert.Equal(3, r.ActivitySeverity);
-    }
-
-    // ── Activité : menaces détectées ─────────────────────────────────────────
-
-    [Fact]
-    public void Activity_ActThreats_when_threats_in_last_30_days()
-    {
-        var sessions = new[] { Session(daysAgo: 5, threats: 3) };
-
-        var r = OverviewRecommendationsBuilder.Build(BaseContext(sessions: sessions));
-
-        Assert.Equal(1, r.ActivitySeverity);
-        Assert.Contains("3", r.ActivityLine);
-    }
-
-    [Fact]
-    public void Activity_old_threats_beyond_30_days_do_not_trigger_alert()
-    {
-        var sessions = new[] { Session(daysAgo: 45, threats: 10) };
-
-        var r = OverviewRecommendationsBuilder.Build(BaseContext(sessions: sessions));
-
-        // Session trop ancienne → ActOk
-        Assert.Equal(2, r.ActivitySeverity);
-    }
-
-    // ── Activité : tout va bien ───────────────────────────────────────────────
-
-    [Fact]
-    public void Activity_ActOk_when_scans_exist_and_no_recent_threats()
-    {
-        var sessions = new[] { Session(daysAgo: 2, threats: 0) };
-
-        var r = OverviewRecommendationsBuilder.Build(BaseContext(sessions: sessions));
-
-        Assert.Equal(2, r.ActivitySeverity);
     }
 
     // ── Seuils personnalisés ─────────────────────────────────────────────────

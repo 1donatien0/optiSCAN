@@ -383,7 +383,7 @@ Stockage : `%LOCALAPPDATA%\optiSCAN\Quarantine\` — `{guid}.quar` + `manifest.j
 
 | Fichier / service | Rôle |
 |---|---|
-| `ScanLogManager` → `scan_history.dat` / `clean_history.dat` | Historique chiffré **DPAPI + HMAC** (`SecureStore`, 100 entrées max) ; **v8** : `Threats[]` (chemin + nom de menace) ; migration auto depuis `.json` → `.legacy` |
+| `ScanLogManager` → `scan_history.dat` / `clean_history.dat` | Historique chiffré **DPAPI + HMAC** (`SecureStore`) ; rotation implicite : à **100** entrées, les **50** plus anciennes sont retirées (reste **50**, regrossit jusqu'à 100) ; **v8** : `Threats[]` ; migration `.json` → `.legacy` |
 | `ScanLogManager` → `optiSCAN.log` | Journal texte volontairement **non chiffré** (diagnostic) ; `FormatScanDetailCore` applique `PathRedaction` sur cible et chemins de menaces — noms de virus, dates et compteurs restent lisibles ; résumé dans **Historique → Scan Antivirus** |
 | `AppLogger` → `optiscan-YYYY-MM-DD.log` | Logs applicatifs (composants, erreurs) ; purge **> 30 jours**, au plus **1×/jour** (marqueur `.lastcleanup` persisté) |
 
@@ -792,7 +792,7 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 - Scanner ClamAV (rapide / complet / dossier / fichier)
 - Moteur YARA comportemental + règles YARA-Forge
 - Quarantaine locale chiffrée (`.quar` + `manifest.json`)
-- Historique des scans (100 entrées ; détail menaces et chiffrement **.dat** depuis **v8**)
+- Historique des scans (rotation 100→50 ; détail menaces et chiffrement **.dat** depuis **v8**)
 - Mise à jour automatique signatures (4 h) et règles (24 h)
 - Système d'exclusions (dossiers + règles)
 - Nettoyage fichiers temporaires

@@ -468,9 +468,8 @@ namespace optiSCAN
         private void RefreshHistory()
         {
             var sessions = _logManager?.GetHistory() ?? Array.Empty<ScanSession>();
-            var cleanSessions = _logManager?.GetCleanHistory() ?? Array.Empty<CleanSession>();
-            (panelHistory as Views.HistoryControl)?.UpdateScanHistory(sessions);
-            (panelHistory as Views.HistoryControl)?.UpdateCleanHistory(cleanSessions);
+            var feed = _logManager?.GetActivityFeed() ?? Array.Empty<Models.ActivityEntry>();
+            (panelHistory as Views.HistoryControl)?.UpdateActivityHistory(feed);
             ApplyLastScanSummary(sessions);
             (panelOverview as Views.OverviewControl)?.UpdateProtectionStatistics(sessions);
             RefreshOverviewProtectionAndRecommendations();
@@ -608,12 +607,10 @@ namespace optiSCAN
                 ClamInstalled = clam,
                 LastFreshclamUpdate = _freshclamUpdater?.GetLastSignatureUpdateTime(),
                 LastCleanAt = cleanHist.Count > 0 ? cleanHist[0].StartedAt : null,
-                ScanSessions = sessions,
             });
 
             overview.UpdateRecommendations(
                 rec.HygieneLine, rec.HygieneSeverity,
-                rec.ActivityLine, rec.ActivitySeverity,
                 rec.ShowSigUpdateLink);
 
             var lastScan = sessions.Count > 0 ? sessions[0].StartedAt : (DateTime?)null;

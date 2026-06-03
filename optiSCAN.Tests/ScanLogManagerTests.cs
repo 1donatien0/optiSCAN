@@ -23,12 +23,48 @@ public sealed class ScanLogManagerTests : IDisposable
     }
 
     [Fact]
-    public void SaveScanResult_caps_history_at_100_entries()
+    public void GetActivityFeed_merges_scans_and_cleans_newest_first()
     {
-        for (int i = 0; i < 105; i++)
+        var scanTime = new DateTime(2026, 1, 10, 12, 0, 0);
+        var cleanTime = new DateTime(2026, 1, 11, 8, 0, 0);
+
+        _manager.SaveScanResult(new ScanResult
+        {
+            StartedAt = scanTime,
+            Type = ScanType.QuickScan,
+            TargetPath = @"C:\scan",
+            Status = ScanStatus.Completed,
+            FilesScanned = 10,
+        });
+        _manager.SaveCleanSession(new CleanSession
+        {
+            StartedAt = cleanTime,
+            FinishedAt = cleanTime.AddMinutes(2),
+            TargetsSummary = "Temp",
+            BytesFreed = 1024,
+        });
+
+        var feed = _manager.GetActivityFeed();
+        Assert.Equal(2, feed.Count);
+        Assert.Equal(ActivityKind.Clean, feed[0].Kind);
+        Assert.Equal(cleanTime, feed[0].StartedAt);
+        Assert.Equal(ActivityKind.Scan, feed[1].Kind);
+        Assert.Equal(scanTime, feed[1].StartedAt);
+    }
+
+    [Fact]
+    public void SaveScanResult_trims_50_oldest_when_reaching_100_then_grows_again()
+    {
+        for (int i = 0; i < 100; i++)
             _manager.SaveScanResult(new ScanResult { Type = ScanType.QuickScan, TargetPath = $"t-{i}", Status = ScanStatus.Completed, FilesScanned = i });
 
-        Assert.Equal(100, _manager.GetHistory().Count);
+        Assert.Equal(50, _manager.GetHistory().Count);
+        Assert.Equal(99, _manager.GetHistory()[0].FilesScanned);
+
+        for (int i = 100; i < 105; i++)
+            _manager.SaveScanResult(new ScanResult { Type = ScanType.QuickScan, TargetPath = $"t-{i}", Status = ScanStatus.Completed, FilesScanned = i });
+
+        Assert.Equal(55, _manager.GetHistory().Count);
         Assert.Equal(104, _manager.GetHistory()[0].FilesScanned);
     }
 

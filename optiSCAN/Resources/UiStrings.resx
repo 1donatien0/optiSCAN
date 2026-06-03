@@ -161,12 +161,14 @@
   <data name="Overview_HistorySub" xml:space="preserve"><value>Voir l'historique</value></data>
   <data name="Overview_UpdateTitle" xml:space="preserve"><value>Mise à jour</value></data>
   <data name="Overview_UpdateSub" xml:space="preserve"><value>Signatures antivirus</value></data>
-  <data name="Overview_StatsNone30" xml:space="preserve"><value>• Aucune analyse enregistrée sur les 30 derniers jours.</value></data>
+  <data name="Overview_StatsNoHistory" xml:space="preserve"><value>• Aucune analyse enregistrée — lancez une analyse depuis Antivirus.</value></data>
+  <data name="Overview_StatsNone30" xml:space="preserve"><value>• Aucune analyse sur les 30 derniers jours (sessions plus anciennes : onglet Historique).</value></data>
+  <data name="Overview_StatsTreatHint" xml:space="preserve"><value>• Menaces à traiter : onglet Historique ou Analyse.</value></data>
   <data name="Overview_StatsScans" xml:space="preserve"><value>• Analyses enregistrées : {0}</value></data>
   <data name="Overview_StatsFiles" xml:space="preserve"><value>• Fichiers parcourus (cumul) : {0}</value></data>
   <data name="Overview_StatsThreats" xml:space="preserve"><value>• Menaces détectées (cumul) : {0}</value></data>
-  <data name="Overview_StatsLifetime" xml:space="preserve"><value>Total depuis l'installation : {0} analyse(s). Détail dans Historique.</value></data>
-  <data name="Overview_StatsHistoryHint" xml:space="preserve"><value>Le détail par session reste disponible dans l'onglet Historique.</value></data>
+  <data name="Overview_StatsLifetime" xml:space="preserve"><value>Total depuis l'installation : {0} analyse(s).</value></data>
+  <data name="Overview_StatsHistoryHint" xml:space="preserve"><value>Détail par session : onglet Historique.</value></data>
   <data name="Overview_UpdatedAt" xml:space="preserve"><value>Actualisé : {0}</value></data>
   <data name="Overview_LastScan" xml:space="preserve"><value>Dernière analyse</value></data>
   <data name="Overview_LastScanLine" xml:space="preserve"><value>{0} — {1} · {2}</value></data>
@@ -420,6 +422,10 @@
   <data name="Hist_FilterAll" xml:space="preserve"><value>Tous les scans</value></data>
   <data name="Hist_FilterWithThreats" xml:space="preserve"><value>Avec menaces</value></data>
   <data name="Hist_FilterNoThreats" xml:space="preserve"><value>Sans menace</value></data>
+  <data name="Hist_ChipAll" xml:space="preserve"><value>Tout</value></data>
+  <data name="Hist_ChipThreats" xml:space="preserve"><value>Menaces</value></data>
+  <data name="Hist_ChipClean" xml:space="preserve"><value>Analyses propres</value></data>
+  <data name="Hist_ChipSweep" xml:space="preserve"><value>Nettoyages</value></data>
   <data name="Hist_SearchScan" xml:space="preserve"><value>Rechercher (cible ou type)…</value></data>
   <data name="Hist_SearchClean" xml:space="preserve"><value>Rechercher (cibles)…</value></data>
   <data name="Hist_DetailSelectClean" xml:space="preserve"><value>Sélectionnez un nettoyage pour afficher le journal d'opérations.</value></data>
@@ -428,6 +434,12 @@
   <data name="Hist_TreatInAv" xml:space="preserve"><value>Traiter dans Analyse</value></data>
   <data name="Hist_TooltipTreatInAv" xml:space="preserve"><value>Ouvre l'onglet Analyse avec les menaces de cette session pour les traiter comme après un scan.</value></data>
   <data name="Hist_QuarantineAll" xml:space="preserve"><value>Tout mettre en quarantaine</value></data>
+  <data name="Hist_SelectScanHint" xml:space="preserve"><value>Sélectionnez une entrée ci-dessus pour afficher le détail.</value></data>
+  <data name="Hist_NoThreatsInSession" xml:space="preserve"><value>Aucune menace détectée lors de cette analyse.</value></data>
+  <data name="Hist_ThreatsLegacy" xml:space="preserve"><value>Menaces détectées (chemins non enregistrés — session v7). Relancez une analyse pour le détail.</value></data>
+  <data name="Hist_InfoFiles" xml:space="preserve"><value>{0} fichiers</value></data>
+  <data name="Hist_InfoThreats" xml:space="preserve"><value>{0} menace(s)</value></data>
+  <data name="Hist_InfoClean" xml:space="preserve"><value>Aucune menace</value></data>
   <data name="Hist_TooltipQuarantineAll" xml:space="preserve"><value>Met en quarantaine toutes les menaces listées pour cette session.</value></data>
   <data name="Hist_DetailCleanSummary" xml:space="preserve"><value>Cibles : {0}&#x0a;Libéré : {1} — Durée : {2}&#x0a;&#x0a;(Session antérieure : journal d'opérations non enregistré.)</value></data>
   <data name="Hist_ExportPdfSelect" xml:space="preserve"><value>Sélectionnez une ligne dans l'onglet « Scan Antivirus », puis cliquez sur Exporter PDF (sélection).</value></data>

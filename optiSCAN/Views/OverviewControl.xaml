@@ -362,7 +362,7 @@
                         </Border>
 
                         <Border x:Name="brRecHygiene" Background="{DynamicResource AlertBg}"
-                                CornerRadius="8" Padding="10,8" Margin="0,0,0,6">
+                                CornerRadius="8" Padding="10,8">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
@@ -373,22 +373,6 @@
                                              VerticalAlignment="Top" Margin="0,1,0,0"/>
                                 <TextBlock x:Name="txtRecHygiene" Grid.Column="1" Text="{loc:Loc Key=Overview_RecHygiene}"
                                            FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource AlertGold}"
-                                           LineHeight="16" TextWrapping="Wrap" Margin="6,0,0,0"/>
-                            </Grid>
-                        </Border>
-
-                        <Border x:Name="brRecActivity" Background="{DynamicResource SurfaceBg}"
-                                CornerRadius="8" Padding="10,8">
-                            <Grid>
-                                <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="Auto"/>
-                                    <ColumnDefinition Width="*"/>
-                                </Grid.ColumnDefinitions>
-                                <md:PackIcon x:Name="icRecActivity" Grid.Column="0" Kind="History" Width="14" Height="14"
-                                             Foreground="{DynamicResource SuccessGreen}"
-                                             VerticalAlignment="Top" Margin="0,1,0,0"/>
-                                <TextBlock x:Name="txtRecActivity" Grid.Column="1" Text="{loc:Loc Key=Overview_RecScans}"
-                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMedium}"
                                            LineHeight="16" TextWrapping="Wrap" Margin="6,0,0,0"/>
                             </Grid>
                         </Border>
