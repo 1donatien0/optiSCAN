@@ -45,7 +45,9 @@
 ## CI GitHub (`main` uniquement)
 
 1. `fetch-runtime-deps.ps1`
-2. `fetch-runtime-deps.ps1 -RunFreshclam` (timeout 45 min)
+2. `fetch-runtime-deps.ps1 -RunFreshclam` (timeout 45 min) — génère un `freshclam.conf` minimal dans `clamav\x64\` (non versionné dans Git, comme en production via `FreshclamUpdater`)
+
+**Erreur CI connue (corrigée)** : `Can't open/parse freshclam.conf` si freshclam est lancé sans `--config-file` — le dépôt n’embarque pas de `.conf` dans `clamav\x64\` (évite des chemins machine de dev).
 3. `dotnet publish` → `verify-runtime-deps.ps1`
 4. Inno Setup → artefact `optiSCAN_Setup_v8.0.0.exe`
 
