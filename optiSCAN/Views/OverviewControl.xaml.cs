@@ -195,8 +195,7 @@ namespace optiSCAN.Views
 
             try
             {
-                // Certains FixUri sont des commandes (ex. "control.exe /name ..."),
-                // pas des URI shell. On détecte le cas pour passer FileName + Arguments.
+                // FixUri posture : ms-settings:* (ex. advancedsharing). Fallback control.exe si besoin.
                 if (uri.StartsWith("control.exe", StringComparison.OrdinalIgnoreCase))
                 {
                     var parts = uri.Split(' ', 2);

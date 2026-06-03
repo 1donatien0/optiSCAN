@@ -125,9 +125,8 @@ namespace optiSCAN.Services
                 Title = LocalizationService.GetString("Posture_Shares"),
                 Passed = !risky,
                 Weight = 10,
-                // ms-settings:network-sharing n'existe plus sous Windows 11.
-                // control.exe ouvre le Centre Réseau et partage sur toutes versions.
-                FixUri = "control.exe /name Microsoft.NetworkAndSharingCenter",
+                // ms-settings:network-sharing n'existe plus ; Win 11 : partage avancé.
+                FixUri = "ms-settings:advancedsharing",
             };
         }
 
