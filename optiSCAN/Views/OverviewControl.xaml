@@ -335,61 +335,61 @@
                                    Foreground="{DynamicResource TextDark}" Margin="0,0,0,10"/>
 
                         <Border Background="{DynamicResource SurfaceBg}"
-                                CornerRadius="8" Padding="12,10" Margin="0,0,0,10">
+                                CornerRadius="8" Padding="10,8" Margin="0,0,0,8">
                             <StackPanel>
                                 <TextBlock Text="{loc:Loc Key=Posture_Title}"
-                                           FontSize="{DynamicResource FontSize.Small}" FontWeight="Bold"
+                                           FontSize="{DynamicResource FontSize.Caption}" FontWeight="Bold"
                                            Foreground="{DynamicResource TextMuted}"/>
-                                <StackPanel Orientation="Horizontal" Margin="0,6,0,4">
+                                <StackPanel Orientation="Horizontal" Margin="0,4,0,2">
                                     <TextBlock x:Name="txtSecurityScore"
                                                Text="—"
-                                               FontSize="32" FontWeight="Bold"
+                                               FontSize="28" FontWeight="Bold"
                                                Foreground="{DynamicResource TextAccent}"
                                                VerticalAlignment="Center"/>
                                     <TextBlock Text="/100"
-                                               FontSize="{DynamicResource FontSize.Body}"
+                                               FontSize="{DynamicResource FontSize.Small}"
                                                Foreground="{DynamicResource TextMuted}"
-                                               VerticalAlignment="Bottom" Margin="4,0,0,6"/>
+                                               VerticalAlignment="Bottom" Margin="4,0,0,5"/>
                                 </StackPanel>
                                 <TextBlock x:Name="txtPostureSummary"
                                            TextWrapping="Wrap"
-                                           FontSize="{DynamicResource FontSize.Caption}"
+                                           FontSize="{DynamicResource FontSize.Micro}"
                                            Foreground="{DynamicResource TextDark}"
-                                           LineHeight="16"
+                                           LineHeight="14"
                                            Visibility="Collapsed"/>
                                 <StackPanel x:Name="postureIssuesPanel"/>
                             </StackPanel>
                         </Border>
 
                         <Border x:Name="brRecHygiene" Background="{DynamicResource AlertBg}"
-                                CornerRadius="8" Padding="12,10" Margin="0,0,0,8">
+                                CornerRadius="8" Padding="10,8" Margin="0,0,0,6">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <md:PackIcon x:Name="icRecHygiene" Grid.Column="0" Kind="Broom" Width="16" Height="16"
+                                <md:PackIcon x:Name="icRecHygiene" Grid.Column="0" Kind="Broom" Width="14" Height="14"
                                              Foreground="{DynamicResource AlertGoldLight}"
-                                             VerticalAlignment="Top" Margin="0,2,0,0"/>
+                                             VerticalAlignment="Top" Margin="0,1,0,0"/>
                                 <TextBlock x:Name="txtRecHygiene" Grid.Column="1" Text="{loc:Loc Key=Overview_RecHygiene}"
-                                           FontSize="{DynamicResource FontSize.Body}" Foreground="{DynamicResource AlertGold}"
-                                           VerticalAlignment="Center" TextWrapping="Wrap" Margin="6,0,0,0"/>
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource AlertGold}"
+                                           LineHeight="16" TextWrapping="Wrap" Margin="6,0,0,0"/>
                             </Grid>
                         </Border>
 
                         <Border x:Name="brRecActivity" Background="{DynamicResource SurfaceBg}"
-                                CornerRadius="8" Padding="12,10">
+                                CornerRadius="8" Padding="10,8">
                             <Grid>
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="Auto"/>
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
-                                <md:PackIcon x:Name="icRecActivity" Grid.Column="0" Kind="History" Width="16" Height="16"
+                                <md:PackIcon x:Name="icRecActivity" Grid.Column="0" Kind="History" Width="14" Height="14"
                                              Foreground="{DynamicResource SuccessGreen}"
-                                             VerticalAlignment="Top" Margin="0,2,0,0"/>
+                                             VerticalAlignment="Top" Margin="0,1,0,0"/>
                                 <TextBlock x:Name="txtRecActivity" Grid.Column="1" Text="{loc:Loc Key=Overview_RecScans}"
-                                           FontSize="{DynamicResource FontSize.Body}" Foreground="{DynamicResource TextMedium}"
-                                           VerticalAlignment="Center" TextWrapping="Wrap" Margin="6,0,0,0"/>
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMedium}"
+                                           LineHeight="16" TextWrapping="Wrap" Margin="6,0,0,0"/>
                             </Grid>
                         </Border>
                     </StackPanel>

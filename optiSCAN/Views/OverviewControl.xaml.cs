@@ -140,7 +140,8 @@ namespace optiSCAN.Views
                     {
                         Text = LocalizationService.GetString("Posture_AllGood"),
                         TextWrapping = TextWrapping.Wrap,
-                        FontSize = (double)FindResource("FontSize.Caption"),
+                        FontSize = (double)FindResource("FontSize.Micro"),
+                        LineHeight = 14,
                         Foreground = (Brush)FindResource("TextDark"),
                     });
                     return;
@@ -153,7 +154,8 @@ namespace optiSCAN.Views
                     {
                         Text = "• " + check.Title,
                         TextWrapping = TextWrapping.Wrap,
-                        FontSize = (double)FindResource("FontSize.Caption"),
+                        FontSize = (double)FindResource("FontSize.Micro"),
+                        LineHeight = 14,
                         Foreground = (Brush)FindResource("TextDark"),
                         VerticalAlignment = VerticalAlignment.Center,
                     });
@@ -168,7 +170,8 @@ namespace optiSCAN.Views
                         fix.Click += PostureFix_Click;
                         row.Children.Add(new TextBlock
                         {
-                            Margin = new Thickness(8, 0, 0, 0),
+                            Margin = new Thickness(6, 0, 0, 0),
+                            FontSize = (double)FindResource("FontSize.Micro"),
                             VerticalAlignment = VerticalAlignment.Center,
                             Inlines = { fix },
                         });
@@ -246,26 +249,35 @@ namespace optiSCAN.Views
         {
             if (border == null || text == null) return;
 
+            text.FontSize = (double)text.FindResource("FontSize.Small");
+            text.LineHeight = 16;
+
             // Si lien demandé : utiliser Inlines pour intercaler texte + hyperlien.
             // Sinon : Text simple (efface tout lien précédent).
             text.Inlines.Clear();
             if (showUpdateLink)
             {
+                border.Cursor = System.Windows.Input.Cursors.Hand;
+                border.MouseLeftButtonUp -= RecHygieneSigUpdate_Click;
+                border.MouseLeftButtonUp += RecHygieneSigUpdate_Click;
+
                 text.Inlines.Add(new Run(line + " "));
                 var link = new Hyperlink(new Run(LocalizationService.GetString("Rec_SigStaleAction")))
                 {
                     Foreground = text.TryFindResource("TextAccent") as Brush
                                  ?? text.TryFindResource("AlertGold") as Brush,
                 };
-                link.Click += (_, _) =>
+                link.Click += (_, e) =>
                 {
-                    ServiceContainer.Default.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
-                    ServiceContainer.Default.TriggerSignatureUpdate();
+                    e.Handled = true;
+                    NavigateToSignaturesAndUpdate();
                 };
                 text.Inlines.Add(link);
             }
             else
             {
+                border.Cursor = null;
+                border.MouseLeftButtonUp -= RecHygieneSigUpdate_Click;
                 text.Inlines.Add(new Run(line));
             }
             Brush? bg = null, fg = null, ifg = null;
@@ -383,6 +395,21 @@ namespace optiSCAN.Views
                 System.Windows.Application.Current.Shutdown();
         }
 
+        private static void RecHygieneSigUpdate_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)
+        {
+            NavigateToSignaturesAndUpdate();
+            e.Handled = true;
+        }
+
+        /// <summary>Accueil → Antivirus, onglet Signatures, puis lance la MAJ (progression visible).</summary>
+        private static void NavigateToSignaturesAndUpdate()
+        {
+            var container = ServiceContainer.Default;
+            container.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
+            container.RequestFocusAntivirusSignaturesTab();
+            container.TriggerSignatureUpdate();
+        }
+
         private void ActionCard_Click(object sender, RoutedEventArgs e)
         {
             string? target = null;
@@ -395,9 +422,7 @@ namespace optiSCAN.Views
 
             if (target == OptiscanStrings.ActionIds.Update)
             {
-                container.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
-                container.RequestFocusAntivirusSignaturesTab();
-                container.TriggerSignatureUpdate();
+                NavigateToSignaturesAndUpdate();
             }
             else
             {
