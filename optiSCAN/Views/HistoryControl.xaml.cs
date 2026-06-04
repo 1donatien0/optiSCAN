@@ -1,337 +1,830 @@
 using optiSCAN.Localization;
+
 using optiSCAN.Models;
+
 using optiSCAN.Services;
+
 using optiSCAN.Strings;
-using System.Collections.Generic;
+
+using optiSCAN.ViewModels;
+
 using System.Globalization;
-using System.Linq;
+
 using System.Windows;
+
 using System.Windows.Controls;
+
 using System.Windows.Media;
+
+using System.Windows.Threading;
+
 using Brush = System.Windows.Media.Brush;
+
 using Button = System.Windows.Controls.Button;
 
+using RadioButton = System.Windows.Controls.RadioButton;
+
+
+
 namespace optiSCAN.Views
+
 {
+
     /// <summary>
-    /// Historique unifié (scans + nettoyages) avec filtres chips et traitement des menaces.
+
+    /// Historique unifié (journal d'activité) avec filtres chips et traitement des menaces.
+
     /// </summary>
+
     public partial class HistoryControl : System.Windows.Controls.UserControl
+
     {
+
         private readonly AntivirusActions _actions = ServiceContainer.Default.Actions;
+
         private readonly ScanLogManager _logger = ServiceContainer.Default.Logger;
 
-        private List<ActivityEntry> _allFeed = new();
-        private object? _selectionKey;
+        private bool _syncingFilterChips;
+
+
+
+        public HistoryViewModel VM { get; }
+
+
 
         public HistoryControl()
+
         {
+
+            VM = new HistoryViewModel(ServiceContainer.Default);
+
             InitializeComponent();
-            ShowNoSelectionHint();
+
+            DataContext = VM;
+
+
+
+            VM.PropertyChanged += OnViewModelPropertyChanged;
+
+            Loaded += OnLoaded;
+
+            Unloaded += OnUnloaded;
+
         }
 
-        /// <summary>Alimente la timeline depuis <see cref="ScanLogManager.GetActivityFeed"/>.</summary>
-        public void UpdateActivityHistory(IEnumerable<ActivityEntry> feed)
+
+
+        public void RefreshTimeline()
+
         {
-            Dispatcher.InvokeAsync(() =>
-            {
-                _allFeed = feed.ToList();
-                ApplyFilters();
-            });
+
+            VM.Refresh();
+
+            SyncFilterChips();
+
+            UpdateDetailPanels();
+
         }
 
-        private void Chip_Checked(object sender, RoutedEventArgs e) => ApplyFilters();
-        private void Search_Changed(object sender, TextChangedEventArgs e) => ApplyFilters();
 
-        private void ApplyFilters()
+
+        private void OnLoaded(object sender, RoutedEventArgs e)
+
         {
-            if (dgTimeline == null) return;
 
-            IEnumerable<ActivityEntry> query = _allFeed;
+            ServiceContainer.Default.ScanHistoryViewsRefreshRequested += OnExternalRefreshRequested;
 
-            if (chipThreats?.IsChecked == true)
-                query = query.Where(e => e.Kind == ActivityKind.Scan && e.HasThreats);
-            else if (chipClean?.IsChecked == true)
-                query = query.Where(e => e.Kind == ActivityKind.Scan && !e.HasThreats);
-            else if (chipSweep?.IsChecked == true)
-                query = query.Where(e => e.Kind == ActivityKind.Clean);
+            RefreshTimeline();
 
-            var search = txtSearch?.Text?.Trim();
-            if (!string.IsNullOrEmpty(search))
+        }
+
+
+
+        private void OnUnloaded(object sender, RoutedEventArgs e)
+
+        {
+
+            ServiceContainer.Default.ScanHistoryViewsRefreshRequested -= OnExternalRefreshRequested;
+
+        }
+
+
+
+        private void OnExternalRefreshRequested(object? sender, EventArgs e)
+
+        {
+
+            if (!IsLoaded) return;
+
+            Dispatcher.BeginInvoke(RefreshTimeline, DispatcherPriority.Background);
+
+        }
+
+
+
+        private void OnViewModelPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+
+        {
+
+            switch (e.PropertyName)
+
             {
-                query = query.Where(e =>
-                    (e.TypeDisplay?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
-                    || (e.ResultSummary?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
-                    || (e.ScanSession?.TargetPath?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false)
-                    || (e.CleanSession?.TargetsSummary?.Contains(search, StringComparison.OrdinalIgnoreCase) ?? false));
+
+                case nameof(HistoryViewModel.SelectedEntry):
+
+                case nameof(HistoryViewModel.ShowScanActions):
+
+                case nameof(HistoryViewModel.ShowQuarantineReadOnly):
+
+                case nameof(HistoryViewModel.HasQuarantineSourceScan):
+
+                    UpdateDetailPanels();
+
+                    break;
+
+                case nameof(HistoryViewModel.SelectedFilter):
+
+                    SyncFilterChips();
+
+                    break;
+
             }
 
-            var list = query.ToList();
-            dgTimeline.ItemsSource = list;
+        }
 
-            if (list.Count == 0)
+
+
+        private void SyncFilterChips()
+
+        {
+
+            if (!IsLoaded) return;
+
+
+
+            var tag = VM.SelectedFilter switch
+
             {
-                dgTimeline.SelectedIndex = -1;
-                if (emptyState != null)
-                    emptyState.Visibility = Visibility.Visible;
-                UpdateDetail();
-                return;
+
+                HistoryFilter.Threats => "Threats",
+
+                HistoryFilter.CleanScans => "CleanScans",
+
+                HistoryFilter.Cleans => "Cleans",
+
+                HistoryFilter.Quarantine => "Quarantine",
+
+                _ => "All",
+
+            };
+
+
+
+            _syncingFilterChips = true;
+
+            try
+
+            {
+
+                if (chipAll != null) chipAll.IsChecked = tag == "All";
+
+                if (chipThreats != null) chipThreats.IsChecked = tag == "Threats";
+
+                if (chipClean != null) chipClean.IsChecked = tag == "CleanScans";
+
+                if (chipSweep != null) chipSweep.IsChecked = tag == "Cleans";
+
+                if (chipQuarantine != null) chipQuarantine.IsChecked = tag == "Quarantine";
+
             }
 
-            if (emptyState != null)
-                emptyState.Visibility = Visibility.Collapsed;
+            finally
 
-            var idx = FindSelectionIndex(list);
-            dgTimeline.SelectedIndex = idx >= 0 ? idx : 0;
-            UpdateDetail();
-        }
-
-        private int FindSelectionIndex(IReadOnlyList<ActivityEntry> list)
-        {
-            if (_selectionKey == null) return -1;
-            for (int i = 0; i < list.Count; i++)
             {
-                if (Equals(SelectionKey(list[i]), _selectionKey))
-                    return i;
+
+                _syncingFilterChips = false;
+
             }
-            return -1;
+
         }
 
-        private static object SelectionKey(ActivityEntry entry) =>
-            entry.Kind == ActivityKind.Scan
-                ? (object)(entry.ScanSession?.SessionId ?? Guid.Empty)
-                : entry.StartedAt;
 
-        private void DgTimeline_SelectionChanged(object sender, SelectionChangedEventArgs e)
+
+        private void Chip_Checked(object sender, RoutedEventArgs e)
+
         {
-            _selectionKey = SelectedEntry != null ? SelectionKey(SelectedEntry) : null;
-            UpdateDetail();
+
+            if (_syncingFilterChips || sender is not RadioButton { Tag: string tag } || !IsLoaded) return;
+
+            VM.SelectedFilter = tag switch
+
+            {
+
+                "Threats" => HistoryFilter.Threats,
+
+                "CleanScans" => HistoryFilter.CleanScans,
+
+                "Cleans" => HistoryFilter.Cleans,
+
+                "Quarantine" => HistoryFilter.Quarantine,
+
+                _ => HistoryFilter.All,
+
+            };
+
         }
 
-        private ActivityEntry? SelectedEntry =>
-            dgTimeline?.SelectedItem as ActivityEntry;
 
-        private ScanSession? SelectedScanSession =>
-            SelectedEntry?.ScanSession;
 
-        private void UpdateDetail()
+        private void UpdateDetailPanels()
+
         {
-            var entry = SelectedEntry;
+
+            var entry = VM.SelectedEntry;
+
             if (entry == null)
+
             {
+
                 ShowNoSelectionHint();
+
                 HideDetailPanels();
+
                 return;
+
             }
+
+
 
             if (txtNoSelHint != null)
+
                 txtNoSelHint.Visibility = Visibility.Collapsed;
+
             if (sessionInfoBar != null)
+
                 sessionInfoBar.Visibility = Visibility.Visible;
+
+
 
             ShowEntryInfo(entry);
 
-            if (entry.Kind == ActivityKind.Clean)
+
+
+            if (entry.Kind == ActivityKind.Quarantine)
+
+                ShowQuarantineDetail(entry);
+
+            else if (entry.Kind == ActivityKind.Clean)
+
                 ShowCleanDetail(entry.CleanSession);
+
             else
+
                 ShowScanDetail(entry.ScanSession);
+
         }
+
+
 
         private void ShowNoSelectionHint()
+
         {
+
             if (sessionInfoBar != null)
+
                 sessionInfoBar.Visibility = Visibility.Collapsed;
+
             if (txtNoSelHint != null)
+
                 txtNoSelHint.Visibility = Visibility.Visible;
-            if (scanActionBar != null)
-                scanActionBar.Visibility = Visibility.Collapsed;
+
             HideDetailPanels();
+
         }
+
+
 
         private void HideDetailPanels()
+
         {
+
             if (dgHistoryThreats != null)
+
             {
+
                 dgHistoryThreats.ItemsSource = null;
+
                 dgHistoryThreats.Visibility = Visibility.Collapsed;
+
             }
+
             if (cleanLogPanel != null)
+
                 cleanLogPanel.Visibility = Visibility.Collapsed;
+
+            if (quarantineDetailPanel != null)
+
+                quarantineDetailPanel.Visibility = Visibility.Collapsed;
+
             if (noThreatsState != null)
+
                 noThreatsState.Visibility = Visibility.Collapsed;
+
             if (txtHistThreatsLegacy != null)
+
                 txtHistThreatsLegacy.Visibility = Visibility.Collapsed;
+
         }
+
+
 
         private void ShowEntryInfo(ActivityEntry entry)
+
         {
+
             var cult = CultureInfo.CurrentCulture;
 
+
+
             if (txtSessionDate != null)
+
                 txtSessionDate.Text = entry.StartedAt.ToString("dd/MM/yyyy HH:mm", cult);
 
+
+
             if (txtSessionMeta != null)
+
             {
-                txtSessionMeta.Text = entry.Kind == ActivityKind.Clean
-                    ? (entry.CleanSession?.TargetsSummary ?? string.Empty)
-                    : entry.ScanSession != null
+
+                txtSessionMeta.Text = entry.Kind switch
+
+                {
+
+                    ActivityKind.Clean => entry.CleanSession?.TargetsSummary ?? entry.TargetDisplay,
+
+                    ActivityKind.Quarantine => entry.DetailDisplay,
+
+                    _ => entry.ScanSession != null
+
                         ? LocalizationService.Format("Hist_InfoFiles", entry.ScanSession.FilesScanned.ToString("N0", cult))
-                        : string.Empty;
+
+                        : string.Empty,
+
+                };
+
             }
+
+
 
             if (txtSessionResult != null)
+
             {
+
                 txtSessionResult.Text = entry.ResultSummary;
-                if (entry.HasThreats)
-                {
-                    txtSessionResult.Foreground = TryFindBrush("DangerRed") ?? txtSessionResult.Foreground;
-                    if (resultChip != null)
-                        resultChip.Background = TryFindBrush("RiskMinor") ?? resultChip.Background;
-                }
-                else if (entry.Kind == ActivityKind.Clean)
-                {
-                    txtSessionResult.Foreground = TryFindBrush("TextAccent") ?? txtSessionResult.Foreground;
-                    if (resultChip != null)
-                        resultChip.Background = TryFindBrush("InfoBg") ?? resultChip.Background;
-                }
-                else
-                {
-                    txtSessionResult.Foreground = TryFindBrush("SuccessGreen") ?? txtSessionResult.Foreground;
-                    if (resultChip != null)
-                        resultChip.Background = TryFindBrush("SuccessBg") ?? resultChip.Background;
-                }
+
+                ApplyResultChipStyle(entry);
+
             }
+
         }
+
+
+
+        private void ApplyResultChipStyle(ActivityEntry entry)
+
+        {
+
+            if (txtSessionResult == null) return;
+
+
+
+            if (entry.HasThreats)
+
+            {
+
+                txtSessionResult.Foreground = TryFindBrush("DangerRed") ?? txtSessionResult.Foreground;
+
+                if (resultChip != null)
+
+                    resultChip.Background = TryFindBrush("RiskMinor") ?? resultChip.Background;
+
+            }
+
+            else if (entry.Kind == ActivityKind.Clean)
+
+            {
+
+                txtSessionResult.Foreground = TryFindBrush("TextAccent") ?? txtSessionResult.Foreground;
+
+                if (resultChip != null)
+
+                    resultChip.Background = TryFindBrush("InfoBg") ?? resultChip.Background;
+
+            }
+
+            else if (entry.Kind == ActivityKind.Quarantine)
+
+            {
+
+                txtSessionResult.Foreground = TryFindBrush("WarningOrange") ?? txtSessionResult.Foreground;
+
+                if (resultChip != null)
+
+                    resultChip.Background = TryFindBrush("SurfaceBg") ?? resultChip.Background;
+
+            }
+
+            else
+
+            {
+
+                txtSessionResult.Foreground = TryFindBrush("SuccessGreen") ?? txtSessionResult.Foreground;
+
+                if (resultChip != null)
+
+                    resultChip.Background = TryFindBrush("SuccessBg") ?? resultChip.Background;
+
+            }
+
+        }
+
+
 
         private void ShowScanDetail(ScanSession? session)
+
         {
+
             if (cleanLogPanel != null)
+
                 cleanLogPanel.Visibility = Visibility.Collapsed;
-            if (scanActionBar != null)
-                scanActionBar.Visibility = Visibility.Visible;
+
+            if (quarantineDetailPanel != null)
+
+                quarantineDetailPanel.Visibility = Visibility.Collapsed;
+
+
 
             var hasStoredThreats = session?.Threats.Count > 0;
+
             var sessionSelected = session != null;
+
             var legacyOnly = sessionSelected && session!.ThreatsFound > 0 && session.Threats.Count == 0;
 
+
+
             if (dgHistoryThreats != null)
+
             {
-                dgHistoryThreats.ItemsSource = hasStoredThreats ? session!.Threats : null;
+
+                dgHistoryThreats.ItemsSource = hasStoredThreats
+                    ? VM.BuildThreatRows(session!.Threats)
+                    : null;
+
                 dgHistoryThreats.Visibility = hasStoredThreats ? Visibility.Visible : Visibility.Collapsed;
+
             }
 
+
+
             if (noThreatsState != null)
+
                 noThreatsState.Visibility = (sessionSelected && !hasStoredThreats && !legacyOnly)
+
                     ? Visibility.Visible : Visibility.Collapsed;
 
+
+
             if (txtHistThreatsLegacy != null)
+
                 txtHistThreatsLegacy.Visibility = legacyOnly ? Visibility.Visible : Visibility.Collapsed;
 
-            var canTreat = hasStoredThreats;
-            if (btnTreatInAntivirus != null)
-                btnTreatInAntivirus.IsEnabled = canTreat;
-            if (btnHistQuarantineAll != null)
-                btnHistQuarantineAll.IsEnabled = canTreat;
         }
 
-        private void ShowCleanDetail(CleanSession? session)
+
+
+        private void ShowQuarantineDetail(ActivityEntry entry)
+
         {
-            if (scanActionBar != null)
-                scanActionBar.Visibility = Visibility.Collapsed;
+
             if (dgHistoryThreats != null)
+
                 dgHistoryThreats.Visibility = Visibility.Collapsed;
+
+            if (cleanLogPanel != null)
+
+                cleanLogPanel.Visibility = Visibility.Collapsed;
+
             if (noThreatsState != null)
+
                 noThreatsState.Visibility = Visibility.Collapsed;
+
             if (txtHistThreatsLegacy != null)
+
                 txtHistThreatsLegacy.Visibility = Visibility.Collapsed;
 
-            if (cleanLogPanel == null || txtCleanLog == null)
+
+
+            if (quarantineDetailPanel == null)
+
                 return;
 
-            cleanLogPanel.Visibility = Visibility.Visible;
-            if (session == null)
+
+
+            quarantineDetailPanel.Visibility = Visibility.Visible;
+
+            var q = entry.QuarantineEntry;
+
+
+
+            if (txtQuarTitle != null)
+
+                txtQuarTitle.Text = q?.FileName ?? entry.TypeDisplay;
+
+            if (txtQuarPath != null)
+
+                txtQuarPath.Text = q != null
+
+                    ? LocalizationService.Format("Hist_DetailQuarantinePath", q.OriginalPath)
+
+                    : entry.TargetDisplay;
+
+            if (txtQuarMeta != null && q != null)
+
+                txtQuarMeta.Text = LocalizationService.Format("Hist_DetailQuarantineMeta", q.VirusName, q.SizeDisplay);
+
+            if (txtQuarStatus != null)
+
             {
-                txtCleanLog.Text = LocalizationService.GetString("Hist_DetailSelectClean");
-                return;
+
+                txtQuarStatus.Text = entry.IsStillQuarantined
+
+                    ? LocalizationService.GetString("Hist_QuarantineStillActive")
+
+                    : LocalizationService.GetString("Hist_QuarantineHistorical");
+
             }
 
-            txtCleanLog.Text = !string.IsNullOrWhiteSpace(session.OperationLog)
-                ? session.OperationLog
-                : LocalizationService.Format(
-                    "Hist_DetailCleanSummary",
-                    session.TargetsSummary ?? string.Empty,
-                    session.BytesDisplay ?? string.Empty,
-                    session.DurationDisplay ?? string.Empty);
+            if (btnManageInAv != null)
+
+                btnManageInAv.IsEnabled = entry.IsStillQuarantined;
+
         }
+
+
+
+        private void ShowCleanDetail(CleanSession? session)
+
+        {
+
+            if (dgHistoryThreats != null)
+
+                dgHistoryThreats.Visibility = Visibility.Collapsed;
+
+            if (quarantineDetailPanel != null)
+
+                quarantineDetailPanel.Visibility = Visibility.Collapsed;
+
+            if (noThreatsState != null)
+
+                noThreatsState.Visibility = Visibility.Collapsed;
+
+            if (txtHistThreatsLegacy != null)
+
+                txtHistThreatsLegacy.Visibility = Visibility.Collapsed;
+
+
+
+            if (cleanLogPanel == null || txtCleanLog == null)
+
+                return;
+
+
+
+            cleanLogPanel.Visibility = Visibility.Visible;
+
+            if (session == null)
+
+            {
+
+                txtCleanLog.Text = LocalizationService.GetString("Hist_DetailSelectClean");
+
+                return;
+
+            }
+
+
+
+            txtCleanLog.Text = !string.IsNullOrWhiteSpace(session.OperationLog)
+
+                ? session.OperationLog
+
+                : LocalizationService.Format(
+
+                    "Hist_DetailCleanSummary",
+
+                    session.TargetsSummary ?? string.Empty,
+
+                    session.BytesDisplay ?? string.Empty,
+
+                    session.DurationDisplay ?? string.Empty);
+
+        }
+
+
 
         private static string? FilePathFromSender(object sender) =>
+
             sender is Button { Tag: string path } && !string.IsNullOrEmpty(path) ? path : null;
 
+
+
         private Brush? TryFindBrush(string key)
+
         {
+
             try { return TryFindResource(key) as Brush; }
+
             catch { return null; }
+
         }
 
+
+
+        private ScanSession? SelectedScanSession => VM.SelectedEntry?.ScanSession;
+
+
+
         private void BtnTreatInAntivirus_Click(object sender, RoutedEventArgs e)
+
         {
+
             if (SelectedScanSession is not { Threats.Count: > 0 } session) return;
+
             ServiceContainer.Default.RequestReviewHistorySession(session);
+
         }
+
+
 
         private void BtnHistQuarantineAll_Click(object sender, RoutedEventArgs e)
         {
             if (SelectedScanSession is not ScanSession session || session.Threats.Count == 0) return;
-            int count = ServiceContainer.Default.Quarantine.QuarantineAll(session.Threats);
-            if (count > 0)
+
+            int count = 0;
+            foreach (var t in session.Threats.ToList())
             {
-                foreach (var t in session.Threats.ToList())
+                if (!VM.IsThreatFileAccessible(t.FilePath))
+                    continue;
+                if (ServiceContainer.Default.Quarantine.Quarantine(t, session.SessionId))
+                {
+                    count++;
                     _logger.TryRemoveThreatFromSession(session.SessionId, t.FilePath);
-                ApplyFilters();
+                }
             }
+
+            if (count > 0)
+                RefreshTimeline();
         }
+
+
 
         private void BtnHistQuarantine_Click(object sender, RoutedEventArgs e)
         {
             if (FilePathFromSender(sender) is not string filePath ||
                 SelectedScanSession is not ScanSession session) return;
-            if (_actions.QuarantineThreat(filePath).Success)
+
+            if (VM.IsFileStillQuarantined(filePath))
             {
                 _logger.TryRemoveThreatFromSession(session.SessionId, filePath);
-                ApplyFilters();
+                RefreshTimeline();
+                return;
+            }
+
+            if (_actions.QuarantineThreat(filePath, session.SessionId).Success)
+            {
+                _logger.TryRemoveThreatFromSession(session.SessionId, filePath);
+                RefreshTimeline();
             }
         }
+
+        private void BtnHistDismiss_Click(object sender, RoutedEventArgs e)
+        {
+            if (FilePathFromSender(sender) is not string filePath ||
+                SelectedScanSession is not ScanSession session) return;
+            _logger.TryRemoveThreatFromSession(session.SessionId, filePath);
+            RefreshTimeline();
+        }
+
+
 
         private void BtnHistIgnore_Click(object sender, RoutedEventArgs e)
+
         {
+
             if (FilePathFromSender(sender) is not string filePath ||
+
                 SelectedScanSession is not ScanSession session) return;
+
             _actions.IgnoreThreat(filePath);
+
             _logger.TryRemoveThreatFromSession(session.SessionId, filePath);
-            ApplyFilters();
+
+            RefreshTimeline();
+
         }
+
+
 
         private void BtnHistDelete_Click(object sender, RoutedEventArgs e)
+
         {
+
             if (FilePathFromSender(sender) is not string filePath ||
+
                 SelectedScanSession is not ScanSession session) return;
+
             if (_actions.DeleteThreatFile(filePath).Success)
+
             {
+
                 _logger.TryRemoveThreatFromSession(session.SessionId, filePath);
-                ApplyFilters();
+
+                RefreshTimeline();
+
             }
+
         }
+
+
+
+        private void BtnViewInQuarantine_Click(object sender, RoutedEventArgs e)
+
+        {
+
+            if (FilePathFromSender(sender) is not string filePath) return;
+
+            if (!VM.IsFileStillQuarantined(filePath)) return;
+
+            OpenAntivirusQuarantineTab();
+
+        }
+
+
+
+        private void BtnViewSourceScan_Click(object sender, RoutedEventArgs e)
+
+        {
+
+            var sessionId = VM.SelectedEntry?.QuarantineEntry?.SourceSessionId;
+
+            if (sessionId is not { } id || id == Guid.Empty) return;
+
+            if (!VM.TrySelectScanSession(id)) return;
+
+            SyncFilterChips();
+
+            UpdateDetailPanels();
+
+        }
+
+
+
+        private void BtnManageInAv_Click(object sender, RoutedEventArgs e) =>
+
+            OpenAntivirusQuarantineTab();
+
+
+
+        private static void OpenAntivirusQuarantineTab() =>
+
+            ServiceContainer.Default.RequestOpenQuarantineTab();
+
+
 
         private void BtnOpenAntivirus_Click(object sender, RoutedEventArgs e) =>
+
             ServiceContainer.Default.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
 
+
+
         private void BtnExportHtml_Click(object sender, RoutedEventArgs e) =>
+
             ServiceContainer.Default.RequestExportScanHistoryHtml();
 
+
+
         private void BtnExportSelectedPdf_Click(object sender, RoutedEventArgs e)
+
         {
+
             if (SelectedScanSession is ScanSession session)
+
                 ServiceContainer.Default.RequestExportScanSessionPdf(session);
+
         }
+
     }
+
 }
+
+

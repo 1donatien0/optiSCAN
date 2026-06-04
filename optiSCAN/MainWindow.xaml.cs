@@ -133,8 +133,10 @@ namespace optiSCAN
                 c.ExportScanHistoryHtmlRequested += SurDemandeExportHistoriqueHtml;
                 c.ExportScanSessionPdfRequested += SurDemandeExportSessionScanPdf;
                 c.ReviewHistorySessionRequested += SurDemandeRevueSessionHistorique;
+                c.OpenQuarantineTabRequested += SurDemandeOngletQuarantaine;
                 c.RealTimeProtection.ThreatDetected += SurMenaceTempsReelDetectee;
                 c.RemovableDriveScan.ThreatDetected += SurMenaceTempsReelDetectee;
+                c.RemovableDriveScan.ScanStatusChanged += SurStatutAnalyseUsb;
                 c.Notifications.ToastActivated -= SurActivationToast;
                 c.Notifications.ToastActivated += SurActivationToast;
                 c.Notifications.SyncFromUserPreferences();
@@ -237,6 +239,7 @@ namespace optiSCAN
 
                 SetStatus(OptiscanStrings.UiMessages.ProtectionActive);
                 OnboardingService.ShowIfNeeded(this);
+                _ = WarmUpYaraRulesAsync();
             }
             catch (Exception ex)
             {
@@ -244,6 +247,22 @@ namespace optiSCAN
                 SetStatus(LocalizationService.Format("Status_Error", ex.Message), isError: true);
             }
             await Task.CompletedTask;
+        }
+
+        /// <summary>Compile les règles YARA en arrière-plan pour éviter le blocage au premier scan.</summary>
+        private static async Task WarmUpYaraRulesAsync()
+        {
+            try
+            {
+                var yara = ServiceContainer.Default.Yara;
+                if (!yara.IsAvailable || yara.HasCompiled)
+                    return;
+                await yara.CompileRulesAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("MainWindow", "WarmUpYaraRulesAsync", ex);
+            }
         }
 
         /// <summary>
@@ -354,6 +373,14 @@ namespace optiSCAN
                 av.SelectScanTab();
         }
 
+        private void SurDemandeOngletQuarantaine(object? sender, EventArgs e)
+        {
+            _navigationService.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
+            ViewModel?.LoadQuarantine(reset: true);
+            RefreshQuarantineList();
+            (panelAntivirus as Views.AntivirusView)?.SelectQuarantineTab();
+        }
+
         private void UnhookServiceContainerEvents()
         {
             var c = ServiceContainer.Default;
@@ -362,9 +389,11 @@ namespace optiSCAN
             c.ExportScanHistoryHtmlRequested -= SurDemandeExportHistoriqueHtml;
             c.ExportScanSessionPdfRequested -= SurDemandeExportSessionScanPdf;
             c.ReviewHistorySessionRequested -= SurDemandeRevueSessionHistorique;
+            c.OpenQuarantineTabRequested -= SurDemandeOngletQuarantaine;
             c.FocusAntivirusSignaturesRequested -= SurDemandeFocusSignaturesAntivirus;
             c.RealTimeProtection.ThreatDetected -= SurMenaceTempsReelDetectee;
             c.RemovableDriveScan.ThreatDetected -= SurMenaceTempsReelDetectee;
+            c.RemovableDriveScan.ScanStatusChanged -= SurStatutAnalyseUsb;
             c.Notifications.ToastActivated -= SurActivationToast;
             c.Actions.ActionCompleted -= SurActionAntivirusTerminee;
         }
@@ -472,8 +501,7 @@ namespace optiSCAN
         private void RefreshHistory()
         {
             var sessions = _logManager?.GetHistory() ?? Array.Empty<ScanSession>();
-            var feed = _logManager?.GetActivityFeed() ?? Array.Empty<Models.ActivityEntry>();
-            (panelHistory as Views.HistoryControl)?.UpdateActivityHistory(feed);
+            (panelHistory as Views.HistoryControl)?.RefreshTimeline();
             ApplyLastScanSummary(sessions);
             (panelOverview as Views.OverviewControl)?.UpdateProtectionStatistics(sessions);
             RefreshOverviewProtectionAndRecommendations();
@@ -499,6 +527,33 @@ namespace optiSCAN
             }), DispatcherPriority.Background);
         }
 
+        private void SurStatutAnalyseUsb(object? sender, RemovableDriveScanStatusEventArgs e)
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                if (e.Phase == RemovableDriveScanPhase.Started)
+                {
+                    SetStatus(
+                        LocalizationService.Format("Status_UsbScanStarting", e.DriveLabel),
+                        iconKindName: UiIconKinds.Refresh);
+                    return;
+                }
+
+                if (e.Phase == RemovableDriveScanPhase.Failed)
+                {
+                    SetStatus(
+                        LocalizationService.Format("Status_UsbScanFailed", e.DriveLabel),
+                        isError: true);
+                    return;
+                }
+
+                SetStatus(
+                    LocalizationService.Format("Status_UsbScanComplete", e.DriveLabel, e.FilesScanned, e.ThreatsFound),
+                    isWarning: e.ThreatsFound > 0,
+                    iconKindName: e.ThreatsFound > 0 ? null : UiIconKinds.Success);
+            }, DispatcherPriority.Background);
+        }
+
         private void SurActionAntivirusTerminee(object? sender, ActionResult result)
         {
             Dispatcher.BeginInvoke(() =>
@@ -507,6 +562,7 @@ namespace optiSCAN
                 if (result.Success)
                 {
                     RefreshQuarantineList();
+                    RefreshHistory();
                     (panelAntivirus as Views.AntivirusView)?.RefreshAllData();
                 }
             }, DispatcherPriority.Normal);

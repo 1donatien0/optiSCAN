@@ -146,6 +146,15 @@
   <data name="Notif_ScanOkBody" xml:space="preserve"><value>{0:N0} fichiers analysés, aucune menace</value></data>
   <data name="Notif_ScanThreatsTitle" xml:space="preserve"><value>Scan terminé — {0} menace(s)</value></data>
   <data name="Notif_ScanThreatsBody" xml:space="preserve"><value>Consultez l'historique pour plus de détails</value></data>
+  <data name="Notif_UsbScanStartedTitle" xml:space="preserve"><value>Analyse USB en cours</value></data>
+  <data name="Notif_UsbScanStartedBody" xml:space="preserve"><value>Analyse du lecteur {0}…</value></data>
+  <data name="Notif_UsbScanOkTitle" xml:space="preserve"><value>Analyse USB terminée — {0}</value></data>
+  <data name="Notif_UsbScanOkBody" xml:space="preserve"><value>{1:N0} fichiers analysés, aucune menace</value></data>
+  <data name="Notif_UsbScanThreatsTitle" xml:space="preserve"><value>Analyse USB — {1} menace(s) sur {0}</value></data>
+  <data name="Notif_UsbScanThreatsBody" xml:space="preserve"><value>{2:N0} fichiers analysés — consultez l'historique</value></data>
+  <data name="Status_UsbScanStarting" xml:space="preserve"><value>Analyse USB de {0} en cours…</value></data>
+  <data name="Status_UsbScanComplete" xml:space="preserve"><value>Analyse USB de {0} terminée — {1:N0} fichier(s), {2} menace(s)</value></data>
+  <data name="Status_UsbScanFailed" xml:space="preserve"><value>Analyse USB de {0} interrompue ou échouée</value></data>
   <data name="Notif_HistoryBtn" xml:space="preserve"><value>Ouvrir l'historique</value></data>
   <data name="Notif_RtpStartedTitle" xml:space="preserve"><value>Protection temps réel activée</value></data>
   <data name="Notif_RtpStartedBody" xml:space="preserve"><value>optiSCAN surveille les fichiers en arrière-plan</value></data>
@@ -299,7 +308,7 @@
   <data name="Clean_EmptyTitle" xml:space="preserve"><value>Rien à libérer</value></data>
   <data name="Clean_EmptySub" xml:space="preserve"><value>Aucun fichier récupérable détecté lors de l'analyse.</value></data>
   <data name="Hist_Title" xml:space="preserve"><value>Historique</value></data>
-  <data name="Hist_Sub" xml:space="preserve"><value>Consultez vos analyses, traitez les menaces détectées et exportez vos rapports.</value></data>
+  <data name="Hist_Sub" xml:space="preserve"><value>Journal de vos analyses, nettoyages et actions de sécurité.</value></data>
   <data name="Hist_ExportHtml" xml:space="preserve"><value>Exporter HTML</value></data>
   <data name="Hist_ExportPdf" xml:space="preserve"><value>Exporter PDF (sélection)</value></data>
   <data name="Hist_OpenAv" xml:space="preserve"><value>Ouvrir l'antivirus</value></data>
@@ -338,7 +347,7 @@
   <data name="Opt_RemovableScan" xml:space="preserve"><value>Analyser les clés USB et cartes SD</value></data>
   <data name="Opt_RemovableScanSub" xml:space="preserve"><value>Lance une analyse automatique à l'insertion (lecteurs de moins de 64 Go par défaut).</value></data>
   <data name="Opt_RemovableDetailed" xml:space="preserve"><value>Analyse USB complète</value></data>
-  <data name="Opt_RemovableDetailedSub" xml:space="preserve"><value>Tous les fichiers du lecteur (plus long). Sinon : tous les fichiers (jusqu'à 4 000), analyse fichier par fichier.</value></data>
+  <data name="Opt_RemovableDetailedSub" xml:space="preserve"><value>Tous les fichiers du lecteur (plus long). Sinon : extensions à risque uniquement (exe, scripts, macros…), jusqu'à 4 000 fichiers.</value></data>
   <data name="Opt_IncludeRemovableFull" xml:space="preserve"><value>Inclure les lecteurs amovibles dans l'analyse complète</value></data>
   <data name="Opt_IncludeRemovableFullSub" xml:space="preserve"><value>Ajoute les volumes USB/SD à l'analyse complète manuelle ou planifiée.</value></data>
   <data name="Opt_AutoQuarantine" xml:space="preserve"><value>Quarantaine automatique</value></data>
@@ -418,7 +427,7 @@
   <data name="Hist_ColType" xml:space="preserve"><value>Type</value></data>
   <data name="Hist_ColTarget" xml:space="preserve"><value>Cible</value></data>
   <data name="Hist_ColFiles" xml:space="preserve"><value>Fichiers</value></data>
-  <data name="Hist_ColDuration" xml:space="preserve"><value>Durée</value></data>
+  <data name="Hist_ColDuration" xml:space="preserve"><value>Détail</value></data>
   <data name="Hist_ColResult" xml:space="preserve"><value>Résultat</value></data>
   <data name="Hist_ColTargets" xml:space="preserve"><value>Cibles</value></data>
   <data name="Hist_ColFreed" xml:space="preserve"><value>Libéré</value></data>
@@ -437,7 +446,30 @@
   <data name="Hist_ChipThreats" xml:space="preserve"><value>Menaces</value></data>
   <data name="Hist_ChipClean" xml:space="preserve"><value>Analyses propres</value></data>
   <data name="Hist_ChipSweep" xml:space="preserve"><value>Nettoyages</value></data>
-  <data name="Hist_SearchScan" xml:space="preserve"><value>Rechercher (cible ou type)…</value></data>
+  <data name="Hist_ChipQuarantine" xml:space="preserve"><value>Quarantaine</value></data>
+  <data name="Hist_InfoQuarantined" xml:space="preserve"><value>{0} — {1}</value></data>
+  <data name="Hist_InfoRestored" xml:space="preserve"><value>Restauré — {0}</value></data>
+  <data name="Hist_InfoQuarantineDeleted" xml:space="preserve"><value>Supprimé — {0}</value></data>
+  <data name="Hist_EmptyQuarantine" xml:space="preserve"><value>Aucun fichier en quarantaine</value></data>
+  <data name="Hist_EmptyQuarantineSub" xml:space="preserve"><value>Les fichiers mis en quarantaine apparaîtront ici.</value></data>
+  <data name="Hist_DetailQuarantinePath" xml:space="preserve"><value>Chemin d'origine : {0}</value></data>
+  <data name="Hist_DetailQuarantineMeta" xml:space="preserve"><value>Menace : {0} — Taille : {1}</value></data>
+  <data name="Hist_EventRestored" xml:space="preserve"><value>Restauration</value></data>
+  <data name="Hist_EventQuarantineDeleted" xml:space="preserve"><value>Suppression quarantaine</value></data>
+  <data name="Hist_EmptyAll" xml:space="preserve"><value>Aucune activité enregistrée</value></data>
+  <data name="Hist_EmptyAllSub" xml:space="preserve"><value>Scans, nettoyages et actions de sécurité apparaîtront ici.</value></data>
+  <data name="Hist_EmptyThreats" xml:space="preserve"><value>Aucune menace en attente</value></data>
+  <data name="Hist_EmptyThreatsSub" xml:space="preserve"><value>Les analyses avec menaces non traitées s'afficheront ici.</value></data>
+  <data name="Hist_EmptyCleanScans" xml:space="preserve"><value>Aucune analyse propre</value></data>
+  <data name="Hist_EmptyCleanScansSub" xml:space="preserve"><value>Les analyses sans menace détectée apparaîtront ici.</value></data>
+  <data name="Hist_ManageInAv" xml:space="preserve"><value>Gérer dans Antivirus</value></data>
+  <data name="Hist_TooltipManageInAv" xml:space="preserve"><value>Ouvre l'onglet Quarantaine de l'Antivirus pour restaurer ou supprimer.</value></data>
+  <data name="Hist_ViewInQuarantine" xml:space="preserve"><value>Voir en quarantaine</value></data>
+  <data name="Hist_ViewSourceScan" xml:space="preserve"><value>Voir l'analyse source</value></data>
+  <data name="Hist_TooltipViewSourceScan" xml:space="preserve"><value>Affiche l'analyse antivirus qui a conduit à cette quarantaine.</value></data>
+  <data name="Hist_QuarantineStillActive" xml:space="preserve"><value>Fichier encore en quarantaine</value></data>
+  <data name="Hist_QuarantineHistorical" xml:space="preserve"><value>Action enregistrée (fichier plus en quarantaine)</value></data>
+  <data name="Hist_SearchScan" xml:space="preserve"><value>Rechercher (cible, type, menace)…</value></data>
   <data name="Hist_SearchClean" xml:space="preserve"><value>Rechercher (cibles)…</value></data>
   <data name="Hist_DetailSelectClean" xml:space="preserve"><value>Sélectionnez un nettoyage pour afficher le journal d'opérations.</value></data>
   <data name="Hist_DetailThreatsLegacy" xml:space="preserve"><value>(Session enregistrée sous v7 : chemins des menaces non conservés. Les analyses v8 enregistrent le détail.)</value></data>
@@ -452,6 +484,8 @@
   <data name="Hist_InfoThreats" xml:space="preserve"><value>{0} menace(s)</value></data>
   <data name="Hist_InfoClean" xml:space="preserve"><value>Aucune menace</value></data>
   <data name="Hist_TooltipQuarantineAll" xml:space="preserve"><value>Met en quarantaine toutes les menaces listées pour cette session.</value></data>
+  <data name="Hist_DismissThreat" xml:space="preserve"><value>Retirer</value></data>
+  <data name="Hist_TooltipDismiss" xml:space="preserve"><value>Retire cette menace de l'historique (fichier absent ou lecteur débranché).</value></data>
   <data name="Hist_DetailCleanSummary" xml:space="preserve"><value>Cibles : {0}&#x0a;Libéré : {1} — Durée : {2}&#x0a;&#x0a;(Session antérieure : journal d'opérations non enregistré.)</value></data>
   <data name="Hist_ExportPdfSelect" xml:space="preserve"><value>Sélectionnez une ligne dans l'onglet « Scan Antivirus », puis cliquez sur Exporter PDF (sélection).</value></data>
   <data name="Hist_ExportPdfTitle" xml:space="preserve"><value>Export PDF</value></data>
@@ -575,6 +609,8 @@
   <data name="Scan_FullPartialWithoutAdmin" xml:space="preserve"><value>Analyse complète — couverture partielle sans droits administrateur (voir bandeau Accueil).</value></data>
   <data name="SigUpd_VerifyingRules" xml:space="preserve"><value>Vérification des règles de détection…</value></data>
   <data name="Av_Action_FileNotFound" xml:space="preserve"><value>Fichier introuvable : {0}</value></data>
+  <data name="Av_Action_DriveUnavailable" xml:space="preserve"><value>Lecteur inaccessible ({0}) — rebranchez-le pour mettre en quarantaine, ou retirez la menace de l'historique.</value></data>
+  <data name="Av_Action_AlreadyQuarantined" xml:space="preserve"><value>Déjà en quarantaine : {0}</value></data>
   <data name="Av_Action_DetectedDefault" xml:space="preserve"><value>Détecté</value></data>
   <data name="Av_Action_QuarantineOk" xml:space="preserve"><value>Fichier mis en quarantaine : {0}</value></data>
   <data name="Av_Action_QuarantineFail" xml:space="preserve"><value>Échec quarantaine : {0}</value></data>

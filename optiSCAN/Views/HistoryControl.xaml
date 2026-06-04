@@ -7,6 +7,9 @@
              xmlns:services="clr-namespace:optiSCAN.Services">
 
     <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis"/>
+        <c:InverseBooleanToVisibilityConverter x:Key="InverseBoolToVis"/>
+        <c:QuarantinePathVisibilityConverter x:Key="QuarantinePathVis"/>
         <c:ThreatRiskLevelConverter x:Key="ThreatRiskLevel"/>
         <c:ThreatRiskSeverityConverter x:Key="ThreatRiskSeverity"/>
         <c:ThreatRiskIconConverter x:Key="ThreatRiskIcon"/>
@@ -38,6 +41,7 @@
                             AutomationProperties.Name="{loc:Loc Key=Hist_ExportHtml}"/>
                     <Button Content="{loc:Loc Key=Hist_ExportPdf}"
                             Click="BtnExportSelectedPdf_Click" Style="{StaticResource ExportButton}"
+                            IsEnabled="{Binding CanExportPdf}"
                             Margin="0,0,8,0" ToolTip="{loc:Loc Key=Hist_TooltipExportPdf}"
                             AutomationProperties.Name="{loc:Loc Key=Hist_ExportPdf}"/>
                     <Button Click="BtnOpenAntivirus_Click" Style="{StaticResource ExportButton}"
@@ -79,38 +83,45 @@
                         <!-- Chips filtre -->
                         <StackPanel Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center">
                             <RadioButton x:Name="chipAll"
-                                         Content="{loc:Loc Key=Hist_ChipAll}"
+                                         Content="{Binding ChipAllLabel}"
                                          GroupName="HistFilter" IsChecked="True"
                                          Style="{StaticResource DonabyChipRadio}"
-                                         Checked="Chip_Checked" Margin="0,0,6,0"/>
+                                         Checked="Chip_Checked" Tag="All" Margin="0,0,6,0"/>
                             <RadioButton x:Name="chipThreats"
-                                         Content="{loc:Loc Key=Hist_ChipThreats}"
+                                         Content="{Binding ChipThreatsLabel}"
                                          GroupName="HistFilter"
                                          Style="{StaticResource DonabyChipRadio}"
-                                         Checked="Chip_Checked" Margin="0,0,6,0"/>
+                                         Checked="Chip_Checked" Tag="Threats" Margin="0,0,6,0"/>
                             <RadioButton x:Name="chipClean"
-                                         Content="{loc:Loc Key=Hist_ChipClean}"
+                                         Content="{Binding ChipCleanScansLabel}"
                                          GroupName="HistFilter"
                                          Style="{StaticResource DonabyChipRadio}"
-                                         Checked="Chip_Checked" Margin="0,0,6,0"/>
+                                         Checked="Chip_Checked" Tag="CleanScans" Margin="0,0,6,0"/>
                             <RadioButton x:Name="chipSweep"
-                                         Content="{loc:Loc Key=Hist_ChipSweep}"
+                                         Content="{Binding ChipCleansLabel}"
                                          GroupName="HistFilter"
                                          Style="{StaticResource DonabyChipRadio}"
-                                         Checked="Chip_Checked"/>
+                                         Checked="Chip_Checked" Tag="Cleans" Margin="0,0,6,0"/>
+                            <RadioButton x:Name="chipQuarantine"
+                                         Content="{Binding ChipQuarantineLabel}"
+                                         GroupName="HistFilter"
+                                         Style="{StaticResource DonabyChipRadio}"
+                                         Checked="Chip_Checked" Tag="Quarantine"/>
                         </StackPanel>
 
                         <!-- Recherche -->
                         <TextBox Grid.Column="1" x:Name="txtSearch"
-                                 Width="200" Height="32" VerticalAlignment="Center"
+                                 Width="220" Height="32" VerticalAlignment="Center"
                                  md:HintAssist.Hint="{loc:Loc Key=Hist_SearchScan}"
                                  md:HintAssist.Foreground="{DynamicResource TextMuted}"
-                                 TextChanged="Search_Changed"/>
+                                 Text="{Binding SearchText, UpdateSourceTrigger=PropertyChanged}"/>
                     </Grid>
 
                     <!-- DataGrid timeline unifiee -->
                     <Grid Grid.Row="1">
                         <DataGrid x:Name="dgTimeline"
+                                  ItemsSource="{Binding FilteredEntries}"
+                                  SelectedItem="{Binding SelectedEntry, Mode=TwoWay}"
                                   AutoGenerateColumns="False" IsReadOnly="True"
                                   CanUserAddRows="False"
                                   GridLinesVisibility="Horizontal"
@@ -119,8 +130,17 @@
                                   ColumnHeaderStyle="{DynamicResource DgHeader}"
                                   RowStyle="{DynamicResource DgRow}"
                                   AlternationCount="2"
-                                  VirtualizingPanel.IsVirtualizing="True"
-                                  SelectionChanged="DgTimeline_SelectionChanged">
+                                  VirtualizingPanel.IsVirtualizing="True">
+                            <DataGrid.Style>
+                                <Style TargetType="DataGrid">
+                                    <Setter Property="Visibility" Value="Visible"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsEmpty}" Value="True">
+                                            <Setter Property="Visibility" Value="Collapsed"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </DataGrid.Style>
                             <DataGrid.Columns>
                                 <!-- Icone type -->
                                 <DataGridTemplateColumn Width="36" CanUserResize="False" CanUserSort="False">
@@ -140,6 +160,9 @@
                                                             <DataTrigger Binding="{Binding Kind}" Value="Clean">
                                                                 <Setter Property="Foreground" Value="{DynamicResource TextAccent}"/>
                                                             </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Kind}" Value="Quarantine">
+                                                                <Setter Property="Foreground" Value="{DynamicResource WarningOrange}"/>
+                                                            </DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
                                                 </md:PackIcon.Style>
@@ -151,12 +174,20 @@
                                 <DataGridTextColumn Header="{loc:Loc Key=Hist_ColDate}"
                                                     Binding="{Binding DateDisplay}" Width="140"/>
                                 <DataGridTextColumn Header="{loc:Loc Key=Hist_ColType}"
-                                                    Binding="{Binding TypeDisplay}" Width="130"/>
+                                                    Binding="{Binding TypeDisplay}" Width="120"/>
+                                <DataGridTextColumn Header="{loc:Loc Key=Hist_ColTarget}"
+                                                    Binding="{Binding TargetDisplay}" Width="*">
+                                    <DataGridTextColumn.ElementStyle>
+                                        <Style TargetType="TextBlock" BasedOn="{StaticResource DgCellTextEllipsis}">
+                                            <Setter Property="ToolTip" Value="{Binding TargetDisplay}"/>
+                                        </Style>
+                                    </DataGridTextColumn.ElementStyle>
+                                </DataGridTextColumn>
                                 <DataGridTextColumn Header="{loc:Loc Key=Hist_ColDuration}"
-                                                    Binding="{Binding DurationDisplay}" Width="100"/>
+                                                    Binding="{Binding DetailDisplay}" Width="100"/>
 
                                 <!-- Resultat avec couleur -->
-                                <DataGridTemplateColumn Header="{loc:Loc Key=Hist_ColResult}" Width="*">
+                                <DataGridTemplateColumn Header="{loc:Loc Key=Hist_ColResult}" Width="180">
                                     <DataGridTemplateColumn.CellTemplate>
                                         <DataTemplate>
                                             <Border CornerRadius="4" Padding="6,2" Margin="2,1"
@@ -170,6 +201,9 @@
                                                             </DataTrigger>
                                                             <DataTrigger Binding="{Binding Kind}" Value="Clean">
                                                                 <Setter Property="Background" Value="{DynamicResource InfoBg}"/>
+                                                            </DataTrigger>
+                                                            <DataTrigger Binding="{Binding Kind}" Value="Quarantine">
+                                                                <Setter Property="Background" Value="{DynamicResource SurfaceBg}"/>
                                                             </DataTrigger>
                                                         </Style.Triggers>
                                                     </Style>
@@ -187,6 +221,9 @@
                                                                 <DataTrigger Binding="{Binding Kind}" Value="Clean">
                                                                     <Setter Property="Foreground" Value="{DynamicResource TextAccent}"/>
                                                                 </DataTrigger>
+                                                                <DataTrigger Binding="{Binding Kind}" Value="Quarantine">
+                                                                    <Setter Property="Foreground" Value="{DynamicResource WarningOrange}"/>
+                                                                </DataTrigger>
                                                             </Style.Triggers>
                                                         </Style>
                                                     </TextBlock.Style>
@@ -199,16 +236,25 @@
                         </DataGrid>
 
                         <!-- Etat vide -->
-                        <StackPanel x:Name="emptyState" Visibility="Collapsed"
-                                    Style="{StaticResource EmptyStatePlaceholder}">
+                        <StackPanel x:Name="emptyState">
+                            <StackPanel.Style>
+                                <Style TargetType="StackPanel" BasedOn="{StaticResource EmptyStatePlaceholder}">
+                                    <Setter Property="Visibility" Value="Collapsed"/>
+                                    <Style.Triggers>
+                                        <DataTrigger Binding="{Binding IsEmpty}" Value="True">
+                                            <Setter Property="Visibility" Value="Visible"/>
+                                        </DataTrigger>
+                                    </Style.Triggers>
+                                </Style>
+                            </StackPanel.Style>
                             <md:PackIcon Kind="History" Width="48" Height="48"
                                          Foreground="{DynamicResource TextMuted}"
                                          HorizontalAlignment="Center"/>
-                            <TextBlock Text="{loc:Loc Key=Hist_EmptyScans}"
+                            <TextBlock Text="{Binding EmptyTitle}"
                                        FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
                                        Foreground="{DynamicResource TextMedium}"
                                        HorizontalAlignment="Center" Margin="0,10,0,4"/>
-                            <TextBlock Text="{loc:Loc Key=Hist_EmptyScansSub}"
+                            <TextBlock Text="{Binding EmptySubtitle}"
                                        FontSize="{DynamicResource FontSize.Body}"
                                        Foreground="{DynamicResource TextMuted}"
                                        HorizontalAlignment="Center"/>
@@ -271,11 +317,13 @@
 
                         <!-- Actions (scan seulement) -->
                         <StackPanel Grid.Column="1" x:Name="scanActionBar"
-                                    Orientation="Horizontal" Visibility="Collapsed">
+                                    Orientation="Horizontal"
+                                    Visibility="{Binding ShowScanActions, Converter={StaticResource BoolToVis}}">
                             <Button x:Name="btnTreatInAntivirus"
                                     Click="BtnTreatInAntivirus_Click"
                                     Style="{StaticResource PrimaryButton}"
-                                    Padding="10,5" Margin="0,0,8,0" IsEnabled="False"
+                                    Padding="10,5" Margin="0,0,8,0"
+                                    IsEnabled="{Binding ShowScanActions}"
                                     ToolTip="{loc:Loc Key=Hist_TooltipTreatInAv}"
                                     AutomationProperties.Name="{loc:Loc Key=Hist_TreatInAv}">
                                 <StackPanel Orientation="Horizontal">
@@ -287,7 +335,8 @@
                             <Button x:Name="btnHistQuarantineAll"
                                     Click="BtnHistQuarantineAll_Click"
                                     Style="{StaticResource WarningButton}"
-                                    Padding="10,5" IsEnabled="False"
+                                    Padding="10,5"
+                                    IsEnabled="{Binding ShowScanActions}"
                                     ToolTip="{loc:Loc Key=Hist_TooltipQuarantineAll}"
                                     AutomationProperties.Name="{loc:Loc Key=Hist_QuarantineAll}">
                                 <TextBlock Text="{loc:Loc Key=Hist_QuarantineAll}" VerticalAlignment="Center"/>
@@ -358,23 +407,45 @@
                                     </Style>
                                 </DataGridTextColumn.ElementStyle>
                             </DataGridTextColumn>
-                            <DataGridTemplateColumn Header="{loc:Loc Key=Av_ColClean}" Width="260">
+                            <DataGridTemplateColumn Header="{loc:Loc Key=Av_ColClean}" Width="300">
                                 <DataGridTemplateColumn.CellTemplate>
                                     <DataTemplate>
                                         <StackPanel Orientation="Horizontal" Margin="2,1">
+                                            <Button Tag="{Binding FilePath}" Click="BtnViewInQuarantine_Click"
+                                                    Style="{StaticResource ExportButton}"
+                                                    FontSize="{DynamicResource FontSize.Caption}" Padding="7,4" Cursor="Hand"
+                                                    Margin="0,0,4,0" ToolTip="{loc:Loc Key=Hist_ViewInQuarantine}"
+                                                    Visibility="{Binding CanViewInQuarantine, Converter={StaticResource BoolToVis}}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <md:PackIcon Kind="ShieldLock" Width="12" Height="12" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{loc:Loc Key=Hist_ViewInQuarantine}" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
                                             <Button Tag="{Binding FilePath}" Click="BtnHistQuarantine_Click"
                                                     Style="{StaticResource PrimaryButton}"
                                                     FontSize="{DynamicResource FontSize.Caption}" Padding="7,4" Cursor="Hand"
-                                                    Margin="0,0,4,0">
+                                                    Margin="0,0,4,0"
+                                                    Visibility="{Binding CanQuarantine, Converter={StaticResource BoolToVis}}">
                                                 <StackPanel Orientation="Horizontal">
                                                     <md:PackIcon Kind="ShieldLock" Width="12" Height="12" Margin="0,0,4,0" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{loc:Loc Key=Av_QuarantineBtn}" VerticalAlignment="Center"/>
                                                 </StackPanel>
                                             </Button>
+                                            <Button Tag="{Binding FilePath}" Click="BtnHistDismiss_Click"
+                                                    Style="{StaticResource ExportButton}"
+                                                    FontSize="{DynamicResource FontSize.Caption}" Padding="7,4" Cursor="Hand"
+                                                    Margin="0,0,4,0" ToolTip="{loc:Loc Key=Hist_TooltipDismiss}"
+                                                    Visibility="{Binding CanDismiss, Converter={StaticResource BoolToVis}}">
+                                                <StackPanel Orientation="Horizontal">
+                                                    <md:PackIcon Kind="CloseCircleOutline" Width="12" Height="12" Margin="0,0,4,0" VerticalAlignment="Center"/>
+                                                    <TextBlock Text="{loc:Loc Key=Hist_DismissThreat}" VerticalAlignment="Center"/>
+                                                </StackPanel>
+                                            </Button>
                                             <Button Tag="{Binding FilePath}" Click="BtnHistIgnore_Click"
                                                     Style="{StaticResource WarningButton}"
                                                     FontSize="{DynamicResource FontSize.Caption}" Padding="7,4" Cursor="Hand"
-                                                    Margin="0,0,4,0" ToolTip="{loc:Loc Key=Av_Tooltip_Exclude}">
+                                                    Margin="0,0,4,0" ToolTip="{loc:Loc Key=Av_Tooltip_Exclude}"
+                                                    Visibility="{Binding IsFileAccessible, Converter={StaticResource BoolToVis}}">
                                                 <StackPanel Orientation="Horizontal">
                                                     <md:PackIcon Kind="EyeOff" Width="12" Height="12" Margin="0,0,4,0" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{loc:Loc Key=Av_IgnoreBtn}" VerticalAlignment="Center"/>
@@ -382,7 +453,8 @@
                                             </Button>
                                             <Button Tag="{Binding FilePath}" Click="BtnHistDelete_Click"
                                                     Style="{StaticResource DangerButton}"
-                                                    FontSize="{DynamicResource FontSize.Caption}" Padding="7,4" Cursor="Hand">
+                                                    FontSize="{DynamicResource FontSize.Caption}" Padding="7,4" Cursor="Hand"
+                                                    Visibility="{Binding IsFileAccessible, Converter={StaticResource BoolToVis}}">
                                                 <StackPanel Orientation="Horizontal">
                                                     <md:PackIcon Kind="TrashCanOutline" Width="12" Height="12" Margin="0,0,4,0" VerticalAlignment="Center"/>
                                                     <TextBlock Text="{loc:Loc Key=Av_DeleteBtn}" VerticalAlignment="Center"/>
@@ -405,6 +477,65 @@
                                        FontSize="{DynamicResource FontSize.Small}"
                                        Foreground="{DynamicResource TextDark}"/>
                         </ScrollViewer>
+                    </Border>
+
+                    <!-- Détail quarantaine -->
+                    <Border x:Name="quarantineDetailPanel" Grid.Row="1"
+                            Background="{DynamicResource SurfaceBg}"
+                            CornerRadius="8" Padding="16,14"
+                            Visibility="Collapsed">
+                        <StackPanel>
+                            <StackPanel Orientation="Horizontal" Margin="0,0,0,10">
+                                <md:PackIcon Kind="ShieldLock" Width="22" Height="22"
+                                             Foreground="{DynamicResource WarningOrange}"
+                                             VerticalAlignment="Center" Margin="0,0,10,0"/>
+                                <TextBlock x:Name="txtQuarTitle"
+                                           FontSize="{DynamicResource FontSize.Title}"
+                                           FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextDark}"
+                                           VerticalAlignment="Center"/>
+                            </StackPanel>
+                            <TextBlock x:Name="txtQuarPath"
+                                       TextWrapping="Wrap"
+                                       FontSize="{DynamicResource FontSize.Body}"
+                                       Foreground="{DynamicResource TextMedium}"
+                                       Margin="0,0,0,6"/>
+                            <TextBlock x:Name="txtQuarMeta"
+                                       FontSize="{DynamicResource FontSize.Small}"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       Margin="0,0,0,8"/>
+                            <TextBlock x:Name="txtQuarStatus"
+                                       FontSize="{DynamicResource FontSize.Small}"
+                                       Foreground="{DynamicResource TextAccent}"
+                                       Margin="0,0,0,14"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Button x:Name="btnViewSourceScan"
+                                        Click="BtnViewSourceScan_Click"
+                                        Style="{StaticResource ExportButton}"
+                                        Padding="10,5" Margin="0,0,8,0"
+                                        Visibility="{Binding HasQuarantineSourceScan, Converter={StaticResource BoolToVis}}"
+                                        ToolTip="{loc:Loc Key=Hist_TooltipViewSourceScan}"
+                                        AutomationProperties.Name="{loc:Loc Key=Hist_ViewSourceScan}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <md:PackIcon Kind="ShieldSearch" Width="14" Height="14"
+                                                     VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                        <TextBlock Text="{loc:Loc Key=Hist_ViewSourceScan}" VerticalAlignment="Center"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="btnManageInAv"
+                                    Click="BtnManageInAv_Click"
+                                    Style="{StaticResource PrimaryButton}"
+                                    Padding="10,5"
+                                    ToolTip="{loc:Loc Key=Hist_TooltipManageInAv}"
+                                    AutomationProperties.Name="{loc:Loc Key=Hist_ManageInAv}">
+                                <StackPanel Orientation="Horizontal">
+                                    <md:PackIcon Kind="ShieldLock" Width="14" Height="14"
+                                                 VerticalAlignment="Center" Margin="0,0,6,0"/>
+                                    <TextBlock Text="{loc:Loc Key=Hist_ManageInAv}" VerticalAlignment="Center"/>
+                                </StackPanel>
+                            </Button>
+                            </StackPanel>
+                        </StackPanel>
                     </Border>
 
                     <!-- Etat : session propre -->
