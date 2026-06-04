@@ -65,6 +65,8 @@ namespace optiSCAN
 
         public MainWindow()
         {
+            // Avant OptionsControl (LoadPreferences) : thème Windows + prefs déjà appliqués.
+            ThemeManager.Initialize();
             InitializeComponent();
             // Avant toute navigation (ex. RadioButton coché), enregistrer les panneaux.
             RegisterPanels();
@@ -130,7 +132,11 @@ namespace optiSCAN
                 c.ScanHistoryViewsRefreshRequested += SurDemandeRafraichissementHistorique;
                 c.ExportScanHistoryHtmlRequested += SurDemandeExportHistoriqueHtml;
                 c.ExportScanSessionPdfRequested += SurDemandeExportSessionScanPdf;
+                c.ReviewHistorySessionRequested += SurDemandeRevueSessionHistorique;
+                c.OpenQuarantineTabRequested += SurDemandeOngletQuarantaine;
                 c.RealTimeProtection.ThreatDetected += SurMenaceTempsReelDetectee;
+                c.RemovableDriveScan.ThreatDetected += SurMenaceTempsReelDetectee;
+                c.RemovableDriveScan.ScanStatusChanged += SurStatutAnalyseUsb;
                 c.Notifications.ToastActivated -= SurActivationToast;
                 c.Notifications.ToastActivated += SurActivationToast;
                 c.Notifications.SyncFromUserPreferences();
@@ -233,6 +239,7 @@ namespace optiSCAN
 
                 SetStatus(OptiscanStrings.UiMessages.ProtectionActive);
                 OnboardingService.ShowIfNeeded(this);
+                _ = WarmUpYaraRulesAsync();
             }
             catch (Exception ex)
             {
@@ -240,6 +247,22 @@ namespace optiSCAN
                 SetStatus(LocalizationService.Format("Status_Error", ex.Message), isError: true);
             }
             await Task.CompletedTask;
+        }
+
+        /// <summary>Compile les règles YARA en arrière-plan pour éviter le blocage au premier scan.</summary>
+        private static async Task WarmUpYaraRulesAsync()
+        {
+            try
+            {
+                var yara = ServiceContainer.Default.Yara;
+                if (!yara.IsAvailable || yara.HasCompiled)
+                    return;
+                await yara.CompileRulesAsync(CancellationToken.None).ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("MainWindow", "WarmUpYaraRulesAsync", ex);
+            }
         }
 
         /// <summary>
@@ -342,6 +365,22 @@ namespace optiSCAN
                 av.SelectSignaturesTab();
         }
 
+        private void SurDemandeRevueSessionHistorique(object? sender, ScanSession session)
+        {
+            ViewModel?.LoadThreatsFromHistorySession(session);
+            _navigationService.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
+            if (panelAntivirus is Views.AntivirusView av)
+                av.SelectScanTab();
+        }
+
+        private void SurDemandeOngletQuarantaine(object? sender, EventArgs e)
+        {
+            _navigationService.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
+            ViewModel?.LoadQuarantine(reset: true);
+            RefreshQuarantineList();
+            (panelAntivirus as Views.AntivirusView)?.SelectQuarantineTab();
+        }
+
         private void UnhookServiceContainerEvents()
         {
             var c = ServiceContainer.Default;
@@ -349,8 +388,12 @@ namespace optiSCAN
             c.ScanHistoryViewsRefreshRequested -= SurDemandeRafraichissementHistorique;
             c.ExportScanHistoryHtmlRequested -= SurDemandeExportHistoriqueHtml;
             c.ExportScanSessionPdfRequested -= SurDemandeExportSessionScanPdf;
+            c.ReviewHistorySessionRequested -= SurDemandeRevueSessionHistorique;
+            c.OpenQuarantineTabRequested -= SurDemandeOngletQuarantaine;
             c.FocusAntivirusSignaturesRequested -= SurDemandeFocusSignaturesAntivirus;
             c.RealTimeProtection.ThreatDetected -= SurMenaceTempsReelDetectee;
+            c.RemovableDriveScan.ThreatDetected -= SurMenaceTempsReelDetectee;
+            c.RemovableDriveScan.ScanStatusChanged -= SurStatutAnalyseUsb;
             c.Notifications.ToastActivated -= SurActivationToast;
             c.Actions.ActionCompleted -= SurActionAntivirusTerminee;
         }
@@ -440,7 +483,8 @@ namespace optiSCAN
                     : ThemeUiBrushes.Get("DangerRed", icoSidebarClamAv);
             }
 
-            (panelOverview as Views.OverviewControl)?.UpdateAntivirusCardStatus(clamAvOk, yaraRules);
+            var clamMode = ServiceContainer.Default.ClamActiveEngine;
+            (panelOverview as Views.OverviewControl)?.UpdateAntivirusCardStatus(clamAvOk, yaraRules, clamMode);
         }
 
         private void RefreshQuarantineList()
@@ -457,9 +501,7 @@ namespace optiSCAN
         private void RefreshHistory()
         {
             var sessions = _logManager?.GetHistory() ?? Array.Empty<ScanSession>();
-            var cleanSessions = _logManager?.GetCleanHistory() ?? Array.Empty<CleanSession>();
-            (panelHistory as Views.HistoryControl)?.UpdateScanHistory(sessions);
-            (panelHistory as Views.HistoryControl)?.UpdateCleanHistory(cleanSessions);
+            (panelHistory as Views.HistoryControl)?.RefreshTimeline();
             ApplyLastScanSummary(sessions);
             (panelOverview as Views.OverviewControl)?.UpdateProtectionStatistics(sessions);
             RefreshOverviewProtectionAndRecommendations();
@@ -485,6 +527,33 @@ namespace optiSCAN
             }), DispatcherPriority.Background);
         }
 
+        private void SurStatutAnalyseUsb(object? sender, RemovableDriveScanStatusEventArgs e)
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                if (e.Phase == RemovableDriveScanPhase.Started)
+                {
+                    SetStatus(
+                        LocalizationService.Format("Status_UsbScanStarting", e.DriveLabel),
+                        iconKindName: UiIconKinds.Refresh);
+                    return;
+                }
+
+                if (e.Phase == RemovableDriveScanPhase.Failed)
+                {
+                    SetStatus(
+                        LocalizationService.Format("Status_UsbScanFailed", e.DriveLabel),
+                        isError: true);
+                    return;
+                }
+
+                SetStatus(
+                    LocalizationService.Format("Status_UsbScanComplete", e.DriveLabel, e.FilesScanned, e.ThreatsFound),
+                    isWarning: e.ThreatsFound > 0,
+                    iconKindName: e.ThreatsFound > 0 ? null : UiIconKinds.Success);
+            }, DispatcherPriority.Background);
+        }
+
         private void SurActionAntivirusTerminee(object? sender, ActionResult result)
         {
             Dispatcher.BeginInvoke(() =>
@@ -493,6 +562,7 @@ namespace optiSCAN
                 if (result.Success)
                 {
                     RefreshQuarantineList();
+                    RefreshHistory();
                     (panelAntivirus as Views.AntivirusView)?.RefreshAllData();
                 }
             }, DispatcherPriority.Normal);
@@ -588,25 +658,36 @@ namespace optiSCAN
 
             overview.UpdateProtectionHeadline(protectedOk);
 
+            // Déléguer la logique de calcul à OverviewRecommendationsBuilder (testable sans UI).
             var cleanHist = _logManager?.GetCleanHistory() ?? Array.Empty<CleanSession>();
-            DateTime? lastClean = cleanHist.Count > 0 ? cleanHist[0].StartedAt : null;
-            bool suggestClean = !lastClean.HasValue || (DateTime.Now - lastClean.Value).TotalDays > 14;
-            string hyp = suggestClean
-                ? LocalizationService.GetString("Rec_CleanSuggest")
-                : LocalizationService.Format("Rec_CleanRecent", lastClean!.Value.ToString("d", LocalizationService.CurrentCulture));
-            int hypSev = suggestClean ? 1 : 0;
-
             var sessions = _logManager?.GetHistory() ?? Array.Empty<ScanSession>();
-            var cutoff = DateTime.Now.AddDays(-30);
-            int threats30 = sessions.Where(s => s.StartedAt >= cutoff).Sum(s => s.ThreatsFound);
-            string act = sessions.Count == 0
-                ? LocalizationService.GetString("Rec_ActNone")
-                : threats30 > 0
-                    ? LocalizationService.Format("Rec_ActThreats", threats30)
-                    : LocalizationService.GetString("Rec_ActOk");
-            int actSev = threats30 > 0 ? 1 : (sessions.Count == 0 ? 1 : 2);
 
-            overview.UpdateRecommendations(hyp, hypSev, act, actSev);
+            var rec = OverviewRecommendationsBuilder.Build(new OverviewRecommendationsBuilder.Context
+            {
+                ClamInstalled = clam,
+                LastFreshclamUpdate = _freshclamUpdater?.GetLastSignatureUpdateTime(),
+                LastCleanAt = cleanHist.Count > 0 ? cleanHist[0].StartedAt : null,
+            });
+
+            overview.UpdateRecommendations(
+                rec.HygieneLine, rec.HygieneSeverity,
+                rec.ShowSigUpdateLink);
+
+            var lastScan = sessions.Count > 0 ? sessions[0].StartedAt : (DateTime?)null;
+            bool rtpOn = ExclusionSettings.Current.RealTimeEnabled;
+            bool rtpRun = ServiceContainer.Default.RealTimeProtection.IsEnabled;
+
+            var posture = ServiceContainer.Default.SecurityPosture.Evaluate(new SecurityPostureContext
+            {
+                ClamInstalled = clam,
+                YaraAvailable = yaraAvail,
+                YaraRulesCount = yaraRules,
+                RealTimeProtectionEnabled = rtpOn,
+                RealTimeProtectionRunning = rtpRun,
+                LastScanAt = lastScan,
+                SignatureAutoUpdateEnabled = UserPreferences.Current.SignatureAutoUpdateEnabled,
+            });
+            overview.UpdateSecurityPosture(posture);
         }
 
         public async Task RefreshAntivirusDataAsync()
@@ -854,7 +935,7 @@ namespace optiSCAN
 
         private void ApplyVersionLabels()
         {
-            // Nomenclature : vM.m (README, v7.0) + M.m.p (assembly / installateur).
+            // Nomenclature : vM.m (README, v8.0) + M.m.p (assembly / installateur).
             var release = ProductVersionInfo.ReleaseLabel;
             var semver = ProductVersionInfo.SemVer;
             if (txtSidebarVersion != null)

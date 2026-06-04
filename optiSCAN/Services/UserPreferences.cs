@@ -66,7 +66,8 @@ namespace optiSCAN.Services
         public bool DarkTheme { get; set; } = false;
 
         /// <summary>Suivre le thème Windows automatiquement.</summary>
-        public bool SyncWindowsTheme { get; set; } = false;
+        /// <summary>Vrai par défaut : optiSCAN suit le thème applications de Windows.</summary>
+        public bool SyncWindowsTheme { get; set; } = true;
 
         /// <summary>Afficher les notifications d'action (toast avec boutons).</summary>
         public bool ActionNotificationsEnabled { get; set; } = true;
@@ -82,6 +83,39 @@ namespace optiSCAN.Services
 
         /// <summary>Thème à contraste renforcé (lisibilité accrue).</summary>
         public bool HighContrastEnabled { get; set; }
+
+        /// <summary>Préférer le daemon clamd (repli automatique sur clamscan.exe).</summary>
+        public bool UseClamdEngine { get; set; } = true;
+
+        /// <summary>Mode jeu : réduit notifications et reports scans headless si plein écran / jeu.</summary>
+        public bool GameModeAutoEnabled { get; set; } = true;
+
+        /// <summary>Analyser automatiquement les lecteurs amovibles à l'insertion.</summary>
+        public bool RemovableDriveScanEnabled { get; set; } = true;
+
+        /// <summary>Analyse USB complète (récursive) ; sinon fichiers à risque uniquement.</summary>
+        public bool RemovableDriveScanDetailed { get; set; }
+
+        /// <summary>Taille max. du lecteur (Go) ; 0 = pas de limite.</summary>
+        public int RemovableDriveMaxSizeGb { get; set; } = 64;
+
+        /// <summary>Inclure les lecteurs amovibles dans l'analyse complète manuelle.</summary>
+        public bool IncludeRemovableInFullScan { get; set; }
+
+        /// <summary>Clé API VirusTotal (optionnelle, stockée chiffrée via SecureStore).</summary>
+        public string VirusTotalApiKey { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Seuil (jours) au-delà duquel une suggestion de nettoyage est affichée sur l'accueil.
+        /// Valeur par défaut : <see cref="RecommendationThresholds.CleanSuggestThresholdDays"/>.
+        /// </summary>
+        public int CleanSuggestThresholdDays { get; set; } = RecommendationThresholds.CleanSuggestThresholdDays;
+
+        /// <summary>
+        /// Seuil (jours) au-delà duquel les signatures ClamAV sont considérées obsolètes.
+        /// Valeur par défaut : <see cref="RecommendationThresholds.SignatureStaleThresholdDays"/>.
+        /// </summary>
+        public int SignatureStaleThresholdDays { get; set; } = RecommendationThresholds.SignatureStaleThresholdDays;
 
         // ── Méthodes ──────────────────────────────────────────────────────────────
 

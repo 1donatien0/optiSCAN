@@ -1,6 +1,7 @@
 using optiSCAN.Localization;
 using optiSCAN.Models;
 using System.IO;
+using System.Linq;
 using System.Runtime.Versioning;
 
 namespace optiSCAN.Services
@@ -38,13 +39,35 @@ namespace optiSCAN.Services
 
         public event EventHandler<ActionResult>? ActionCompleted;
 
-        public ActionResult QuarantineThreat(string filePath) =>
-            QuarantineThreat(ResolveThreatForPath(filePath));
+        public ActionResult QuarantineThreat(string filePath, Guid sourceSessionId = default) =>
+            QuarantineThreat(ResolveThreatForPath(filePath), sourceSessionId);
 
-        public ActionResult QuarantineThreat(ThreatInfo threat)
+        public ActionResult QuarantineThreat(ThreatInfo threat, Guid sourceSessionId = default)
         {
-            if (string.IsNullOrEmpty(threat.FilePath) || !File.Exists(threat.FilePath))
-                return Complete(false, LocalizationService.Format("Av_Action_FileNotFound", Path.GetFileName(threat.FilePath)));
+            if (string.IsNullOrEmpty(threat.FilePath))
+                return Complete(false, LocalizationService.GetString("Av_Action_InvalidPath"), isError: true);
+
+            var existing = _quarantine.GetEntries().FirstOrDefault(e =>
+                string.Equals(e.OriginalPath, threat.FilePath, StringComparison.OrdinalIgnoreCase));
+            if (existing != null)
+                return Complete(true,
+                    LocalizationService.Format("Av_Action_AlreadyQuarantined", Path.GetFileName(threat.FilePath)),
+                    isWarning: true);
+
+            if (!File.Exists(threat.FilePath))
+            {
+                var root = Path.GetPathRoot(threat.FilePath);
+                if (!string.IsNullOrEmpty(root) && root.Length >= 2 && !Directory.Exists(root))
+                {
+                    return Complete(false,
+                        LocalizationService.Format("Av_Action_DriveUnavailable", root.TrimEnd('\\')),
+                        isError: true);
+                }
+
+                return Complete(false,
+                    LocalizationService.Format("Av_Action_FileNotFound", Path.GetFileName(threat.FilePath)),
+                    isError: true);
+            }
 
             if (threat.FileSize < 0)
                 threat.FileSize = SafeFileSize(threat.FilePath);
@@ -52,7 +75,7 @@ namespace optiSCAN.Services
                 threat.VirusName = LocalizationService.GetString("Av_Action_DetectedDefault");
             threat.Status = ThreatStatus.Detected;
 
-            bool ok = _quarantine.Quarantine(threat);
+            bool ok = _quarantine.Quarantine(threat, sourceSessionId);
             return Complete(ok,
                 ok ? LocalizationService.Format("Av_Action_QuarantineOk", Path.GetFileName(threat.FilePath))
                    : LocalizationService.Format("Av_Action_QuarantineFail", Path.GetFileName(threat.FilePath)));

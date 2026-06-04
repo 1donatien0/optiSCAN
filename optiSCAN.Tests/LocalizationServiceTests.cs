@@ -53,4 +53,35 @@ public sealed class LocalizationServiceTests : IDisposable
         LocalizationService.ApplyCulture("fr");
         Assert.False(LocalizationService.IsEnglish);
     }
+
+    [Fact]
+    public void Resx_FR_and_EN_have_same_keys()
+    {
+        // Charge les deux fichiers resx et vérifie la parité des clés.
+        var assembly = typeof(LocalizationService).Assembly;
+
+        var frKeys  = GetResxKeys(assembly, "optiSCAN.Resources.UiStrings",    "fr-FR");
+        var enKeys  = GetResxKeys(assembly, "optiSCAN.Resources.UiStrings",    "en-US");
+
+        var missingInEn = frKeys.Except(enKeys).OrderBy(k => k).ToList();
+        var missingInFr = enKeys.Except(frKeys).OrderBy(k => k).ToList();
+
+        Assert.True(missingInEn.Count == 0,
+            $"Clés présentes en FR mais absentes en EN ({missingInEn.Count}) :\n{string.Join("\n", missingInEn)}");
+        Assert.True(missingInFr.Count == 0,
+            $"Clés présentes en EN mais absentes en FR ({missingInFr.Count}) :\n{string.Join("\n", missingInFr)}");
+    }
+
+    private static HashSet<string> GetResxKeys(System.Reflection.Assembly asm, string baseName, string culture)
+    {
+        var rm = new System.Resources.ResourceManager(baseName, asm);
+        var ci = System.Globalization.CultureInfo.GetCultureInfo(culture);
+        using var rs = rm.GetResourceSet(ci, createIfNotExists: true, tryParents: false);
+        if (rs == null) return new HashSet<string>();
+
+        var keys = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (System.Collections.DictionaryEntry entry in rs)
+            keys.Add((string)entry.Key);
+        return keys;
+    }
 }

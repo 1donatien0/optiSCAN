@@ -11,6 +11,11 @@ namespace optiSCAN.Services
         bool IsClamAvInstalled();
         Task<ScanResult> ScanFileAsync(string filePath, IProgress<ScanProgress>? progress = null, CancellationToken ct = default);
         Task<ScanResult> ScanFolderAsync(string folderPath, IProgress<ScanProgress>? progress = null, CancellationToken ct = default);
+        Task<ScanResult> ScanFileListAsync(
+            IReadOnlyList<string> files,
+            string targetPath,
+            IProgress<ScanProgress>? progress = null,
+            CancellationToken ct = default);
     }
 
     /// <summary>Contrat YARA utilisé par <see cref="ScanOrchestrator"/> (tests via InternalsVisibleTo).</summary>
@@ -20,6 +25,10 @@ namespace optiSCAN.Services
         int RulesCount { get; }
         Task<List<YaraMatch>> ScanFileAsync(string filePath, CancellationToken ct = default);
         Task<List<YaraMatch>> ScanFolderAsync(string folderPath, IProgress<string>? progress = null, CancellationToken ct = default);
+        Task<List<YaraMatch>> ScanFilesAsync(
+            IReadOnlyList<string> files,
+            IProgress<string>? progress = null,
+            CancellationToken ct = default);
     }
 
     /// <summary>

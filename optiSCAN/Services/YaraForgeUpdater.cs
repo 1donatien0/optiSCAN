@@ -122,10 +122,20 @@ namespace optiSCAN.Services
         public void EnableAutoUpdate(TimeSpan? interval = null)
         {
             var period = interval ?? TimeSpan.FromHours(24);
+            _autoTimer?.Dispose();
             _autoTimer = new System.Threading.Timer(
-                async _ => await UpdateAsync(),
+                _ =>
+                {
+                    if (IsUpdating) return;
+                    _ = Task.Run(async () =>
+                    {
+                        try { await UpdateAsync().ConfigureAwait(false); }
+                        catch (OperationCanceledException) { /* annulé */ }
+                        catch (Exception ex) { AppLogger.Warn("YaraForgeUpdater", "Auto-update", ex); }
+                    });
+                },
                 null,
-                period,      // premier déclenchement après 1 période
+                period,
                 period);
         }
 

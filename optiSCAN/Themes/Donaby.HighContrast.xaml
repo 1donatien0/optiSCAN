@@ -50,6 +50,7 @@
     <SolidColorBrush x:Key="AlertGold"          Color="#7A4A00"/>
     <SolidColorBrush x:Key="AlertGoldLight"     Color="#7A4A00"/>
     <SolidColorBrush x:Key="AlertBg"            Color="{x:Static SystemColors.WindowColor}"/>
+    <SolidColorBrush x:Key="InfoBg"             Color="{x:Static SystemColors.WindowColor}"/>
 
     <!-- ── AVERTISSEMENT / ORANGE ── -->
     <SolidColorBrush x:Key="WarningOrange"      Color="#7A3300"/>

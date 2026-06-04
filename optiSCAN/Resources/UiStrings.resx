@@ -93,6 +93,7 @@
   <data name="ScanType_Full" xml:space="preserve"><value>Analyse complète</value></data>
   <data name="ScanType_Quick" xml:space="preserve"><value>Analyse rapide</value></data>
   <data name="ScanType_Default" xml:space="preserve"><value>Analyse</value></data>
+  <data name="ScanType_Removable" xml:space="preserve"><value>Lecteur amovible</value></data>
   <data name="ScanSummary_Running" xml:space="preserve"><value>Analyse en cours… ({0:N0} fichier(s) déjà parcourus)</value></data>
   <data name="ScanSummary_Clean" xml:space="preserve"><value>Aucune menace — {0:N0} fichier(s) en {1}</value></data>
   <data name="ScanSummary_Threats" xml:space="preserve"><value>Attention : {0} menace(s) sur {1:N0} fichier(s)</value></data>
@@ -145,6 +146,15 @@
   <data name="Notif_ScanOkBody" xml:space="preserve"><value>{0:N0} fichiers analysés, aucune menace</value></data>
   <data name="Notif_ScanThreatsTitle" xml:space="preserve"><value>Scan terminé — {0} menace(s)</value></data>
   <data name="Notif_ScanThreatsBody" xml:space="preserve"><value>Consultez l'historique pour plus de détails</value></data>
+  <data name="Notif_UsbScanStartedTitle" xml:space="preserve"><value>Analyse USB en cours</value></data>
+  <data name="Notif_UsbScanStartedBody" xml:space="preserve"><value>Analyse du lecteur {0}…</value></data>
+  <data name="Notif_UsbScanOkTitle" xml:space="preserve"><value>Analyse USB terminée — {0}</value></data>
+  <data name="Notif_UsbScanOkBody" xml:space="preserve"><value>{1:N0} fichiers analysés, aucune menace</value></data>
+  <data name="Notif_UsbScanThreatsTitle" xml:space="preserve"><value>Analyse USB — {1} menace(s) sur {0}</value></data>
+  <data name="Notif_UsbScanThreatsBody" xml:space="preserve"><value>{2:N0} fichiers analysés — consultez l'historique</value></data>
+  <data name="Status_UsbScanStarting" xml:space="preserve"><value>Analyse USB de {0} en cours…</value></data>
+  <data name="Status_UsbScanComplete" xml:space="preserve"><value>Analyse USB de {0} terminée — {1:N0} fichier(s), {2} menace(s)</value></data>
+  <data name="Status_UsbScanFailed" xml:space="preserve"><value>Analyse USB de {0} interrompue ou échouée</value></data>
   <data name="Notif_HistoryBtn" xml:space="preserve"><value>Ouvrir l'historique</value></data>
   <data name="Notif_RtpStartedTitle" xml:space="preserve"><value>Protection temps réel activée</value></data>
   <data name="Notif_RtpStartedBody" xml:space="preserve"><value>optiSCAN surveille les fichiers en arrière-plan</value></data>
@@ -161,18 +171,21 @@
   <data name="Overview_HistorySub" xml:space="preserve"><value>Voir l'historique</value></data>
   <data name="Overview_UpdateTitle" xml:space="preserve"><value>Mise à jour</value></data>
   <data name="Overview_UpdateSub" xml:space="preserve"><value>Signatures antivirus</value></data>
-  <data name="Overview_StatsNone30" xml:space="preserve"><value>• Aucune analyse enregistrée sur les 30 derniers jours.</value></data>
+  <data name="Overview_StatsNoHistory" xml:space="preserve"><value>• Aucune analyse enregistrée — lancez une analyse depuis Antivirus.</value></data>
+  <data name="Overview_StatsNone30" xml:space="preserve"><value>• Aucune analyse sur les 30 derniers jours (sessions plus anciennes : onglet Historique).</value></data>
+  <data name="Overview_StatsTreatHint" xml:space="preserve"><value>• Menaces à traiter : onglet Historique ou Analyse.</value></data>
   <data name="Overview_StatsScans" xml:space="preserve"><value>• Analyses enregistrées : {0}</value></data>
   <data name="Overview_StatsFiles" xml:space="preserve"><value>• Fichiers parcourus (cumul) : {0}</value></data>
   <data name="Overview_StatsThreats" xml:space="preserve"><value>• Menaces détectées (cumul) : {0}</value></data>
-  <data name="Overview_StatsLifetime" xml:space="preserve"><value>Total depuis l'installation : {0} analyse(s). Détail dans Historique.</value></data>
-  <data name="Overview_StatsHistoryHint" xml:space="preserve"><value>Le détail par session reste disponible dans l'onglet Historique.</value></data>
+  <data name="Overview_StatsLifetime" xml:space="preserve"><value>Total depuis l'installation : {0} analyse(s).</value></data>
+  <data name="Overview_StatsHistoryHint" xml:space="preserve"><value>Détail par session : onglet Historique.</value></data>
   <data name="Overview_UpdatedAt" xml:space="preserve"><value>Actualisé : {0}</value></data>
   <data name="Overview_LastScan" xml:space="preserve"><value>Dernière analyse</value></data>
   <data name="Overview_LastScanLine" xml:space="preserve"><value>{0} — {1} · {2}</value></data>
   <data name="Overview_LastScanClean" xml:space="preserve"><value>aucune menace</value></data>
   <data name="Overview_LastScanThreats" xml:space="preserve"><value>{0} menace(s)</value></data>
   <data name="Overview_ClamActive" xml:space="preserve"><value>Actif</value></data>
+  <data name="Overview_ClamEngine" xml:space="preserve"><value>Actif ({0})</value></data>
   <data name="Overview_ClamMissing" xml:space="preserve"><value>Non installé</value></data>
   <data name="Overview_YaraLoaded" xml:space="preserve"><value>{0:N0} règles</value></data>
   <data name="Overview_YaraMissing" xml:space="preserve"><value>Non chargé</value></data>
@@ -295,7 +308,7 @@
   <data name="Clean_EmptyTitle" xml:space="preserve"><value>Rien à libérer</value></data>
   <data name="Clean_EmptySub" xml:space="preserve"><value>Aucun fichier récupérable détecté lors de l'analyse.</value></data>
   <data name="Hist_Title" xml:space="preserve"><value>Historique</value></data>
-  <data name="Hist_Sub" xml:space="preserve"><value>Consultez et exportez vos rapports d'analyse et de nettoyage.</value></data>
+  <data name="Hist_Sub" xml:space="preserve"><value>Journal de vos analyses, nettoyages et actions de sécurité.</value></data>
   <data name="Hist_ExportHtml" xml:space="preserve"><value>Exporter HTML</value></data>
   <data name="Hist_ExportPdf" xml:space="preserve"><value>Exporter PDF (sélection)</value></data>
   <data name="Hist_OpenAv" xml:space="preserve"><value>Ouvrir l'antivirus</value></data>
@@ -310,6 +323,10 @@
   <data name="Opt_NotifSub" xml:space="preserve"><value>Alertes si menace détectée ou mise à jour disponible</value></data>
   <data name="Opt_DarkTheme" xml:space="preserve"><value>Thème sombre</value></data>
   <data name="Opt_DarkSub" xml:space="preserve"><value>Même réglage que le bouton Mode dans la barre latérale</value></data>
+  <data name="Opt_ThemeLight" xml:space="preserve"><value>Thème clair</value></data>
+  <data name="Opt_ThemeLightSub" xml:space="preserve"><value>Windows est en mode sombre — cochez pour utiliser le thème clair dans optiSCAN. Décochez pour suivre le thème Windows.</value></data>
+  <data name="Opt_ThemeDark" xml:space="preserve"><value>Thème sombre</value></data>
+  <data name="Opt_ThemeDarkSub" xml:space="preserve"><value>Windows est en mode clair — cochez pour utiliser le thème sombre dans optiSCAN. Décochez pour suivre le thème Windows.</value></data>
   <data name="Opt_SyncWin" xml:space="preserve"><value>Suivre le thème Windows</value></data>
   <data name="Opt_SyncSub" xml:space="preserve"><value>S'adapte automatiquement au mode clair/sombre de Windows</value></data>
   <data name="Opt_FavScan" xml:space="preserve"><value>Type d'analyse favori</value></data>
@@ -327,10 +344,21 @@
   <data name="Opt_Antivirus" xml:space="preserve"><value>Antivirus</value></data>
   <data name="Opt_Rtp" xml:space="preserve"><value>Protection temps réel</value></data>
   <data name="Opt_RtpSub" xml:space="preserve"><value>ProgramData, Temp Windows et extensions à risque — pas l'intégralité du profil utilisateur.</value></data>
+  <data name="Opt_RemovableScan" xml:space="preserve"><value>Analyser les clés USB et cartes SD</value></data>
+  <data name="Opt_RemovableScanSub" xml:space="preserve"><value>Lance une analyse automatique à l'insertion (lecteurs de moins de 64 Go par défaut).</value></data>
+  <data name="Opt_RemovableDetailed" xml:space="preserve"><value>Analyse USB complète</value></data>
+  <data name="Opt_RemovableDetailedSub" xml:space="preserve"><value>Tous les fichiers du lecteur (plus long). Sinon : extensions à risque uniquement (exe, scripts, macros…), jusqu'à 4 000 fichiers.</value></data>
+  <data name="Opt_IncludeRemovableFull" xml:space="preserve"><value>Inclure les lecteurs amovibles dans l'analyse complète</value></data>
+  <data name="Opt_IncludeRemovableFullSub" xml:space="preserve"><value>Ajoute les volumes USB/SD à l'analyse complète manuelle ou planifiée.</value></data>
   <data name="Opt_AutoQuarantine" xml:space="preserve"><value>Quarantaine automatique</value></data>
   <data name="Opt_AutoQuarSub" xml:space="preserve"><value>Toute menace détectée (analyse manuelle, temps réel ou planifiée) est mise en quarantaine — jamais supprimée automatiquement</value></data>
   <data name="Opt_AutoSig" xml:space="preserve"><value>Mise à jour automatique des signatures (toutes les 4h)</value></data>
   <data name="Opt_AutoSigSub" xml:space="preserve"><value>freshclam.exe est lancé en arrière-plan périodiquement</value></data>
+  <data name="Opt_RecThresholds" xml:space="preserve"><value>Seuils des recommandations</value></data>
+  <data name="Opt_RecThresholdsSub" xml:space="preserve"><value>Délais au-delà desquels une recommandation s'affiche sur l'accueil</value></data>
+  <data name="Opt_CleanThreshold" xml:space="preserve"><value>Suggérer nettoyage après</value></data>
+  <data name="Opt_SigThreshold" xml:space="preserve"><value>Signatures obsolètes après</value></data>
+  <data name="Opt_Days" xml:space="preserve"><value>jours</value></data>
   <data name="Opt_Scheduled" xml:space="preserve"><value>Analyse complète planifiée (quotidienne)</value></data>
   <data name="Opt_ScheduledSub" xml:space="preserve"><value>Tâche « optiSCAN_DailyScan » (--fullscan --quiet). Droits administrateur recommandés pour les dossiers système.</value></data>
   <data name="Opt_ScheduleTime" xml:space="preserve"><value>Heure :</value></data>
@@ -348,6 +376,30 @@
   <data name="Overview_StatsTitle" xml:space="preserve"><value>Statistiques de protection</value></data>
   <data name="Overview_StatsSub" xml:space="preserve"><value>Synthèse textuelle — 30 derniers jours</value></data>
   <data name="Overview_StatsLoading" xml:space="preserve"><value>Chargement des statistiques…</value></data>
+  <data name="Posture_Title" xml:space="preserve"><value>Note de sécurité</value></data>
+  <data name="Posture_AllGood" xml:space="preserve"><value>Tous les contrôles essentiels sont au vert.</value></data>
+  <data name="Posture_Firewall" xml:space="preserve"><value>Pare-feu Windows actif</value></data>
+  <data name="Posture_Uac" xml:space="preserve"><value>Contrôle de compte (UAC)</value></data>
+  <data name="Posture_WindowsUpdate" xml:space="preserve"><value>Mises à jour Windows récentes</value></data>
+  <data name="Posture_Shares" xml:space="preserve"><value>Partages réseau non exposés</value></data>
+  <data name="Posture_Optiscan" xml:space="preserve"><value>Protection optiSCAN active</value></data>
+  <data name="Posture_RecentScan" xml:space="preserve"><value>Analyse récente (&lt; 7 jours)</value></data>
+  <data name="Posture_SigAuto" xml:space="preserve"><value>MAJ signatures automatiques</value></data>
+  <data name="Posture_Fix" xml:space="preserve"><value>Corriger</value></data>
+  <data name="Clamd_NotReady" xml:space="preserve"><value>Le service clamd n'est pas disponible.</value></data>
+  <data name="Opt_UseClamd" xml:space="preserve"><value>Moteur clamd (rapide)</value></data>
+  <data name="Opt_UseClamdSub" xml:space="preserve"><value>Daemon ClamAV en mémoire ; repli sur clamscan si indisponible.</value></data>
+  <data name="Opt_GameMode" xml:space="preserve"><value>Mode jeu / Ne pas déranger</value></data>
+  <data name="Opt_GameModeSub" xml:space="preserve"><value>Réduit les notifications et reporte les scans planifiés en plein écran.</value></data>
+  <data name="Opt_VirusTotal" xml:space="preserve"><value>Clé API VirusTotal (optionnel)</value></data>
+  <data name="Opt_VirusTotalSub" xml:space="preserve"><value>Envoie uniquement le hash SHA-256 du fichier pour la réputation cloud.</value></data>
+  <data name="VT_NoApiKey" xml:space="preserve"><value>Ajoutez une clé API VirusTotal dans Options.</value></data>
+  <data name="VT_HashFailed" xml:space="preserve"><value>Impossible de calculer le hash du fichier.</value></data>
+  <data name="VT_HttpError" xml:space="preserve"><value>VirusTotal a répondu HTTP {0}.</value></data>
+  <data name="VT_Summary" xml:space="preserve"><value>Détections : {0} malveillants, {1} suspects, {2} sains, {3} non détectés.</value></data>
+  <data name="VT_Error" xml:space="preserve"><value>Erreur : {0}</value></data>
+  <data name="Av_ReputationTitle" xml:space="preserve"><value>Réputation cloud</value></data>
+  <data name="Av_Tooltip_Reputation" xml:space="preserve"><value>Vérifier sur VirusTotal (hash SHA-256)</value></data>
   <data name="Overview_Recommendations" xml:space="preserve"><value>Recommandations</value></data>
   <data name="Overview_RecHygiene" xml:space="preserve"><value>Nettoyage disque</value></data>
   <data name="Overview_RecScans" xml:space="preserve"><value>Analyses</value></data>
@@ -366,11 +418,16 @@
   <data name="Rec_ActNone" xml:space="preserve"><value>Aucune analyse dans l'historique — lancez une analyse rapide (Antivirus).</value></data>
   <data name="Rec_ActThreats" xml:space="preserve"><value>30 derniers jours : {0} menace(s) signalée(s) — consultez Historique / onglet Analyse.</value></data>
   <data name="Rec_ActOk" xml:space="preserve"><value>Historique d'analyses disponible — ouvrez l'onglet Historique pour le détail.</value></data>
+  <data name="Rec_ClamMissing" xml:space="preserve"><value>ClamAV non installé — les analyses antivirus sont désactivées. Installez ClamAV via l'onglet Antivirus.</value></data>
+  <data name="Rec_SigAutoOff" xml:space="preserve"><value>Mise à jour automatique des signatures désactivée — vos définitions peuvent devenir obsolètes. Activez-la dans Options.</value></data>
+  <data name="Rec_SigStale" xml:space="preserve"><value>Signatures ClamAV datant de plus de {0} jours — lancez une mise à jour (Antivirus ou Options).</value></data>
+  <data name="Rec_SigNeverUpdated" xml:space="preserve"><value>Signatures ClamAV jamais mises à jour — lancez une première mise à jour via l'onglet Antivirus.</value></data>
+  <data name="Rec_SigStaleAction" xml:space="preserve"><value>Mettre à jour maintenant →</value></data>
   <data name="Hist_ColDate" xml:space="preserve"><value>Date</value></data>
   <data name="Hist_ColType" xml:space="preserve"><value>Type</value></data>
   <data name="Hist_ColTarget" xml:space="preserve"><value>Cible</value></data>
   <data name="Hist_ColFiles" xml:space="preserve"><value>Fichiers</value></data>
-  <data name="Hist_ColDuration" xml:space="preserve"><value>Durée</value></data>
+  <data name="Hist_ColDuration" xml:space="preserve"><value>Détail</value></data>
   <data name="Hist_ColResult" xml:space="preserve"><value>Résultat</value></data>
   <data name="Hist_ColTargets" xml:space="preserve"><value>Cibles</value></data>
   <data name="Hist_ColFreed" xml:space="preserve"><value>Libéré</value></data>
@@ -385,10 +442,50 @@
   <data name="Hist_FilterAll" xml:space="preserve"><value>Tous les scans</value></data>
   <data name="Hist_FilterWithThreats" xml:space="preserve"><value>Avec menaces</value></data>
   <data name="Hist_FilterNoThreats" xml:space="preserve"><value>Sans menace</value></data>
-  <data name="Hist_SearchScan" xml:space="preserve"><value>Rechercher (cible ou type)…</value></data>
+  <data name="Hist_ChipAll" xml:space="preserve"><value>Tout</value></data>
+  <data name="Hist_ChipThreats" xml:space="preserve"><value>Menaces</value></data>
+  <data name="Hist_ChipClean" xml:space="preserve"><value>Analyses propres</value></data>
+  <data name="Hist_ChipSweep" xml:space="preserve"><value>Nettoyages</value></data>
+  <data name="Hist_ChipQuarantine" xml:space="preserve"><value>Quarantaine</value></data>
+  <data name="Hist_InfoQuarantined" xml:space="preserve"><value>{0} — {1}</value></data>
+  <data name="Hist_InfoRestored" xml:space="preserve"><value>Restauré — {0}</value></data>
+  <data name="Hist_InfoQuarantineDeleted" xml:space="preserve"><value>Supprimé — {0}</value></data>
+  <data name="Hist_EmptyQuarantine" xml:space="preserve"><value>Aucun fichier en quarantaine</value></data>
+  <data name="Hist_EmptyQuarantineSub" xml:space="preserve"><value>Les fichiers mis en quarantaine apparaîtront ici.</value></data>
+  <data name="Hist_DetailQuarantinePath" xml:space="preserve"><value>Chemin d'origine : {0}</value></data>
+  <data name="Hist_DetailQuarantineMeta" xml:space="preserve"><value>Menace : {0} — Taille : {1}</value></data>
+  <data name="Hist_EventRestored" xml:space="preserve"><value>Restauration</value></data>
+  <data name="Hist_EventQuarantineDeleted" xml:space="preserve"><value>Suppression quarantaine</value></data>
+  <data name="Hist_EmptyAll" xml:space="preserve"><value>Aucune activité enregistrée</value></data>
+  <data name="Hist_EmptyAllSub" xml:space="preserve"><value>Scans, nettoyages et actions de sécurité apparaîtront ici.</value></data>
+  <data name="Hist_EmptyThreats" xml:space="preserve"><value>Aucune menace en attente</value></data>
+  <data name="Hist_EmptyThreatsSub" xml:space="preserve"><value>Les analyses avec menaces non traitées s'afficheront ici.</value></data>
+  <data name="Hist_EmptyCleanScans" xml:space="preserve"><value>Aucune analyse propre</value></data>
+  <data name="Hist_EmptyCleanScansSub" xml:space="preserve"><value>Les analyses sans menace détectée apparaîtront ici.</value></data>
+  <data name="Hist_ManageInAv" xml:space="preserve"><value>Gérer dans Antivirus</value></data>
+  <data name="Hist_TooltipManageInAv" xml:space="preserve"><value>Ouvre l'onglet Quarantaine de l'Antivirus pour restaurer ou supprimer.</value></data>
+  <data name="Hist_ViewInQuarantine" xml:space="preserve"><value>Voir en quarantaine</value></data>
+  <data name="Hist_ViewSourceScan" xml:space="preserve"><value>Voir l'analyse source</value></data>
+  <data name="Hist_TooltipViewSourceScan" xml:space="preserve"><value>Affiche l'analyse antivirus qui a conduit à cette quarantaine.</value></data>
+  <data name="Hist_QuarantineStillActive" xml:space="preserve"><value>Fichier encore en quarantaine</value></data>
+  <data name="Hist_QuarantineHistorical" xml:space="preserve"><value>Action enregistrée (fichier plus en quarantaine)</value></data>
+  <data name="Hist_SearchScan" xml:space="preserve"><value>Rechercher (cible, type, menace)…</value></data>
   <data name="Hist_SearchClean" xml:space="preserve"><value>Rechercher (cibles)…</value></data>
   <data name="Hist_DetailSelectClean" xml:space="preserve"><value>Sélectionnez un nettoyage pour afficher le journal d'opérations.</value></data>
-  <data name="Hist_DetailThreatsLegacy" xml:space="preserve"><value>(Session antérieure : chemins et noms des menaces non enregistrés.)</value></data>
+  <data name="Hist_DetailThreatsLegacy" xml:space="preserve"><value>(Session enregistrée sous v7 : chemins des menaces non conservés. Les analyses v8 enregistrent le détail.)</value></data>
+  <data name="Hist_ThreatsTitle" xml:space="preserve"><value>Détections de la session</value></data>
+  <data name="Hist_TreatInAv" xml:space="preserve"><value>Traiter dans Analyse</value></data>
+  <data name="Hist_TooltipTreatInAv" xml:space="preserve"><value>Ouvre l'onglet Analyse avec les menaces de cette session pour les traiter comme après un scan.</value></data>
+  <data name="Hist_QuarantineAll" xml:space="preserve"><value>Tout mettre en quarantaine</value></data>
+  <data name="Hist_SelectScanHint" xml:space="preserve"><value>Sélectionnez une entrée ci-dessus pour afficher le détail.</value></data>
+  <data name="Hist_NoThreatsInSession" xml:space="preserve"><value>Aucune menace détectée lors de cette analyse.</value></data>
+  <data name="Hist_ThreatsLegacy" xml:space="preserve"><value>Menaces détectées (chemins non enregistrés — session v7). Relancez une analyse pour le détail.</value></data>
+  <data name="Hist_InfoFiles" xml:space="preserve"><value>{0} fichiers</value></data>
+  <data name="Hist_InfoThreats" xml:space="preserve"><value>{0} menace(s)</value></data>
+  <data name="Hist_InfoClean" xml:space="preserve"><value>Aucune menace</value></data>
+  <data name="Hist_TooltipQuarantineAll" xml:space="preserve"><value>Met en quarantaine toutes les menaces listées pour cette session.</value></data>
+  <data name="Hist_DismissThreat" xml:space="preserve"><value>Retirer</value></data>
+  <data name="Hist_TooltipDismiss" xml:space="preserve"><value>Retire cette menace de l'historique (fichier absent ou lecteur débranché).</value></data>
   <data name="Hist_DetailCleanSummary" xml:space="preserve"><value>Cibles : {0}&#x0a;Libéré : {1} — Durée : {2}&#x0a;&#x0a;(Session antérieure : journal d'opérations non enregistré.)</value></data>
   <data name="Hist_ExportPdfSelect" xml:space="preserve"><value>Sélectionnez une ligne dans l'onglet « Scan Antivirus », puis cliquez sur Exporter PDF (sélection).</value></data>
   <data name="Hist_ExportPdfTitle" xml:space="preserve"><value>Export PDF</value></data>
@@ -424,16 +521,31 @@
   <data name="Runtime_DevCopyHint" xml:space="preserve"><value>En développement : copiez clamav/x64 et yara/ sous optiSCAN/,</value></data>
   <data name="Runtime_DevVerifyScript" xml:space="preserve"><value>ou exécutez : .\scripts\verify-runtime-deps.ps1</value></data>
   <data name="Runtime_DevReadmeRefs" xml:space="preserve"><value>Voir README § 3 (ClamAV) et publication § 8.</value></data>
+  <data name="Runtime_ClamBothDetected" xml:space="preserve"><value>clamscan + freshclam détectés.</value></data>
+  <data name="Runtime_ClamNoFreshclam" xml:space="preserve"><value>clamscan OK ; freshclam.exe absent (MAJ signatures limitées).</value></data>
+  <data name="Runtime_ClamMissing" xml:space="preserve"><value>Téléchargez ClamAV win.x64 et copiez les binaires (README § 3.2).</value></data>
+  <data name="Runtime_YaraReady" xml:space="preserve"><value>{0} fichier(s) .yar, {1} présent.</value></data>
+  <data name="Runtime_YaraBinMissing" xml:space="preserve"><value>Copiez yara{0}.exe et yarac{0}.exe dans yara/.</value></data>
+  <data name="Runtime_YaraNoRules" xml:space="preserve"><value>Aucune règle .yar dans rules/ ({0}).</value></data>
+  <data name="Runtime_YaracMissing" xml:space="preserve"><value> yarac absent — compilation au premier scan.</value></data>
   <data name="Opt_AppUpdateTitle" xml:space="preserve"><value>Mise à jour applicative</value></data>
   <data name="Opt_AppUpdateCheckError" xml:space="preserve"><value>Erreur lors du contrôle : {0}</value></data>
   <data name="Upd_NotConfigured" xml:space="preserve"><value>Version installée : {0} ({1})&#x0D;&#x0A;&#x0D;&#x0A;optiSCAN ne télécharge pas encore les mises à jour du programme en arrière-plan.&#x0D;&#x0A;&#x0D;&#x0A;• Signatures ClamAV et règles YARA : Antivirus → onglet Signatures.&#x0D;&#x0A;• Nouvelle version du programme : {2}&#x0D;&#x0A;&#x0D;&#x0A;Dossier de préparation local : {3}</value></data>
   <data name="Upd_StagingError" xml:space="preserve"><value>Version installée : {0} ({1})&#x0D;&#x0A;&#x0D;&#x0A;Impossible de préparer le dossier de mises à jour :&#x0D;&#x0A;{2}&#x0D;&#x0A;&#x0D;&#x0A;Signatures : onglet Antivirus → Signatures.&#x0D;&#x0A;Programme : {3}</value></data>
   <data name="Vm_QuarantineBatch" xml:space="preserve"><value>{0} fichier(s) placé(s) en quarantaine.</value></data>
+  <data name="Vm_HistReviewLoaded" xml:space="preserve"><value>Session du {0:dd/MM/yyyy HH:mm} — {1} menace(s) chargée(s) pour traitement.</value></data>
   <data name="Vm_RestoreOk" xml:space="preserve"><value>Fichier restauré.</value></data>
   <data name="Vm_RestoreFail" xml:space="preserve"><value>Impossible de restaurer le fichier.</value></data>
   <data name="Vm_DeleteOk" xml:space="preserve"><value>Fichier supprimé définitivement.</value></data>
   <data name="Vm_DeleteFail" xml:space="preserve"><value>Erreur lors de la suppression.</value></data>
   <data name="Vm_PurgeCount" xml:space="preserve"><value>{0} fichier(s) supprimé(s) de la quarantaine.</value></data>
+  <data name="Scan_Yara_StartingWithCount" xml:space="preserve"><value>Analyse de {0} ({1:N0} fichiers)…</value></data>
+  <data name="Scan_Yara_Starting" xml:space="preserve"><value>Analyse de {0}…</value></data>
+  <data name="Scan_Zone_Starting" xml:space="preserve"><value>Zone {0}/{1} : {2}</value></data>
+  <data name="Scan_Zone_Done" xml:space="preserve"><value>Zone {0}/{1} terminée — {2:N0} fichier(s) analysés au total</value></data>
+  <data name="Scan_Yara_Rule" xml:space="preserve"><value>YARA : règle {0}</value></data>
+  <data name="Scan_Yara_Recursive" xml:space="preserve"><value>YARA : scan récursif de {0}…</value></data>
+  <data name="Scan_Progress_Starting" xml:space="preserve"><value>Analyse de {0}…</value></data>
   <data name="YaraForge_AlreadyRunning" xml:space="preserve"><value>Mise à jour des règles de détection déjà en cours.</value></data>
   <data name="YaraForge_ContactError" xml:space="preserve"><value>Impossible de contacter le serveur de mise à jour : {0}</value></data>
   <data name="YaraForge_AlreadyUpToDate" xml:space="preserve"><value>Les règles de détection sont déjà à jour.</value></data>
@@ -497,6 +609,8 @@
   <data name="Scan_FullPartialWithoutAdmin" xml:space="preserve"><value>Analyse complète — couverture partielle sans droits administrateur (voir bandeau Accueil).</value></data>
   <data name="SigUpd_VerifyingRules" xml:space="preserve"><value>Vérification des règles de détection…</value></data>
   <data name="Av_Action_FileNotFound" xml:space="preserve"><value>Fichier introuvable : {0}</value></data>
+  <data name="Av_Action_DriveUnavailable" xml:space="preserve"><value>Lecteur inaccessible ({0}) — rebranchez-le pour mettre en quarantaine, ou retirez la menace de l'historique.</value></data>
+  <data name="Av_Action_AlreadyQuarantined" xml:space="preserve"><value>Déjà en quarantaine : {0}</value></data>
   <data name="Av_Action_DetectedDefault" xml:space="preserve"><value>Détecté</value></data>
   <data name="Av_Action_QuarantineOk" xml:space="preserve"><value>Fichier mis en quarantaine : {0}</value></data>
   <data name="Av_Action_QuarantineFail" xml:space="preserve"><value>Échec quarantaine : {0}</value></data>
