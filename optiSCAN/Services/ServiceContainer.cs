@@ -38,6 +38,7 @@ namespace optiSCAN.Services
         public YaraForgeUpdater RulesUpdater { get; }
         public QuarantineManager Quarantine { get; }
         public ScanLogManager Logger { get; }
+        public ActivityLogService ActivityLog { get; }
         public NotificationService Notifications { get; }
         /// <summary>Surveillance fichiers sensibles (désactivable via Options / exclusions).</summary>
         public RealTimeProtection RealTimeProtection { get; }
@@ -227,6 +228,17 @@ namespace optiSCAN.Services
         public void RequestReviewHistorySession(Models.ScanSession session) =>
             _reviewHistorySessionHandlers?.Invoke(this, session);
 
+        private EventHandler? _openQuarantineTabHandlers;
+        /// <summary>Ouvre l'onglet Quarantaine de l'Antivirus (écouteur : MainWindow).</summary>
+        public event EventHandler? OpenQuarantineTabRequested
+        {
+            add => _openQuarantineTabHandlers += value;
+            remove => _openQuarantineTabHandlers -= value;
+        }
+
+        public void RequestOpenQuarantineTab() =>
+            _openQuarantineTabHandlers?.Invoke(this, EventArgs.Empty);
+
         private ServiceContainer()
         {
             // Ordre de construction : du plus indépendant au plus dépendant.
@@ -238,6 +250,10 @@ namespace optiSCAN.Services
             RulesUpdater = new YaraForgeUpdater();
             Quarantine = new QuarantineManager();
             Logger = new ScanLogManager();
+            ActivityLog = new ActivityLogService(Logger);
+            Logger.BindActivityLog(ActivityLog);
+            Quarantine.BindActivityLog(ActivityLog);
+            ActivityLog.EnsureMigrated(Quarantine);
             Notifications = new NotificationService();
 
             Orchestrator = new ScanOrchestrator(ClamAvBackend, Yara);
