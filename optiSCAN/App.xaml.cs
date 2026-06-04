@@ -114,7 +114,7 @@ namespace optiSCAN
                 // configurée — sinon les menaces sont simplement journalisées.
                 if (ExclusionSettings.Current.AutoQuarantineEnabled)
                 {
-                    int q = quarantine.QuarantineAll(result.Threats);
+                    int q = quarantine.QuarantineAll(result.Threats, result.SessionId);
                     logger.WriteToLog($"[Headless] Quarantaine automatique : {q} fichier(s)");
                 }
 

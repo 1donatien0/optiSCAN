@@ -24,6 +24,10 @@ packages/
 # Sorties de test / publish locales (racine)
 test-*.txt
 artifacts/
+_build_verify/
+
+# Raccourcis Windows locaux (non versionnés)
+*.lnk
 
 # Binaires ClamAV / YARA (téléchargés via scripts/fetch-runtime-deps.ps1)
 optiSCAN/clamav/x64/*.exe

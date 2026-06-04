@@ -71,5 +71,16 @@ namespace optiSCAN.Services
             ClamdEngine.LastMode = "clamscan";
             return await _clamscan.ScanFolderAsync(folderPath, progress, ct).ConfigureAwait(false);
         }
+
+        public Task<Models.ScanResult> ScanFileListAsync(
+            IReadOnlyList<string> files,
+            string targetPath,
+            IProgress<Models.ScanProgress>? progress = null,
+            CancellationToken ct = default)
+        {
+            // clamscan --file-list = un seul processus ; plus rapide que N appels clamd.
+            ClamdEngine.LastMode = "clamscan";
+            return _clamscan.ScanFileListAsync(files, targetPath, progress, ct);
+        }
     }
 }

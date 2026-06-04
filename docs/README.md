@@ -6,7 +6,7 @@
 |-------|----------------|
 | Build, publish, Inno, CI, checklist | [§8](../README.md#8-publication-installateur-et-checklist-release-v80) |
 | FR / EN (621 clés) | [§9](../README.md#9-langues-de-linterface-fr-fr--en-us) |
-| Historique timeline + menaces v8 | [§4.9](../README.md#49-journaux-et-historique) |
+| Historique (`ActivityLogService`, 5 filtres) | [§4.9](../README.md#49-journaux-et-historique) |
 | Accueil stats / recommandations | [§4.11](../README.md#411-vue-densemble-dashboard) |
 | Scan USB/SD | [§5](../README.md#5-services-avancés-modules-complémentaires) · `RemovableDriveScanService` |
 | Thème Windows | [§2.2](../README.md#22-thememanager) |

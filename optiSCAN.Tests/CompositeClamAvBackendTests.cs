@@ -64,6 +64,16 @@ public sealed class CompositeClamAvBackendTests
 
         public Task<ScanResult> ScanFolderAsync(string folderPath, IProgress<ScanProgress>? progress = null, CancellationToken ct = default)
             => Task.FromResult(new ScanResult { Type = ScanType.Folder, TargetPath = folderPath, Status = ScanStatus.Completed });
+
+        public Task<ScanResult> ScanFileListAsync(
+            IReadOnlyList<string> files,
+            string targetPath,
+            IProgress<ScanProgress>? progress = null,
+            CancellationToken ct = default)
+        {
+            ClamdEngine.LastMode = _label;
+            return Task.FromResult(new ScanResult { Type = ScanType.Folder, TargetPath = targetPath, Status = ScanStatus.Completed, FilesScanned = files.Count });
+        }
     }
 
     private sealed class ThrowingBackend : IClamAvOrchestratorBackend
@@ -72,6 +82,12 @@ public sealed class CompositeClamAvBackendTests
         public Task<ScanResult> ScanFileAsync(string filePath, IProgress<ScanProgress>? progress = null, CancellationToken ct = default)
             => throw new InvalidOperationException("clamd down");
         public Task<ScanResult> ScanFolderAsync(string folderPath, IProgress<ScanProgress>? progress = null, CancellationToken ct = default)
+            => throw new InvalidOperationException("clamd down");
+        public Task<ScanResult> ScanFileListAsync(
+            IReadOnlyList<string> files,
+            string targetPath,
+            IProgress<ScanProgress>? progress = null,
+            CancellationToken ct = default)
             => throw new InvalidOperationException("clamd down");
     }
 }

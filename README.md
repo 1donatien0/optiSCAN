@@ -87,9 +87,10 @@ Branche par défaut GitHub : **`main`**. CI : uniquement `main` et `dev` (voir [
     │   ├── ScanProgress.cs            ← Progression temps réel (IProgress<T>)
     │   ├── ScanResult.cs              ← Résultat global d'un scan (types dont RemovableDrive)
     │   ├── ScanSession.cs             ← Entrée d'historique scan (v8 : Threats[] ; v7 : type legacy)
-    │   └── ActivityEntry.cs           ← Ligne timeline Historique (scan + nettoyage)
+    │   ├── ActivityEntry.cs           ← Ligne timeline Historique (projection UI)
+    │   └── ActivityEventRecord.cs     ← Événement immuable (activity_log.dat)
     │
-    ├── ViewModels/                    ← ScanViewModel, RelayCommand
+    ├── ViewModels/                    ← ScanViewModel, HistoryViewModel, HistoryThreatRow, RelayCommand
     ├── Views/                         ← Overview, Antivirus, Clean, History, Options
     │
     ├── Localization/
@@ -103,7 +104,8 @@ Branche par défaut GitHub : **`main`**. CI : uniquement `main` et `dev` (voir [
     │   └── OptiscanStrings.cs         ← URLs, confirmations, statuts MAJ
     │
     ├── Converters/
-    │   └── ThreatRiskConverters.cs    ← Colonne « Risque » (RiskScoringService → UI)
+    │   ├── ThreatRiskConverters.cs    ← Colonne « Risque » (RiskScoringService → UI)
+    │   └── QuarantinePathVisibilityConverter.cs ← Chemin quarantaine (Historique, lecture seule)
     │
     ├── Services/
     │   ├── ClamAvEngine.cs            ← clamscan.exe (sonde --version mise en cache 60 s)
@@ -132,10 +134,11 @@ Branche par défaut GitHub : **`main`**. CI : uniquement `main` et `dev` (voir [
     │   ├── SecureStore.cs             ← Persistance DPAPI + HMAC (prefs, exclusions, historique)
     │   ├── OverviewRecommendationsBuilder.cs ← Recommandations accueil (hygiène + activité)
     │   ├── OverviewProtectionStatsFormatter.cs ← Stats protection 30 j. (accueil, sans doublon reco.)
-    │   ├── ScanLogManager.cs          ← Historique chiffré (.dat), GetActivityFeed, optiSCAN.log
+    │   ├── ActivityLogService.cs      ← Journal unifié activity_log.dat (timeline Historique)
+    │   ├── ScanLogManager.cs          ← Sessions scan/nettoyage (.dat), ReconcileQuarantinedThreats, optiSCAN.log
     │   ├── RealTimeProtection.cs      ← FileSystemWatcher (Options)
     │   ├── RemovableDriveScanService.cs ← Scan auto USB/SD à l'insertion (WMI + polling)
-    │   ├── RiskyFileExtensions.cs     ← Extensions à risque (partagées RTP ; USB = tous fichiers en rapide)
+    │   ├── RiskyFileExtensions.cs     ← Extensions à risque (RTP + énumération USB rapide)
     │   ├── ScheduledScanService.cs    ← schtasks (async côté Options)
     │   ├── IpcManager.cs              ← Instance unique : WM_SHOWME
     │   ├── HtmlExportService.cs       ← Rapport HTML
@@ -298,7 +301,7 @@ Les vues sont empilées dans un seul `Grid` (`MainWindow.xaml`) : une seule est 
 | `Overview` | Vue d'ensemble | `OverviewControl` | Cartes d'action (boutons), bandeau UAC, statut protection, recommandations |
 | `Antivirus` | Antivirus | `AntivirusView` | Scans ; onglets **Analyse en cours** / **Quarantaine** / **Historique** / **Signatures** (`ScanViewModel`) |
 | `Clean` | Nettoyer | `CleanControl` | Analyse / nettoyage (caches navigateurs, temp, corbeille) + **historique local** (colonne **Libéré** = `BytesDisplay`) |
-| `History` | Historique | `HistoryControl` | Timeline unifiée scans + nettoyages (`GetActivityFeed`) ; traitement menaces v8 ; exports **HTML** / **PDF** |
+| `History` | Historique | `HistoryControl` + `HistoryViewModel` | Timeline `ActivityLogService.GetActivityFeed` ; 5 filtres (puces) ; traitement menaces ; exports **HTML** / **PDF** |
 | `Options` | Options | `OptionsControl` | **Langue** (fr/en, redémarrage), thème / `SyncWindowsTheme`, scan favori, RTP, **scan USB/SD** (auto à l'insertion, mode complet, inclure dans analyse complète), quarantaine auto, planif. (`ServiceContainer.ScheduledScan`, prochaine exécution, **Lancer maintenant**), exclusions |
 
 Raccourcis clavier : `Ctrl+1` … `Ctrl+5` (`KeyboardShortcuts`) — ordre des panneaux : **Vue d’ensemble**, **Antivirus**, **Nettoyer**, **Historique**, **Options**.
@@ -384,20 +387,28 @@ Les fichiers en quarantaine sont stockés en **AES-256-GCM** (format binaire `OP
 
 Stockage : `%LOCALAPPDATA%\optiSCAN\Quarantine\` — `{guid}.quar` + `manifest.json`. Restauration par défaut ou vers un dossier choisi : `IThreatStore.RestoreTo(quarantineId, destinationFolder)`.
 
+- Si la **suppression du fichier original** échoue après écriture du blob `.quar`, le blob est **supprimé** (rollback) et la quarantaine est annulée.
+- Si la **persistance du manifeste** échoue après écriture du blob, l’entrée est retirée et le blob est supprimé.
+
+Pendant un **scan en cours**, `ScanViewModel.ActiveScanSessionId` lie les quarantaines à la session ; les chemins isolés pendant l’analyse sont exclus du résultat final (`RemoveAlreadyQuarantinedThreats`).
+
 ### 4.9 Journaux et historique
 
 | Fichier / service | Rôle |
 |---|---|
-| `ScanLogManager` → `scan_history.dat` / `clean_history.dat` | Historique chiffré **DPAPI + HMAC** (`SecureStore`) ; rotation implicite : à **100** entrées, les **50** plus anciennes sont retirées (reste **50**, regrossit jusqu'à 100) ; **v8** : `Threats[]` ; migration `.json` → `.legacy` |
+| `ActivityLogService` → `%LocalAppData%\optiSCAN\Logs\activity_log.dat` | Timeline **Historique** (DPAPI + HMAC) ; événements immuables : `ScanCompleted`, `CleanCompleted`, `ThreatQuarantined`, `ThreatRestored`, `QuarantineDeleted` ; rétention **150** événements les plus récents (`MaxActivityEvents`) ; **migration unique** au premier lancement depuis `scan_history.dat` / `clean_history.dat` + entrées quarantaine actuelles si le fichier est vide |
+| `ScanLogManager` → `scan_history.dat` / `clean_history.dat` | Détail des sessions (menaces en attente, exports) ; rotation **100 → 50** (même règle qu’avant) ; **v8** : `Threats[]` ; migration `.json` → `.legacy` ; alimente `ActivityLogService` à chaque scan/nettoyage terminé |
 | `ScanLogManager` → `optiSCAN.log` | Journal texte volontairement **non chiffré** (diagnostic) ; `FormatScanDetailCore` applique `PathRedaction` sur cible et chemins de menaces — noms de virus, dates et compteurs restent lisibles ; résumé dans **Historique → Scan Antivirus** |
 | `AppLogger` → `optiscan-YYYY-MM-DD.log` | Logs applicatifs (composants, erreurs) ; purge **> 30 jours**, au plus **1×/jour** (marqueur `.lastcleanup` persisté) |
 
-**Panneau Historique** (`HistoryControl`, `Ctrl+4`) :
+**Panneau Historique** (`HistoryControl` + `HistoryViewModel`, `Ctrl+4`) :
 
-- **Timeline** : `ScanLogManager.GetActivityFeed()` fusionne scans et nettoyages (`ActivityEntry`), tri date décroissante ; filtres **Scans** / **Nettoyages** / **Tout** ; recherche sur type ou cible.
-- Détail d’une session **scan** : grille **Détections** (chemin, menace, risque) ; **Quarantaine** / **Ignorer** / **Supprimer** ; **Tout mettre en quarantaine** ; **Traiter dans Analyse** (`RequestReviewHistorySession`). Succès → `TryRemoveThreatFromSession` met à jour `scan_history.dat`.
+- **Timeline** : `ActivityLogService.GetActivityFeed(quarantine)` → `ActivityEntry`, tri date décroissante ; **5 puces** : **Tout**, **Menaces** (scans avec détections en attente), **Scans sains**, **Nettoyages**, **Quarantaine** ; recherche sur type, résumé, cible ou chemins quarantaine.
+- **Sélection stable** : clé `SelectionKey` — `SessionId` pour les scans, `EventId` pour quarantaine/restauration/suppression — conservée après `Refresh()`.
+- **Refresh** : `ReconcileQuarantinedThreats` retire des sessions persistées les menaces déjà en quarantaine (même chemin d’origine).
+- Détail **scan** : grille via `HistoryThreatRow` ; **Quarantaine** / **Ignorer** / **Supprimer** ; **Tout mettre en quarantaine** ; **Traiter dans Analyse**. Détail **quarantaine** : lecture seule ; chemin masqué selon contexte (`QuarantinePathVisibilityConverter`).
 - Sessions **v7** : badge menaces possible sans chemins (`Hist_DetailThreatsLegacy`) — relancer une analyse pour traiter.
-- Types affichés : analyse rapide/complète, fichier, dossier, **lecteur amovible** (`ScanType.RemovableDrive`), nettoyage système.
+- Types affichés : analyse rapide/complète, fichier, dossier, **lecteur amovible** (`ScanType.RemovableDrive`), nettoyage système, événements quarantaine.
 
 ### 4.10 Exports PDF et HTML
 
@@ -430,11 +441,12 @@ Le panneau **Vue d'ensemble** (`OverviewControl`, clé `Overview`) regroupe :
 |---|---|
 | Détection | `DriveType.Removable` **ou** lecteur `Fixed` reconnu USB via WMI (`InterfaceType`, `PNPDeviceID`, `MediaType`) |
 | Déjà branché au démarrage | Enregistré sans scan (évite une vague au lancement) |
-| Mode rapide (défaut) | Tous les fichiers du volume (plafond **4 000**), analyse fichier par fichier |
-| Mode complet (option) | `ScanOrchestrator.ScanFolderAsync` récursif (ClamAV + YARA) |
+| Mode rapide (défaut) | `CollectRiskyFiles` par **extension à risque** (`RiskyFileExtensions`, plafond **4 000**, délai énumération **90 s**) ; **ClamAV `--file-list`** puis **YARA par lots en série** (`scanEnginesSequentially: true`, évite verrous USB) ; **timeout 10 min** ; repli `ScanFolderBackgroundAsync` si erreur/annulation |
+| Mode complet (option) | `ScanFolderBackgroundAsync` récursif (ClamAV + YARA en parallèle, **sans pré-dénombrement YARA**) ; **timeout 45 min** |
 | Taille max. | **64 Go** par défaut (`RemovableDriveMaxSizeGb` ; `0` = illimité) |
 | Analyse complète manuelle | Option **Inclure les lecteurs amovibles** → `ScanTargets.FullScanTargets(includeRemovable: true)` |
-| Menace détectée | Historique (`ScanType.RemovableDrive`), toasts, quarantaine auto si activée, liste **Analyser** via `ThreatDetected` (même handler que la RTP) |
+| UI / notifications | Toasts début/fin (`ShowRemovableDriveScanStarted` / `ShowRemovableDriveScanCompleted`) si notifications activées ; barre de statut **Démarré** / **Terminé** / **Échec** via `ScanStatusChanged` (`MainWindow`) |
+| Menace détectée | Historique (`ScanType.RemovableDrive`), quarantaine auto si activée, liste **Analyser** via `ThreatDetected` (même handler que la RTP) ; RTP **suspendue** pendant le scan |
 
 Un seul scan USB à la fois (**SemaphoreSlim(1)**). `ServiceContainer.ApplyRemovableDriveScan` / `ApplyPreferencesOnStartup` démarrent ou arrêtent le service.
 
@@ -511,7 +523,7 @@ DÉMARRAGE (UI)
             ├─→ [VUE D'ENSEMBLE] — hero (protection + dernière analyse), cartes d’action, statistiques 30 j., recommandations
             ├─→ [NETTOYER] — temporaires, caches navigateurs (Edge, Chrome, Firefox, Brave, **Opera**, **Vivaldi**, **Arc**), corbeille, journaux Windows
             ├─→ [ANTIVIRUS] — scans rapide/complet/dossier/fichier, quarantaine, historique de session, signatures
-            ├─→ [HISTORIQUE] — sessions v8 : grille détections (chemin + menace), quarantaine / ignorer / supprimer, **Traiter dans Analyse** ; exports **HTML** / **PDF**
+            ├─→ [HISTORIQUE] — timeline `activity_log.dat` (5 filtres) ; sessions v8 : détections, quarantaine / ignorer / supprimer, **Traiter dans Analyse** ; exports **HTML** / **PDF**
             └─→ [OPTIONS] — langue FR/EN, thème (sync Windows par défaut), scan favori, démarrage auto, MAJ auto, RTP, scan USB/SD, quarantaine auto, planification, exclusions
 
 FERMETURE
@@ -661,7 +673,7 @@ Pipeline : [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 | Recommandations accueil | `OverviewRecommendationsBuilderTests` |
 | Stats accueil 30 j. | `OverviewProtectionStatsFormatterTests` |
 | Posture /100 | `SecurityPostureServiceTests` |
-| Historique / timeline | `ScanLogManagerTests` (`GetActivityFeed`, DPAPI, rotation) |
+| Historique / timeline | `ActivityLogServiceTests` (`GetActivityFeed`, trim 150) ; `ScanLogManagerTests` (DPAPI, rotation, `ReconcileQuarantinedThreats`) |
 | Scan USB/SD | `RemovableDriveDiscoveryTests` |
 | Thème Windows | `ThemeManagerPreferenceTests` |
 | Persistance | `SecureStoreTests`, `UserPreferencesStorageTests`, `ExclusionSettingsTests` |
@@ -727,9 +739,10 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 
 ### v8.0 — Clamd, posture, historique unifié, scan USB
 
-- **Historique** — timeline scans + nettoyages (`ActivityEntry`, `GetActivityFeed`) ; menaces traitables (**Traiter dans Analyse**) ; `scan_history.dat` / `clean_history.dat` chiffrés (DPAPI) ; rotation 100→50 ; compat v7 sans chemins
+- **Historique** — `ActivityLogService` + `activity_log.dat` (150 événements, migration unique) ; `HistoryViewModel` (5 filtres, `SelectionKey`) ; menaces traitables (**Traiter dans Analyse**) ; `scan_history.dat` / `clean_history.dat` (rotation 100→50) ; compat v7 sans chemins
 - **Accueil** — `OverviewRecommendationsBuilder` + `OverviewProtectionStatsFormatter` (stats 30 j. sans doublon dans les recommandations)
-- **Scan USB/SD** — `RemovableDriveScanService` (WMI + polling) ; rapide = tous fichiers (plafond 4 000) ; clés `Fixed` détectées via WMI USB ; type `RemovableDrive` ; pipeline menaces identique à la RTP
+- **Scan USB/SD** — rapide = extensions à risque (4 000 max), moteurs **en série**, timeouts 10/45 min, repli récursif ; complet = `ScanFolderBackgroundAsync` ; statut barre + toasts début/fin
+- **Quarantaine** — rollback si suppression originale échoue ; `ReconcileQuarantinedThreats` ; session scan active (`ActiveScanSessionId`)
 - **Thème Windows** — `SyncWindowsTheme` par défaut ; case Options (thème opposé à Windows) ; `ThemeManager.Initialize()` dans `MainWindow` avant `InitializeComponent`
 - **clamd** — `CompositeClamAvBackend`, TCP `127.0.0.1:3310`, repli `clamscan.exe`
 - **Posture /100**, **VirusTotal**, **mode jeu** — voir [§13](#13-sécurité-posture-et-menaces) et Options

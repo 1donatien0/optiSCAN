@@ -51,6 +51,62 @@ namespace optiSCAN.Services
             return RunScanAsync(ScanType.Folder, folderPath, recursive: true, progress, ct);
         }
 
+        public Task<ScanResult> ScanFileListAsync(
+            IReadOnlyList<string> files,
+            string targetPath,
+            IProgress<ScanProgress>? progress = null,
+            CancellationToken ct = default)
+        {
+            if (files.Count == 0)
+            {
+                var now = DateTime.Now;
+                return Task.FromResult(new ScanResult
+                {
+                    Type = ScanType.Folder,
+                    TargetPath = targetPath,
+                    StartedAt = now,
+                    FinishedAt = now,
+                    Status = ScanStatus.Completed,
+                    FilesScanned = 0,
+                });
+            }
+
+            return RunFileListViaClamdAsync(files, targetPath, progress, ct);
+        }
+
+        private async Task<ScanResult> RunFileListViaClamdAsync(
+            IReadOnlyList<string> files,
+            string targetPath,
+            IProgress<ScanProgress>? progress,
+            CancellationToken ct)
+        {
+            if (!await TryEnsureReadyAsync(ct).ConfigureAwait(false))
+                throw new InvalidOperationException(LocalizationService.GetString("Clamd_NotReady"));
+
+            LastMode = "clamd";
+            var merged = new ScanResult
+            {
+                Type = ScanType.Folder,
+                TargetPath = targetPath,
+                StartedAt = DateTime.Now,
+                Status = ScanStatus.Running,
+            };
+
+            foreach (var file in files)
+            {
+                if (ct.IsCancellationRequested) break;
+                if (!File.Exists(file)) continue;
+                var partial = await ScanFileAsync(file, progress, ct).ConfigureAwait(false);
+                foreach (var threat in partial.Threats)
+                    merged.Threats.Add(threat);
+                merged.FilesScanned += Math.Max(partial.FilesScanned, 1);
+            }
+
+            merged.FinishedAt = DateTime.Now;
+            merged.Status = ct.IsCancellationRequested ? ScanStatus.Cancelled : ScanStatus.Completed;
+            return merged;
+        }
+
         private async Task<ScanResult> RunScanAsync(
             ScanType type, string targetPath, bool recursive,
             IProgress<ScanProgress>? progress, CancellationToken ct)

@@ -130,6 +130,67 @@ namespace optiSCAN.Services
             }
         }
 
+        public void ShowRemovableDriveScanStarted(string driveLabel)
+        {
+            if (!ShouldShowToast()) return;
+
+            try
+            {
+                new ToastContentBuilder()
+                    .AddArgument("action", "usbscanstart")
+                    .AddArgument("drive", driveLabel)
+                    .AddText(LocalizationService.GetString("Notif_UsbScanStartedTitle"))
+                    .AddText(LocalizationService.Format("Notif_UsbScanStartedBody", driveLabel))
+                    .SetToastDuration(ToastDuration.Short)
+                    .Show();
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("NotificationService", "ShowRemovableDriveScanStarted", ex);
+            }
+        }
+
+        public void ShowRemovableDriveScanCompleted(string driveLabel, int threatsFound, int filesScanned)
+        {
+            if (!ShouldShowToast()) return;
+
+            try
+            {
+                if (threatsFound == 0)
+                {
+                    new ToastContentBuilder()
+                        .AddArgument("action", "usbscanok")
+                        .AddArgument("drive", driveLabel)
+                        .AddText(LocalizationService.Format("Notif_UsbScanOkTitle", driveLabel))
+                        .AddText(LocalizationService.Format("Notif_UsbScanOkBody", driveLabel, filesScanned))
+                        .AddButton(new ToastButton()
+                            .SetContent(LocalizationService.GetString("Notif_OpenAntivirus"))
+                            .AddArgument("action", "openav"))
+                        .Show();
+                }
+                else
+                {
+                    new ToastContentBuilder()
+                        .AddArgument("action", "usbscanthreats")
+                        .AddArgument("drive", driveLabel)
+                        .AddArgument("threats", threatsFound.ToString())
+                        .AddText(LocalizationService.Format("Notif_UsbScanThreatsTitle", driveLabel, threatsFound))
+                        .AddText(LocalizationService.Format("Notif_UsbScanThreatsBody", driveLabel, threatsFound, filesScanned))
+                        .AddButton(new ToastButton()
+                            .SetContent(LocalizationService.GetString("Notif_OpenAntivirus"))
+                            .AddArgument("action", "openav"))
+                        .AddButton(new ToastButton()
+                            .SetContent(LocalizationService.GetString("Notif_HistoryBtn"))
+                            .AddArgument("action", "history"))
+                        .Show();
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("NotificationService", "ShowRemovableDriveScanCompleted", ex);
+            }
+        }
+
         public void ShowScanCompleted(int threatsFound, int filesScanned)
         {
             if (!ShouldShowToast()) return;

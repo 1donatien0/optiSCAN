@@ -14,8 +14,10 @@ namespace optiSCAN.Services
     public sealed class RemovableDriveScanService : IDisposable
     {
         private const int MountSettleDelayMs = 2000;
-        private const int QuickScanMaxRiskyFiles = 4000;
         private const int PollIntervalMs = 4000;
+        private static readonly TimeSpan QuickScanTimeout = TimeSpan.FromMinutes(10);
+        private static readonly TimeSpan DetailedScanTimeout = TimeSpan.FromMinutes(45);
+        private static readonly TimeSpan RiskyFileEnumTimeout = TimeSpan.FromSeconds(90);
         private const int WmiDeviceArrival = 2;
         private const int WmiDeviceRemoval = 3;
 
@@ -33,6 +35,9 @@ namespace optiSCAN.Services
         private bool _disposed;
 
         public event EventHandler<ThreatInfo>? ThreatDetected;
+
+        /// <summary>Émis au début et à la fin d'une analyse USB (thread pool — marshaler vers l'UI).</summary>
+        public event EventHandler<RemovableDriveScanStatusEventArgs>? ScanStatusChanged;
 
         public RemovableDriveScanService(
             ScanOrchestrator orchestrator,
@@ -197,94 +202,199 @@ namespace optiSCAN.Services
 
         private async Task RunScanAsync(string root)
         {
-            AppLogger.Info("RemovableDriveScan", $"Analyse du lecteur {root}…");
+            var driveLabel = RemovableDriveDiscovery.GetDriveDisplayLabel(root);
             var detailed = UserPreferences.Current.RemovableDriveScanDetailed;
-            ScanResult result;
-            try
-            {
-                result = detailed
-                    ? await ScanDetailedAsync(root).ConfigureAwait(false)
-                    : await ScanQuickAsync(root).ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Error("RemovableDriveScan", $"Échec scan {root}", ex);
-                return;
-            }
+            AppLogger.Info("RemovableDriveScan", $"Analyse du lecteur {root}… (mode {(detailed ? "complet" : "rapide")})");
 
-            _logger.SaveScanResult(result);
-            UserPreferences.Current.IncrementScanCount(ScanType.RemovableDrive);
-            ServiceContainer.Default.RequestScanHistoryViewsRefresh();
-
-            if (result.Threats.Count > 0)
-            {
-                if (ExclusionSettings.Current.AutoQuarantineEnabled)
-                {
-                    var n = _quarantine.QuarantineAll(result.Threats);
-                    if (n > 0)
-                        AppLogger.Info("RemovableDriveScan", $"{n} fichier(s) mis en quarantaine sur {root}.");
-                }
-
-                foreach (var threat in result.Threats)
-                {
-                    _notifications.ShowThreatDetected(threat);
-                    ThreatDetected?.Invoke(this, threat);
-                }
-            }
+            NotifyScanStatus(RemovableDriveScanPhase.Started, root, driveLabel, 0, 0);
 
             if (UserPreferences.Current.ActionNotificationsEnabled)
-                _notifications.ShowScanCompleted(result.Threats.Count, result.FilesScanned);
+                _notifications.ShowRemovableDriveScanStarted(driveLabel);
+
+            ScanResult? result = null;
+            var scanSucceeded = false;
+
+            ServiceContainer.Default.RealTimeProtection.Suspend();
+            try
+            {
+                using var cts = new CancellationTokenSource(detailed ? DetailedScanTimeout : QuickScanTimeout);
+                try
+                {
+                    result = detailed
+                        ? await ScanDetailedAsync(root, cts.Token).ConfigureAwait(false)
+                        : await ScanQuickAsync(root, cts.Token).ConfigureAwait(false);
+                    scanSucceeded = result.Status is ScanStatus.Completed or ScanStatus.Cancelled;
+                }
+                catch (OperationCanceledException)
+                {
+                    AppLogger.Warn("RemovableDriveScan", $"Analyse {root} annulée (délai dépassé).");
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Error("RemovableDriveScan", $"Échec scan {root}", ex);
+                }
+
+                if (scanSucceeded && result != null)
+                {
+                    _logger.SaveScanResult(result);
+                    UserPreferences.Current.IncrementScanCount(ScanType.RemovableDrive);
+                    ServiceContainer.Default.RequestScanHistoryViewsRefresh();
+
+                    if (result.Threats.Count > 0)
+                    {
+                        if (ExclusionSettings.Current.AutoQuarantineEnabled)
+                        {
+                            int n = 0;
+                            foreach (var threat in result.Threats.ToList())
+                            {
+                                if (_quarantine.Quarantine(threat, result.SessionId))
+                                {
+                                    n++;
+                                    _logger.TryRemoveThreatFromSession(result.SessionId, threat.FilePath);
+                                }
+                            }
+                            if (n > 0)
+                            {
+                                AppLogger.Info("RemovableDriveScan", $"{n} fichier(s) mis en quarantaine sur {root}.");
+                                ServiceContainer.Default.RequestScanHistoryViewsRefresh();
+                            }
+                        }
+
+                        foreach (var threat in result.Threats)
+                            ThreatDetected?.Invoke(this, threat);
+                    }
+
+                    if (UserPreferences.Current.ActionNotificationsEnabled)
+                        _notifications.ShowRemovableDriveScanCompleted(
+                            driveLabel, result.Threats.Count, result.FilesScanned);
+                }
+            }
+            finally
+            {
+                ServiceContainer.Default.RealTimeProtection.Resume();
+
+                var phase = scanSucceeded ? RemovableDriveScanPhase.Completed : RemovableDriveScanPhase.Failed;
+                var threats = result?.Threats.Count ?? 0;
+                var files = result?.FilesScanned ?? 0;
+                NotifyScanStatus(phase, root, driveLabel, threats, files);
+            }
         }
 
-        private async Task<ScanResult> ScanDetailedAsync(string root)
+        private async Task<ScanResult> ScanDetailedAsync(string root, CancellationToken ct)
         {
-            var result = await _orchestrator.ScanFolderAsync(root).ConfigureAwait(false);
+            var result = await _orchestrator.ScanFolderBackgroundAsync(root, ScanType.RemovableDrive, ct).ConfigureAwait(false);
             result.Type = ScanType.RemovableDrive;
             return result;
         }
 
-        private async Task<ScanResult> ScanQuickAsync(string root)
+        /// <summary>
+        /// Scan USB rapide : extensions à risque, plafonnées, moteurs en série (évite les verrous USB).
+        /// Repli sur scan dossier si la liste de fichiers échoue.
+        /// </summary>
+        private async Task<ScanResult> ScanQuickAsync(string root, CancellationToken ct)
         {
-            var files = RemovableDriveDiscovery.EnumerateAllFiles(root, QuickScanMaxRiskyFiles).ToList();
-            if (files.Count == 0)
-            {
-                AppLogger.Info("RemovableDriveScan", $"Aucun fichier lisible sur {root} — repli analyse complète du volume.");
-                return await ScanDetailedAsync(root).ConfigureAwait(false);
-            }
+            var files = await Task.Run(
+                () => RemovableDriveDiscovery.CollectRiskyFiles(
+                    root,
+                    RemovableDriveDiscovery.QuickScanMaxFiles,
+                    ct,
+                    RiskyFileEnumTimeout),
+                ct).ConfigureAwait(false);
 
-            var merged = new ScanResult
-            {
-                Type = ScanType.RemovableDrive,
-                TargetPath = root,
-                StartedAt = DateTime.Now,
-                Status = ScanStatus.Running,
-            };
+            AppLogger.Info("RemovableDriveScan",
+                $"Mode rapide {root} — {files.Count} fichier(s) à risque.");
 
-            foreach (var file in files)
+            ScanResult result;
+            if (files.Count > 0)
             {
-                if (ExclusionSettings.Current.IsFileExcluded(file))
+                result = await _orchestrator.ScanFileListAsync(
+                    files,
+                    root,
+                    ScanType.RemovableDrive,
+                    progress: null,
+                    ct,
+                    scanEnginesSequentially: true).ConfigureAwait(false);
+
+                if (result.Status is ScanStatus.Error or ScanStatus.Cancelled)
                 {
-                    merged.FilesSkipped++;
-                    continue;
+                    AppLogger.Warn("RemovableDriveScan",
+                        $"Scan liste {root} interrompu ({result.Status}) — repli scan récursif.");
+                    result = await _orchestrator.ScanFolderBackgroundAsync(root, ScanType.RemovableDrive, ct)
+                        .ConfigureAwait(false);
                 }
-
-                var sub = await _orchestrator.ScanFileAsync(file).ConfigureAwait(false);
-                merged.FilesScanned += sub.FilesScanned > 0 ? sub.FilesScanned : 1;
-                merged.FilesSkipped += sub.FilesSkipped;
-                merged.TotalBytesScanned += sub.TotalBytesScanned;
-                foreach (var t in sub.Threats)
-                    ScanThreatMerger.AddOrMergeThreat(merged.Threats, t);
+            }
+            else
+            {
+                var now = DateTime.Now;
+                result = new ScanResult
+                {
+                    Type = ScanType.RemovableDrive,
+                    TargetPath = root,
+                    StartedAt = now,
+                    FinishedAt = now,
+                    Status = ScanStatus.Completed,
+                    FilesScanned = 0,
+                };
             }
 
-            merged.FinishedAt = DateTime.Now;
-            merged.Status = ScanStatus.Completed;
-            return merged;
+            result.Type = ScanType.RemovableDrive;
+            return result;
         }
+
+        private void NotifyScanStatus(
+            RemovableDriveScanPhase phase,
+            string root,
+            string driveLabel,
+            int threatsFound,
+            int filesScanned)
+        {
+            try
+            {
+                ScanStatusChanged?.Invoke(this, new RemovableDriveScanStatusEventArgs(
+                    phase, root, driveLabel, threatsFound, filesScanned));
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("RemovableDriveScan", "ScanStatusChanged", ex);
+            }
+        }
+    }
+
+    public enum RemovableDriveScanPhase
+    {
+        Started,
+        Completed,
+        Failed
+    }
+
+    public sealed class RemovableDriveScanStatusEventArgs : EventArgs
+    {
+        public RemovableDriveScanStatusEventArgs(
+            RemovableDriveScanPhase phase,
+            string root,
+            string driveLabel,
+            int threatsFound,
+            int filesScanned)
+        {
+            Phase = phase;
+            Root = root;
+            DriveLabel = driveLabel;
+            ThreatsFound = threatsFound;
+            FilesScanned = filesScanned;
+        }
+
+        public RemovableDriveScanPhase Phase { get; }
+        public string Root { get; }
+        public string DriveLabel { get; }
+        public int ThreatsFound { get; }
+        public int FilesScanned { get; }
     }
 
     /// <summary>Détection et filtrage des lecteurs amovibles (testable).</summary>
     internal static class RemovableDriveDiscovery
     {
+        public const int QuickScanMaxFiles = 4000;
+
         public static IReadOnlyList<string> GetReadyRemovableRoots()
         {
             var list = new List<string>();
@@ -345,6 +455,24 @@ namespace optiSCAN.Services
             }
         }
 
+        public static string GetDriveDisplayLabel(string root)
+        {
+            try
+            {
+                var letter = root.TrimEnd('\\');
+                if (letter.Length < 2)
+                    return root;
+                var drive = new DriveInfo(letter);
+                if (drive.IsReady && !string.IsNullOrWhiteSpace(drive.VolumeLabel))
+                    return $"{letter} ({drive.VolumeLabel})";
+                return letter;
+            }
+            catch
+            {
+                return root.TrimEnd('\\');
+            }
+        }
+
         /// <summary>Tous les fichiers du volume (pas seulement les extensions RTP), plafonnés.</summary>
         public static IEnumerable<string> EnumerateAllFiles(string root, int maxFiles)
         {
@@ -389,6 +517,82 @@ namespace optiSCAN.Services
                         yield break;
                 }
             }
+        }
+
+        /// <summary>Fichiers à risque uniquement (même critère que la protection temps réel).</summary>
+        public static IEnumerable<string> EnumerateRiskyFiles(string root, int maxFiles) =>
+            CollectRiskyFiles(root, maxFiles, CancellationToken.None);
+
+        /// <summary>
+        /// Collecte les fichiers à risque par extension (plus rapide qu'un parcours fichier par fichier).
+        /// Respecte <paramref name="maxFiles"/>, le jeton d'annulation et un délai max d'énumération.
+        /// </summary>
+        public static List<string> CollectRiskyFiles(
+            string root,
+            int maxFiles,
+            CancellationToken ct,
+            TimeSpan? enumerationTimeout = null)
+        {
+            var list = new List<string>(Math.Min(maxFiles, 256));
+            if (!Directory.Exists(root) || maxFiles <= 0)
+                return list;
+
+            var deadline = enumerationTimeout.HasValue
+                ? DateTime.UtcNow + enumerationTimeout.Value
+                : DateTime.MaxValue;
+            var excl = ExclusionSettings.Current;
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+
+            foreach (var ext in RiskyFileExtensions.All)
+            {
+                if (list.Count >= maxFiles || ct.IsCancellationRequested || DateTime.UtcNow >= deadline)
+                    break;
+
+                IEnumerable<string> candidates;
+                try
+                {
+                    candidates = Directory.EnumerateFiles(root, "*" + ext, SearchOption.AllDirectories);
+                }
+                catch
+                {
+                    continue;
+                }
+
+                foreach (var file in candidates)
+                {
+                    if (list.Count >= maxFiles || ct.IsCancellationRequested || DateTime.UtcNow >= deadline)
+                        return list;
+                    if (ShouldSkipUsbScanPath(file))
+                        continue;
+                    if (excl.IsFileExcluded(file))
+                        continue;
+                    if (!seen.Add(file))
+                        continue;
+                    list.Add(file);
+                }
+            }
+
+            return list;
+        }
+
+        internal static bool ShouldSkipUsbScanPath(string path)
+        {
+            if (string.IsNullOrWhiteSpace(path))
+                return true;
+
+            var parts = path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            foreach (var part in parts)
+            {
+                if (part.Equals("$RECYCLE.BIN", StringComparison.OrdinalIgnoreCase)
+                    || part.Equals("System Volume Information", StringComparison.OrdinalIgnoreCase)
+                    || part.Equals("RECYCLER", StringComparison.OrdinalIgnoreCase)
+                    || part.Equals("RECYCLED", StringComparison.OrdinalIgnoreCase))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         /// <summary>

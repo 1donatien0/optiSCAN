@@ -282,6 +282,59 @@ namespace optiSCAN.Services
             return matches;
         }
 
+        /// <summary>
+        /// Scanne une liste de fichiers en lots (un processus yara par lot).
+        /// Évite le scan récursif complet du volume pour le mode USB rapide.
+        /// </summary>
+        public async Task<List<YaraMatch>> ScanFilesAsync(
+            IReadOnlyList<string> files,
+            IProgress<string>? progress = null,
+            CancellationToken ct = default)
+        {
+            var matches = new List<YaraMatch>();
+            if (!IsAvailable || files.Count == 0) return matches;
+
+            if (!HasCompiled)
+                await CompileRulesAsync(ct);
+
+            const int batchSize = 32;
+            for (var i = 0; i < files.Count; i += batchSize)
+            {
+                if (ct.IsCancellationRequested) break;
+
+                var batch = new List<string>(batchSize);
+                for (var j = i; j < files.Count && batch.Count < batchSize; j++)
+                {
+                    var path = files[j];
+                    if (File.Exists(path) && !ExclusionSettings.Current.IsFileExcluded(path))
+                        batch.Add(path);
+                }
+
+                if (batch.Count == 0) continue;
+
+                progress?.Report(LocalizationService.Format("Scan_Yara_Recursive", batch.Count.ToString()));
+
+                if (HasCompiled)
+                {
+                    var args = new List<string> { "-N", "--compiled-rules", _compiledRulesPath };
+                    args.AddRange(batch);
+                    matches.AddRange(await RunYaraScanRecursiveAsync(args, ct, progress).ConfigureAwait(false));
+                }
+                else
+                {
+                    foreach (var ruleFile in Directory.GetFiles(_rulesDirectory, "*.yar"))
+                    {
+                        if (ct.IsCancellationRequested) break;
+                        var args = new List<string> { "-N", ruleFile };
+                        args.AddRange(batch);
+                        matches.AddRange(await RunYaraScanRecursiveAsync(args, ct, progress).ConfigureAwait(false));
+                    }
+                }
+            }
+
+            return matches;
+        }
+
         /// <summary>Retourne true si au moins une règle YARA matche le fichier.</summary>
         public async Task<bool> IsMaliciousAsync(string filePath, CancellationToken ct = default)
             => (await ScanFileAsync(filePath, ct)).Count > 0;
@@ -383,7 +436,22 @@ namespace optiSCAN.Services
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
 
-                await process.WaitForExitAsync(ct);
+                using (ct.Register(() =>
+                {
+                    try
+                    {
+                        if (!process.HasExited)
+                            process.Kill(entireProcessTree: true);
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Warn("YaraEngine", "Annulation — arrêt yara", ex);
+                    }
+                }))
+                {
+                    await process.WaitForExitAsync(ct).ConfigureAwait(false);
+                }
+
                 try { process.WaitForExit(); }
                 catch { /* processus déjà terminé — drain stdout */ }
 
@@ -461,7 +529,21 @@ namespace optiSCAN.Services
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
 
-                await process.WaitForExitAsync(ct);
+                using (ct.Register(() =>
+                {
+                    try
+                    {
+                        if (!process.HasExited)
+                            process.Kill(entireProcessTree: true);
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Warn("YaraEngine", "Annulation — arrêt yara", ex);
+                    }
+                }))
+                {
+                    await process.WaitForExitAsync(ct).ConfigureAwait(false);
+                }
 
                 // Drain final synchrone : garantit la réception des dernières
                 // lignes capturées avant que outputSb soit lu (cf. doc MS).

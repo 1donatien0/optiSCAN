@@ -19,6 +19,7 @@ namespace optiSCAN.Services
         private System.Threading.Timer? _cacheCleanupTimer;
         private bool _isEnabled;
         private bool _disposed;
+        private int _suspendCount;
 
         // Dossiers système à surveiller (pas C:\Users en entier — trop d'événements avec sous-dossiers).
         private static readonly string[] DefaultWatchFolders = new[]
@@ -33,6 +34,18 @@ namespace optiSCAN.Services
 
         public event EventHandler<Models.ThreatInfo>? ThreatDetected;
         public bool IsEnabled => _isEnabled;
+
+        /// <summary>Ignore les événements watcher pendant un scan manuel (compteur réentrant).</summary>
+        public void Suspend() => Interlocked.Increment(ref _suspendCount);
+
+        /// <summary>Réactive la surveillance après <see cref="Suspend"/>.</summary>
+        public void Resume()
+        {
+            if (Interlocked.Decrement(ref _suspendCount) < 0)
+                Interlocked.Exchange(ref _suspendCount, 0);
+        }
+
+        private bool IsSuspended => Volatile.Read(ref _suspendCount) > 0;
 
         public RealTimeProtection(ScanOrchestrator orchestrator, QuarantineManager quarantineManager, NotificationService notifications)
         {
@@ -148,6 +161,8 @@ namespace optiSCAN.Services
                 // Ignorer les dossiers
                 if (Directory.Exists(e.FullPath)) return;
 
+                if (IsSuspended) return;
+
                 if (!RiskyFileExtensions.IsRisky(e.FullPath)) return;
 
                 // Dédup immédiate (avant le délai de stabilisation) pour éviter deux
@@ -198,6 +213,8 @@ namespace optiSCAN.Services
             try
             {
                 if (Directory.Exists(e.FullPath)) return;
+
+                if (IsSuspended) return;
 
                 if (!RiskyFileExtensions.IsRisky(e.FullPath)) return;
 

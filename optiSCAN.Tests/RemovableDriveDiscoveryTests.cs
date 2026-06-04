@@ -28,7 +28,37 @@ public class RemovableDriveDiscoveryTests
     }
 
     [Fact]
-    public void EnumerateAllFiles_includes_non_executable_extensions()
+    public void CollectRiskyFiles_skips_non_executable_extensions()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "optiscan_usb_risky_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var doc = Path.Combine(dir, "readme.txt");
+            var exe = Path.Combine(dir, "app.exe");
+            File.WriteAllText(doc, "test");
+            File.WriteAllText(exe, "MZ");
+
+            var files = RemovableDriveDiscovery.CollectRiskyFiles(dir, 10, CancellationToken.None);
+            Assert.Contains(exe, files);
+            Assert.DoesNotContain(doc, files);
+        }
+        finally
+        {
+            try { Directory.Delete(dir, true); } catch { /* ignore */ }
+        }
+    }
+
+    [Fact]
+    public void ShouldSkipUsbScanPath_skips_recycle_and_system_folders()
+    {
+        Assert.True(RemovableDriveDiscovery.ShouldSkipUsbScanPath(@"F:\$RECYCLE.BIN\file.exe"));
+        Assert.True(RemovableDriveDiscovery.ShouldSkipUsbScanPath(@"F:\System Volume Information\idx"));
+        Assert.False(RemovableDriveDiscovery.ShouldSkipUsbScanPath(@"F:\tools\setup.exe"));
+    }
+
+    [Fact]
+    public void EnumerateRiskyFiles_includes_non_executable_extensions()
     {
         var dir = Path.Combine(Path.GetTempPath(), "optiscan_usb_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);

@@ -131,6 +131,33 @@ namespace optiSCAN.Services
             return RunScanAsync(ScanType.Folder, folderPath, recursive: true, progress, ct);
         }
 
+        /// <summary>
+        /// Analyse une liste de fichiers en un seul processus clamscan (--file-list).
+        /// Utilisé pour le scan USB rapide (extensions à risque uniquement).
+        /// </summary>
+        public Task<ScanResult> ScanFileListAsync(
+            IReadOnlyList<string> files,
+            string targetPath,
+            IProgress<ScanProgress>? progress = null,
+            CancellationToken ct = default)
+        {
+            if (files.Count == 0)
+            {
+                var now = DateTime.Now;
+                return Task.FromResult(new ScanResult
+                {
+                    Type = ScanType.Folder,
+                    TargetPath = targetPath,
+                    StartedAt = now,
+                    FinishedAt = now,
+                    Status = ScanStatus.Completed,
+                    FilesScanned = 0,
+                });
+            }
+
+            return RunFileListScanAsync(files, targetPath, progress, ct);
+        }
+
         /// <summary>Analyse rapide sur les dossiers système prioritaires (chemins définis dans <see cref="ScanTargets"/>).</summary>
         public async Task<ScanResult> QuickScanAsync(
             IProgress<ScanProgress>? progress = null,
@@ -149,9 +176,38 @@ namespace optiSCAN.Services
 
         // ── Implémentation interne ────────────────────────────────────────────────
 
-        private async Task<ScanResult> RunScanAsync(
+        private Task<ScanResult> RunFileListScanAsync(
+            IReadOnlyList<string> files,
+            string targetPath,
+            IProgress<ScanProgress>? progress,
+            CancellationToken ct) =>
+            RunScanCoreAsync(ScanType.Folder, targetPath, progress, ct, args =>
+            {
+                var listPath = Path.Combine(Path.GetTempPath(), "optiscan_clam_" + Guid.NewGuid().ToString("N") + ".lst");
+                var existing = files.Where(File.Exists).ToList();
+                if (existing.Count == 0)
+                    throw new InvalidOperationException("Aucun fichier accessible dans la liste de scan.");
+
+                File.WriteAllLines(listPath, existing, System.Text.Encoding.UTF8);
+                BuildFileListScanArgs(args, listPath);
+                return listPath;
+            });
+
+        private Task<ScanResult> RunScanAsync(
             ScanType type, string targetPath, bool recursive,
-            IProgress<ScanProgress>? progress, CancellationToken ct)
+            IProgress<ScanProgress>? progress, CancellationToken ct) =>
+            RunScanCoreAsync(type, targetPath, progress, ct, args =>
+            {
+                BuildScanArgs(args, targetPath, recursive);
+                return null;
+            });
+
+        private async Task<ScanResult> RunScanCoreAsync(
+            ScanType type,
+            string targetPath,
+            IProgress<ScanProgress>? progress,
+            CancellationToken ct,
+            Func<Collection<string>, string?> configureArgs)
         {
             ValidateInstallation();
 
@@ -170,10 +226,12 @@ namespace optiSCAN.Services
                 CurrentFilePath = targetPath,
             });
 
+            string? tempFileList = null;
             try
             {
                 var startInfo = BuildStartInfo(_clamscanExe);
-                BuildScanArgs(startInfo.ArgumentList, targetPath, recursive);
+                tempFileList = configureArgs(startInfo.ArgumentList);
+
                 using var proc = new Process { StartInfo = startInfo };
 
                 proc.OutputDataReceived += (_, e) =>
@@ -193,10 +251,6 @@ namespace optiSCAN.Services
 
                 await WaitForProcessAsync(proc, ct);
 
-                // Drain : selon la doc Microsoft, après un WaitForExit asynchrone
-                // avec des async readers (BeginOutputReadLine), il faut un appel
-                // synchrone WaitForExit() pour garantir que les derniers buffers
-                // stdout/stderr aient été remis aux handlers.
                 try { proc.WaitForExit(); } catch { /* déjà terminé */ }
 
                 result.FinishedAt = DateTime.Now;
@@ -217,6 +271,13 @@ namespace optiSCAN.Services
                 result.Status = ScanStatus.Error;
                 result.ErrorMessage = ex.Message;
                 result.FinishedAt = DateTime.Now;
+            }
+            finally
+            {
+                if (!string.IsNullOrEmpty(tempFileList))
+                {
+                    try { File.Delete(tempFileList); } catch { /* ignore */ }
+                }
             }
 
             progress?.Report(new ScanProgress
@@ -284,6 +345,15 @@ namespace optiSCAN.Services
                 args.Add($"--database={dbDir}"); // ArgumentList gère l'échappement (quoting)
 
             args.Add(target);
+        }
+
+        private void BuildFileListScanArgs(Collection<string> args, string listPath)
+        {
+            args.Add("--stdout");
+            var dbDir = DatabaseDir;
+            if (!string.IsNullOrEmpty(dbDir))
+                args.Add($"--database={dbDir}");
+            args.Add($"--file-list={listPath}");
         }
 
         /// <summary>
