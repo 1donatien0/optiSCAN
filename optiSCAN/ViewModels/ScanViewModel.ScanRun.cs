@@ -2,7 +2,7 @@ using optiSCAN.Localization;
 using optiSCAN.Models;
 using optiSCAN.Services;
 using optiSCAN.Strings;
-using System.Linq;
+using System.Windows.Threading;
 using WpfApp = System.Windows.Application;
 
 namespace optiSCAN.ViewModels
@@ -21,7 +21,14 @@ namespace optiSCAN.ViewModels
             CurrentScanItem = ScanUserDisplay.Preparation;
             ScanProgressDetail = ScanUserDisplay.Preparation;
 
-            WpfApp.Current?.Dispatcher.Invoke(() => Threats.Clear());
+            WpfApp.Current?.Dispatcher.Invoke(() =>
+            {
+                Threats.Clear();
+                _scanThreatPaths.Clear();
+                _quarantinedDuringScanPaths.Clear();
+            });
+
+            _activeScanSessionId = Guid.NewGuid();
 
             if (type is ScanType.QuickScan or ScanType.FullScan)
             {
@@ -38,6 +45,7 @@ namespace optiSCAN.ViewModels
             var epoch = Interlocked.Increment(ref _scanEpoch);
             var progress = new Progress<ScanProgress>(p => SurChangementProgressionScan(p, epoch));
 
+            ServiceContainer.Default.RealTimeProtection.Suspend();
             try
             {
                 ScanResult result = type switch
@@ -48,6 +56,11 @@ namespace optiSCAN.ViewModels
                     ScanType.File => await _orchestrator.ScanFileAsync(path!, progress, _cts.Token),
                     _ => throw new InvalidOperationException(),
                 };
+
+                FlushPendingProgressToUiImmediate(epoch);
+
+                result.SessionId = _activeScanSessionId;
+                RemoveAlreadyQuarantinedThreats(result);
 
                 LastResult = result;
                 _logger.SaveScanResult(result);
@@ -65,14 +78,18 @@ namespace optiSCAN.ViewModels
                 WpfApp.Current?.Dispatcher.Invoke(() =>
                 {
                     foreach (var t in result.Threats)
-                        Threats.Add(t);
+                    {
+                        if (_scanThreatPaths.Add(t.FilePath))
+                            Threats.Add(t);
+                    }
                 });
 
                 int autoQuarantined = 0;
                 if (ExclusionSettings.Current.AutoQuarantineEnabled && result.Threats.Count > 0)
                 {
-                    autoQuarantined = _quarantine.QuarantineAll(result.Threats);
+                    autoQuarantined = _quarantine.QuarantineAll(result.Threats, result.SessionId);
                     WpfApp.Current?.Dispatcher.Invoke(LoadQuarantine);
+                    ServiceContainer.Default.RequestScanHistoryViewsRefresh();
                 }
 
                 StatusMessage = autoQuarantined > 0
@@ -98,6 +115,7 @@ namespace optiSCAN.ViewModels
             }
             finally
             {
+                FlushPendingProgressToUiImmediate(_scanEpoch);
                 Interlocked.Increment(ref _scanEpoch);
                 IsScanning = false;
                 IsIndeterminate = false;
@@ -106,73 +124,168 @@ namespace optiSCAN.ViewModels
                 ScanProgressDetail = string.Empty;
                 _cts?.Dispose();
                 _cts = null;
+                ServiceContainer.Default.RealTimeProtection.Resume();
             }
         }
 
         private void SurChangementProgressionScan(ScanProgress p, long epoch)
         {
-            WpfApp.Current?.Dispatcher.BeginInvoke(new Action(() =>
+            lock (_progressCoalesceLock)
             {
-                if (epoch != _scanEpoch)
-                    return;
+                _pendingProgress = p;
+                _pendingProgressEpoch = epoch;
+            }
+            ArmProgressCoalesceTimer();
+        }
 
-                if (p.FilesScanned > 0)
-                    FilesScanned = Math.Max(FilesScanned, p.FilesScanned);
-                if (p.ThreatsFound > 0)
-                    ThreatsFound = Math.Max(ThreatsFound, p.ThreatsFound);
+        private void ArmProgressCoalesceTimer()
+        {
+            var disp = WpfApp.Current?.Dispatcher;
+            if (disp == null) return;
 
-                if (!string.IsNullOrWhiteSpace(p.CurrentFilePath))
-                    CurrentScanItem = p.CurrentFilePath;
-                else if (p.Phase == ScanPhase.ThreatFound && p.ThreatInfo != null
-                    && !string.IsNullOrWhiteSpace(p.ThreatInfo.FilePath))
-                    CurrentScanItem = p.ThreatInfo.FilePath;
+            if (Interlocked.CompareExchange(ref _progressCoalesceArmPosted, 1, 0) != 0)
+                return;
 
-                int displayedFiles = FilesScanned;
+            disp.BeginInvoke(() =>
+            {
+                EnsureProgressCoalesceTimer();
+                _progressCoalesceTimer!.Stop();
+                _progressCoalesceTimer.Start();
+            }, DispatcherPriority.Background);
+        }
 
-                if (p.Phase != ScanPhase.ThreatFound)
+        private void EnsureProgressCoalesceTimer()
+        {
+            if (_progressCoalesceTimer != null) return;
+
+            var disp = WpfApp.Current?.Dispatcher;
+            if (disp == null) return;
+
+            _progressCoalesceTimer = new DispatcherTimer(
+                ProgressCoalesceInterval,
+                DispatcherPriority.Background,
+                FlushPendingProgressToUi,
+                disp);
+        }
+
+        private void FlushPendingProgressToUi(object? sender, EventArgs e)
+        {
+            _progressCoalesceTimer?.Stop();
+            Interlocked.Exchange(ref _progressCoalesceArmPosted, 0);
+
+            ScanProgress? p;
+            long epoch;
+            lock (_progressCoalesceLock)
+            {
+                p = _pendingProgress;
+                epoch = _pendingProgressEpoch;
+            }
+
+            if (p == null || epoch != _scanEpoch) return;
+            ApplyProgressSnapshot(p);
+
+            lock (_progressCoalesceLock)
+            {
+                if (_pendingProgress != null && _pendingProgressEpoch == epoch)
+                    ArmProgressCoalesceTimer();
+            }
+        }
+
+        private void FlushPendingProgressToUiImmediate(long epoch)
+        {
+            var disp = WpfApp.Current?.Dispatcher;
+            if (disp == null) return;
+
+            disp.Invoke(() =>
+            {
+                _progressCoalesceTimer?.Stop();
+                Interlocked.Exchange(ref _progressCoalesceArmPosted, 0);
+
+                ScanProgress? p;
+                long pendingEpoch;
+                lock (_progressCoalesceLock)
                 {
-                    StatusMessage = ScanUserDisplay.SyncFileCountInMessage(
-                        ScanUserDisplay.ForProgressMessage(p.Message),
-                        displayedFiles);
+                    p = _pendingProgress;
+                    pendingEpoch = _pendingProgressEpoch;
                 }
 
-                if (p.TotalFiles > 0 && displayedFiles > 0)
-                {
-                    var pctVal = Math.Min(100.0, displayedFiles * 100.0 / p.TotalFiles);
-                    ScanProgressDetail = LocalizationService.Format(
-                        "Vm_ScanProgressCountPct", displayedFiles, p.TotalFiles, (int)pctVal);
-                }
-                else if (displayedFiles > 0)
-                {
-                    ScanProgressDetail = LocalizationService.Format("Vm_ScanProgressScanned", displayedFiles);
-                }
-                else if (p.TotalFiles > 0)
-                {
-                    ScanProgressDetail = LocalizationService.Format("Vm_ScanProgressEstimated", p.TotalFiles);
-                }
-                else
-                {
-                    ScanProgressDetail = LocalizationService.GetString("Vm_ScanInProgress");
-                }
+                if (p == null || pendingEpoch != epoch) return;
+                ApplyProgressSnapshot(p);
+            });
+        }
 
-                if (p.TotalFiles > 0 && displayedFiles > 0)
-                {
-                    IsIndeterminate = false;
-                    ProgressValue = Math.Min(100.0, displayedFiles * 100.0 / p.TotalFiles);
-                }
-                else if (displayedFiles > 0)
-                {
-                    IsIndeterminate = true;
-                }
+        private void ApplyProgressSnapshot(ScanProgress p)
+        {
+            if (p.FilesScanned > 0)
+                FilesScanned = Math.Max(FilesScanned, p.FilesScanned);
+            if (p.ThreatsFound > 0)
+                ThreatsFound = Math.Max(ThreatsFound, p.ThreatsFound);
 
-                if (p.Phase == ScanPhase.ThreatFound && p.ThreatInfo != null)
+            if (!string.IsNullOrWhiteSpace(p.CurrentFilePath))
+                CurrentScanItem = p.CurrentFilePath;
+            else if (p.Phase == ScanPhase.ThreatFound && p.ThreatInfo != null
+                     && !string.IsNullOrWhiteSpace(p.ThreatInfo.FilePath))
+                CurrentScanItem = p.ThreatInfo.FilePath;
+
+            int displayedFiles = FilesScanned;
+
+            if (p.Phase != ScanPhase.ThreatFound)
+            {
+                StatusMessage = ScanUserDisplay.SyncFileCountInMessage(
+                    ScanUserDisplay.ForProgressMessage(p.Message),
+                    displayedFiles);
+            }
+
+            if (p.TotalFiles > 0 && displayedFiles > 0)
+            {
+                var pctVal = Math.Min(100.0, displayedFiles * 100.0 / p.TotalFiles);
+                ScanProgressDetail = LocalizationService.Format(
+                    "Vm_ScanProgressCountPct", displayedFiles, p.TotalFiles, (int)pctVal);
+            }
+            else if (displayedFiles > 0)
+            {
+                ScanProgressDetail = LocalizationService.Format("Vm_ScanProgressScanned", displayedFiles);
+            }
+            else if (p.TotalFiles > 0)
+            {
+                ScanProgressDetail = LocalizationService.Format("Vm_ScanProgressEstimated", p.TotalFiles);
+            }
+            else
+            {
+                ScanProgressDetail = LocalizationService.GetString("Vm_ScanInProgress");
+            }
+
+            if (p.TotalFiles > 0 && displayedFiles > 0)
+            {
+                IsIndeterminate = false;
+                ProgressValue = Math.Min(100.0, displayedFiles * 100.0 / p.TotalFiles);
+            }
+            else if (displayedFiles > 0)
+            {
+                IsIndeterminate = true;
+            }
+
+            if (p.Phase == ScanPhase.ThreatFound && p.ThreatInfo != null)
+            {
+                CurrentScanItem = p.ThreatInfo.FilePath;
+                StatusMessage = p.ThreatInfo.VirusName;
+                if (_scanThreatPaths.Add(p.ThreatInfo.FilePath))
+                    Threats.Add(p.ThreatInfo);
+            }
+        }
+
+        private void RemoveAlreadyQuarantinedThreats(ScanResult result)
+        {
+            for (int i = result.Threats.Count - 1; i >= 0; i--)
+            {
+                var path = result.Threats[i].FilePath;
+                if (_quarantinedDuringScanPaths.Contains(path)
+                    || _quarantine.GetEntries().Any(e =>
+                        string.Equals(e.OriginalPath, path, StringComparison.OrdinalIgnoreCase)))
                 {
-                    CurrentScanItem = p.ThreatInfo.FilePath;
-                    StatusMessage = p.ThreatInfo.VirusName;
-                    if (!Threats.Any(t => string.Equals(t.FilePath, p.ThreatInfo.FilePath, StringComparison.OrdinalIgnoreCase)))
-                        Threats.Add(p.ThreatInfo);
+                    result.Threats.RemoveAt(i);
                 }
-            }));
+            }
         }
 
         private void SurAjoutSortieMiseAJour(object? sender, string line)

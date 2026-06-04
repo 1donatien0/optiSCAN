@@ -18,12 +18,36 @@ namespace optiSCAN.ViewModels
                     OptiscanStrings.Confirmations.Title))
                 return;
 
-            int count = _quarantine.QuarantineAll(Threats);
+            var sessionId = ActiveScanSessionId;
+            int count = _quarantine.QuarantineAll(Threats, sessionId);
+            foreach (var threat in Threats.ToList())
+            {
+                if (IsPathCurrentlyQuarantined(threat.FilePath))
+                    _quarantinedDuringScanPaths.Add(threat.FilePath);
+            }
             LoadQuarantine();
-            foreach (var threat in Threats)
-                threat.Status = ThreatStatus.Quarantined;
+            foreach (var threat in Threats.ToList())
+            {
+                if (IsPathCurrentlyQuarantined(threat.FilePath))
+                    threat.Status = ThreatStatus.Quarantined;
+            }
             StatusMessage = LocalizationService.Format("Vm_QuarantineBatch", count);
+            ServiceContainer.Default.RequestScanHistoryViewsRefresh();
         }
+
+        /// <summary>Appelé après une quarantaine réussie pendant un scan en cours.</summary>
+        public void NotifyThreatQuarantinedDuringScan(string filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath)) return;
+            _quarantinedDuringScanPaths.Add(filePath);
+            LoadQuarantine();
+            ServiceContainer.Default.RequestScanHistoryViewsRefresh();
+        }
+
+        private bool IsPathCurrentlyQuarantined(string filePath) =>
+            !string.IsNullOrWhiteSpace(filePath)
+            && _quarantine.GetEntries().Any(e =>
+                string.Equals(e.OriginalPath, filePath, StringComparison.OrdinalIgnoreCase));
 
         private void RestoreFromQuarantine(string? id)
         {

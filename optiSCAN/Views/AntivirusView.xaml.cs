@@ -30,7 +30,20 @@ namespace optiSCAN.Views
         {
             InitializeComponent();
             DataContextChanged += AntivirusView_DataContextChanged;
+            Loaded += AntivirusView_Loaded;
             Unloaded += AntivirusView_Unloaded;
+        }
+
+        private void AntivirusView_Loaded(object sender, RoutedEventArgs e)
+        {
+            if (antivirusMainTabs != null)
+                antivirusMainTabs.SelectionChanged += AntivirusMainTabs_SelectionChanged;
+        }
+
+        private void AntivirusMainTabs_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            if (antivirusMainTabs?.SelectedIndex == 1)
+                VM?.LoadQuarantine(reset: true);
         }
 
         private void AntivirusView_DataContextChanged(object sender, DependencyPropertyChangedEventArgs e)
@@ -50,6 +63,9 @@ namespace optiSCAN.Views
 
         private void AntivirusView_Unloaded(object sender, RoutedEventArgs e)
         {
+            if (antivirusMainTabs != null)
+                antivirusMainTabs.SelectionChanged -= AntivirusMainTabs_SelectionChanged;
+
             if (_vmScanTabSubscription != null)
             {
                 _vmScanTabSubscription.DisplayScanProgressRequested -= SurDemandeAffichageProgressionScan;
@@ -259,13 +275,18 @@ namespace optiSCAN.Views
         {
             if (sender is System.Windows.Controls.Button btn && btn.Tag is string filePath)
             {
+                var sessionId = VM?.ActiveScanSessionId ?? Guid.Empty;
                 var known = ServiceContainer.Default.FindKnownThreat(filePath);
                 var result = known != null
-                    ? Actions.QuarantineThreat(known.Clone())
-                    : Actions.QuarantineThreat(filePath);
+                    ? Actions.QuarantineThreat(known.Clone(), sessionId)
+                    : Actions.QuarantineThreat(filePath, sessionId);
                 if (result.Success)
+                {
                     VM?.RemoveDetectedThreat(filePath);
-                RefreshAllData();
+                    VM?.NotifyThreatQuarantinedDuringScan(filePath);
+                }
+                VM?.LoadQuarantine(reset: true);
+                ServiceContainer.Default.RequestScanHistoryViewsRefresh();
             }
         }
 

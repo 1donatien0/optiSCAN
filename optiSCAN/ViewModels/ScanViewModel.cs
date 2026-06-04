@@ -32,6 +32,23 @@ namespace optiSCAN.ViewModels
         private CancellationTokenSource? _cts;
         private long _scanEpoch;
 
+        /// <summary>Chemins déjà affichés dans <see cref="Threats"/> pour le scan en cours (O(1)).</summary>
+        private readonly HashSet<string> _scanThreatPaths = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Session en cours (stable dès le début du scan — liée à la quarantaine).</summary>
+        private Guid _activeScanSessionId;
+
+        /// <summary>Fichiers mis en quarantaine pendant le scan en cours (exclus du résultat final).</summary>
+        private readonly HashSet<string> _quarantinedDuringScanPaths = new(StringComparer.OrdinalIgnoreCase);
+
+        // Coalescence des mises à jour UI pendant un scan (dernier ScanProgress gagnant).
+        private readonly object _progressCoalesceLock = new();
+        private ScanProgress? _pendingProgress;
+        private long _pendingProgressEpoch;
+        private int _progressCoalesceArmPosted;
+        private System.Windows.Threading.DispatcherTimer? _progressCoalesceTimer;
+        private static readonly TimeSpan ProgressCoalesceInterval = TimeSpan.FromMilliseconds(100);
+
         // ── Propriétés bindées ───────────────────────────────────────────────────
 
         private bool _isScanning;
@@ -280,6 +297,9 @@ namespace optiSCAN.ViewModels
         public bool CanScan => !IsScanning;
         public bool CanStop => IsScanning;
 
+        /// <summary>Identifiant de la session scan en cours (Guid.Empty si aucun scan actif).</summary>
+        public Guid ActiveScanSessionId => IsScanning ? _activeScanSessionId : Guid.Empty;
+
         public ICommand QuickScanCommand { get; }
         public ICommand FullScanCommand { get; }
         public ICommand ScanFolderCommand { get; }
@@ -486,6 +506,13 @@ namespace optiSCAN.ViewModels
             try { _cts?.Cancel(); } catch { }
             try { _cts?.Dispose(); } catch { }
             _cts = null;
+
+            try
+            {
+                _progressCoalesceTimer?.Stop();
+                _progressCoalesceTimer = null;
+            }
+            catch { /* ignore */ }
 
             try
             {

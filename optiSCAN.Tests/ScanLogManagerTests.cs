@@ -23,8 +23,12 @@ public sealed class ScanLogManagerTests : IDisposable
     }
 
     [Fact]
-    public void GetActivityFeed_merges_scans_and_cleans_newest_first()
+    public void ActivityLog_feed_merges_scans_and_cleans_newest_first()
     {
+        var activityLog = new ActivityLogService(_manager, _logDir);
+        _manager.BindActivityLog(activityLog);
+        var quarantine = new QuarantineManager(Path.Combine(_logDir, "q"));
+
         var scanTime = new DateTime(2026, 1, 10, 12, 0, 0);
         var cleanTime = new DateTime(2026, 1, 11, 8, 0, 0);
 
@@ -44,12 +48,40 @@ public sealed class ScanLogManagerTests : IDisposable
             BytesFreed = 1024,
         });
 
-        var feed = _manager.GetActivityFeed();
+        var feed = activityLog.GetActivityFeed(quarantine);
         Assert.Equal(2, feed.Count);
         Assert.Equal(ActivityKind.Clean, feed[0].Kind);
         Assert.Equal(cleanTime, feed[0].StartedAt);
         Assert.Equal(ActivityKind.Scan, feed[1].Kind);
         Assert.Equal(scanTime, feed[1].StartedAt);
+    }
+
+    [Fact]
+    public void ReconcileQuarantinedThreats_removes_paths_already_in_quarantine()
+    {
+        var sessionId = Guid.NewGuid();
+        _manager.SaveScanResult(new ScanResult
+        {
+            SessionId = sessionId,
+            StartedAt = DateTime.Now,
+            Type = ScanType.RemovableDrive,
+            TargetPath = @"F:\",
+            Status = ScanStatus.Completed,
+            FilesScanned = 1,
+            Threats = { ThreatInfo.FromClamAv(@"F:\cob.exe", "Test.Eicar", 68) },
+        });
+
+        var session = Assert.Single(_manager.GetHistory());
+        Assert.Single(session.Threats);
+
+        int removed = _manager.ReconcileQuarantinedThreats(new[]
+        {
+            new QuarantineEntry { OriginalPath = @"F:\cob.exe" },
+        });
+
+        Assert.Equal(1, removed);
+        session = Assert.Single(_manager.GetHistory());
+        Assert.Empty(session.Threats);
     }
 
     [Fact]

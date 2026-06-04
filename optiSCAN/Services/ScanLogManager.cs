@@ -47,6 +47,7 @@ namespace optiSCAN.Services
 
         private List<ScanSession> _history;
         private List<CleanSession> _cleanHistory;
+        private ActivityLogService? _activityLog;
 
         public ScanLogManager(string? logDir = null)
         {
@@ -66,6 +67,8 @@ namespace optiSCAN.Services
             _cleanHistory = LoadCleanHistory();
         }
 
+        public void BindActivityLog(ActivityLogService activityLog) => _activityLog = activityLog;
+
         // ── Historique des scans ────────────────────────────────────────────────
 
         /// <summary>
@@ -77,6 +80,7 @@ namespace optiSCAN.Services
             _history.Insert(0, session); // plus récent en premier
             TrimNewestFirstList(_history);
             PersistHistory();
+            _activityLog?.RecordScanCompleted(session);
 
             WriteToLog(FormatScanDetail(result));
         }
@@ -108,6 +112,32 @@ namespace optiSCAN.Services
             return true;
         }
 
+        /// <summary>
+        /// Retire des sessions persistées les menaces déjà isolées en quarantaine (même chemin d'origine).
+        /// </summary>
+        public int ReconcileQuarantinedThreats(IEnumerable<QuarantineEntry> quarantineEntries)
+        {
+            var paths = quarantineEntries
+                .Select(e => e.OriginalPath)
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .ToHashSet(StringComparer.OrdinalIgnoreCase);
+            if (paths.Count == 0)
+                return 0;
+
+            int removed = 0;
+            foreach (var session in _history)
+            {
+                int n = session.Threats.RemoveAll(t => paths.Contains(t.FilePath));
+                if (n == 0) continue;
+                session.ThreatsFound = session.Threats.Count;
+                removed += n;
+            }
+
+            if (removed > 0)
+                PersistHistory();
+            return removed;
+        }
+
         // ── Historique des nettoyages système (vue Historique → Nettoyages) ───────
 
         /// <summary>Enregistre un nettoyage terminé (plus récent en tête ; rotation 100 → 50).</summary>
@@ -116,25 +146,11 @@ namespace optiSCAN.Services
             _cleanHistory.Insert(0, session);
             TrimNewestFirstList(_cleanHistory);
             PersistCleanHistory();
+            _activityLog?.RecordCleanCompleted(session);
             WriteToLog($"Nettoyage système — {session.BytesDisplay} libéré(s) — {session.TargetsSummary}");
         }
 
         public IReadOnlyList<CleanSession> GetCleanHistory() => _cleanHistory.AsReadOnly();
-
-        /// <summary>
-        /// Retourne la timeline d'activité unifiée (scans + nettoyages), triée par date décroissante.
-        /// C'est la source de vérité pour <see cref="Views.HistoryControl"/>.
-        /// </summary>
-        public IReadOnlyList<Models.ActivityEntry> GetActivityFeed()
-        {
-            var feed = new List<Models.ActivityEntry>(_history.Count + _cleanHistory.Count);
-            foreach (var s in _history)
-                feed.Add(Models.ActivityEntry.FromScan(s));
-            foreach (var c in _cleanHistory)
-                feed.Add(Models.ActivityEntry.FromClean(c));
-            feed.Sort((a, b) => b.StartedAt.CompareTo(a.StartedAt));
-            return feed.AsReadOnly();
-        }
 
         /// <summary>
         /// Efface tout l'historique.
