@@ -17,9 +17,9 @@ public sealed class MultiTargetScanAggregatorTests
             (target, prog, _) =>
             {
                 if (target.Contains("targetA", StringComparison.Ordinal))
-                    prog?.Report(new ScanProgress { FilesScanned = 12_000, Phase = ScanPhase.Scanning });
+                    prog?.Report(new ScanProgress { FilesScanned = 12_000, ClamFilesScanned = 12_000, Phase = ScanPhase.Scanning });
                 else
-                    prog?.Report(new ScanProgress { FilesScanned = 12, Phase = ScanPhase.Scanning });
+                    prog?.Report(new ScanProgress { FilesScanned = 12, ClamFilesScanned = 12, Phase = ScanPhase.Scanning });
 
                 return Task.FromResult(new ScanResult
                 {
@@ -33,5 +33,26 @@ public sealed class MultiTargetScanAggregatorTests
 
         Assert.Contains(12_000, reported);
         Assert.Contains(12_012, reported);
+    }
+
+    [Fact]
+    public async Task Aggregate_merges_same_file_detected_in_two_zones()
+    {
+        var path = @"C:\zone\evil.exe";
+        var result = await MultiTargetScanAggregator.AggregateAsync(
+            ScanType.QuickScan,
+            new[] { @"C:\zoneA", @"C:\zoneB" },
+            (_, _, _) => Task.FromResult(new ScanResult
+            {
+                Status = ScanStatus.Completed,
+                Threats =
+                {
+                    new ThreatInfo { FilePath = path, VirusName = "Trojan.X", DetectedBy = "ClamAV" },
+                }
+            }),
+            CancellationToken.None);
+
+        Assert.Single(result.Threats);
+        Assert.Equal(path, result.Threats[0].FilePath);
     }
 }

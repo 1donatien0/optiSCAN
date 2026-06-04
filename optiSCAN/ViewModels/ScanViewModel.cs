@@ -15,7 +15,7 @@ namespace optiSCAN.ViewModels
     /// ViewModel principal de la fenêtre de scan optiSCAN.
     /// Utilise ScanOrchestrator pour le moteur ClamAV + YARA en parallèle.
     /// </summary>
-    public class ScanViewModel : INotifyPropertyChanged, IDisposable
+    public partial class ScanViewModel : INotifyPropertyChanged, IDisposable
     {
         private bool _disposed;
 
@@ -31,6 +31,23 @@ namespace optiSCAN.ViewModels
 
         private CancellationTokenSource? _cts;
         private long _scanEpoch;
+
+        /// <summary>Chemins déjà affichés dans <see cref="Threats"/> pour le scan en cours (O(1)).</summary>
+        private readonly HashSet<string> _scanThreatPaths = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Session en cours (stable dès le début du scan — liée à la quarantaine).</summary>
+        private Guid _activeScanSessionId;
+
+        /// <summary>Fichiers mis en quarantaine pendant le scan en cours (exclus du résultat final).</summary>
+        private readonly HashSet<string> _quarantinedDuringScanPaths = new(StringComparer.OrdinalIgnoreCase);
+
+        // Coalescence des mises à jour UI pendant un scan (dernier ScanProgress gagnant).
+        private readonly object _progressCoalesceLock = new();
+        private ScanProgress? _pendingProgress;
+        private long _pendingProgressEpoch;
+        private int _progressCoalesceArmPosted;
+        private System.Windows.Threading.DispatcherTimer? _progressCoalesceTimer;
+        private static readonly TimeSpan ProgressCoalesceInterval = TimeSpan.FromMilliseconds(100);
 
         // ── Propriétés bindées ───────────────────────────────────────────────────
 
@@ -280,6 +297,9 @@ namespace optiSCAN.ViewModels
         public bool CanScan => !IsScanning;
         public bool CanStop => IsScanning;
 
+        /// <summary>Identifiant de la session scan en cours (Guid.Empty si aucun scan actif).</summary>
+        public Guid ActiveScanSessionId => IsScanning ? _activeScanSessionId : Guid.Empty;
+
         public ICommand QuickScanCommand { get; }
         public ICommand FullScanCommand { get; }
         public ICommand ScanFolderCommand { get; }
@@ -470,394 +490,6 @@ namespace optiSCAN.ViewModels
             }
         }
 
-        // ── Scans ─────────────────────────────────────────────────────────────────
-
-        /// <summary>
-        /// Démarre un scan (rapide, complet, dossier, fichier) et met à jour l'état exposé à l'UI.
-        /// </summary>
-        /// <remarks>
-        /// La progression est injectée via <c>IProgress&lt;ScanProgress&gt;</c> afin d’éviter
-        /// les blocages inter-thread, et les erreurs sont converties en message utilisateur
-        /// dans <see cref="StatusMessage"/>.
-        /// </remarks>
-        private async Task StartScanAsync(ScanType type, string? path = null)
-        {
-            if (IsScanning) return;
-
-            IsScanning = true;
-            IsIndeterminate = true;
-            ProgressValue = 0;
-            FilesScanned = 0;
-            ThreatsFound = 0;
-            CurrentScanItem = ScanUserDisplay.Preparation;
-            ScanProgressDetail = ScanUserDisplay.Preparation;
-
-            WpfApp.Current?.Dispatcher.Invoke(() => Threats.Clear());
-
-            if (type is ScanType.QuickScan or ScanType.FullScan)
-            {
-                ServiceContainer.Default.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
-                DisplayScanProgressRequested?.Invoke(this, EventArgs.Empty);
-            }
-
-            if (type == ScanType.FullScan && !ElevationHelper.IsRunningElevated())
-                StatusMessage = LocalizationService.GetString("Scan_FullPartialWithoutAdmin");
-            else
-                StatusMessage = ScanUserDisplay.ScanStarting(type, path);
-
-            _cts = new CancellationTokenSource();
-            var epoch = Interlocked.Increment(ref _scanEpoch);
-            var progress = new Progress<ScanProgress>(p => SurChangementProgressionScan(p, epoch));
-
-            try
-            {
-                ScanResult result = type switch
-                {
-                    ScanType.QuickScan => await _orchestrator.QuickScanAsync(progress, _cts.Token),
-                    ScanType.FullScan => await _orchestrator.FullScanAsync(progress, _cts.Token),
-                    ScanType.Folder => await _orchestrator.ScanFolderAsync(path!, progress, _cts.Token),
-                    ScanType.File => await _orchestrator.ScanFileAsync(path!, progress, _cts.Token),
-                    _ => throw new InvalidOperationException()
-                };
-
-                LastResult = result;
-                _logger.SaveScanResult(result);
-                var prefs = UserPreferences.Current;
-                prefs.FavoriteScanType = type;
-                if (type is ScanType.File or ScanType.Folder && !string.IsNullOrWhiteSpace(path))
-                    prefs.AddRecentTarget(path, type);
-                else if (type is ScanType.QuickScan or ScanType.FullScan)
-                    prefs.AddRecentTarget(string.Empty, type);
-                prefs.IncrementScanCount(type);
-                RefreshRecentTargets();
-                LoadHistory();
-                ServiceContainer.Default.RequestScanHistoryViewsRefresh();
-
-                WpfApp.Current?.Dispatcher.Invoke(() =>
-                {
-                    foreach (var t in result.Threats)
-                        Threats.Add(t);
-                });
-
-                int autoQuarantined = 0;
-                if (ExclusionSettings.Current.AutoQuarantineEnabled && result.Threats.Count > 0)
-                {
-                    autoQuarantined = _quarantine.QuarantineAll(result.Threats);
-                    WpfApp.Current?.Dispatcher.Invoke(LoadQuarantine);
-                }
-
-                StatusMessage = autoQuarantined > 0
-                    ? LocalizationService.Format("Vm_AutoQuarantineMsg", result.SummaryDisplay, autoQuarantined)
-                    : result.SummaryDisplay;
-                FilesScanned = result.FilesScanned;
-                ThreatsFound = result.Threats.Count;
-
-                if (UserPreferences.Current.ActionNotificationsEnabled)
-                {
-                    ServiceContainer.Default.Notifications.ShowScanCompleted(
-                        result.Threats.Count,
-                        result.FilesScanned);
-                }
-            }
-            catch (OperationCanceledException)
-            {
-                StatusMessage = OptiscanStrings.UiMessages.AnalyseInterrompueSurDemande;
-            }
-            catch (Exception ex)
-            {
-                StatusMessage = LocalizationService.Format("Vm_ScanError", ex.Message);
-            }
-            finally
-            {
-                Interlocked.Increment(ref _scanEpoch);
-                IsScanning = false;
-                IsIndeterminate = false;
-                ProgressValue = 0;
-                CurrentScanItem = string.Empty;
-                ScanProgressDetail = string.Empty;
-                _cts?.Dispose();
-                _cts = null;
-            }
-        }
-
-        // ── Progression ───────────────────────────────────────────────────────────
-
-        /// <summary>
-        /// Reçoit les mises à jour de progression d’un scan et met à jour l’état bindé.
-        /// </summary>
-        /// <remarks>
-        /// Cette méthode s’exécute via <c>IProgress&lt;ScanProgress&gt;</c> : on effectue
-        /// un marshalling vers le thread UI via <c>Dispatcher.BeginInvoke</c> pour éviter
-        /// les blocages sur les scans courts (fréquence élevée des événements de progression).
-        /// Les compteurs (fichiers/menaces) ne reculent jamais pour refléter la stratégie
-        /// multi-moteurs (ClamAV/YARA) et multi-cibles.
-        /// </remarks>
-        private void SurChangementProgressionScan(ScanProgress p, long epoch)
-        {
-            // BeginInvoke (asynchrone) plutôt que Invoke : le thread de scan
-            // ne bloque pas en attente du Dispatcher UI. Sur un scan rapide
-            // émettant 50+ progressions/sec, l'ancienne version sérialisait
-            // le scan derrière le rendu WPF.
-            WpfApp.Current?.Dispatcher.BeginInvoke(new Action(() =>
-            {
-                if (epoch != _scanEpoch)
-                    return;
-
-                if (p.FilesScanned > 0)
-                    FilesScanned = Math.Max(FilesScanned, p.FilesScanned);
-                if (p.ThreatsFound > 0)
-                    ThreatsFound = Math.Max(ThreatsFound, p.ThreatsFound);
-
-                if (!string.IsNullOrWhiteSpace(p.CurrentFilePath))
-                    CurrentScanItem = p.CurrentFilePath;
-                else if (p.Phase == ScanPhase.ThreatFound && p.ThreatInfo != null
-                    && !string.IsNullOrWhiteSpace(p.ThreatInfo.FilePath))
-                    CurrentScanItem = p.ThreatInfo.FilePath;
-
-                int displayedFiles = FilesScanned;
-
-                if (p.Phase != ScanPhase.ThreatFound)
-                {
-                    StatusMessage = ScanUserDisplay.SyncFileCountInMessage(
-                        ScanUserDisplay.ForProgressMessage(p.Message),
-                        displayedFiles);
-                }
-
-                if (p.TotalFiles > 0 && displayedFiles > 0)
-                {
-                    var pctVal = Math.Min(100.0, displayedFiles * 100.0 / p.TotalFiles);
-                    ScanProgressDetail = LocalizationService.Format(
-                        "Vm_ScanProgressCountPct", displayedFiles, p.TotalFiles, (int)pctVal);
-                }
-                else if (displayedFiles > 0)
-                {
-                    ScanProgressDetail = LocalizationService.Format("Vm_ScanProgressScanned", displayedFiles);
-                }
-                else if (p.TotalFiles > 0)
-                {
-                    ScanProgressDetail = LocalizationService.Format("Vm_ScanProgressEstimated", p.TotalFiles);
-                }
-                else
-                {
-                    ScanProgressDetail = LocalizationService.GetString("Vm_ScanInProgress");
-                }
-
-                if (p.TotalFiles > 0 && displayedFiles > 0)
-                {
-                    IsIndeterminate = false;
-                    ProgressValue = Math.Min(100.0, displayedFiles * 100.0 / p.TotalFiles);
-                }
-                else if (displayedFiles > 0)
-                {
-                    IsIndeterminate = true;
-                }
-
-                if (p.Phase == ScanPhase.ThreatFound && p.ThreatInfo != null)
-                {
-                    CurrentScanItem = p.ThreatInfo.FilePath;
-                    StatusMessage = p.ThreatInfo.VirusName;
-                    if (!Threats.Any(t => string.Equals(t.FilePath, p.ThreatInfo.FilePath, StringComparison.OrdinalIgnoreCase)))
-                        Threats.Add(p.ThreatInfo);
-                }
-            }));
-        }
-
-        // ── Mise à jour base de signatures ────────────────────────────────────────
-        // Le flux de mise à jour est piloté par MainWindow → SignatureUpdateCoordinator.
-        // ScanViewModel réagit aux événements UpdateCompleted des updaters pour
-        // synchroniser ses propriétés bindées (DbVersion, YaraStatus, etc.).
-
-        private void SurAjoutSortieMiseAJour(object? sender, string line)
-            => AppendUpdateLog(line);
-
-        /// <summary>Appelé par <see cref="FreshclamUpdater.UpdateCompleted"/> après une MAJ ClamAV.</summary>
-        private void SurTermineeMiseAJourSignatures(object? sender, UpdateResult result)
-        {
-            var d = WpfApp.Current?.Dispatcher;
-            if (d == null) return;
-            _ = d.InvokeAsync(async () =>
-            {
-                StatusMessage = result.Message;
-                DbVersion = await _updater.GetLocalDatabaseVersionAsync().ConfigureAwait(false);
-                LastUpdateDisplay = _updater.LastUpdateTime?.ToString("dd/MM/yyyy HH:mm") ?? LocalizationService.GetString("Vm_Never");
-                RulesPackVersion = _rulesUpdater.GetRulesPackVersionDisplay();
-                RulesLastUpdateDisplay = _rulesUpdater.GetRulesLastUpdateDisplay();
-            });
-        }
-
-        /// <summary>
-        /// Appelé par <see cref="YaraForgeUpdater.UpdateCompleted"/> après une MAJ des règles.
-        /// Rafraîchit toujours YaraRulesCount et YaraStatus, même si déjà à jour,
-        /// pour garantir la cohérence du VM quel que soit l’état de départ.
-        /// </summary>
-        private void SurTermineeMiseAJourRegles(object? sender, RulesUpdateResult result)
-        {
-            var d = WpfApp.Current?.Dispatcher;
-            if (d == null) return;
-            _ = d.InvokeAsync(() =>
-            {
-                RulesPackVersion = _rulesUpdater.GetRulesPackVersionDisplay();
-                RulesLastUpdateDisplay = _rulesUpdater.GetRulesLastUpdateDisplay();
-                // Toujours rafraîchir : un rechargement peut avoir eu lieu même sans nouvelle version.
-                YaraRulesCount = _yara.RulesCount;
-                YaraStatus = _yara.IsAvailable
-                    ? LocalizationService.Format("Vm_YaraEngineActive", _yara.RulesCount)
-                    : result.Success
-                        ? LocalizationService.GetString("Vm_SigEngineReloaded")
-                        : LocalizationService.GetString("Vm_SigEngineUnavailable");
-                RefreshProtectionStatus();
-            });
-        }
-
-        // ── Quarantaine ───────────────────────────────────────────────────────────
-
-        private void QuarantineAllThreats()
-        {
-            if (Threats.Count == 0) return;
-            if (!_confirm.ConfirmYesNo(
-                    OptiscanStrings.Confirmations.QuarantineAll(Threats.Count),
-                    OptiscanStrings.Confirmations.Title))
-                return;
-
-            int count = _quarantine.QuarantineAll(Threats);
-            LoadQuarantine();
-            // Mettre à jour le statut des menaces
-            foreach (var threat in Threats)
-                threat.Status = ThreatStatus.Quarantined;
-            StatusMessage = LocalizationService.Format("Vm_QuarantineBatch", count);
-        }
-
-        private void RestoreFromQuarantine(string? id)
-        {
-            if (string.IsNullOrEmpty(id)) return;
-            bool ok = _quarantine.Restore(id);
-            LoadQuarantine();
-            StatusMessage = ok ? LocalizationService.GetString("Vm_RestoreOk") : LocalizationService.GetString("Vm_RestoreFail");
-        }
-
-        private void DeleteFromQuarantine(string? id)
-        {
-            if (string.IsNullOrEmpty(id)) return;
-            bool ok = _quarantine.DeletePermanently(id);
-            LoadQuarantine();
-            StatusMessage = ok ? LocalizationService.GetString("Vm_DeleteOk") : LocalizationService.GetString("Vm_DeleteFail");
-        }
-
-        private void PurgeAll()
-        {
-            int total = _quarantine.Count;
-            if (total == 0) return;
-            if (!_confirm.ConfirmYesNo(
-                    OptiscanStrings.Confirmations.PurgeQuarantine(total),
-                    OptiscanStrings.Confirmations.Title))
-                return;
-
-            int count = _quarantine.PurgeAll();
-            LoadQuarantine();
-            StatusMessage = LocalizationService.Format("Vm_PurgeCount", count);
-        }
-
-        /// <summary>Recharge la première page de quarantaine (réinitialise la liste affichée).</summary>
-        public void LoadQuarantine(bool reset = true)
-        {
-            WpfApp.Current?.Dispatcher.Invoke(() =>
-            {
-                QuarantineTotalCount = _quarantine.Count;
-                if (reset)
-                    QuarantineEntries.Clear();
-                var offset = QuarantineEntries.Count;
-                foreach (var e in _quarantine.GetEntriesPaged(offset, QuarantinePageSize))
-                    QuarantineEntries.Add(e);
-                NotifyQuarantinePaging();
-            });
-        }
-
-        private void LoadMoreQuarantinePage() => LoadQuarantine(reset: false);
-
-        private void NotifyQuarantinePaging()
-        {
-            OnPropertyChanged(nameof(QuarantineHasMore));
-            OnPropertyChanged(nameof(QuarantinePagingStatus));
-            CommandManager.InvalidateRequerySuggested();
-        }
-
-        /// <summary>
-        /// Anciennes builds n'appelaient pas <see cref="UserPreferences.IncrementScanCount"/> :
-        /// si le compteur est encore à zéro alors qu'un historique existe, on l'aligne une fois.
-        /// </summary>
-        private void MigrateScanCountFromHistoryIfNeeded()
-        {
-            var prefs = UserPreferences.Current;
-            if (prefs.TotalScansCount > 0) return;
-            int n = _logger.GetHistory().Count;
-            if (n <= 0) return;
-            prefs.TotalScansCount = n;
-            prefs.Save();
-        }
-
-        private void LoadHistory()
-        {
-            WpfApp.Current?.Dispatcher.Invoke(() =>
-            {
-                History.Clear();
-                foreach (var s in _logger.GetHistory())
-                    History.Add(s);
-            });
-        }
-
-        /// <summary>Ajoute une menace détectée par la protection temps réel (hors scan manuel).</summary>
-        public void AppendLiveThreat(ThreatInfo threat)
-        {
-            if (string.IsNullOrWhiteSpace(threat.FilePath)) return;
-            WpfApp.Current?.Dispatcher.Invoke(() =>
-            {
-                if (Threats.Any(t => string.Equals(t.FilePath, threat.FilePath, StringComparison.OrdinalIgnoreCase)))
-                    return;
-                Threats.Add(threat);
-                ThreatsFound = Threats.Count;
-                OnPropertyChanged(nameof(SummaryDisplay));
-            });
-        }
-
-        /// <summary>Retire une menace de la grille après suppression ou quarantaine du fichier source.</summary>
-        public void RemoveDetectedThreat(string? filePath)
-        {
-            if (string.IsNullOrWhiteSpace(filePath)) return;
-            WpfApp.Current?.Dispatcher.Invoke(() =>
-            {
-                var removed = Threats
-                    .Where(t => string.Equals(t.FilePath, filePath, StringComparison.OrdinalIgnoreCase))
-                    .ToList();
-                if (removed.Count == 0)
-                    return;
-                foreach (var t in removed)
-                    Threats.Remove(t);
-                ThreatsFound = Threats.Count;
-                OnPropertyChanged(nameof(SummaryDisplay));
-            });
-        }
-
-        // ── Méthodes publiques pour l'interface ───────────────────────────────────
-
-        public void RefreshQuarantineList() => LoadQuarantine(reset: true);
-
-        public void RefreshHistory()
-        {
-            LoadHistory();
-            RefreshRecentTargets();
-        }
-
-        /// <summary>Recharge les 5 dernières cibles depuis <see cref="UserPreferences"/>.</summary>
-        public void RefreshRecentTargets()
-        {
-            WpfApp.Current?.Dispatcher.Invoke(() =>
-            {
-                RecentTargets.Clear();
-                foreach (var t in UserPreferences.Current.RecentTargets)
-                    RecentTargets.Add(t);
-            });
-        }
-
         // ── INotifyPropertyChanged ────────────────────────────────────────────────
 
         public event PropertyChangedEventHandler? PropertyChanged;
@@ -874,6 +506,13 @@ namespace optiSCAN.ViewModels
             try { _cts?.Cancel(); } catch { }
             try { _cts?.Dispose(); } catch { }
             _cts = null;
+
+            try
+            {
+                _progressCoalesceTimer?.Stop();
+                _progressCoalesceTimer = null;
+            }
+            catch { /* ignore */ }
 
             try
             {

@@ -1,0 +1,11 @@
+
+; ── Signature Authenticode (optionnelle) ─────────────────────────────────────
+; Décommenter SignTool dans [Setup] + adapter la commande ci-dessous si vous avez
+; un certificat .pfx (release officielle — voir README.md §8 Signature Authenticode).
+;
+; [Setup]
+; SignTool=optiscan
+; SignedUninstaller=yes
+;
+; [SignTools]
+; Name: "optiscan"; Command: "signtool sign /fd SHA256 /f $qC:\chemin\cert.pfx$q /p $qMotDePasse$q /tr http://timestamp.digicert.com /td SHA256 $f"

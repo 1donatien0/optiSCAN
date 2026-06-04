@@ -20,19 +20,7 @@ namespace optiSCAN.Services
             QuestPDF.Settings.License = LicenseType.Community;
         }
 
-        /// <summary>
-        /// Remplace le profil utilisateur dans un chemin par %UserProfile%
-        /// pour éviter d'exposer le nom de compte dans les exports partagés.
-        /// </summary>
-        private static string RedactPath(string? path)
-        {
-            if (string.IsNullOrEmpty(path))
-                return string.Empty;
-            var profile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            if (!string.IsNullOrEmpty(profile) && path.StartsWith(profile, StringComparison.OrdinalIgnoreCase))
-                return "%UserProfile%" + path[profile.Length..];
-            return path;
-        }
+        private static string RedactPath(string? path) => PathRedaction.RedactPath(path);
 
         /// <summary>
         /// Génère un rapport PDF et le sauvegarde au chemin indiqué.

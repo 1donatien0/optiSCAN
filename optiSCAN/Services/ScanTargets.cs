@@ -60,14 +60,17 @@ namespace optiSCAN.Services
         /// <summary>
         /// Cibles d'un scan complet : tous les volumes fixes prêts.
         /// </summary>
-        public static List<string> FullScanTargets()
+        public static List<string> FullScanTargets(bool includeRemovable = false)
         {
             var drives = new List<string>();
             foreach (var d in DriveInfo.GetDrives())
             {
                 try
                 {
-                    if (d.IsReady && d.DriveType == DriveType.Fixed)
+                    if (!d.IsReady)
+                        continue;
+                    if (d.DriveType == DriveType.Fixed
+                        || (includeRemovable && d.DriveType == DriveType.Removable))
                         drives.Add(d.RootDirectory.FullName);
                 }
                 catch { /* lecteur en cours de remontée — on l'ignore */ }

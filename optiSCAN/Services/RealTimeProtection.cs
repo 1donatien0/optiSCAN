@@ -19,6 +19,7 @@ namespace optiSCAN.Services
         private System.Threading.Timer? _cacheCleanupTimer;
         private bool _isEnabled;
         private bool _disposed;
+        private int _suspendCount;
 
         // Dossiers système à surveiller (pas C:\Users en entier — trop d'événements avec sous-dossiers).
         private static readonly string[] DefaultWatchFolders = new[]
@@ -28,16 +29,23 @@ namespace optiSCAN.Services
             @"C:\Windows\Downloaded Program Files"
         };
 
-        // Extensions surveillées (fichiers exécutables et scripts)
-        private static readonly HashSet<string> WatchedExtensions = new(
-            new[] { ".exe", ".dll", ".scr", ".bat", ".cmd", ".ps1", ".vbs", ".js", ".jar", ".msi", ".docm", ".xlsm", ".pptm" },
-            StringComparer.OrdinalIgnoreCase);
-
         // Délai d'attente après création/modification (éviter les scans sur écriture partielle)
         private static readonly TimeSpan StabilizationDelay = TimeSpan.FromMilliseconds(500);
 
         public event EventHandler<Models.ThreatInfo>? ThreatDetected;
         public bool IsEnabled => _isEnabled;
+
+        /// <summary>Ignore les événements watcher pendant un scan manuel (compteur réentrant).</summary>
+        public void Suspend() => Interlocked.Increment(ref _suspendCount);
+
+        /// <summary>Réactive la surveillance après <see cref="Suspend"/>.</summary>
+        public void Resume()
+        {
+            if (Interlocked.Decrement(ref _suspendCount) < 0)
+                Interlocked.Exchange(ref _suspendCount, 0);
+        }
+
+        private bool IsSuspended => Volatile.Read(ref _suspendCount) > 0;
 
         public RealTimeProtection(ScanOrchestrator orchestrator, QuarantineManager quarantineManager, NotificationService notifications)
         {
@@ -153,9 +161,9 @@ namespace optiSCAN.Services
                 // Ignorer les dossiers
                 if (Directory.Exists(e.FullPath)) return;
 
-                // Vérifier l'extension
-                var ext = Path.GetExtension(e.FullPath);
-                if (!WatchedExtensions.Contains(ext)) return;
+                if (IsSuspended) return;
+
+                if (!RiskyFileExtensions.IsRisky(e.FullPath)) return;
 
                 // Dédup immédiate (avant le délai de stabilisation) pour éviter deux
                 // événements concurrents sur le même fichier avant l'écriture du cache.
@@ -206,8 +214,9 @@ namespace optiSCAN.Services
             {
                 if (Directory.Exists(e.FullPath)) return;
 
-                var ext = Path.GetExtension(e.FullPath);
-                if (!WatchedExtensions.Contains(ext)) return;
+                if (IsSuspended) return;
+
+                if (!RiskyFileExtensions.IsRisky(e.FullPath)) return;
 
                 var utcNow = DateTime.UtcNow;
                 if (!_recentlyScanned.TryAdd(e.FullPath, utcNow))

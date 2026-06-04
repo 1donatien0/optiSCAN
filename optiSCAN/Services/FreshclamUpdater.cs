@@ -73,17 +73,22 @@ namespace optiSCAN.Services
         {
             var period = interval ?? TimeSpan.FromHours(24);
             _autoUpdateTimer?.Dispose();
+            // TimerCallback est void — on ne peut pas utiliser async directement.
+            // Task.Run avec catch complet garantit qu'aucune exception ne remonte
+            // sur le ThreadPool et ne crashe le processus silencieusement.
             _autoUpdateTimer = new System.Threading.Timer(
-                async _ =>
+                _ =>
                 {
-                    // Skip silencieux si une mise à jour est déjà en cours
-                    // (manuelle ou auto précédente non terminée).
                     if (IsUpdating) return;
-                    try { await UpdateAsync(); }
-                    catch (Exception ex)
+                    _ = Task.Run(async () =>
                     {
-                        AppLogger.Warn("FreshclamUpdater", "Auto-update", ex);
-                    }
+                        try { await UpdateAsync().ConfigureAwait(false); }
+                        catch (OperationCanceledException) { /* annulé normalement */ }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Warn("FreshclamUpdater", "Auto-update", ex);
+                        }
+                    });
                 },
                 null, period, period);
         }
@@ -324,14 +329,24 @@ namespace optiSCAN.Services
         }
 
         /// <summary>
+        /// Dernière MAJ réussie via freshclam dans cette session, sinon date des bases .cvd/.cld locales
+        /// (installateur, CI, fetch-runtime-deps). Aligné avec <see cref="GetLastSignatureChangeDisplay"/>.
+        /// </summary>
+        public DateTime? GetLastSignatureUpdateTime()
+        {
+            if (LastUpdateTime.HasValue)
+                return LastUpdateTime.Value;
+            var utc = GetLatestLocalDatabaseWriteTime();
+            return utc?.ToLocalTime();
+        }
+
+        /// <summary>
         /// Date du dernier succès freshclam, sinon dernière modification des bases .cld/.cvd.
         /// </summary>
         public string GetLastSignatureChangeDisplay()
         {
-            if (LastUpdateTime.HasValue)
-                return LastUpdateTime.Value.ToString("dd/MM/yyyy HH:mm");
-            var t = GetLatestLocalDatabaseWriteTime();
-            return t.HasValue ? t.Value.ToLocalTime().ToString("dd/MM/yyyy HH:mm") : "—";
+            var t = GetLastSignatureUpdateTime();
+            return t.HasValue ? t.Value.ToString("dd/MM/yyyy HH:mm") : "—";
         }
 
         private DateTime? GetLatestLocalDatabaseWriteTime()
@@ -563,7 +578,7 @@ namespace optiSCAN.Services
                 await Task.WhenAll(stdoutTask, stderrTask).ConfigureAwait(false);
                 await proc.WaitForExitAsync(cts.Token).ConfigureAwait(false);
 
-                var output = stdoutTask.Result;
+                var output = await stdoutTask.ConfigureAwait(false);
                 var m = Regex.Match(output, @"(?:ClamAV\s+[\d.]+/|version\s+)(\d{4,6})");
                 return m.Success ? m.Groups[1].Value : VersionDisplayHelper.UnknownLabel;
             }

@@ -1,0 +1,9 @@
+#!/bin/sh
+# Retire les lignes Co-authored-by ajoutées par Cursor (auteur = vous uniquement).
+# Activer : git config core.hooksPath .githooks  (une fois, dans ce dépôt)
+MSG_FILE="$1"
+if [ -f "$MSG_FILE" ]; then
+  sed -i.bak '/^[[:space:]]*Co-authored-by:[[:space:]]*Cursor[[:space:]]*</d' "$MSG_FILE" 2>/dev/null \
+    || sed -i '' '/^[[:space:]]*Co-authored-by:[[:space:]]*Cursor[[:space:]]*</d' "$MSG_FILE" 2>/dev/null
+  rm -f "${MSG_FILE}.bak"
+fi
