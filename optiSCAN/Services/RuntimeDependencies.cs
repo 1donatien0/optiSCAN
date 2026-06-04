@@ -89,14 +89,20 @@ namespace optiSCAN.Services
             var yaraReady = yaraBinOk && yaraRulesOk;
 
             string clamDetail = clamReady
-                ? (File.Exists(freshclam) ? "clamscan + freshclam détectés." : "clamscan OK ; freshclam.exe absent (MAJ signatures limitées).")
-                : "Téléchargez ClamAV win.x64 et copiez les binaires (README § 3.2).";
+                ? (File.Exists(freshclam)
+                    ? LocalizationService.GetString("Runtime_ClamBothDetected")
+                    : LocalizationService.GetString("Runtime_ClamNoFreshclam"))
+                : LocalizationService.GetString("Runtime_ClamMissing");
 
             string yaraDetail = yaraReady
-                ? $"{yarCount} fichier(s) .yar, {Path.GetFileName(yaraExe)} présent."
+                ? LocalizationService.Format("Runtime_YaraReady", yarCount.ToString(), Path.GetFileName(yaraExe))
                 : !yaraBinOk
-                    ? $"Copiez yara{yaraArch}.exe et yarac{yaraArch}.exe dans yara/."
-                    : $"Aucune règle .yar dans rules/ ({rulesDir}).";
+                    ? LocalizationService.Format("Runtime_YaraBinMissing", yaraArch)
+                    : LocalizationService.Format("Runtime_YaraNoRules", rulesDir);
+
+            var yaracSuffix = File.Exists(yaracExe)
+                ? string.Empty
+                : LocalizationService.GetString("Runtime_YaracMissing");
 
             return new Report
             {
@@ -114,7 +120,7 @@ namespace optiSCAN.Services
                         Name = "YARA",
                         IsReady = yaraReady,
                         ExpectedPath = yaraExe,
-                        Detail = yaraDetail + (File.Exists(yaracExe) ? "" : " yarac absent — compilation au premier scan."),
+                        Detail = yaraDetail + yaracSuffix,
                     },
                 },
             };

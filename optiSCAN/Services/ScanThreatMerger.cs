@@ -3,13 +3,14 @@ using optiSCAN.Models;
 namespace optiSCAN.Services
 {
     /// <summary>
-    /// Fusionne les menaces ClamAV et YARA dans un <see cref="ScanResult"/> unique.
+    /// Fusionne les menaces ClamAV et YARA dans un <see cref="ScanResult"/> unique
+    /// (une ligne par fichier infecté, comme les suites multi-moteurs type 360).
     /// </summary>
     internal static class ScanThreatMerger
     {
         /// <summary>
-        /// Fusionne deux résultats moteur. Plusieurs signatures ClamAV ou règles YARA
-        /// pour le même fichier sont agrégées dans <see cref="ThreatInfo.VirusName"/>.
+        /// Fusionne deux résultats moteur. Statistiques : un seul compteur de fichiers/octets
+        /// (<see cref="ScanResult.FilesScanned"/> = max des moteurs, octets = ClamAV).
         /// </summary>
         public static ScanResult Merge(ScanType type, string target, ScanResult clamResult, ScanResult yaraResult)
         {
@@ -28,54 +29,54 @@ namespace optiSCAN.Services
             };
 
             var excl = ExclusionSettings.Current;
-            var clamThreats = clamResult.Threats.Where(t => !excl.IsFileExcluded(t.FilePath)).ToList();
-            var yaraThreats = yaraResult.Threats.Where(t => !excl.IsFileExcluded(t.FilePath)).ToList();
+            var clamByPath = AggregateThreatsByPath(
+                clamResult.Threats.Where(t => !excl.IsFileExcluded(t.FilePath)));
+            var yaraByPath = AggregateThreatsByPath(
+                yaraResult.Threats.Where(t => !excl.IsFileExcluded(t.FilePath)));
 
-            var clamByPath = AggregateClamByPath(clamThreats);
-            merged.Threats.AddRange(clamByPath.Values);
+            var allPaths = new HashSet<string>(clamByPath.Keys, StringComparer.OrdinalIgnoreCase);
+            foreach (var p in yaraByPath.Keys)
+                allPaths.Add(p);
 
-            var yaraNamesByPath = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
-            var seenYaraTriples = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-
-            foreach (var yaraT in yaraThreats)
+            foreach (var path in allPaths)
             {
-                var triple = $"{yaraT.FilePath}|{yaraT.VirusName}";
-                if (!seenYaraTriples.Add(triple))
-                    continue;
+                clamByPath.TryGetValue(path, out var clamT);
+                yaraByPath.TryGetValue(path, out var yaraT);
 
-                if (clamByPath.TryGetValue(yaraT.FilePath, out var existing))
-                {
-                    if (!yaraNamesByPath.TryGetValue(yaraT.FilePath, out var names))
-                        yaraNamesByPath[yaraT.FilePath] = names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    names.Add(yaraT.VirusName);
-                    existing.DetectedBy = "ClamAV+YARA";
-                }
-                else
-                {
+                if (clamT != null && yaraT != null)
+                    merged.Threats.Add(MergeThreatPair(clamT, yaraT));
+                else if (clamT != null)
+                    merged.Threats.Add(clamT);
+                else if (yaraT != null)
                     merged.Threats.Add(yaraT);
-                }
-            }
-
-            foreach (var kv in yaraNamesByPath)
-            {
-                var t = clamByPath[kv.Key];
-                var sortedRules = string.Join(",", kv.Value.OrderBy(s => s, StringComparer.Ordinal));
-                if (!t.VirusName.Contains(sortedRules, StringComparison.OrdinalIgnoreCase))
-                    t.VirusName += $" / YARA:{sortedRules}";
             }
 
             return merged;
         }
 
+        /// <summary>Ajoute ou fusionne une menace dans une liste (agrégation multi-zones).</summary>
+        public static void AddOrMergeThreat(IList<ThreatInfo> threats, ThreatInfo incoming)
+        {
+            for (var i = 0; i < threats.Count; i++)
+            {
+                if (!string.Equals(threats[i].FilePath, incoming.FilePath, StringComparison.OrdinalIgnoreCase))
+                    continue;
+                threats[i] = MergeThreatPair(threats[i], incoming);
+                return;
+            }
+
+            threats.Add(incoming);
+        }
+
         /// <summary>
-        /// Une entrée ClamAV par chemin ; plusieurs noms de virus → libellé joint par « / ».
+        /// Une entrée par chemin ; plusieurs signatures ou règles → libellé joint.
         /// </summary>
-        internal static Dictionary<string, ThreatInfo> AggregateClamByPath(IEnumerable<ThreatInfo> clamThreats)
+        internal static Dictionary<string, ThreatInfo> AggregateThreatsByPath(IEnumerable<ThreatInfo> threats)
         {
             var byPath = new Dictionary<string, ThreatInfo>(StringComparer.OrdinalIgnoreCase);
             var namesByPath = new Dictionary<string, HashSet<string>>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var t in clamThreats)
+            foreach (var t in threats)
             {
                 if (!byPath.TryGetValue(t.FilePath, out var existing))
                 {
@@ -87,6 +88,8 @@ namespace optiSCAN.Services
                 namesByPath[t.FilePath].Add(t.VirusName);
                 if (t.DetectedAt < existing.DetectedAt)
                     existing.DetectedAt = t.DetectedAt;
+                if (t.FileSize >= 0 && existing.FileSize < 0)
+                    existing.FileSize = t.FileSize;
             }
 
             foreach (var kv in namesByPath)
@@ -96,6 +99,81 @@ namespace optiSCAN.Services
             }
 
             return byPath;
+        }
+
+        /// <summary>Alias historique (tests ClamAV).</summary>
+        internal static Dictionary<string, ThreatInfo> AggregateClamByPath(IEnumerable<ThreatInfo> clamThreats) =>
+            AggregateThreatsByPath(clamThreats);
+
+        internal static ThreatInfo MergeThreatPair(ThreatInfo a, ThreatInfo b)
+        {
+            if (!string.Equals(a.FilePath, b.FilePath, StringComparison.OrdinalIgnoreCase))
+                throw new ArgumentException("Les menaces doivent concerner le même fichier.");
+
+            var clamNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var yaraNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            CollectSignatureNames(a, clamNames, yaraNames);
+            CollectSignatureNames(b, clamNames, yaraNames);
+
+            var detectedBy = ResolveDetectedBy(a.DetectedBy, b.DetectedBy);
+            var virusName = FormatCombinedVirusName(clamNames, yaraNames);
+
+            var merged = a.DetectedAt <= b.DetectedAt ? a : b;
+            return new ThreatInfo
+            {
+                FilePath = merged.FilePath,
+                VirusName = virusName,
+                DetectedAt = merged.DetectedAt,
+                Status = merged.Status,
+                FileSize = Math.Max(a.FileSize, b.FileSize),
+                QuarantinePath = merged.QuarantinePath,
+                DetectedBy = detectedBy,
+            };
+        }
+
+        private static void CollectSignatureNames(ThreatInfo t, HashSet<string> clamNames, HashSet<string> yaraNames)
+        {
+            var yaraOnly = string.Equals(t.DetectedBy, "YARA", StringComparison.OrdinalIgnoreCase);
+            foreach (var part in t.VirusName.Split(" / ", StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+            {
+                if (part.StartsWith("YARA:", StringComparison.OrdinalIgnoreCase))
+                {
+                    foreach (var rule in part.Substring(5).Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+                        yaraNames.Add(rule);
+                }
+                else if (yaraOnly)
+                {
+                    yaraNames.Add(part);
+                }
+                else
+                {
+                    clamNames.Add(part);
+                }
+            }
+        }
+
+        private static string FormatCombinedVirusName(HashSet<string> clamNames, HashSet<string> yaraNames)
+        {
+            var parts = new List<string>();
+            if (clamNames.Count > 0)
+                parts.Add(string.Join(" / ", clamNames.OrderBy(s => s, StringComparer.Ordinal)));
+            if (yaraNames.Count > 0)
+                parts.Add("YARA:" + string.Join(",", yaraNames.OrderBy(s => s, StringComparer.Ordinal)));
+            return parts.Count > 0 ? string.Join(" / ", parts) : string.Empty;
+        }
+
+        private static string ResolveDetectedBy(string a, string b)
+        {
+            static bool HasClam(string d) =>
+                d.Contains("ClamAV", StringComparison.OrdinalIgnoreCase);
+            static bool HasYara(string d) =>
+                d.Contains("YARA", StringComparison.OrdinalIgnoreCase);
+
+            var clam = HasClam(a) || HasClam(b);
+            var yara = HasYara(a) || HasYara(b);
+            if (clam && yara) return "ClamAV+YARA";
+            if (yara) return "YARA";
+            return "ClamAV";
         }
     }
 }

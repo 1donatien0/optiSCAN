@@ -46,17 +46,24 @@ namespace optiSCAN
         {
             var prefs = UserPreferences.Current;
 
-            // Détection HC système — priorité sur la préférence utilisateur
             bool systemHc = SystemParameters.HighContrast;
             _highContrast = systemHc || prefs.HighContrastEnabled;
 
+            bool windowsDark = IsWindowsAppsDarkTheme();
+            _lastWindowsDarkTheme = windowsDark;
+
+            if (TryMigrateToWindowsThemeSync(prefs, windowsDark))
+                prefs.Save();
+
             if (prefs.SyncWindowsTheme)
             {
-                bool dark = IsWindowsAppsDarkTheme();
-                _isDarkTheme = dark;
-                ApplyTheme(dark);
-                prefs.DarkTheme = dark;
-                prefs.Save();
+                _isDarkTheme = windowsDark;
+                ApplyTheme(windowsDark);
+                if (prefs.DarkTheme != windowsDark)
+                {
+                    prefs.DarkTheme = windowsDark;
+                    prefs.Save();
+                }
             }
             else
             {
@@ -64,8 +71,18 @@ namespace optiSCAN
                 ApplyTheme(prefs.DarkTheme);
             }
 
-            // HC système + thème Windows : réaction immédiate via SystemEvents (sans polling).
             StartSystemEventsWatcher();
+        }
+
+        /// <summary>
+        /// Ancien défaut <c>SyncWindowsTheme=false</c> : si le thème stocké = Windows, activer le suivi.
+        /// </summary>
+        internal static bool TryMigrateToWindowsThemeSync(UserPreferences prefs, bool windowsDark)
+        {
+            if (prefs.SyncWindowsTheme || prefs.DarkTheme != windowsDark)
+                return false;
+            prefs.SyncWindowsTheme = true;
+            return true;
         }
 
         /// <summary>Indique si Windows est en mode applications sombres (registre Personalize).</summary>
@@ -78,6 +95,8 @@ namespace optiSCAN
                 var v = key?.GetValue("AppsUseLightTheme");
                 if (v is int light)
                     return light == 0;
+                if (v is uint u)
+                    return u == 0;
             }
             catch (Exception ex)
             {
@@ -96,22 +115,43 @@ namespace optiSCAN
             ApplyTheme(_isDarkTheme);
         }
 
-        /// <summary>Bascule sombre ↔ clair et sauvegarde la préférence.</summary>
+        /// <summary>Thème différent du mode Windows (case Options cochée).</summary>
+        public static bool IsAlternateThemeEnabled =>
+            !UserPreferences.Current.SyncWindowsTheme;
+
+        /// <summary>Active ou repasse au suivi du thème Windows (case Options décochée).</summary>
+        public static void SetAlternateThemeEnabled(bool enabled)
+        {
+            if (enabled)
+            {
+                var prefs = UserPreferences.Current;
+                prefs.SyncWindowsTheme = false;
+                prefs.Save();
+                Apply(!IsWindowsAppsDarkTheme());
+            }
+            else
+                SetSyncWithWindows(true);
+        }
+
+        /// <summary>
+        /// Barre latérale : si suivi Windows, passe au thème opposé ; sinon bascule clair/sombre en dérogation.
+        /// </summary>
         public static void Toggle()
+        {
+            if (UserPreferences.Current.SyncWindowsTheme)
+                SetAlternateThemeEnabled(true);
+            else
+                Apply(!IsDarkTheme);
+        }
+
+        /// <summary>Applique un thème en dérogation (ne suit plus Windows).</summary>
+        public static void Apply(bool dark)
         {
             var prefs = UserPreferences.Current;
             prefs.SyncWindowsTheme = false;
-            prefs.Save();
-            Apply(!IsDarkTheme);
-        }
-
-        /// <summary>Applique explicitement un thème et sauvegarde.</summary>
-        public static void Apply(bool dark)
-        {
-            IsDarkTheme = dark;
-            var prefs = UserPreferences.Current;
             prefs.DarkTheme = dark;
             prefs.Save();
+            IsDarkTheme = dark;
         }
 
         /// <summary>Active ou désactive le suivi du thème Windows.</summary>
@@ -122,13 +162,16 @@ namespace optiSCAN
             if (sync)
             {
                 bool dark = IsWindowsAppsDarkTheme();
-                Apply(dark);
                 _lastWindowsDarkTheme = dark;
+                prefs.DarkTheme = dark;
+                prefs.Save();
+                if (_isDarkTheme != dark)
+                    IsDarkTheme = dark;
+                else
+                    ApplyTheme(dark);
             }
             else
-            {
                 Apply(prefs.DarkTheme);
-            }
         }
 
         // ── Abonnement à SystemEvents (zéro polling) ──────────────────────
@@ -178,9 +221,13 @@ namespace optiSCAN
                     ApplyTheme(_isDarkTheme);
                 }
 
-                // 2. Thème clair/sombre (seulement si SyncWindowsTheme activé)
+                // 2. Thème clair/sombre
                 if (!UserPreferences.Current.SyncWindowsTheme)
+                {
+                    // Thème affiché inchangé ; rafraîchir Options (libellé Thème clair / sombre).
+                    ThemeChanged?.Invoke(null, _isDarkTheme);
                     return;
+                }
 
                 bool dark = IsWindowsAppsDarkTheme();
                 if (_lastWindowsDarkTheme.HasValue && _lastWindowsDarkTheme.Value == dark && !hcChanged)

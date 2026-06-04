@@ -21,12 +21,12 @@ namespace optiSCAN.Models
 
         /// <summary>
         /// Type de scan — source de vérité pour le libellé affiché.
-        /// Stocké dans le JSON depuis v7.1 ; les anciennes entrées ont <see cref="TypeDisplayLegacy"/> à la place.
+        /// Stocké dans le JSON depuis v8 ; les entrées v7 ont <see cref="TypeDisplayLegacy"/> à la place.
         /// </summary>
         public ScanType ScanTypeValue { get; set; } = ScanType.QuickScan;
 
         /// <summary>
-        /// Libellé brut stocké par les versions antérieures à v7.1 (chaîne localisée au moment du scan).
+        /// Libellé brut stocké par optiSCAN v7 (chaîne localisée au moment du scan).
         /// Conservé pour la rétrocompatibilité JSON uniquement — ne pas utiliser dans l'UI.
         /// </summary>
         [JsonPropertyName("typeDisplay")]
@@ -34,7 +34,7 @@ namespace optiSCAN.Models
 
         /// <summary>
         /// Libellé localisé du type de scan, calculé selon la culture UI active.
-        /// Si <see cref="ScanTypeValue"/> est défini (v7.1+), il est utilisé ; sinon repli sur <see cref="TypeDisplayLegacy"/>.
+        /// Si <see cref="ScanTypeValue"/> est défini (v8+), il est utilisé ; sinon repli sur <see cref="TypeDisplayLegacy"/> (v7).
         /// </summary>
         [JsonIgnore]
         public string TypeDisplay =>

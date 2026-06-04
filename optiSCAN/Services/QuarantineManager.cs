@@ -49,6 +49,7 @@ namespace optiSCAN.Services
         private readonly byte[] _masterKey;     // 32 octets (déchiffrés en RAM)
         private QuarantineDocument _doc;
         private readonly object _lock = new();
+        private ActivityLogService? _activityLog;
 
         // ── Construction ─────────────────────────────────────────────────────────
 
@@ -67,6 +68,8 @@ namespace optiSCAN.Services
             MigrateUnsignedManifestIfNeeded();
             _ = Task.Run(EnsureQuarantineBlobLayout);
         }
+
+        public void BindActivityLog(ActivityLogService activityLog) => _activityLog = activityLog;
 
         /// <summary>Legacy v1 : signe le manifeste au premier chargement. v2+ non signé : rejet.</summary>
         private void MigrateUnsignedManifestIfNeeded()
@@ -134,7 +137,11 @@ namespace optiSCAN.Services
 
         // ── Quarantaine ──────────────────────────────────────────────────────────
 
-        public bool Quarantine(ThreatInfo threat)
+        bool IThreatStore.Quarantine(ThreatInfo threat) => Quarantine(threat, default);
+
+        int IThreatStore.QuarantineAll(IEnumerable<ThreatInfo> threats) => QuarantineAll(threats, default);
+
+        public bool Quarantine(ThreatInfo threat, Guid sourceSessionId = default)
         {
             try
             {
@@ -203,16 +210,24 @@ namespace optiSCAN.Services
                 }
 
                 // 5. Suppression du fichier original (après écriture confirmée).
-                //    Si la suppression échoue, on a une copie quarantaine valide
-                //    et le fichier reste sur disque — l'opérateur peut réessayer.
-                File.Delete(threat.FilePath);
+                try
+                {
+                    File.Delete(threat.FilePath);
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn("QuarantineManager",
+                        $"Suppression originale échouée après quarantaine ({threat.FilePath})", ex);
+                    try { File.Delete(qPath); } catch { /* rollback blob */ }
+                    return false;
+                }
 
                 threat.Status = ThreatStatus.Quarantined;
                 threat.QuarantinePath = qPath;
 
                 lock (_lock)
                 {
-                    _doc.Entries.Add(new QuarantineEntry
+                    var entry = new QuarantineEntry
                     {
                         Id = id,
                         OriginalPath = threat.FilePath,
@@ -221,8 +236,16 @@ namespace optiSCAN.Services
                         QuarantinedAt = DateTime.Now,
                         OriginalSize = threat.FileSize,
                         Sha256 = Convert.ToHexString(sha256),
-                    });
-                    SaveManifest();
+                        SourceSessionId = sourceSessionId != Guid.Empty ? sourceSessionId : null,
+                    };
+                    _doc.Entries.Add(entry);
+                    if (!TrySaveManifest())
+                    {
+                        _doc.Entries.Remove(entry);
+                        try { File.Delete(qPath); } catch { /* best effort */ }
+                        return false;
+                    }
+                    _activityLog?.RecordThreatQuarantined(entry, sourceSessionId);
                 }
 
                 // 6. Wipe du plaintext en RAM (réduit la fenêtre d'exposition mémoire).
@@ -237,11 +260,11 @@ namespace optiSCAN.Services
             }
         }
 
-        public int QuarantineAll(IEnumerable<ThreatInfo> threats)
+        public int QuarantineAll(IEnumerable<ThreatInfo> threats, Guid sourceSessionId = default)
         {
             int count = 0;
             foreach (var t in threats)
-                if (Quarantine(t)) count++;
+                if (Quarantine(t, sourceSessionId)) count++;
             return count;
         }
 
@@ -331,6 +354,7 @@ namespace optiSCAN.Services
                 File.Delete(entry.QuarantinePath);
                 lock (_lock)
                 {
+                    _activityLog?.RecordThreatRestored(entry);
                     _doc.Entries.Remove(entry);
                     SaveManifest();
                 }
@@ -499,6 +523,7 @@ namespace optiSCAN.Services
 
                 lock (_lock)
                 {
+                    _activityLog?.RecordQuarantineDeleted(entry);
                     _doc.Entries.Remove(entry);
                     SaveManifest();
                 }
@@ -593,7 +618,7 @@ namespace optiSCAN.Services
                 fallbackValue: new QuarantineDocument());
         }
 
-        private void SaveManifest()
+        private bool TrySaveManifest()
         {
             try
             {
@@ -605,11 +630,19 @@ namespace optiSCAN.Services
                     WriteIndented = true,
                 });
                 AtomicFile.WriteAllText(_manifestPath, json);
+                return true;
             }
             catch (Exception ex)
             {
                 AppLogger.Error("QuarantineManager", "SaveManifest", ex);
+                return false;
             }
+        }
+
+        private void SaveManifest()
+        {
+            if (!TrySaveManifest())
+                AppLogger.Warn("QuarantineManager", "SaveManifest ignoré (échec silencieux évité)");
         }
 
         /// <summary>
@@ -669,6 +702,9 @@ namespace optiSCAN.Services
 
         /// <summary>Hash SHA-256 hex du fichier original (vérifié à la restauration).</summary>
         public string Sha256 { get; set; } = string.Empty;
+
+        /// <summary>Session scan d'origine si connue (traçabilité Historique).</summary>
+        public Guid? SourceSessionId { get; set; }
 
         public string FileName => Path.GetFileName(OriginalPath);
         public string SizeDisplay => OriginalSize >= 0

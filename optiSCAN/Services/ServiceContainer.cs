@@ -26,15 +26,25 @@ namespace optiSCAN.Services
 
         // ── Services singleton ───────────────────────────────────────────────────
         public ClamAvEngine ClamAv { get; }
+
+        /// <summary>Moteur Clam effectif (clamd avec repli clamscan).</summary>
+        internal CompositeClamAvBackend ClamAvBackend { get; }
+
+        /// <summary><c>clamd</c> ou <c>clamscan</c> selon le dernier scan.</summary>
+        public string ClamActiveEngine => ClamAvBackend.ActiveEngine;
         public YaraEngine Yara { get; }
         public ScanOrchestrator Orchestrator { get; }
         public FreshclamUpdater FreshclamUpdater { get; }
         public YaraForgeUpdater RulesUpdater { get; }
         public QuarantineManager Quarantine { get; }
         public ScanLogManager Logger { get; }
+        public ActivityLogService ActivityLog { get; }
         public NotificationService Notifications { get; }
         /// <summary>Surveillance fichiers sensibles (désactivable via Options / exclusions).</summary>
         public RealTimeProtection RealTimeProtection { get; }
+
+        /// <summary>Scan automatique des lecteurs amovibles à l'insertion.</summary>
+        public RemovableDriveScanService RemovableDriveScan { get; }
 
         /// <summary>Tâche planifiée Windows (schtasks) — instance partagée pour Options et diagnostics.</summary>
         public ScheduledScanService ScheduledScan { get; }
@@ -44,6 +54,10 @@ namespace optiSCAN.Services
 
         /// <summary>Actions UI antivirus (quarantaine, suppression, stop updates).</summary>
         public AntivirusActions Actions { get; }
+
+        public ThreatReputationService ThreatReputation { get; }
+
+        public ISecurityPostureService SecurityPosture { get; }
 
         // Navigation entre panneaux. Initialisé par MainWindow.OnLoaded une fois
         // que tous les UserControls sont créés (RegisterPanel a besoin de leur
@@ -74,6 +88,16 @@ namespace optiSCAN.Services
             ExclusionSettings.Current.Save();
             if (enabled) RealTimeProtection.Start();
             else RealTimeProtection.Stop();
+            RequestProtectionStateRefresh();
+        }
+
+        /// <summary>Active ou arrête la surveillance des lecteurs amovibles.</summary>
+        public void ApplyRemovableDriveScan(bool enabled)
+        {
+            UserPreferences.Current.RemovableDriveScanEnabled = enabled;
+            UserPreferences.Current.Save();
+            if (enabled) RemovableDriveScan.Start();
+            else RemovableDriveScan.Stop();
             RequestProtectionStateRefresh();
         }
 
@@ -123,6 +147,25 @@ namespace optiSCAN.Services
                 RealTimeProtection.Start();
             else
                 RealTimeProtection.Stop();
+
+            if (UserPreferences.Current.GameModeAutoEnabled)
+                DistractionFreeMonitor.Start();
+            else
+                DistractionFreeMonitor.Stop();
+
+            if (UserPreferences.Current.UseClamdEngine)
+            {
+                _ = Task.Run(async () =>
+                {
+                    try { await ClamdHost.Shared.EnsureRunningAsync().ConfigureAwait(false); }
+                    catch (Exception ex) { AppLogger.Warn("ServiceContainer", "Préchauffage clamd", ex); }
+                });
+            }
+
+            if (UserPreferences.Current.RemovableDriveScanEnabled)
+                RemovableDriveScan.Start();
+            else
+                RemovableDriveScan.Stop();
         }
 
         // Demandes UI (export, onglet Signatures, etc.) : événements nommés plutôt que des
@@ -174,21 +217,52 @@ namespace optiSCAN.Services
         public void RequestExportScanSessionPdf(Models.ScanSession session) =>
             _exportScanSessionPdfHandlers?.Invoke(this, session);
 
+        private EventHandler<Models.ScanSession>? _reviewHistorySessionHandlers;
+        /// <summary>Charge les menaces d'une session historique dans Analyse (écouteur : MainWindow).</summary>
+        public event EventHandler<Models.ScanSession>? ReviewHistorySessionRequested
+        {
+            add => _reviewHistorySessionHandlers += value;
+            remove => _reviewHistorySessionHandlers -= value;
+        }
+
+        public void RequestReviewHistorySession(Models.ScanSession session) =>
+            _reviewHistorySessionHandlers?.Invoke(this, session);
+
+        private EventHandler? _openQuarantineTabHandlers;
+        /// <summary>Ouvre l'onglet Quarantaine de l'Antivirus (écouteur : MainWindow).</summary>
+        public event EventHandler? OpenQuarantineTabRequested
+        {
+            add => _openQuarantineTabHandlers += value;
+            remove => _openQuarantineTabHandlers -= value;
+        }
+
+        public void RequestOpenQuarantineTab() =>
+            _openQuarantineTabHandlers?.Invoke(this, EventArgs.Empty);
+
         private ServiceContainer()
         {
             // Ordre de construction : du plus indépendant au plus dépendant.
             ClamAv = new ClamAvEngine();
+            var clamdEngine = new ClamdEngine();
+            ClamAvBackend = new CompositeClamAvBackend(clamdEngine, ClamAv);
             Yara = new YaraEngine();
             FreshclamUpdater = new FreshclamUpdater();
             RulesUpdater = new YaraForgeUpdater();
             Quarantine = new QuarantineManager();
             Logger = new ScanLogManager();
+            ActivityLog = new ActivityLogService(Logger);
+            Logger.BindActivityLog(ActivityLog);
+            Quarantine.BindActivityLog(ActivityLog);
+            ActivityLog.EnsureMigrated(Quarantine);
             Notifications = new NotificationService();
 
-            Orchestrator = new ScanOrchestrator(ClamAv, Yara);
+            Orchestrator = new ScanOrchestrator(ClamAvBackend, Yara);
             ScanEngine = new ClamAvScanEngineAdapter(ClamAv);
             Actions = new AntivirusActions(this);
+            ThreatReputation = new ThreatReputationService();
+            SecurityPosture = new SecurityPostureService();
             RealTimeProtection = new RealTimeProtection(Orchestrator, Quarantine, Notifications);
+            RemovableDriveScan = new RemovableDriveScanService(Orchestrator, Quarantine, Notifications, Logger);
             ScheduledScan = new ScheduledScanService();
 
             // Timers MAJ signatures : état restauré depuis UserPreferences (ApplyPreferencesOnStartup).
@@ -227,10 +301,16 @@ namespace optiSCAN.Services
             _exportScanSessionPdfHandlers = null;
             try { RealTimeProtection.Dispose(); }
             catch (Exception ex) { AppLogger.Warn("ServiceContainer", "RealTimeProtection.Dispose", ex); }
+            try { RemovableDriveScan.Dispose(); }
+            catch (Exception ex) { AppLogger.Warn("ServiceContainer", "RemovableDriveScan.Dispose", ex); }
             try { FreshclamUpdater.DisableAutoUpdate(); }
             catch (Exception ex) { AppLogger.Warn("ServiceContainer", "FreshclamUpdater.DisableAutoUpdate", ex); }
             try { RulesUpdater.DisableAutoUpdate(); }
             catch (Exception ex) { AppLogger.Warn("ServiceContainer", "RulesUpdater.DisableAutoUpdate", ex); }
+            try { ClamdHost.Shared.Stop(); }
+            catch (Exception ex) { AppLogger.Warn("ServiceContainer", "ClamdHost.Stop", ex); }
+            try { DistractionFreeMonitor.Stop(); }
+            catch (Exception ex) { AppLogger.Warn("ServiceContainer", "DistractionFreeMonitor.Stop", ex); }
             (ClamAv as IDisposable)?.Dispose();
             (Yara as IDisposable)?.Dispose();
             AppLogger.Info("ServiceContainer", "Services fermés");

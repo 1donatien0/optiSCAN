@@ -1,7 +1,7 @@
 ; =============================================================================
 ; optiSCAN — Installateur Windows (Inno Setup)
 ; =============================================================================
-; AppRelease = nom vM.m (v7.0) · AppVersion = semver / Directory.Build.props
+; AppRelease = nom vM.m (v8.0) · AppVersion = semver / Directory.Build.props
 
 #define AppName        "optiSCAN"
 #ifndef AppVersion
