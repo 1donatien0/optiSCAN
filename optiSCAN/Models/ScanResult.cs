@@ -94,7 +94,9 @@ namespace optiSCAN.Models
         /// <summary>Analyse rapide (dossiers système prioritaires).</summary>
         QuickScan,
         /// <summary>Analyse complète de tous les lecteurs.</summary>
-        FullScan
+        FullScan,
+        /// <summary>Analyse automatique d'un lecteur amovible (USB, carte SD…).</summary>
+        RemovableDrive
     }
 
     /// <summary>État d'avancement du scan.</summary>

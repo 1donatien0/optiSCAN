@@ -80,7 +80,11 @@ namespace optiSCAN.Services
 
         /// <summary>Analyse complète sur l'ensemble des cibles définies dans <see cref="ScanTargets"/>.</summary>
         public Task<ScanResult> FullScanAsync(IProgress<ScanProgress>? progress = null, CancellationToken ct = default)
-            => RunMultiTargetPipelineAsync(ScanType.FullScan, ScanTargets.FullScanTargets(), progress, ct);
+            => RunMultiTargetPipelineAsync(
+                ScanType.FullScan,
+                ScanTargets.FullScanTargets(UserPreferences.Current.IncludeRemovableInFullScan),
+                progress,
+                ct);
 
         // ── Pipeline interne ─────────────────────────────────────────────────────
 

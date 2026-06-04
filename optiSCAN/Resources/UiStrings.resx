@@ -93,6 +93,7 @@
   <data name="ScanType_Full" xml:space="preserve"><value>Analyse complète</value></data>
   <data name="ScanType_Quick" xml:space="preserve"><value>Analyse rapide</value></data>
   <data name="ScanType_Default" xml:space="preserve"><value>Analyse</value></data>
+  <data name="ScanType_Removable" xml:space="preserve"><value>Lecteur amovible</value></data>
   <data name="ScanSummary_Running" xml:space="preserve"><value>Analyse en cours… ({0:N0} fichier(s) déjà parcourus)</value></data>
   <data name="ScanSummary_Clean" xml:space="preserve"><value>Aucune menace — {0:N0} fichier(s) en {1}</value></data>
   <data name="ScanSummary_Threats" xml:space="preserve"><value>Attention : {0} menace(s) sur {1:N0} fichier(s)</value></data>
@@ -313,6 +314,10 @@
   <data name="Opt_NotifSub" xml:space="preserve"><value>Alertes si menace détectée ou mise à jour disponible</value></data>
   <data name="Opt_DarkTheme" xml:space="preserve"><value>Thème sombre</value></data>
   <data name="Opt_DarkSub" xml:space="preserve"><value>Même réglage que le bouton Mode dans la barre latérale</value></data>
+  <data name="Opt_ThemeLight" xml:space="preserve"><value>Thème clair</value></data>
+  <data name="Opt_ThemeLightSub" xml:space="preserve"><value>Windows est en mode sombre — cochez pour utiliser le thème clair dans optiSCAN. Décochez pour suivre le thème Windows.</value></data>
+  <data name="Opt_ThemeDark" xml:space="preserve"><value>Thème sombre</value></data>
+  <data name="Opt_ThemeDarkSub" xml:space="preserve"><value>Windows est en mode clair — cochez pour utiliser le thème sombre dans optiSCAN. Décochez pour suivre le thème Windows.</value></data>
   <data name="Opt_SyncWin" xml:space="preserve"><value>Suivre le thème Windows</value></data>
   <data name="Opt_SyncSub" xml:space="preserve"><value>S'adapte automatiquement au mode clair/sombre de Windows</value></data>
   <data name="Opt_FavScan" xml:space="preserve"><value>Type d'analyse favori</value></data>
@@ -330,6 +335,12 @@
   <data name="Opt_Antivirus" xml:space="preserve"><value>Antivirus</value></data>
   <data name="Opt_Rtp" xml:space="preserve"><value>Protection temps réel</value></data>
   <data name="Opt_RtpSub" xml:space="preserve"><value>ProgramData, Temp Windows et extensions à risque — pas l'intégralité du profil utilisateur.</value></data>
+  <data name="Opt_RemovableScan" xml:space="preserve"><value>Analyser les clés USB et cartes SD</value></data>
+  <data name="Opt_RemovableScanSub" xml:space="preserve"><value>Lance une analyse automatique à l'insertion (lecteurs de moins de 64 Go par défaut).</value></data>
+  <data name="Opt_RemovableDetailed" xml:space="preserve"><value>Analyse USB complète</value></data>
+  <data name="Opt_RemovableDetailedSub" xml:space="preserve"><value>Tous les fichiers du lecteur (plus long). Sinon : tous les fichiers (jusqu'à 4 000), analyse fichier par fichier.</value></data>
+  <data name="Opt_IncludeRemovableFull" xml:space="preserve"><value>Inclure les lecteurs amovibles dans l'analyse complète</value></data>
+  <data name="Opt_IncludeRemovableFullSub" xml:space="preserve"><value>Ajoute les volumes USB/SD à l'analyse complète manuelle ou planifiée.</value></data>
   <data name="Opt_AutoQuarantine" xml:space="preserve"><value>Quarantaine automatique</value></data>
   <data name="Opt_AutoQuarSub" xml:space="preserve"><value>Toute menace détectée (analyse manuelle, temps réel ou planifiée) est mise en quarantaine — jamais supprimée automatiquement</value></data>
   <data name="Opt_AutoSig" xml:space="preserve"><value>Mise à jour automatique des signatures (toutes les 4h)</value></data>

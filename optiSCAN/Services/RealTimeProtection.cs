@@ -28,11 +28,6 @@ namespace optiSCAN.Services
             @"C:\Windows\Downloaded Program Files"
         };
 
-        // Extensions surveillées (fichiers exécutables et scripts)
-        private static readonly HashSet<string> WatchedExtensions = new(
-            new[] { ".exe", ".dll", ".scr", ".bat", ".cmd", ".ps1", ".vbs", ".js", ".jar", ".msi", ".docm", ".xlsm", ".pptm" },
-            StringComparer.OrdinalIgnoreCase);
-
         // Délai d'attente après création/modification (éviter les scans sur écriture partielle)
         private static readonly TimeSpan StabilizationDelay = TimeSpan.FromMilliseconds(500);
 
@@ -153,9 +148,7 @@ namespace optiSCAN.Services
                 // Ignorer les dossiers
                 if (Directory.Exists(e.FullPath)) return;
 
-                // Vérifier l'extension
-                var ext = Path.GetExtension(e.FullPath);
-                if (!WatchedExtensions.Contains(ext)) return;
+                if (!RiskyFileExtensions.IsRisky(e.FullPath)) return;
 
                 // Dédup immédiate (avant le délai de stabilisation) pour éviter deux
                 // événements concurrents sur le même fichier avant l'écriture du cache.
@@ -206,8 +199,7 @@ namespace optiSCAN.Services
             {
                 if (Directory.Exists(e.FullPath)) return;
 
-                var ext = Path.GetExtension(e.FullPath);
-                if (!WatchedExtensions.Contains(ext)) return;
+                if (!RiskyFileExtensions.IsRisky(e.FullPath)) return;
 
                 var utcNow = DateTime.UtcNow;
                 if (!_recentlyScanned.TryAdd(e.FullPath, utcNow))

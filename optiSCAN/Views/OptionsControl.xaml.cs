@@ -35,9 +35,15 @@ namespace optiSCAN.Views
             Loaded += (_, _) =>
             {
                 ThemeManager.ThemeChanged += SurChangementTheme;
+                SyncThemeControls();
                 _ = LoadScheduledTaskStateAsync();
             };
             Unloaded += (_, _) => ThemeManager.ThemeChanged -= SurChangementTheme;
+            IsVisibleChanged += (_, _) =>
+            {
+                if (IsVisible)
+                    SyncThemeControls();
+            };
         }
 
         private void SurChangementTheme(object? sender, bool isDark) => SyncThemeControls();
@@ -73,19 +79,25 @@ namespace optiSCAN.Views
             _suppressPreferenceEvents = true;
             try
             {
-                var prefs = UserPreferences.Current;
-                if (chkSyncWindowsTheme != null)
-                    chkSyncWindowsTheme.IsChecked = prefs.SyncWindowsTheme;
-                if (chkDarkTheme != null)
-                {
-                    chkDarkTheme.IsChecked = isDark;
-                    chkDarkTheme.IsEnabled = !prefs.SyncWindowsTheme;
-                }
+                UpdateAlternateThemeLabels();
+                if (chkAlternateTheme != null)
+                    chkAlternateTheme.IsChecked = ThemeManager.IsAlternateThemeEnabled;
             }
             finally
             {
                 _suppressPreferenceEvents = false;
             }
+        }
+
+        private void UpdateAlternateThemeLabels()
+        {
+            bool windowsDark = ThemeManager.IsWindowsAppsDarkTheme();
+            if (txtAlternateThemeTitle != null)
+                txtAlternateThemeTitle.Text = LocalizationService.GetString(
+                    windowsDark ? "Opt_ThemeLight" : "Opt_ThemeDark");
+            if (txtAlternateThemeSub != null)
+                txtAlternateThemeSub.Text = LocalizationService.GetString(
+                    windowsDark ? "Opt_ThemeLightSub" : "Opt_ThemeDarkSub");
         }
 
         private void LoadPreferences()
@@ -98,12 +110,6 @@ namespace optiSCAN.Views
                     chkNotifications.IsChecked = prefs.ActionNotificationsEnabled;
                 if (chkAutoStart != null)
                     chkAutoStart.IsChecked = IsAutoStartRegistered();
-                if (chkDarkTheme != null)
-                    chkDarkTheme.IsChecked = prefs.DarkTheme;
-                if (chkSyncWindowsTheme != null)
-                    chkSyncWindowsTheme.IsChecked = prefs.SyncWindowsTheme;
-                if (chkDarkTheme != null)
-                    chkDarkTheme.IsEnabled = prefs.SyncWindowsTheme != true;
 
                 if (cmbUiLanguage != null)
                     SelectUiLanguageCombo(UserPreferences.Current.UiCulture);
@@ -122,6 +128,13 @@ namespace optiSCAN.Views
                 var ex = ExclusionSettings.Current;
                 if (chkRealtimeProtection != null)
                     chkRealtimeProtection.IsChecked = ex.RealTimeEnabled;
+                if (chkRemovableDriveScan != null)
+                    chkRemovableDriveScan.IsChecked = prefs.RemovableDriveScanEnabled;
+                if (chkRemovableDriveDetailed != null)
+                    chkRemovableDriveDetailed.IsChecked = prefs.RemovableDriveScanDetailed;
+                if (chkIncludeRemovableFullScan != null)
+                    chkIncludeRemovableFullScan.IsChecked = prefs.IncludeRemovableInFullScan;
+
                 if (chkAutoQuarantine != null)
                     chkAutoQuarantine.IsChecked = ex.AutoQuarantineEnabled;
 
@@ -258,27 +271,27 @@ namespace optiSCAN.Views
                     c.ApplyRealtimeProtection(isOn);
                     break;
 
+                case "RemovableDriveScan":
+                    c.ApplyRemovableDriveScan(isOn);
+                    break;
+
+                case "RemovableDriveDetailed":
+                    prefs.RemovableDriveScanDetailed = isOn;
+                    prefs.Save();
+                    break;
+
+                case "IncludeRemovableFullScan":
+                    prefs.IncludeRemovableInFullScan = isOn;
+                    prefs.Save();
+                    break;
+
                 case "AutoQuarantine":
                     c.ApplyAutoQuarantine(isOn);
                     break;
 
-                case "DarkTheme":
-                    if (prefs.SyncWindowsTheme)
-                    {
-                        prefs.SyncWindowsTheme = false;
-                        ThemeManager.SetSyncWithWindows(false);
-                    }
-                    ThemeManager.Apply(isOn);
-                    break;
-
-                case "SyncWindowsTheme":
-                    ThemeManager.SetSyncWithWindows(isOn);
-                    if (chkDarkTheme != null)
-                    {
-                        chkDarkTheme.IsEnabled = !isOn;
-                        if (isOn)
-                            chkDarkTheme.IsChecked = ThemeManager.IsDarkTheme;
-                    }
+                case "AlternateTheme":
+                    ThemeManager.SetAlternateThemeEnabled(isOn);
+                    SyncThemeControls();
                     break;
 
                 case "HighContrast":

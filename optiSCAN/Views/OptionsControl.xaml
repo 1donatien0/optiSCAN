@@ -84,21 +84,21 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <!-- Thème sombre -->
+                        <!-- Thème opposé au mode Windows (libellé dynamique : clair si Windows sombre, etc.) -->
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                            <CheckBox x:Name="chkDarkTheme"
+                            <CheckBox x:Name="chkAlternateTheme"
                                       VerticalAlignment="Top"
                                       Margin="0,2,16,0"
                                       Checked="CheckOption_Changed"
                                       Unchecked="CheckOption_Changed"
-                                      Tag="DarkTheme"/>
+                                      Tag="AlternateTheme"/>
                             <StackPanel>
-                                <TextBlock Text="{loc:Loc Key=Opt_DarkTheme}"
+                                <TextBlock x:Name="txtAlternateThemeTitle"
                                            FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextDark}"/>
-                                <TextBlock Text="{loc:Loc Key=Opt_DarkSub}"
+                                <TextBlock x:Name="txtAlternateThemeSub"
                                            FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
-                                           Margin="0,3,0,0"/>
+                                           Margin="0,3,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                         </StackPanel>
 
@@ -120,23 +120,6 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <!-- Suivre le thème Windows -->
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                            <CheckBox x:Name="chkSyncWindowsTheme"
-                                      VerticalAlignment="Top"
-                                      Margin="0,2,16,0"
-                                      Checked="CheckOption_Changed"
-                                      Unchecked="CheckOption_Changed"
-                                      Tag="SyncWindowsTheme"/>
-                            <StackPanel>
-                                <TextBlock Text="{loc:Loc Key=Opt_SyncWin}"
-                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextDark}"/>
-                                <TextBlock Text="{loc:Loc Key=Opt_SyncSub}"
-                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
-                                           Margin="0,3,0,0"/>
-                            </StackPanel>
-                        </StackPanel>
 
                         <!-- Langue de l'interface -->
                         <StackPanel Margin="0,0,0,20">
@@ -211,6 +194,59 @@
                                 <TextBlock Text="{loc:Loc Key=Opt_RtpSub}"
                                            FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
                                            Margin="0,3,0,0"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Scan lecteurs amovibles -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                            <CheckBox x:Name="chkRemovableDriveScan"
+                                      IsChecked="True"
+                                      VerticalAlignment="Top"
+                                      Margin="0,2,16,0"
+                                      Checked="CheckOption_Changed"
+                                      Unchecked="CheckOption_Changed"
+                                      Tag="RemovableDriveScan"/>
+                            <StackPanel>
+                                <TextBlock Text="{loc:Loc Key=Opt_RemovableScan}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextDark}"/>
+                                <TextBlock Text="{loc:Loc Key=Opt_RemovableScanSub}"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                           Margin="0,3,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Margin="32,0,0,12">
+                            <CheckBox x:Name="chkRemovableDriveDetailed"
+                                      VerticalAlignment="Top"
+                                      Margin="0,2,16,0"
+                                      Checked="CheckOption_Changed"
+                                      Unchecked="CheckOption_Changed"
+                                      Tag="RemovableDriveDetailed"/>
+                            <StackPanel>
+                                <TextBlock Text="{loc:Loc Key=Opt_RemovableDetailed}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextDark}"/>
+                                <TextBlock Text="{loc:Loc Key=Opt_RemovableDetailedSub}"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                           Margin="0,3,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Margin="32,0,0,20">
+                            <CheckBox x:Name="chkIncludeRemovableFullScan"
+                                      VerticalAlignment="Top"
+                                      Margin="0,2,16,0"
+                                      Checked="CheckOption_Changed"
+                                      Unchecked="CheckOption_Changed"
+                                      Tag="IncludeRemovableFullScan"/>
+                            <StackPanel>
+                                <TextBlock Text="{loc:Loc Key=Opt_IncludeRemovableFull}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextDark}"/>
+                                <TextBlock Text="{loc:Loc Key=Opt_IncludeRemovableFullSub}"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                           Margin="0,3,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                         </StackPanel>
 

@@ -65,6 +65,8 @@ namespace optiSCAN
 
         public MainWindow()
         {
+            // Avant OptionsControl (LoadPreferences) : thème Windows + prefs déjà appliqués.
+            ThemeManager.Initialize();
             InitializeComponent();
             // Avant toute navigation (ex. RadioButton coché), enregistrer les panneaux.
             RegisterPanels();
@@ -132,6 +134,7 @@ namespace optiSCAN
                 c.ExportScanSessionPdfRequested += SurDemandeExportSessionScanPdf;
                 c.ReviewHistorySessionRequested += SurDemandeRevueSessionHistorique;
                 c.RealTimeProtection.ThreatDetected += SurMenaceTempsReelDetectee;
+                c.RemovableDriveScan.ThreatDetected += SurMenaceTempsReelDetectee;
                 c.Notifications.ToastActivated -= SurActivationToast;
                 c.Notifications.ToastActivated += SurActivationToast;
                 c.Notifications.SyncFromUserPreferences();
@@ -361,6 +364,7 @@ namespace optiSCAN
             c.ReviewHistorySessionRequested -= SurDemandeRevueSessionHistorique;
             c.FocusAntivirusSignaturesRequested -= SurDemandeFocusSignaturesAntivirus;
             c.RealTimeProtection.ThreatDetected -= SurMenaceTempsReelDetectee;
+            c.RemovableDriveScan.ThreatDetected -= SurMenaceTempsReelDetectee;
             c.Notifications.ToastActivated -= SurActivationToast;
             c.Actions.ActionCompleted -= SurActionAntivirusTerminee;
         }

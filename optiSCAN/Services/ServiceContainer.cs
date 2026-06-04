@@ -42,6 +42,9 @@ namespace optiSCAN.Services
         /// <summary>Surveillance fichiers sensibles (désactivable via Options / exclusions).</summary>
         public RealTimeProtection RealTimeProtection { get; }
 
+        /// <summary>Scan automatique des lecteurs amovibles à l'insertion.</summary>
+        public RemovableDriveScanService RemovableDriveScan { get; }
+
         /// <summary>Tâche planifiée Windows (schtasks) — instance partagée pour Options et diagnostics.</summary>
         public ScheduledScanService ScheduledScan { get; }
 
@@ -84,6 +87,16 @@ namespace optiSCAN.Services
             ExclusionSettings.Current.Save();
             if (enabled) RealTimeProtection.Start();
             else RealTimeProtection.Stop();
+            RequestProtectionStateRefresh();
+        }
+
+        /// <summary>Active ou arrête la surveillance des lecteurs amovibles.</summary>
+        public void ApplyRemovableDriveScan(bool enabled)
+        {
+            UserPreferences.Current.RemovableDriveScanEnabled = enabled;
+            UserPreferences.Current.Save();
+            if (enabled) RemovableDriveScan.Start();
+            else RemovableDriveScan.Stop();
             RequestProtectionStateRefresh();
         }
 
@@ -147,6 +160,11 @@ namespace optiSCAN.Services
                     catch (Exception ex) { AppLogger.Warn("ServiceContainer", "Préchauffage clamd", ex); }
                 });
             }
+
+            if (UserPreferences.Current.RemovableDriveScanEnabled)
+                RemovableDriveScan.Start();
+            else
+                RemovableDriveScan.Stop();
         }
 
         // Demandes UI (export, onglet Signatures, etc.) : événements nommés plutôt que des
@@ -228,6 +246,7 @@ namespace optiSCAN.Services
             ThreatReputation = new ThreatReputationService();
             SecurityPosture = new SecurityPostureService();
             RealTimeProtection = new RealTimeProtection(Orchestrator, Quarantine, Notifications);
+            RemovableDriveScan = new RemovableDriveScanService(Orchestrator, Quarantine, Notifications, Logger);
             ScheduledScan = new ScheduledScanService();
 
             // Timers MAJ signatures : état restauré depuis UserPreferences (ApplyPreferencesOnStartup).
@@ -266,6 +285,8 @@ namespace optiSCAN.Services
             _exportScanSessionPdfHandlers = null;
             try { RealTimeProtection.Dispose(); }
             catch (Exception ex) { AppLogger.Warn("ServiceContainer", "RealTimeProtection.Dispose", ex); }
+            try { RemovableDriveScan.Dispose(); }
+            catch (Exception ex) { AppLogger.Warn("ServiceContainer", "RemovableDriveScan.Dispose", ex); }
             try { FreshclamUpdater.DisableAutoUpdate(); }
             catch (Exception ex) { AppLogger.Warn("ServiceContainer", "FreshclamUpdater.DisableAutoUpdate", ex); }
             try { RulesUpdater.DisableAutoUpdate(); }

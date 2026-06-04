@@ -67,9 +67,7 @@ namespace optiSCAN
             }
 
             base.OnStartup(e);
-            // Applique le thème Donaby + MaterialDesign selon UserPreferences (sinon
-            // seul le dictionnaire fusionné dans App.xaml est actif — incohérence).
-            ThemeManager.Initialize();
+            // Thème : ThemeManager.Initialize() dans MainWindow (avant InitializeComponent).
         }
 
         // ── Headless ────────────────────────────────────────────────────────────

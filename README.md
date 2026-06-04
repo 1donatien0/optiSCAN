@@ -14,7 +14,7 @@
 | **2** | Donaby Design (thèmes, tokens) |
 | **3** | Installation et configuration ClamAV |
 | **4** | Application mono-fenêtre (panneaux, antivirus, pipeline, persistance, exports, vue d’ensemble) |
-| **5** | Services complémentaires (RTP, planificateur, notifications, scoring, journalisation) |
+| **5** | Services complémentaires (RTP, scan USB/SD, planificateur, notifications, scoring) |
 | **6** | Workflow démarrage UI et ligne de commande |
 | **7** | Bonnes pratiques (droits, perfs, faux positifs, Defender) |
 | **8** | Publication, installateur Inno Setup et checklist release |
@@ -69,7 +69,7 @@ Branche par défaut GitHub : **`main`**. CI : uniquement `main` et `dev` (voir [
 ├── README.md                          ← Ce fichier (guide complet)
 ├── docs/
 │   └── README.md                      ← Index doc (renvoie vers ce README)
-├── .github/workflows/ci.yml           ← Build, tests (171), publish (main)
+├── .github/workflows/ci.yml           ← Build, tests (185), publish (main)
 ├── scripts/
 │   ├── fetch-runtime-deps.ps1         ← Télécharge ClamAV + YARA (CI / dev)
 │   ├── prepare-release-v8.ps1         ← Chaîne complète release v8
@@ -85,8 +85,9 @@ Branche par défaut GitHub : **`main`**. CI : uniquement `main` et `dev` (voir [
     ├── Models/
     │   ├── ThreatInfo.cs              ← Menace détectée
     │   ├── ScanProgress.cs            ← Progression temps réel (IProgress<T>)
-    │   ├── ScanResult.cs              ← Résultat global d'un scan
-    │   └── ScanSession.cs             ← Entrée d'historique JSON (v8 : Threats[] ; v7 : type legacy)
+    │   ├── ScanResult.cs              ← Résultat global d'un scan (types dont RemovableDrive)
+    │   ├── ScanSession.cs             ← Entrée d'historique scan (v8 : Threats[] ; v7 : type legacy)
+    │   └── ActivityEntry.cs           ← Ligne timeline Historique (scan + nettoyage)
     │
     ├── ViewModels/                    ← ScanViewModel, RelayCommand
     ├── Views/                         ← Overview, Antivirus, Clean, History, Options
@@ -129,9 +130,12 @@ Branche par défaut GitHub : **`main`**. CI : uniquement `main` et `dev` (voir [
     │   ├── ElevationHelper.cs         ← Relance UAC (--scan, analyse complète)
     │   ├── QuarantineManager.cs       ← Quarantaine AES-GCM, manifeste signé
     │   ├── SecureStore.cs             ← Persistance DPAPI + HMAC (prefs, exclusions, historique)
-    │   ├── OverviewRecommendationsBuilder.cs ← Recommandations accueil (logique pure, testée)
-    │   ├── ScanLogManager.cs          ← Historique chiffré (.dat) + optiSCAN.log
+    │   ├── OverviewRecommendationsBuilder.cs ← Recommandations accueil (hygiène + activité)
+    │   ├── OverviewProtectionStatsFormatter.cs ← Stats protection 30 j. (accueil, sans doublon reco.)
+    │   ├── ScanLogManager.cs          ← Historique chiffré (.dat), GetActivityFeed, optiSCAN.log
     │   ├── RealTimeProtection.cs      ← FileSystemWatcher (Options)
+    │   ├── RemovableDriveScanService.cs ← Scan auto USB/SD à l'insertion (WMI + polling)
+    │   ├── RiskyFileExtensions.cs     ← Extensions à risque (partagées RTP ; USB = tous fichiers en rapide)
     │   ├── ScheduledScanService.cs    ← schtasks (async côté Options)
     │   ├── IpcManager.cs              ← Instance unique : WM_SHOWME
     │   ├── HtmlExportService.cs       ← Rapport HTML
@@ -179,14 +183,14 @@ Fichiers de thème :
 
 ### 2.2 ThemeManager
 
-`ThemeManager` est un service `static` appelé au démarrage depuis `App.xaml.cs` (après `OnStartup`) :
+`ThemeManager` est un service `static` initialisé **avant** `InitializeComponent()` dans le constructeur de **`MainWindow`** (thème correct dès le premier rendu XAML) :
 
 ```csharp
-// App.xaml.cs — branche interface graphique
-ThemeManager.Initialize(); // applique DarkTheme depuis UserPreferences (clair par défaut)
+// MainWindow() — avant InitializeComponent()
+ThemeManager.Initialize(); // SyncWindowsTheme par défaut, sinon DarkTheme
 
-// Bascule depuis le bouton de l'UI
-ThemeManager.Toggle();
+// Options — thème opposé à Windows (décocher = resuivre Windows)
+ThemeManager.SetAlternateThemeEnabled(true/false);
 
 // Contraste renforcé (Options)
 ThemeManager.SetHighContrast(true);
@@ -197,7 +201,7 @@ ThemeManager.ThemeChanged += (_, isDark) => { /* ... */ };
 
 Styles boutons (`Styles/Controls.xaml`) : `GradientPrimaryButton`, `DangerButton`, `WarningButton`, `SuccessButton`, `HubActionCardButton`, etc. — couleurs sémantiques via `TemplateBinding.Background`.
 
-La préférence est persistée dans `%AppData%\optiSCAN\preferences.dat` (DPAPI + HMAC). Propriétés : `DarkTheme`, `SyncWindowsTheme`, `HighContrastEnabled`.
+La préférence est persistée dans `%AppData%\optiSCAN\preferences.dat` (DPAPI + HMAC). Par défaut **optiSCAN suit le thème applications Windows** (`SyncWindowsTheme`). Dans **Options**, une seule case dynamique propose le thème **opposé** à Windows (libellé « Thème clair » si Windows est sombre, « Thème sombre » si Windows est clair). Propriétés : `DarkTheme`, `SyncWindowsTheme`, `HighContrastEnabled`.
 
 ### 2.3 Tokens de couleur disponibles
 
@@ -294,8 +298,8 @@ Les vues sont empilées dans un seul `Grid` (`MainWindow.xaml`) : une seule est 
 | `Overview` | Vue d'ensemble | `OverviewControl` | Cartes d'action (boutons), bandeau UAC, statut protection, recommandations |
 | `Antivirus` | Antivirus | `AntivirusView` | Scans ; onglets **Analyse en cours** / **Quarantaine** / **Historique** / **Signatures** (`ScanViewModel`) |
 | `Clean` | Nettoyer | `CleanControl` | Analyse / nettoyage (caches navigateurs, temp, corbeille) + **historique local** (colonne **Libéré** = `BytesDisplay`) |
-| `History` | Historique | `HistoryControl` | Sessions scan/nettoyage ; **traitement des menaces** (v8) ; filtres ; export **HTML** / **PDF** |
-| `Options` | Options | `OptionsControl` | **Langue** (fr/en, redémarrage), thème / `SyncWindowsTheme`, scan favori, RTP, quarantaine auto, planif. (`ServiceContainer.ScheduledScan`, prochaine exécution, **Lancer maintenant**), exclusions |
+| `History` | Historique | `HistoryControl` | Timeline unifiée scans + nettoyages (`GetActivityFeed`) ; traitement menaces v8 ; exports **HTML** / **PDF** |
+| `Options` | Options | `OptionsControl` | **Langue** (fr/en, redémarrage), thème / `SyncWindowsTheme`, scan favori, RTP, **scan USB/SD** (auto à l'insertion, mode complet, inclure dans analyse complète), quarantaine auto, planif. (`ServiceContainer.ScheduledScan`, prochaine exécution, **Lancer maintenant**), exclusions |
 
 Raccourcis clavier : `Ctrl+1` … `Ctrl+5` (`KeyboardShortcuts`) — ordre des panneaux : **Vue d’ensemble**, **Antivirus**, **Nettoyer**, **Historique**, **Options**.
 
@@ -310,7 +314,7 @@ Panneau divisé en deux colonnes :
 - **Colonne droite** : TabControl avec 4 onglets :
   - **Analyse en cours** — progression, fichier courant, grille menaces (colonne **Risque** + nom virus), actions par menace, quarantaine groupée
   - **Quarantaine** — entrées paginées, restauration / suppression, purge
-  - **Historique** — aperçu des dernières sessions (liste courte ; traitement complet dans le panneau **Historique** `Ctrl+4`)
+  - **Historique** — aperçu des dernières sessions (détail et actions dans le panneau **Historique** `Ctrl+4`)
   - **Signatures** — version de la base ClamAV, mise à jour manuelle, journaux freshclam / règles
 
 Après chaque analyse réussie, `StartScanAsync` met à jour les **cibles récentes** (fichier/dossier scanné, ou entrée « analyse rapide » / « analyse complète »).
@@ -367,6 +371,7 @@ ScanViewModel → ScanOrchestrator
 - **Dossiers exclus** : listés par l’utilisateur + **dossier d’installation** d’optiSCAN (implicite, sans faux positifs sur les binaires/règles embarqués)
 - **Règles exclues** : matches YARA filtrés (ex. `SuspiciousDownloads` — exclu par défaut)
 - **RTP** : mêmes exclusions avant scan temps réel
+- **Scan USB/SD** : mêmes exclusions ; lecteur entier exclu si son chemin racine est listé
 
 Configurable depuis **Options → EXCLUSIONS**.
 
@@ -387,13 +392,12 @@ Stockage : `%LOCALAPPDATA%\optiSCAN\Quarantine\` — `{guid}.quar` + `manifest.j
 | `ScanLogManager` → `optiSCAN.log` | Journal texte volontairement **non chiffré** (diagnostic) ; `FormatScanDetailCore` applique `PathRedaction` sur cible et chemins de menaces — noms de virus, dates et compteurs restent lisibles ; résumé dans **Historique → Scan Antivirus** |
 | `AppLogger` → `optiscan-YYYY-MM-DD.log` | Logs applicatifs (composants, erreurs) ; purge **> 30 jours**, au plus **1×/jour** (marqueur `.lastcleanup` persisté) |
 
-**Panneau Historique** (`HistoryControl`, `Ctrl+4`) — onglet **Scan Antivirus** :
+**Panneau Historique** (`HistoryControl`, `Ctrl+4`) :
 
-- Grille des sessions : filtres **Avec menaces** / **Sans menace**, recherche sur cible ou type.
-- Session **v8** : grille **Détections** (emplacement du fichier, nom de menace, risque) — le moteur ClamAV/YARA n’est pas affiché (usage interne uniquement).
-- Actions par ligne : **Quarantaine**, **Ignorer**, **Supprimer** (`AntivirusActions`) ; **Tout mettre en quarantaine** ; **Traiter dans Analyse** (`ServiceContainer.RequestReviewHistorySession` → `ScanViewModel.LoadThreatsFromHistorySession` + onglet Analyse).
-- Après traitement réussi : `ScanLogManager.TryRemoveThreatFromSession` met à jour `scan_history.dat`.
-- Session **v7** : le badge peut indiquer des menaces sans chemins enregistrés (message `Hist_DetailThreatsLegacy`) — relancer une analyse pour traiter.
+- **Timeline** : `ScanLogManager.GetActivityFeed()` fusionne scans et nettoyages (`ActivityEntry`), tri date décroissante ; filtres **Scans** / **Nettoyages** / **Tout** ; recherche sur type ou cible.
+- Détail d’une session **scan** : grille **Détections** (chemin, menace, risque) ; **Quarantaine** / **Ignorer** / **Supprimer** ; **Tout mettre en quarantaine** ; **Traiter dans Analyse** (`RequestReviewHistorySession`). Succès → `TryRemoveThreatFromSession` met à jour `scan_history.dat`.
+- Sessions **v7** : badge menaces possible sans chemins (`Hist_DetailThreatsLegacy`) — relancer une analyse pour traiter.
+- Types affichés : analyse rapide/complète, fichier, dossier, **lecteur amovible** (`ScanType.RemovableDrive`), nettoyage système.
 
 ### 4.10 Exports PDF et HTML
 
@@ -407,8 +411,8 @@ Le panneau **Vue d'ensemble** (`OverviewControl`, clé `Overview`) regroupe :
 - **Hero** : titre de protection (« Votre ordinateur est protégé » ou « Protection incomplète » selon les moteurs) et **dernière analyse** uniquement ; pas de détail ClamAV/YARA sur cet écran (voir onglet **Antivirus**).
 - **Quatre cartes d'action** : Nettoyer, Antivirus, Historique, mise à jour des signatures (navigation via `ServiceContainer` / `INavigationService`).
 - **Deux colonnes** sous les cartes :
-  - **Statistiques de protection** : synthèse textuelle sur **30 jours** (analyses, fichiers parcourus, menaces) à partir de l’historique persisté ; horodatage de dernière actualisation.
-  - **Recommandations** : calculées par `OverviewRecommendationsBuilder` (hygiène signatures / nettoyage + activité 30 jours) ; `MainWindow` ne fait que collecter le contexte et mettre à jour `OverviewControl`.
+  - **Statistiques de protection** : `OverviewProtectionStatsFormatter` (30 j., analyses / fichiers / menaces depuis l’historique) — distinct des recommandations pour éviter le doublon « activité ».
+  - **Recommandations** : `OverviewRecommendationsBuilder` (hygiène signatures, suggestion nettoyage) ; `MainWindow` collecte le contexte et met à jour `OverviewControl`.
 
 ---
 
@@ -416,7 +420,23 @@ Le panneau **Vue d'ensemble** (`OverviewControl`, clé `Overview`) regroupe :
 
 ### RealTimeProtection — surveillance temps réel
 
-`RealTimeProtection.cs` : `FileSystemWatcher` sur dossiers sensibles (profil utilisateur, `ProgramData`, `Temp`, etc.), filtre sur extensions à risque, délai de stabilisation, déduplication et **SemaphoreSlim(3)** parallèle. Une instance est créée dans **`ServiceContainer`** ; **Options** active ou coupe la surveillance et persiste le réglage. Les menaces détectées remontent vers l’UI (badge / liste) via événements consommés par **`MainWindow`**.
+`RealTimeProtection.cs` : `FileSystemWatcher` sur dossiers sensibles (profil utilisateur, `ProgramData`, `Temp`, etc.), filtre sur extensions à risque (`RiskyFileExtensions`), délai de stabilisation, déduplication et **SemaphoreSlim(3)** parallèle. Une instance est créée dans **`ServiceContainer`** ; **Options** active ou coupe la surveillance et persiste le réglage. Les menaces détectées remontent vers l’UI (badge / liste) via événements consommés par **`MainWindow`**.
+
+### RemovableDriveScanService — clés USB et cartes SD
+
+`RemovableDriveScanService.cs` : à l’**insertion** d’un volume (WMI `Win32_VolumeChangeEvent` + polling de secours), analyse automatique en arrière-plan si l’option est activée (**Options → Analyser les clés USB et cartes SD**, activée par défaut).
+
+| Aspect | Comportement |
+|---|---|
+| Détection | `DriveType.Removable` **ou** lecteur `Fixed` reconnu USB via WMI (`InterfaceType`, `PNPDeviceID`, `MediaType`) |
+| Déjà branché au démarrage | Enregistré sans scan (évite une vague au lancement) |
+| Mode rapide (défaut) | Tous les fichiers du volume (plafond **4 000**), analyse fichier par fichier |
+| Mode complet (option) | `ScanOrchestrator.ScanFolderAsync` récursif (ClamAV + YARA) |
+| Taille max. | **64 Go** par défaut (`RemovableDriveMaxSizeGb` ; `0` = illimité) |
+| Analyse complète manuelle | Option **Inclure les lecteurs amovibles** → `ScanTargets.FullScanTargets(includeRemovable: true)` |
+| Menace détectée | Historique (`ScanType.RemovableDrive`), toasts, quarantaine auto si activée, liste **Analyser** via `ThreatDetected` (même handler que la RTP) |
+
+Un seul scan USB à la fois (**SemaphoreSlim(1)**). `ServiceContainer.ApplyRemovableDriveScan` / `ApplyPreferencesOnStartup` démarrent ou arrêtent le service.
 
 ### ScheduledScanService — tâche planifiée Windows
 
@@ -485,16 +505,17 @@ DÉMARRAGE (UI)
     ├─→ Minuteries MAJ : freshclam **4 h**, règles YARA **24 h** (désactivables via Options)
     ├─→ `ScanViewModel.InitializeAsync` : versions, base, YARA, historique, quarantaine
     ├─→ Protection temps réel : état selon **Options** (`ServiceContainer.RealTimeProtection`)
+    ├─→ Scan USB/SD : `ServiceContainer.RemovableDriveScan` si option activée
     └─→ Fenêtre principale + icône zone de notification (réduction possible sans quitter)
             │
             ├─→ [VUE D'ENSEMBLE] — hero (protection + dernière analyse), cartes d’action, statistiques 30 j., recommandations
             ├─→ [NETTOYER] — temporaires, caches navigateurs (Edge, Chrome, Firefox, Brave, **Opera**, **Vivaldi**, **Arc**), corbeille, journaux Windows
             ├─→ [ANTIVIRUS] — scans rapide/complet/dossier/fichier, quarantaine, historique de session, signatures
             ├─→ [HISTORIQUE] — sessions v8 : grille détections (chemin + menace), quarantaine / ignorer / supprimer, **Traiter dans Analyse** ; exports **HTML** / **PDF**
-            └─→ [OPTIONS] — langue FR/EN, thème clair/sombre, sync thème Windows, scan favori, démarrage auto, MAJ auto, RTP, quarantaine auto, planification, exclusions
+            └─→ [OPTIONS] — langue FR/EN, thème (sync Windows par défaut), scan favori, démarrage auto, MAJ auto, RTP, scan USB/SD, quarantaine auto, planification, exclusions
 
 FERMETURE
-    └─→ `MainWindow.OnWindowClosing` → `PerformCleanShutdown` → `ServiceContainer.Shutdown()` (RTP, minuteries MAJ, moteurs)
+    └─→ `MainWindow.OnWindowClosing` → `PerformCleanShutdown` → `ServiceContainer.Shutdown()` (RTP, scan USB, minuteries MAJ, moteurs)
 
 DÉMARRAGE (ligne de commande)
     `--fullscan` / `--quickscan` [+ `--quiet` ] → `App.RunHeadlessAsync` : orchestrateur, journal, quarantaine auto si `ExclusionSettings.Current.AutoQuarantineEnabled`, notification fin si menaces et non quiet.
@@ -517,6 +538,7 @@ L’application est publiée en **`asInvoker`** (`app.manifest`) : exécution av
 | `MultiTargetScanAggregator` dédup | Pas de doublons si cibles qui se chevauchent |
 | Règles pré-compilées (_compiled.yarc) | Scan comportemental accéléré |
 | SemaphoreSlim(3) RTP | `RealTimeProtection` (activable depuis Options) |
+| SemaphoreSlim(1) scan USB | `RemovableDriveScanService` (un lecteur à la fois) |
 | Scan rapide limité aux dossiers critiques | `ScanTargets.QuickScanTargets()` |
 | ExclusionSettings.Current (singleton lazy) | Pas de rechargement JSON par fichier |
 | ServiceContainer (singleton services) | Une instance ClamAV/YARA/orchestrateur pour toute l’app |
@@ -562,7 +584,7 @@ Sortie publish : `optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x6
 
 ### Ordre recommandé (équipe)
 
-1. Gel fonctionnel : `dotnet test` Release (**171** tests).
+1. Gel fonctionnel : `dotnet test` Release (**185** tests).
 2. Dépendances : `.\scripts\fetch-runtime-deps.ps1` (+ `-RunFreshclam` pour l’installateur).
 3. Publish local : `.\scripts\prepare-release-v8.ps1` (ou étapes manuelles ci-dessous).
 4. VM propre : installer `optiSCAN_Setup_v8.0.0.exe` ; scan, RTP, clamd, posture, FR/EN.
@@ -613,12 +635,12 @@ optiSCAN_Setup_v8.0.0.exe
 
 ### Checklist binaire (bloquant)
 
-- [ ] `dotnet test` Release — **171** tests OK
+- [ ] `dotnet test` Release — **185** tests OK
 - [ ] `.\scripts\verify-runtime-deps.ps1` — vert sur dossier publish
 - [ ] `clamscan.exe`, `freshclam.exe`, **`clamd.exe`**, `yara64.exe`, règles `.yar`
 - [ ] `clamav\database\` — au moins un `main.cvd` / `daily.cvd` (via freshclam)
 - [ ] Installateur FR/EN, sidebar **v8.0**, options clamd / VT / mode jeu, accueil posture /100
-- [ ] Test post-install : scan fichier, quarantaine, **historique → traiter une menace**, exports PDF/HTML
+- [ ] Test post-install : scan fichier, quarantaine, **historique → traiter une menace**, exports PDF/HTML ; **clé USB** (scan auto si option activée)
 - [ ] Après upgrade depuis v7 : `scan_history.dat` présent (éventuellement `scan_history.json.legacy`)
 
 ### CI GitHub
@@ -632,17 +654,16 @@ Pipeline : [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 **Freshclam en CI** : génère un `freshclam.conf` minimal dans `clamav\x64\` (non versionné dans Git, comme en production via `FreshclamUpdater`). **Erreur connue (corrigée)** : `Can't open/parse freshclam.conf` si freshclam est lancé sans `--config-file`.
 
-```powershell
-dotnet test .\optiSCAN.Tests\optiSCAN.Tests.csproj -c Release   # 171 tests
-```
-
-**Repères de couverture tests (release)** :
+**Repères de couverture tests (release, 185 au total — voir checklist)** :
 
 | Module | Fichier de tests |
 |--------|------------------|
-| Recommandations accueil | `OverviewRecommendationsBuilderTests` (14) |
-| Posture /100 | `SecurityPostureServiceTests` (13) |
-| Historique chiffré | `ScanLogManagerTests` (DPAPI / migration) |
+| Recommandations accueil | `OverviewRecommendationsBuilderTests` |
+| Stats accueil 30 j. | `OverviewProtectionStatsFormatterTests` |
+| Posture /100 | `SecurityPostureServiceTests` |
+| Historique / timeline | `ScanLogManagerTests` (`GetActivityFeed`, DPAPI, rotation) |
+| Scan USB/SD | `RemovableDriveDiscoveryTests` |
+| Thème Windows | `ThemeManagerPreferenceTests` |
 | Persistance | `SecureStoreTests`, `UserPreferencesStorageTests`, `ExclusionSettingsTests` |
 
 ### Après publication
@@ -663,7 +684,7 @@ Windows affiche « Éditeur inconnu » sans certificat. Utile pour release publi
 |-------|----------------|
 | **Installateur Inno** | Choix FR ou EN → `HKCU\Software\optiSCAN\UiCulture` |
 | **Options → Langue** | Français / English → confirmation → **redémarrage** de l’app |
-| **Ressources** | `UiStrings.resx` + `UiStrings.en.resx` (**575** clés FR/EN, parité vérifiée en CI) |
+| **Ressources** | `UiStrings.resx` + `UiStrings.en.resx` (**621** clés FR/EN, parité vérifiée en CI) |
 | **Menu contextuel** | « Scanner avec optiSCAN » ou « Scan with optiSCAN » |
 
 Les deux langues sont **incluses dans le même binaire** (pas de pack de langue séparé). Les rapports PDF/HTML exportés et les journaux techniques ClamAV/YARA peuvent rester partiellement en français ou en anglais technique.
@@ -704,15 +725,15 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 
 ## 11. Historique des versions produit
 
-### v8.0 — Clamd, posture, réputation cloud, historique actionnable
+### v8.0 — Clamd, posture, historique unifié, scan USB
 
-- **clamd** — `CompositeClamAvBackend`, TCP `127.0.0.1:3310`, protocole `CONTSCAN`, repli `clamscan.exe`
-- **Posture /100** — `ISecurityPostureService`, `IWindowsUpdateProbe`, pare-feu 3 profils — [§13](#13-sécurité-posture-et-menaces) ; **13** tests `SecurityPostureServiceTests`
-- **VirusTotal** — réputation par hash SHA-256, cache 6 h, lien GUI (clé API utilisateur)
-- **Mode jeu** — toasts / scans headless atténués si plein écran
-- **Accueil** — `OverviewRecommendationsBuilder` (hygiène + activité) extrait de `MainWindow` ; **14** tests dédiés
-- **Historique** — menaces persistées et traitables (grille + **Traiter dans Analyse**) ; stockage **`scan_history.dat`** chiffré (migration depuis JSON v7) ; compat lectures **v7** sans chemins
-- **Tests** — **171** tests Release — [§12](#12-audit-et-qualité)
+- **Historique** — timeline scans + nettoyages (`ActivityEntry`, `GetActivityFeed`) ; menaces traitables (**Traiter dans Analyse**) ; `scan_history.dat` / `clean_history.dat` chiffrés (DPAPI) ; rotation 100→50 ; compat v7 sans chemins
+- **Accueil** — `OverviewRecommendationsBuilder` + `OverviewProtectionStatsFormatter` (stats 30 j. sans doublon dans les recommandations)
+- **Scan USB/SD** — `RemovableDriveScanService` (WMI + polling) ; rapide = tous fichiers (plafond 4 000) ; clés `Fixed` détectées via WMI USB ; type `RemovableDrive` ; pipeline menaces identique à la RTP
+- **Thème Windows** — `SyncWindowsTheme` par défaut ; case Options (thème opposé à Windows) ; `ThemeManager.Initialize()` dans `MainWindow` avant `InitializeComponent`
+- **clamd** — `CompositeClamAvBackend`, TCP `127.0.0.1:3310`, repli `clamscan.exe`
+- **Posture /100**, **VirusTotal**, **mode jeu** — voir [§13](#13-sécurité-posture-et-menaces) et Options
+- **Tests** — **185** tests Release — [§12](#12-audit-et-qualité) ; i18n **621** clés FR/EN
 
 ### v7.0 — Lifting UI Donaby + identité visuelle
 
@@ -808,7 +829,7 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 | Architecture | 8/10 | `CompositeClamAvBackend`, posture injectable ; recommandations accueil extraites |
 | Sécurité locale | 8/10 | Quarantaine AES-GCM ; historique `.dat` DPAPI ; `optiSCAN.log` diagnostic (chemins redacted, pas de secret critique) |
 | UI / Donaby | 8/10 | Accueil posture ; VT optionnel |
-| Tests & CI | 9/10 | **171** tests (posture, recommandations, `SecureStore`, historique chiffré) ; coverage Cobertura |
+| Tests & CI | 9/10 | **185** tests (posture, accueil, historique/timeline, USB, `SecureStore`) ; coverage Cobertura |
 | Release Inno | 7/10 | Pipeline CI OK |
 
 **Dettes ouvertes (résumé)** : tests intégration clamd/schtasks réels ; signature Authenticode optionnelle. Voir §12.1 pour le reste (maintenabilité, choix volontaires).
