@@ -1,3 +1,4 @@
+using optiSCAN.Localization;
 using optiSCAN.Models;
 using System.IO;
 using System.Linq;
@@ -71,7 +72,42 @@ namespace optiSCAN.Services
 
         /// <summary>Analyse récursivement un dossier avec ClamAV et YARA en parallèle.</summary>
         public Task<ScanResult> ScanFolderAsync(string folderPath, IProgress<ScanProgress>? progress = null, CancellationToken ct = default)
-            => RunPipelineAsync(ScanType.Folder, folderPath, true, progress, ct);
+            => RunPipelineAsync(ScanType.Folder, folderPath, true, progress, ct, skipYaraFileCount: false);
+
+        /// <summary>Analyse récursive sans pré-dénombrement YARA (scan USB complet en arrière-plan).</summary>
+        internal Task<ScanResult> ScanFolderBackgroundAsync(string folderPath, ScanType type, CancellationToken ct = default)
+            => RunPipelineAsync(type, folderPath, true, progress: null, ct, skipYaraFileCount: true);
+
+        /// <summary>Analyse une liste de fichiers (ClamAV --file-list + YARA par lots).</summary>
+        public Task<ScanResult> ScanFileListAsync(
+            IReadOnlyList<string> files,
+            string targetPath,
+            ScanType type = ScanType.Folder,
+            IProgress<ScanProgress>? progress = null,
+            CancellationToken ct = default,
+            bool scanEnginesSequentially = false)
+        {
+            var filtered = files
+                .Where(f => !ExclusionSettings.Current.IsFileExcluded(f))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (filtered.Count == 0)
+            {
+                var now = DateTime.Now;
+                return Task.FromResult(new ScanResult
+                {
+                    Type = type,
+                    TargetPath = targetPath,
+                    StartedAt = now,
+                    FinishedAt = now,
+                    Status = ScanStatus.Completed,
+                    FilesScanned = 0,
+                });
+            }
+
+            return RunFileListPipelineAsync(type, targetPath, filtered, progress, ct, scanEnginesSequentially);
+        }
 
         /// <summary>Analyse rapide sur les dossiers système prioritaires (voir <see cref="ScanTargets"/>).</summary>
         public Task<ScanResult> QuickScanAsync(IProgress<ScanProgress>? progress = null, CancellationToken ct = default)
@@ -79,7 +115,11 @@ namespace optiSCAN.Services
 
         /// <summary>Analyse complète sur l'ensemble des cibles définies dans <see cref="ScanTargets"/>.</summary>
         public Task<ScanResult> FullScanAsync(IProgress<ScanProgress>? progress = null, CancellationToken ct = default)
-            => RunMultiTargetPipelineAsync(ScanType.FullScan, ScanTargets.FullScanTargets(), progress, ct);
+            => RunMultiTargetPipelineAsync(
+                ScanType.FullScan,
+                ScanTargets.FullScanTargets(UserPreferences.Current.IncludeRemovableInFullScan),
+                progress,
+                ct);
 
         // ── Pipeline interne ─────────────────────────────────────────────────────
 
@@ -87,7 +127,9 @@ namespace optiSCAN.Services
         /// Exécute ClamAV et YARA en parallèle sur une cible unique, puis fusionne les résultats.
         /// Les dossiers appartenant au répertoire d'installation sont automatiquement exclus.
         /// </summary>
-        private async Task<ScanResult> RunPipelineAsync(ScanType type, string target, bool recursive, IProgress<ScanProgress>? progress, CancellationToken ct)
+        private async Task<ScanResult> RunPipelineAsync(
+            ScanType type, string target, bool recursive, IProgress<ScanProgress>? progress, CancellationToken ct,
+            bool skipYaraFileCount = false)
         {
             if (recursive && AppInstallPaths.IsUnderInstallRoot(target))
             {
@@ -103,7 +145,6 @@ namespace optiSCAN.Services
                 };
             }
 
-            // Un seul relais pour ClamAV + YARA : le compteur et les messages restent monotones.
             var engineProgress = new ScanProgressRelay().ToParent(progress);
 
             Task<ScanResult> clamTask = recursive
@@ -111,12 +152,38 @@ namespace optiSCAN.Services
                 : _clamAv.ScanFileAsync(target, engineProgress, ct);
 
             Task<ScanResult> yaraTask = recursive
-                ? RunYaraOnFolderAsync(target, engineProgress, ct)
+                ? RunYaraOnFolderAsync(target, engineProgress, ct, skipYaraFileCount)
                 : RunYaraOnFileAsync(target, engineProgress, ct);
 
             await Task.WhenAll(clamTask, yaraTask);
 
             return ScanThreatMerger.Merge(type, target, await clamTask, await yaraTask);
+        }
+
+        private async Task<ScanResult> RunFileListPipelineAsync(
+            ScanType type,
+            string targetPath,
+            IReadOnlyList<string> files,
+            IProgress<ScanProgress>? progress,
+            CancellationToken ct,
+            bool scanEnginesSequentially)
+        {
+            var engineProgress = new ScanProgressRelay().ToParent(progress);
+
+            if (scanEnginesSequentially)
+            {
+                var clamResult = await _clamAv.ScanFileListAsync(files, targetPath, engineProgress, ct)
+                    .ConfigureAwait(false);
+                ct.ThrowIfCancellationRequested();
+                var yaraResult = await RunYaraOnFileListAsync(files, targetPath, engineProgress, ct)
+                    .ConfigureAwait(false);
+                return ScanThreatMerger.Merge(type, targetPath, clamResult, yaraResult);
+            }
+
+            var clamTask = _clamAv.ScanFileListAsync(files, targetPath, engineProgress, ct);
+            var yaraTask = RunYaraOnFileListAsync(files, targetPath, engineProgress, ct);
+            await Task.WhenAll(clamTask, yaraTask).ConfigureAwait(false);
+            return ScanThreatMerger.Merge(type, targetPath, await clamTask, await yaraTask);
         }
 
         /// <summary>Délègue l'agrégation multi-cibles à <see cref="MultiTargetScanAggregator"/>.</summary>
@@ -212,8 +279,121 @@ namespace optiSCAN.Services
             return result;
         }
 
+        private async Task<ScanResult> RunYaraOnFileListAsync(
+            IReadOnlyList<string> files,
+            string targetPath,
+            IProgress<ScanProgress>? progress,
+            CancellationToken ct)
+        {
+            var result = new ScanResult
+            {
+                Type = ScanType.Folder,
+                TargetPath = targetPath,
+                StartedAt = DateTime.Now,
+            };
+
+            if (!_yara.IsAvailable)
+            {
+                result.Status = ScanStatus.Completed;
+                result.FinishedAt = DateTime.Now;
+                return result;
+            }
+
+            try
+            {
+                progress?.Report(new ScanProgress
+                {
+                    Message = LocalizationService.Format("Scan_Yara_StartingWithCount", Path.GetFileName(targetPath), files.Count),
+                    Phase = ScanPhase.Starting,
+                    TotalFiles = files.Count,
+                    CurrentFilePath = targetPath,
+                });
+
+                int scanned = 0;
+                var yaraProgress = new Progress<string>(_ =>
+                {
+                    var n = System.Threading.Interlocked.Increment(ref scanned);
+                    progress?.Report(new ScanProgress
+                    {
+                        Phase = ScanPhase.Scanning,
+                        TotalFiles = files.Count,
+                        FilesScanned = Math.Min(n, files.Count),
+                        YaraFilesScanned = Math.Min(n, files.Count),
+                        CurrentFilePath = targetPath,
+                    });
+                });
+
+                var allMatches = await _yara.ScanFilesAsync(files, yaraProgress, ct).ConfigureAwait(false);
+                var exclusions = ExclusionSettings.Current;
+                var filteredMatches = allMatches
+                    .Where(m => !exclusions.IsFileExcluded(m.FilePath))
+                    .Where(m => !exclusions.IsRuleExcluded(m.RuleName))
+                    .ToList();
+
+                var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var m in filteredMatches)
+                {
+                    var key = $"{m.FilePath}|{m.RuleName}";
+                    if (!seen.Add(key)) continue;
+
+                    long fileSize = -1;
+                    try { fileSize = new FileInfo(m.FilePath).Length; }
+                    catch { /* ignore */ }
+
+                    var threat = new ThreatInfo
+                    {
+                        FilePath = m.FilePath,
+                        VirusName = m.RuleName,
+                        DetectedAt = DateTime.Now,
+                        Status = ThreatStatus.Detected,
+                        FileSize = fileSize,
+                        DetectedBy = "YARA"
+                    };
+                    result.Threats.Add(threat);
+
+                    progress?.Report(new ScanProgress
+                    {
+                        Message = $"{m.RuleName} — {m.FilePath}",
+                        Phase = ScanPhase.ThreatFound,
+                        ThreatsFound = result.Threats.Count,
+                        ThreatInfo = threat,
+                        CurrentFilePath = m.FilePath,
+                        YaraMatchesFound = result.Threats.Count,
+                    });
+                }
+
+                result.FilesScanned = files.Count;
+                result.Status = ct.IsCancellationRequested ? ScanStatus.Cancelled : ScanStatus.Completed;
+                result.FinishedAt = DateTime.Now;
+
+                progress?.Report(new ScanProgress
+                {
+                    Message = $"{result.FilesScanned:N0} fichiers analysés.",
+                    Phase = ScanPhase.Completed,
+                    FilesScanned = result.FilesScanned,
+                    YaraFilesScanned = result.FilesScanned,
+                    TotalFiles = files.Count,
+                    ThreatsFound = result.Threats.Count,
+                });
+            }
+            catch (OperationCanceledException)
+            {
+                result.Status = ScanStatus.Cancelled;
+                result.FinishedAt = DateTime.Now;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ScanOrchestrator", $"RunYaraOnFileListAsync ({targetPath})", ex);
+                result.Status = ScanStatus.Completed;
+                result.FinishedAt = DateTime.Now;
+            }
+
+            return result;
+        }
+
         /// <summary>Exécute YARA en mode récursif (single-process) sur un dossier et convertit les matchs en <see cref="ThreatInfo"/>.</summary>
-        private async Task<ScanResult> RunYaraOnFolderAsync(string folderPath, IProgress<ScanProgress>? progress, CancellationToken ct)
+        private async Task<ScanResult> RunYaraOnFolderAsync(
+            string folderPath, IProgress<ScanProgress>? progress, CancellationToken ct, bool skipFileCount = false)
         {
             var result = new ScanResult
             {
@@ -231,48 +411,69 @@ namespace optiSCAN.Services
 
             try
             {
-                // Énumération streaming pour connaître le total (ProgressBar UI).
-                // On cape à 100k pour éviter de bloquer 30 s sur un disque entier
-                // avant même de commencer à scanner — au-delà, ProgressBar reste
-                // indéterminée et on affiche "100k+ fichiers" plutôt qu'un total
-                // potentiellement faux.
                 const int CountCap = 100_000;
-                int total = 0;
-                try
+                const int UnknownTotalFiles = 0;
+                int total = skipFileCount ? UnknownTotalFiles : 0;
+                if (!skipFileCount)
                 {
-                    foreach (var file in Directory.EnumerateFiles(folderPath, "*.*", SearchOption.AllDirectories))
+                    try
                     {
-                        if (ct.IsCancellationRequested) break;
-                        if (ExclusionSettings.Current.IsFileExcluded(file))
-                            continue;
-                        if (++total >= CountCap) { total = 0; break; } // 0 = inconnu
+                        foreach (var file in Directory.EnumerateFiles(folderPath, "*.*", SearchOption.AllDirectories))
+                        {
+                            if (ct.IsCancellationRequested) break;
+                            if (ExclusionSettings.Current.IsFileExcluded(file))
+                                continue;
+                            if (++total >= CountCap) { total = UnknownTotalFiles; break; }
+                        }
                     }
-                }
-                catch (Exception ex)
-                {
-                    AppLogger.Warn("ScanOrchestrator", $"Énumération {folderPath}", ex);
+                    catch (Exception ex)
+                    {
+                        AppLogger.Warn("ScanOrchestrator", $"Énumération {folderPath}", ex);
+                    }
                 }
 
                 progress?.Report(new ScanProgress
                 {
                     Message = total > 0
-                        ? $"Analyse de {Path.GetFileName(folderPath)} ({total:N0} fichiers)…"
-                        : $"Analyse de {Path.GetFileName(folderPath)}…",
+                        ? LocalizationService.Format("Scan_Yara_StartingWithCount", Path.GetFileName(folderPath), total)
+                        : LocalizationService.Format("Scan_Yara_Starting", Path.GetFileName(folderPath)),
                     Phase = ScanPhase.Starting,
                     TotalFiles = total,
                     CurrentFilePath = folderPath,
                 });
 
                 // Single-process : un seul yara64.exe avec --recursive.
-                // 10 à 50× plus rapide que l'ancienne approche un-process-par-fichier.
+                // YARA émet un message tous les ~20 lignes stdout (matches), pas par fichier.
+                // Si total > 0, on répartit les N messages reçus uniformément sur [0, total]
+                // pour une barre de progression fidèle au nombre de fichiers.
+                // Si total = 0 (inconnu / >100k), on laisse le compteur libre (ProgressBar indéterminée).
+                int filesYara = 0;
+                int msgCount = 0;
                 var yaraProgress = new Progress<string>(msg =>
+                {
+                    var msgs = System.Threading.Interlocked.Increment(ref msgCount);
+                    int n;
+                    if (total > 0)
+                    {
+                        // YaraEngine émet ~1 message par YaraProgressInterval (~20) lignes traitées.
+                        // On interpole : chaque message ≈ YaraProgressInterval fichiers parcourus.
+                        n = Math.Min(msgs * YaraEngine.YaraProgressInterval, total);
+                        System.Threading.Interlocked.Exchange(ref filesYara, n);
+                    }
+                    else
+                    {
+                        n = System.Threading.Interlocked.Increment(ref filesYara);
+                    }
                     progress?.Report(new ScanProgress
                     {
                         Message = msg,
                         Phase = ScanPhase.Scanning,
                         TotalFiles = total,
+                        FilesScanned = n,
+                        YaraFilesScanned = n,
                         CurrentFilePath = folderPath,
-                    }));
+                    });
+                });
 
                 var allMatches = await _yara.ScanFolderAsync(folderPath, yaraProgress, ct);
 
@@ -318,9 +519,19 @@ namespace optiSCAN.Services
                     });
                 }
 
-                result.FilesScanned = total;
+                result.FilesScanned = total > 0 ? total : Math.Max(filesYara, 1);
                 result.Status = ct.IsCancellationRequested ? ScanStatus.Cancelled : ScanStatus.Completed;
                 result.FinishedAt = DateTime.Now;
+
+                progress?.Report(new ScanProgress
+                {
+                    Message = $"{result.FilesScanned:N0} fichiers analysés.",
+                    Phase = ScanPhase.Completed,
+                    FilesScanned = result.FilesScanned,
+                    YaraFilesScanned = result.FilesScanned,
+                    TotalFiles = total,
+                    ThreatsFound = result.Threats.Count,
+                });
             }
             catch (OperationCanceledException)
             {

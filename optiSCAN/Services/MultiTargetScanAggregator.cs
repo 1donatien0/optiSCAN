@@ -1,3 +1,4 @@
+using optiSCAN.Localization;
 using optiSCAN.Models;
 using System.IO;
 
@@ -43,7 +44,7 @@ namespace optiSCAN.Services
                 {
                     progress.Report(new ScanProgress
                     {
-                        Message = $"Zone {idx}/{denom} : {target}",
+                        Message = LocalizationService.Format("Scan_Zone_Starting", idx, denom, target),
                         Phase = ScanPhase.Scanning,
                         CurrentFilePath = target,
                         FilesScanned = filesBaseline,
@@ -58,16 +59,13 @@ namespace optiSCAN.Services
                 merged.FilesSkipped += sub.FilesSkipped;
                 merged.TotalBytesScanned += sub.TotalBytesScanned;
                 foreach (var t in sub.Threats)
-                {
-                    if (!merged.Threats.Any(existing => ThreatsMatch(existing, t)))
-                        merged.Threats.Add(t);
-                }
+                    ScanThreatMerger.AddOrMergeThreat(merged.Threats, t);
 
                 if (progress != null)
                 {
                     progress.Report(new ScanProgress
                     {
-                        Message = $"Zone {idx}/{denom} terminée — {filesBaseline:N0} fichier(s) analysés au total",
+                        Message = LocalizationService.Format("Scan_Zone_Done", idx, denom, filesBaseline),
                         Phase = ScanPhase.Scanning,
                         FilesScanned = filesBaseline,
                         ThreatsFound = merged.Threats.Count,
@@ -81,8 +79,5 @@ namespace optiSCAN.Services
             return merged;
         }
 
-        private static bool ThreatsMatch(ThreatInfo a, ThreatInfo b) =>
-            string.Equals(a.FilePath, b.FilePath, StringComparison.OrdinalIgnoreCase)
-            && string.Equals(a.VirusName, b.VirusName, StringComparison.OrdinalIgnoreCase);
     }
 }

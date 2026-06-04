@@ -84,21 +84,21 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <!-- Thème sombre -->
+                        <!-- Thème opposé au mode Windows (libellé dynamique : clair si Windows sombre, etc.) -->
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                            <CheckBox x:Name="chkDarkTheme"
+                            <CheckBox x:Name="chkAlternateTheme"
                                       VerticalAlignment="Top"
                                       Margin="0,2,16,0"
                                       Checked="CheckOption_Changed"
                                       Unchecked="CheckOption_Changed"
-                                      Tag="DarkTheme"/>
+                                      Tag="AlternateTheme"/>
                             <StackPanel>
-                                <TextBlock Text="{loc:Loc Key=Opt_DarkTheme}"
+                                <TextBlock x:Name="txtAlternateThemeTitle"
                                            FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextDark}"/>
-                                <TextBlock Text="{loc:Loc Key=Opt_DarkSub}"
+                                <TextBlock x:Name="txtAlternateThemeSub"
                                            FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
-                                           Margin="0,3,0,0"/>
+                                           Margin="0,3,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                         </StackPanel>
 
@@ -120,23 +120,6 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <!-- Suivre le thème Windows -->
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
-                            <CheckBox x:Name="chkSyncWindowsTheme"
-                                      VerticalAlignment="Top"
-                                      Margin="0,2,16,0"
-                                      Checked="CheckOption_Changed"
-                                      Unchecked="CheckOption_Changed"
-                                      Tag="SyncWindowsTheme"/>
-                            <StackPanel>
-                                <TextBlock Text="{loc:Loc Key=Opt_SyncWin}"
-                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
-                                           Foreground="{DynamicResource TextDark}"/>
-                                <TextBlock Text="{loc:Loc Key=Opt_SyncSub}"
-                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
-                                           Margin="0,3,0,0"/>
-                            </StackPanel>
-                        </StackPanel>
 
                         <!-- Langue de l'interface -->
                         <StackPanel Margin="0,0,0,20">
@@ -214,6 +197,59 @@
                             </StackPanel>
                         </StackPanel>
 
+                        <!-- Scan lecteurs amovibles -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
+                            <CheckBox x:Name="chkRemovableDriveScan"
+                                      IsChecked="True"
+                                      VerticalAlignment="Top"
+                                      Margin="0,2,16,0"
+                                      Checked="CheckOption_Changed"
+                                      Unchecked="CheckOption_Changed"
+                                      Tag="RemovableDriveScan"/>
+                            <StackPanel>
+                                <TextBlock Text="{loc:Loc Key=Opt_RemovableScan}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextDark}"/>
+                                <TextBlock Text="{loc:Loc Key=Opt_RemovableScanSub}"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                           Margin="0,3,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Margin="32,0,0,12">
+                            <CheckBox x:Name="chkRemovableDriveDetailed"
+                                      VerticalAlignment="Top"
+                                      Margin="0,2,16,0"
+                                      Checked="CheckOption_Changed"
+                                      Unchecked="CheckOption_Changed"
+                                      Tag="RemovableDriveDetailed"/>
+                            <StackPanel>
+                                <TextBlock Text="{loc:Loc Key=Opt_RemovableDetailed}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextDark}"/>
+                                <TextBlock Text="{loc:Loc Key=Opt_RemovableDetailedSub}"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                           Margin="0,3,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Margin="32,0,0,20">
+                            <CheckBox x:Name="chkIncludeRemovableFullScan"
+                                      VerticalAlignment="Top"
+                                      Margin="0,2,16,0"
+                                      Checked="CheckOption_Changed"
+                                      Unchecked="CheckOption_Changed"
+                                      Tag="IncludeRemovableFullScan"/>
+                            <StackPanel>
+                                <TextBlock Text="{loc:Loc Key=Opt_IncludeRemovableFull}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextDark}"/>
+                                <TextBlock Text="{loc:Loc Key=Opt_IncludeRemovableFullSub}"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                           Margin="0,3,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+
                         <!-- Quarantaine automatique -->
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
                             <CheckBox x:Name="chkAutoQuarantine"
@@ -233,6 +269,57 @@
                             </StackPanel>
                         </StackPanel>
 
+                        <!-- Moteur clamd -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                            <CheckBox x:Name="chkUseClamd"
+                                      IsChecked="True"
+                                      VerticalAlignment="Top"
+                                      Margin="0,2,16,0"
+                                      Checked="CheckOption_Changed"
+                                      Unchecked="CheckOption_Changed"
+                                      Tag="UseClamd"/>
+                            <StackPanel>
+                                <TextBlock Text="{loc:Loc Key=Opt_UseClamd}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextDark}"/>
+                                <TextBlock Text="{loc:Loc Key=Opt_UseClamdSub}"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                           Margin="0,3,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Mode jeu -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                            <CheckBox x:Name="chkGameMode"
+                                      IsChecked="True"
+                                      VerticalAlignment="Top"
+                                      Margin="0,2,16,0"
+                                      Checked="CheckOption_Changed"
+                                      Unchecked="CheckOption_Changed"
+                                      Tag="GameMode"/>
+                            <StackPanel>
+                                <TextBlock Text="{loc:Loc Key=Opt_GameMode}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextDark}"/>
+                                <TextBlock Text="{loc:Loc Key=Opt_GameModeSub}"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                           Margin="0,3,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- VirusTotal -->
+                        <StackPanel Margin="0,0,0,20">
+                            <TextBlock Text="{loc:Loc Key=Opt_VirusTotal}"
+                                       FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextDark}"/>
+                            <PasswordBox x:Name="pwdVirusTotalApiKey"
+                                         Margin="0,6,0,0" Height="32" MaxWidth="360" HorizontalAlignment="Left"
+                                         PasswordChanged="PwdVirusTotalApiKey_Changed"/>
+                            <TextBlock Text="{loc:Loc Key=Opt_VirusTotalSub}"
+                                       FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                       Margin="0,4,0,0" TextWrapping="Wrap"/>
+                        </StackPanel>
+
                         <!-- Mise à jour auto -->
                         <StackPanel Orientation="Horizontal">
                             <CheckBox x:Name="chkAutoUpdate"
@@ -250,6 +337,58 @@
                                            FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
                                            Margin="0,3,0,0"/>
                             </StackPanel>
+                        </StackPanel>
+
+                        <!-- Seuils de recommandations -->
+                        <StackPanel Margin="0,16,0,0">
+                            <TextBlock Text="{loc:Loc Key=Opt_RecThresholds}"
+                                       FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                       Foreground="{DynamicResource TextDark}"/>
+                            <TextBlock Text="{loc:Loc Key=Opt_RecThresholdsSub}"
+                                       FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                       Margin="0,3,0,8"/>
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <!-- Seuil nettoyage -->
+                                <StackPanel Grid.Column="0" Margin="0,0,8,0">
+                                    <TextBlock Text="{loc:Loc Key=Opt_CleanThreshold}"
+                                               FontSize="{DynamicResource FontSize.Body}"
+                                               Foreground="{DynamicResource TextDark}" Margin="0,0,0,4"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBox x:Name="txtCleanThreshold"
+                                                 Width="60" TextAlignment="Center"
+                                                 Text="14"
+                                                 PreviewTextInput="NumericOnly_PreviewTextInput"
+                                                 LostFocus="ThresholdBox_LostFocus"
+                                                 Tag="CleanThreshold"/>
+                                        <TextBlock Text="{loc:Loc Key=Opt_Days}"
+                                                   FontSize="{DynamicResource FontSize.Small}"
+                                                   Foreground="{DynamicResource TextMuted}"
+                                                   VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                    </StackPanel>
+                                </StackPanel>
+                                <!-- Seuil signatures -->
+                                <StackPanel Grid.Column="1">
+                                    <TextBlock Text="{loc:Loc Key=Opt_SigThreshold}"
+                                               FontSize="{DynamicResource FontSize.Body}"
+                                               Foreground="{DynamicResource TextDark}" Margin="0,0,0,4"/>
+                                    <StackPanel Orientation="Horizontal">
+                                        <TextBox x:Name="txtSigThreshold"
+                                                 Width="60" TextAlignment="Center"
+                                                 Text="7"
+                                                 PreviewTextInput="NumericOnly_PreviewTextInput"
+                                                 LostFocus="ThresholdBox_LostFocus"
+                                                 Tag="SigThreshold"/>
+                                        <TextBlock Text="{loc:Loc Key=Opt_Days}"
+                                                   FontSize="{DynamicResource FontSize.Small}"
+                                                   Foreground="{DynamicResource TextMuted}"
+                                                   VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                    </StackPanel>
+                                </StackPanel>
+                            </Grid>
                         </StackPanel>
 
                         <!-- Scan planifié (schtasks) -->

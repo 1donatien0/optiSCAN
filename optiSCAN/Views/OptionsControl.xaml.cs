@@ -35,9 +35,15 @@ namespace optiSCAN.Views
             Loaded += (_, _) =>
             {
                 ThemeManager.ThemeChanged += SurChangementTheme;
+                SyncThemeControls();
                 _ = LoadScheduledTaskStateAsync();
             };
             Unloaded += (_, _) => ThemeManager.ThemeChanged -= SurChangementTheme;
+            IsVisibleChanged += (_, _) =>
+            {
+                if (IsVisible)
+                    SyncThemeControls();
+            };
         }
 
         private void SurChangementTheme(object? sender, bool isDark) => SyncThemeControls();
@@ -73,19 +79,25 @@ namespace optiSCAN.Views
             _suppressPreferenceEvents = true;
             try
             {
-                var prefs = UserPreferences.Current;
-                if (chkSyncWindowsTheme != null)
-                    chkSyncWindowsTheme.IsChecked = prefs.SyncWindowsTheme;
-                if (chkDarkTheme != null)
-                {
-                    chkDarkTheme.IsChecked = isDark;
-                    chkDarkTheme.IsEnabled = !prefs.SyncWindowsTheme;
-                }
+                UpdateAlternateThemeLabels();
+                if (chkAlternateTheme != null)
+                    chkAlternateTheme.IsChecked = ThemeManager.IsAlternateThemeEnabled;
             }
             finally
             {
                 _suppressPreferenceEvents = false;
             }
+        }
+
+        private void UpdateAlternateThemeLabels()
+        {
+            bool windowsDark = ThemeManager.IsWindowsAppsDarkTheme();
+            if (txtAlternateThemeTitle != null)
+                txtAlternateThemeTitle.Text = LocalizationService.GetString(
+                    windowsDark ? "Opt_ThemeLight" : "Opt_ThemeDark");
+            if (txtAlternateThemeSub != null)
+                txtAlternateThemeSub.Text = LocalizationService.GetString(
+                    windowsDark ? "Opt_ThemeLightSub" : "Opt_ThemeDarkSub");
         }
 
         private void LoadPreferences()
@@ -98,12 +110,6 @@ namespace optiSCAN.Views
                     chkNotifications.IsChecked = prefs.ActionNotificationsEnabled;
                 if (chkAutoStart != null)
                     chkAutoStart.IsChecked = IsAutoStartRegistered();
-                if (chkDarkTheme != null)
-                    chkDarkTheme.IsChecked = prefs.DarkTheme;
-                if (chkSyncWindowsTheme != null)
-                    chkSyncWindowsTheme.IsChecked = prefs.SyncWindowsTheme;
-                if (chkDarkTheme != null)
-                    chkDarkTheme.IsEnabled = prefs.SyncWindowsTheme != true;
 
                 if (cmbUiLanguage != null)
                     SelectUiLanguageCombo(UserPreferences.Current.UiCulture);
@@ -122,12 +128,31 @@ namespace optiSCAN.Views
                 var ex = ExclusionSettings.Current;
                 if (chkRealtimeProtection != null)
                     chkRealtimeProtection.IsChecked = ex.RealTimeEnabled;
+                if (chkRemovableDriveScan != null)
+                    chkRemovableDriveScan.IsChecked = prefs.RemovableDriveScanEnabled;
+                if (chkRemovableDriveDetailed != null)
+                    chkRemovableDriveDetailed.IsChecked = prefs.RemovableDriveScanDetailed;
+                if (chkIncludeRemovableFullScan != null)
+                    chkIncludeRemovableFullScan.IsChecked = prefs.IncludeRemovableInFullScan;
+
                 if (chkAutoQuarantine != null)
                     chkAutoQuarantine.IsChecked = ex.AutoQuarantineEnabled;
 
                 var c = ServiceContainer.Default;
                 if (chkAutoUpdate != null)
                     chkAutoUpdate.IsChecked = prefs.SignatureAutoUpdateEnabled;
+
+                if (chkUseClamd != null)
+                    chkUseClamd.IsChecked = prefs.UseClamdEngine;
+                if (chkGameMode != null)
+                    chkGameMode.IsChecked = prefs.GameModeAutoEnabled;
+                if (pwdVirusTotalApiKey != null)
+                    pwdVirusTotalApiKey.Password = prefs.VirusTotalApiKey ?? string.Empty;
+
+                if (txtCleanThreshold != null)
+                    txtCleanThreshold.Text = prefs.CleanSuggestThresholdDays.ToString();
+                if (txtSigThreshold != null)
+                    txtSigThreshold.Text = prefs.SignatureStaleThresholdDays.ToString();
 
                 if (chkHighContrast != null)
                     chkHighContrast.IsChecked = prefs.HighContrastEnabled;
@@ -220,31 +245,53 @@ namespace optiSCAN.Views
                     c.ApplySignatureAutoUpdate(isOn);
                     break;
 
+                case "UseClamd":
+                    prefs.UseClamdEngine = isOn;
+                    prefs.Save();
+                    if (isOn)
+                    {
+                        _ = Task.Run(async () =>
+                        {
+                            try { await ClamdHost.Shared.EnsureRunningAsync(); }
+                            catch (Exception ex) { AppLogger.Warn("Options", "clamd", ex); }
+                        });
+                    }
+                    else
+                        ClamdHost.Shared.Stop();
+                    break;
+
+                case "GameMode":
+                    prefs.GameModeAutoEnabled = isOn;
+                    prefs.Save();
+                    if (isOn) DistractionFreeMonitor.Start();
+                    else DistractionFreeMonitor.Stop();
+                    break;
+
                 case "RealtimeProtection":
                     c.ApplyRealtimeProtection(isOn);
+                    break;
+
+                case "RemovableDriveScan":
+                    c.ApplyRemovableDriveScan(isOn);
+                    break;
+
+                case "RemovableDriveDetailed":
+                    prefs.RemovableDriveScanDetailed = isOn;
+                    prefs.Save();
+                    break;
+
+                case "IncludeRemovableFullScan":
+                    prefs.IncludeRemovableInFullScan = isOn;
+                    prefs.Save();
                     break;
 
                 case "AutoQuarantine":
                     c.ApplyAutoQuarantine(isOn);
                     break;
 
-                case "DarkTheme":
-                    if (prefs.SyncWindowsTheme)
-                    {
-                        prefs.SyncWindowsTheme = false;
-                        ThemeManager.SetSyncWithWindows(false);
-                    }
-                    ThemeManager.Apply(isOn);
-                    break;
-
-                case "SyncWindowsTheme":
-                    ThemeManager.SetSyncWithWindows(isOn);
-                    if (chkDarkTheme != null)
-                    {
-                        chkDarkTheme.IsEnabled = !isOn;
-                        if (isOn)
-                            chkDarkTheme.IsChecked = ThemeManager.IsDarkTheme;
-                    }
+                case "AlternateTheme":
+                    ThemeManager.SetAlternateThemeEnabled(isOn);
+                    SyncThemeControls();
                     break;
 
                 case "HighContrast":
@@ -527,6 +574,48 @@ namespace optiSCAN.Views
                 _exclusions.Remove(path);
                 ExclusionSettings.Current.RemoveFolder(path);
             }
+        }
+
+        private void PwdVirusTotalApiKey_Changed(object sender, RoutedEventArgs e)
+        {
+            if (_suppressPreferenceEvents) return;
+            UserPreferences.Current.VirusTotalApiKey = pwdVirusTotalApiKey?.Password ?? string.Empty;
+            UserPreferences.Current.Save();
+        }
+
+        /// <summary>N'autorise que les chiffres dans les TextBox de seuils.</summary>
+        private void NumericOnly_PreviewTextInput(object sender, System.Windows.Input.TextCompositionEventArgs e)
+        {
+            e.Handled = !e.Text.All(char.IsDigit);
+        }
+
+        /// <summary>Sauvegarde la valeur d'un seuil quand le TextBox perd le focus.</summary>
+        private void ThresholdBox_LostFocus(object sender, RoutedEventArgs e)
+        {
+            if (_suppressPreferenceEvents) return;
+            if (sender is not System.Windows.Controls.TextBox box) return;
+
+            if (!int.TryParse(box.Text, out int value) || value < 1 || value > 365)
+            {
+                // Valeur invalide : réinitialiser au défaut
+                var tag = box.Tag as string;
+                value = tag == "CleanThreshold"
+                    ? RecommendationThresholds.CleanSuggestThresholdDays
+                    : RecommendationThresholds.SignatureStaleThresholdDays;
+                box.Text = value.ToString();
+            }
+
+            var prefs = UserPreferences.Current;
+            switch (box.Tag as string)
+            {
+                case "CleanThreshold":
+                    prefs.CleanSuggestThresholdDays = value;
+                    break;
+                case "SigThreshold":
+                    prefs.SignatureStaleThresholdDays = value;
+                    break;
+            }
+            prefs.Save();
         }
     }
 }

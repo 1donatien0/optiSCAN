@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
@@ -5,17 +6,21 @@ using System.Windows.Interop;
 namespace optiSCAN.Services
 {
     /// <summary>
-    /// Communication inter-instance : message Windows broadcast pour qu’une seconde instance
+    /// Communication inter-instance : message Windows pour qu’une seconde instance
     /// en cours de fermeture demande à la première de réafficher sa fenêtre principale.
     /// </summary>
     public static class IpcManager
     {
         public const int HWND_BROADCAST = 0xffff;
-        public static readonly int WM_SHOWME = NativeMethods.RegisterWindowMessage("WM_SHOWME_OPTISCAN");
+
+        private static readonly Lazy<int> WmShowMeLazy = new(() =>
+            NativeMethods.RegisterWindowMessage(
+                $"WM_SHOWME_OPTISCAN_{Process.GetCurrentProcess().SessionId}"));
+
+        public static int WM_SHOWME => WmShowMeLazy.Value;
 
         /// <summary>
-        /// Envoie le message "remonte la fenêtre" à toutes les fenêtres top-level.
-        /// Appelé par la seconde instance qui se ferme.
+        /// Envoie le message « remonte la fenêtre » aux fenêtres top-level de la session courante.
         /// </summary>
         public static void NotifyShowExistingInstance()
         {

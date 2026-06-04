@@ -48,6 +48,7 @@
     <SolidColorBrush x:Key="AlertGold"          Color="#EF9F27"/>
     <SolidColorBrush x:Key="AlertGoldLight"     Color="#FAC775"/>
     <SolidColorBrush x:Key="AlertBg"            Color="#412402"/>
+    <SolidColorBrush x:Key="InfoBg"             Color="#1A1838"/>
 
     <!-- ── AVERTISSEMENT / ORANGE ── -->
     <SolidColorBrush x:Key="WarningOrange"      Color="#FB923C"/>

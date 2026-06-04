@@ -143,10 +143,21 @@ namespace optiSCAN.Services
                 var normPath = path.Replace('/', '\\').TrimEnd('\\');
                 var normFolder = folder.Replace('/', '\\').TrimEnd('\\');
 
-                if (normPath.StartsWith(normFolder, StringComparison.OrdinalIgnoreCase))
+                if (IsUnderExcludedFolder(normPath, normFolder))
                     return true;
             }
             return false;
+        }
+
+        private static bool IsUnderExcludedFolder(string normPath, string normFolder)
+        {
+            if (normPath.Length < normFolder.Length)
+                return false;
+
+            if (normPath.Equals(normFolder, StringComparison.OrdinalIgnoreCase))
+                return true;
+
+            return normPath.StartsWith(normFolder + '\\', StringComparison.OrdinalIgnoreCase);
         }
 
         public bool IsRuleExcluded(string ruleName)

@@ -1,3 +1,4 @@
+using optiSCAN.Localization;
 using System.Diagnostics;
 using System.IO;
 using System.Security.Cryptography;
@@ -12,6 +13,13 @@ namespace optiSCAN.Services
     /// </summary>
     public class YaraEngine : IYaraOrchestratorBackend
     {
+        /// <summary>
+        /// Fréquence d'émission des messages de progression dans RunYaraScanRecursiveAsync :
+        /// un message est émis toutes les N lignes stdout traitées.
+        /// Exposé pour que ScanOrchestrator puisse interpoler le compteur de fichiers.
+        /// </summary>
+        public const int YaraProgressInterval = 20;
+
         private readonly string _yaraExe;     // yara64.exe / yara32.exe
         private readonly string _yaracExe;    // yarac64.exe / yarac32.exe (compilateur)
         private readonly string _rulesDirectory;
@@ -274,6 +282,59 @@ namespace optiSCAN.Services
             return matches;
         }
 
+        /// <summary>
+        /// Scanne une liste de fichiers en lots (un processus yara par lot).
+        /// Évite le scan récursif complet du volume pour le mode USB rapide.
+        /// </summary>
+        public async Task<List<YaraMatch>> ScanFilesAsync(
+            IReadOnlyList<string> files,
+            IProgress<string>? progress = null,
+            CancellationToken ct = default)
+        {
+            var matches = new List<YaraMatch>();
+            if (!IsAvailable || files.Count == 0) return matches;
+
+            if (!HasCompiled)
+                await CompileRulesAsync(ct);
+
+            const int batchSize = 32;
+            for (var i = 0; i < files.Count; i += batchSize)
+            {
+                if (ct.IsCancellationRequested) break;
+
+                var batch = new List<string>(batchSize);
+                for (var j = i; j < files.Count && batch.Count < batchSize; j++)
+                {
+                    var path = files[j];
+                    if (File.Exists(path) && !ExclusionSettings.Current.IsFileExcluded(path))
+                        batch.Add(path);
+                }
+
+                if (batch.Count == 0) continue;
+
+                progress?.Report(LocalizationService.Format("Scan_Yara_Recursive", batch.Count.ToString()));
+
+                if (HasCompiled)
+                {
+                    var args = new List<string> { "-N", "--compiled-rules", _compiledRulesPath };
+                    args.AddRange(batch);
+                    matches.AddRange(await RunYaraScanRecursiveAsync(args, ct, progress).ConfigureAwait(false));
+                }
+                else
+                {
+                    foreach (var ruleFile in Directory.GetFiles(_rulesDirectory, "*.yar"))
+                    {
+                        if (ct.IsCancellationRequested) break;
+                        var args = new List<string> { "-N", ruleFile };
+                        args.AddRange(batch);
+                        matches.AddRange(await RunYaraScanRecursiveAsync(args, ct, progress).ConfigureAwait(false));
+                    }
+                }
+            }
+
+            return matches;
+        }
+
         /// <summary>Retourne true si au moins une règle YARA matche le fichier.</summary>
         public async Task<bool> IsMaliciousAsync(string filePath, CancellationToken ct = default)
             => (await ScanFileAsync(filePath, ct)).Count > 0;
@@ -318,7 +379,7 @@ namespace optiSCAN.Services
                 foreach (var ruleFile in Directory.GetFiles(_rulesDirectory, "*.yar"))
                 {
                     if (ct.IsCancellationRequested) break;
-                    progress?.Report($"YARA : règle {Path.GetFileNameWithoutExtension(ruleFile)}");
+                    progress?.Report(LocalizationService.Format("Scan_Yara_Rule", Path.GetFileNameWithoutExtension(ruleFile)));
                     var sub = await RunYaraScanAsync(
                         new[] { "-N", "--recursive", ruleFile, folderPath },
                         folderPath, ct);
@@ -327,8 +388,8 @@ namespace optiSCAN.Services
                 return matches;
             }
 
-            progress?.Report($"YARA : scan récursif de {Path.GetFileName(folderPath)}…");
-            return await RunYaraScanRecursiveAsync(args, ct);
+            progress?.Report(LocalizationService.Format("Scan_Yara_Recursive", Path.GetFileName(folderPath)));
+            return await RunYaraScanRecursiveAsync(args, ct, progress);
         }
 
         /// <summary>
@@ -336,9 +397,13 @@ namespace optiSCAN.Services
         /// est au format "RuleName /chemin/absolu/fichier" — chaque ligne est un
         /// match indépendant, avec un fichier potentiellement différent.
         /// </summary>
-        private async Task<List<YaraMatch>> RunYaraScanRecursiveAsync(IEnumerable<string> args, CancellationToken ct)
+        private async Task<List<YaraMatch>> RunYaraScanRecursiveAsync(
+            IEnumerable<string> args,
+            CancellationToken ct,
+            IProgress<string>? progress = null)
         {
             var matches = new List<YaraMatch>();
+            var stdoutLines = 0;
 
             var psi = new ProcessStartInfo
             {
@@ -359,12 +424,34 @@ namespace optiSCAN.Services
 
                 var cap = new YaraStdoutCapture();
                 var stderrLines = new StringBuilder();
-                process.OutputDataReceived += (_, e) => cap.SurLigneYara(e.Data, MaxYaraStdoutCaptureChars);
+                process.OutputDataReceived += (_, e) =>
+                {
+                    cap.SurLigneYara(e.Data, MaxYaraStdoutCaptureChars);
+                    if (string.IsNullOrEmpty(e.Data)) return;
+                    var n = System.Threading.Interlocked.Increment(ref stdoutLines);
+                    if (progress != null && (n == 1 || n % YaraProgressInterval == 0))
+                        progress.Report(e.Data);
+                };
                 process.ErrorDataReceived += (_, e) => { if (e.Data != null) stderrLines.AppendLine(e.Data); };
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
 
-                await process.WaitForExitAsync(ct);
+                using (ct.Register(() =>
+                {
+                    try
+                    {
+                        if (!process.HasExited)
+                            process.Kill(entireProcessTree: true);
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Warn("YaraEngine", "Annulation — arrêt yara", ex);
+                    }
+                }))
+                {
+                    await process.WaitForExitAsync(ct).ConfigureAwait(false);
+                }
+
                 try { process.WaitForExit(); }
                 catch { /* processus déjà terminé — drain stdout */ }
 
@@ -442,7 +529,21 @@ namespace optiSCAN.Services
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
 
-                await process.WaitForExitAsync(ct);
+                using (ct.Register(() =>
+                {
+                    try
+                    {
+                        if (!process.HasExited)
+                            process.Kill(entireProcessTree: true);
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Warn("YaraEngine", "Annulation — arrêt yara", ex);
+                    }
+                }))
+                {
+                    await process.WaitForExitAsync(ct).ConfigureAwait(false);
+                }
 
                 // Drain final synchrone : garantit la réception des dernières
                 // lignes capturées avant que outputSb soit lu (cf. doc MS).
