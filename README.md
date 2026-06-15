@@ -60,6 +60,34 @@ Branche par défaut GitHub : **`main`**. CI : uniquement `main` et `dev` (voir [
 | MVVM + Binding UI | Oui — excellent | Partiel — différent | Non — manuel |
 | **Verdict** | **Retenu** | Non nécessaire | Non nécessaire |
 
+### Architecture plateforme v8 (protection système)
+
+optiSCAN v8 rapproche un antivirus « classique » via une couche plateforme Windows :
+
+```
+optiSCAN.exe (UI WPF)
+    ↔ IPC (optiSCAN.Platform — pipe optiSCAN_Protection_v8)
+optiSCAN.Service.exe  →  optiSCAN.exe --service-host
+    ├── RTP + ProcessStartMonitor + scan USB
+    ├── ProtectionPipeServer (scan path/buffer pour AMSI)
+    ├── optiSCAN.AmsiProvider.dll (COM AMSI → IPC)     [build MSVC / WDK]
+    └── optiSCAN.Minifilter.sys (noyau, stub + test signing)
+```
+
+| Composant | Rôle |
+|---|---|
+| `optiSCAN.Platform` | Contrats JSON IPC (`ping`, `scan_path`, `scan_buffer`, `status`, `shutdown`) |
+| `optiSCAN.Service` | Service Windows qui supervise `optiSCAN.exe --service-host` |
+| `--service-host` | Moteur sans UI : RTP, IPC, enregistrement AMSI/minifilter |
+| `ThreatRepairService` | Quarantaine + recours Defender (`MpCmdRun`) |
+| `CloudThreatIntelService` | Enrichissement VirusTotal (cache local) |
+| `native/optiSCAN.AmsiProvider` | DLL C++ fournisseur AMSI (build VS 2022 x64) |
+| `native/optiSCAN.Minifilter` | Driver noyau stub (WDK + certificat EV en production) |
+
+**Prérequis** : droits administrateur pour le service, l'enregistrement AMSI et le chargement minifilter (`fltmc`). En développement : `bcdedit /set testsigning on` pour le driver.
+
+**Option UI** : *Service Windows de protection système* (Options → Protection). Si le service est injoignable, repli automatique sur la RTP locale.
+
 ---
 
 ### Structure des modules
@@ -69,15 +97,21 @@ Branche par défaut GitHub : **`main`**. CI : uniquement `main` et `dev` (voir [
 ├── README.md                          ← Ce fichier (guide complet)
 ├── docs/
 │   └── README.md                      ← Index doc (renvoie vers ce README)
-├── .github/workflows/ci.yml           ← Build, tests (185), publish (main)
+├── .github/workflows/ci.yml           ← Build, tests (208), publish (main)
 ├── scripts/
 │   ├── fetch-runtime-deps.ps1         ← Télécharge ClamAV + YARA (CI / dev)
 │   ├── prepare-release-v8.ps1         ← Chaîne complète release v8
 │   ├── clean-before-publish.ps1       ← Nettoyage bin/obj avant release
 │   ├── verify-runtime-deps.ps1        ← Vérifie clamav + clamd + yara + rules
+│   ├── validate-release-readiness.ps1 ← Tests Release (+ verify publish optionnel)
 │   └── runtime-versions.json          ← Versions URL ClamAV / YARA
 ├── optiSCAN.sln                       ← Solution Visual Studio
+├── optiSCAN.Platform/                 ← IPC protection système v8
+├── optiSCAN.Service/                  ← Service Windows (supervise --service-host)
 ├── optiSCAN.Tests/                    ← Tests unitaires (xUnit)
+├── native/
+│   ├── optiSCAN.AmsiProvider/         ← DLL AMSI (C++, build MSVC)
+│   └── optiSCAN.Minifilter/           ← Driver noyau stub (WDK)
 ├── installer/
 │   ├── setup.iss                      ← Script Inno Setup (FR + EN)
 │   └── build-release-setup.ps1        ← clean + publish + ISCC
@@ -136,6 +170,7 @@ Branche par défaut GitHub : **`main`**. CI : uniquement `main` et `dev` (voir [
     │   ├── OverviewProtectionStatsFormatter.cs ← Stats protection 30 j. (accueil, sans doublon reco.)
     │   ├── ActivityLogService.cs      ← Journal unifié activity_log.dat (timeline Historique)
     │   ├── ScanLogManager.cs          ← Sessions scan/nettoyage (.dat), ReconcileQuarantinedThreats, optiSCAN.log
+    │   ├── SignatureStatusService.cs  ← Versions signatures ClamAV/YARA (cache TTL 30 s)
     │   ├── RealTimeProtection.cs      ← FileSystemWatcher (Options)
     │   ├── RemovableDriveScanService.cs ← Scan auto USB/SD à l'insertion (WMI + polling)
     │   ├── RiskyFileExtensions.cs     ← Extensions à risque (RTP + énumération USB rapide)
@@ -561,7 +596,7 @@ L’application est publiée en **`asInvoker`** (`app.manifest`) : exécution av
 - `SuspiciousDownloads` exclue par défaut (trop agressive sur le dossier Downloads)
 - Ne jamais supprimer automatiquement — toujours mettre en quarantaine en premier
 - L'utilisateur confirme avant toute action destructrice (boîte de dialogue `MessageBoxButton.YesNo`)
-- Le test EICAR est géré normalement par ClamAV (aucun traitement spécial dans le scoring)
+- Le test EICAR est couvert par la règle YARA embarquée `rules/test_rules.yar` (`EICAR_Test`) ; ClamAV le détecte aussi si la base est à jour
 
 ### Exclusion Windows Defender
 
@@ -596,7 +631,7 @@ Sortie publish : `optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x6
 
 ### Ordre recommandé (équipe)
 
-1. Gel fonctionnel : `dotnet test` Release (**185** tests).
+1. Gel fonctionnel : `.\scripts\validate-release-readiness.ps1` (ou `dotnet test` Release — **208** tests).
 2. Dépendances : `.\scripts\fetch-runtime-deps.ps1` (+ `-RunFreshclam` pour l’installateur).
 3. Publish local : `.\scripts\prepare-release-v8.ps1` (ou étapes manuelles ci-dessous).
 4. VM propre : installer `optiSCAN_Setup_v8.0.0.exe` ; scan, RTP, clamd, posture, FR/EN.
@@ -647,7 +682,7 @@ optiSCAN_Setup_v8.0.0.exe
 
 ### Checklist binaire (bloquant)
 
-- [ ] `dotnet test` Release — **185** tests OK
+- [ ] `dotnet test` Release — **208** tests OK
 - [ ] `.\scripts\verify-runtime-deps.ps1` — vert sur dossier publish
 - [ ] `clamscan.exe`, `freshclam.exe`, **`clamd.exe`**, `yara64.exe`, règles `.yar`
 - [ ] `clamav\database\` — au moins un `main.cvd` / `daily.cvd` (via freshclam)
@@ -666,7 +701,7 @@ Pipeline : [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 **Freshclam en CI** : génère un `freshclam.conf` minimal dans `clamav\x64\` (non versionné dans Git, comme en production via `FreshclamUpdater`). **Erreur connue (corrigée)** : `Can't open/parse freshclam.conf` si freshclam est lancé sans `--config-file`.
 
-**Repères de couverture tests (release, 185 au total — voir checklist)** :
+**Repères de couverture tests (release, 208 au total — voir checklist)** :
 
 | Module | Fichier de tests |
 |--------|------------------|
@@ -675,6 +710,8 @@ Pipeline : [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 | Posture /100 | `SecurityPostureServiceTests` |
 | Historique / timeline | `ActivityLogServiceTests` (`GetActivityFeed`, trim 150) ; `ScanLogManagerTests` (DPAPI, rotation, `ReconcileQuarantinedThreats`) |
 | Scan USB/SD | `RemovableDriveDiscoveryTests` |
+| Intégration EICAR (YARA) | `EicarIntegrationTests` — règle `EICAR_Test` dans `test_rules.yar` (no-op si `yara64.exe` absent) |
+| Signatures (cache TTL) | `SignatureStatusServiceTests` |
 | Thème Windows | `ThemeManagerPreferenceTests` |
 | Persistance | `SecureStoreTests`, `UserPreferencesStorageTests`, `ExclusionSettingsTests` |
 
@@ -746,7 +783,7 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 - **Thème Windows** — `SyncWindowsTheme` par défaut ; case Options (thème opposé à Windows) ; `ThemeManager.Initialize()` dans `MainWindow` avant `InitializeComponent`
 - **clamd** — `CompositeClamAvBackend`, TCP `127.0.0.1:3310`, repli `clamscan.exe`
 - **Posture /100**, **VirusTotal**, **mode jeu** — voir [§13](#13-sécurité-posture-et-menaces) et Options
-- **Tests** — **185** tests Release — [§12](#12-audit-et-qualité) ; i18n **621** clés FR/EN
+- **Tests** — **208** tests Release — [§12](#12-audit-et-qualité) ; i18n **621** clés FR/EN
 
 ### v7.0 — Lifting UI Donaby + identité visuelle
 
@@ -842,7 +879,7 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 | Architecture | 8/10 | `CompositeClamAvBackend`, posture injectable ; recommandations accueil extraites |
 | Sécurité locale | 8/10 | Quarantaine AES-GCM ; historique `.dat` DPAPI ; `optiSCAN.log` diagnostic (chemins redacted, pas de secret critique) |
 | UI / Donaby | 8/10 | Accueil posture ; VT optionnel |
-| Tests & CI | 9/10 | **185** tests (posture, accueil, historique/timeline, USB, `SecureStore`) ; coverage Cobertura |
+| Tests & CI | 9/10 | **208** tests (posture, accueil, historique/timeline, USB, `SecureStore`) ; coverage Cobertura |
 | Release Inno | 7/10 | Pipeline CI OK |
 
 **Dettes ouvertes (résumé)** : tests intégration clamd/schtasks réels ; signature Authenticode optionnelle. Voir §12.1 pour le reste (maintenabilité, choix volontaires).
@@ -853,7 +890,7 @@ dotnet test optiSCAN.Tests\optiSCAN.Tests.csproj -c Release
 
 ### 12.1 Maintenabilité et choix volontaires (non bloquants v8)
 
-**`MainWindow` encore central** — `OverviewRecommendationsBuilder` a extrait le calcul des recommandations accueil ; il reste dans la fenêtre : `RefreshSignaturesDisplayAsync`, `RefreshAntivirusStatus`, coordination RTP, navigation. **Prochain candidat** (non urgent) : un `SignatureStatusService` (TTL/cache des libellés signatures). Pure maintenabilité.
+**`MainWindow` encore central** — `OverviewRecommendationsBuilder` et `SignatureStatusService` ont extrait les recommandations accueil et le cache TTL des libellés signatures ; il reste dans la fenêtre : `RefreshAntivirusStatus`, coordination RTP, navigation.
 
 **`optiSCAN.log` non chiffré** — choix intentionnel pour le support et le mode headless. Les lignes produites par `FormatScanDetail` / `FormatScanDetailCore` passent par `PathRedaction.RedactPath` sur `TargetPath` et `FilePath` : pas de chemins complets dans le journal. Restent lisibles : noms de menace, horodatages, compteurs — acceptable pour un log de diagnostic.
 

@@ -137,6 +137,10 @@
     <PackageReference Include="System.Management" Version="8.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\optiSCAN.Platform\optiSCAN.Platform.csproj" />
+  </ItemGroup>
+
 
   <ItemGroup>
     <Compile Update="Views\OptionsControl.xaml.cs">

@@ -40,8 +40,14 @@ namespace optiSCAN.Services
         public ScanLogManager Logger { get; }
         public ActivityLogService ActivityLog { get; }
         public NotificationService Notifications { get; }
-        /// <summary>Surveillance fichiers sensibles (désactivable via Options / exclusions).</summary>
+        /// <summary>Protection temps réel (désactivable via Options / exclusions).</summary>
         public RealTimeProtection RealTimeProtection { get; }
+
+        /// <summary>Surveillance WMI des lancements de processus.</summary>
+        public ProcessStartMonitor ProcessStartMonitor { get; }
+
+        /// <summary>Watchdog planifié contre l'arrêt non autorisé de la protection.</summary>
+        public TamperProtectionService TamperProtection { get; }
 
         /// <summary>Scan automatique des lecteurs amovibles à l'insertion.</summary>
         public RemovableDriveScanService RemovableDriveScan { get; }
@@ -57,7 +63,12 @@ namespace optiSCAN.Services
 
         public ThreatReputationService ThreatReputation { get; }
 
+        public CloudThreatIntelService CloudThreatIntel { get; }
+
         public ISecurityPostureService SecurityPosture { get; }
+
+        /// <summary>Versions signatures ClamAV/YARA avec cache TTL (accueil, onglet Signatures).</summary>
+        public SignatureStatusService SignatureStatus { get; }
 
         // Navigation entre panneaux. Initialisé par MainWindow.OnLoaded une fois
         // que tous les UserControls sont créés (RegisterPanel a besoin de leur
@@ -86,8 +97,64 @@ namespace optiSCAN.Services
         {
             ExclusionSettings.Current.RealTimeEnabled = enabled;
             ExclusionSettings.Current.Save();
-            if (enabled) RealTimeProtection.Start();
-            else RealTimeProtection.Stop();
+
+            if (UserPreferences.Current.UsePlatformProtectionService
+                && PlatformProtectionBootstrap.IsRemoteProtectionActive())
+            {
+                if (enabled)
+                {
+                    PlatformProtectionBootstrap.EnsurePlatformProtectionRunning();
+                    if (UserPreferences.Current.TamperProtectionEnabled)
+                        TamperProtection.EnsureWatchdogTask();
+                }
+                RequestProtectionStateRefresh();
+                return;
+            }
+
+            if (enabled)
+            {
+                RealTimeProtection.Start();
+                if (UserPreferences.Current.ProcessMonitorEnabled)
+                    ProcessStartMonitor.Start();
+                if (UserPreferences.Current.TamperProtectionEnabled)
+                    TamperProtection.EnsureWatchdogTask();
+            }
+            else
+            {
+                RealTimeProtection.Stop();
+                ProcessStartMonitor.Stop();
+            }
+
+            RequestProtectionStateRefresh();
+        }
+
+        /// <summary>Active le service Windows de protection système (v8).</summary>
+        public void ApplyPlatformProtectionService(bool enabled)
+        {
+            UserPreferences.Current.UsePlatformProtectionService = enabled;
+            UserPreferences.Current.Save();
+
+            if (enabled)
+            {
+                PlatformProtectionBootstrap.TryInstallWindowsService();
+                PlatformProtectionBootstrap.EnsurePlatformProtectionRunning();
+                if (PlatformProtectionBootstrap.IsRemoteProtectionActive())
+                {
+                    RealTimeProtection.Stop();
+                    ProcessStartMonitor.Stop();
+                }
+            }
+            else
+            {
+                PlatformProtectionBootstrap.TryStopWindowsService();
+                if (ExclusionSettings.Current.RealTimeEnabled)
+                {
+                    RealTimeProtection.Start();
+                    if (UserPreferences.Current.ProcessMonitorEnabled)
+                        ProcessStartMonitor.Start();
+                }
+            }
+
             RequestProtectionStateRefresh();
         }
 
@@ -111,20 +178,33 @@ namespace optiSCAN.Services
         /// <summary>Active ou coupe les timers freshclam / règles YARA.</summary>
         public void ApplySignatureAutoUpdate(bool enabled)
         {
-            if (enabled)
-            {
-                FreshclamUpdater.EnableAutoUpdate(TimeSpan.FromHours(4));
-                RulesUpdater.EnableAutoUpdate(TimeSpan.FromHours(24));
-            }
-            else
-            {
-                FreshclamUpdater.DisableAutoUpdate();
-                RulesUpdater.DisableAutoUpdate();
-            }
-
+            SignatureUpdatePolicy.ApplyAutoUpdateTimers(FreshclamUpdater, RulesUpdater, enabled);
             UserPreferences.Current.SignatureAutoUpdateEnabled = enabled;
             UserPreferences.Current.Save();
             RequestProtectionStateRefresh();
+        }
+
+        /// <summary>Active ou arrête la surveillance des créations de processus.</summary>
+        public void ApplyProcessMonitor(bool enabled)
+        {
+            UserPreferences.Current.ProcessMonitorEnabled = enabled;
+            UserPreferences.Current.Save();
+            if (enabled && ExclusionSettings.Current.RealTimeEnabled)
+                ProcessStartMonitor.Start();
+            else
+                ProcessStartMonitor.Stop();
+            RequestProtectionStateRefresh();
+        }
+
+        /// <summary>Enregistre ou supprime la tâche watchdog anti-manipulation.</summary>
+        public void ApplyTamperProtection(bool enabled)
+        {
+            UserPreferences.Current.TamperProtectionEnabled = enabled;
+            UserPreferences.Current.Save();
+            if (enabled)
+                TamperProtection.EnsureWatchdogTask();
+            else
+                TamperProtection.DeleteWatchdogTask();
         }
 
         private EventHandler? _protectionStateRefreshHandlers;
@@ -143,11 +223,44 @@ namespace optiSCAN.Services
         public void ApplyPreferencesOnStartup()
         {
             ApplySignatureAutoUpdate(UserPreferences.Current.SignatureAutoUpdateEnabled);
-            if (ExclusionSettings.Current.RealTimeEnabled)
-                RealTimeProtection.Start();
-            else
-                RealTimeProtection.Stop();
+            SignatureUpdatePolicy.ScheduleStartupRefreshIfStale(this);
 
+            if (UserPreferences.Current.UsePlatformProtectionService)
+            {
+                PlatformProtectionBootstrap.EnsurePlatformProtectionRunning();
+                if (PlatformProtectionBootstrap.IsRemoteProtectionActive())
+                {
+                    if (UserPreferences.Current.TamperProtectionEnabled)
+                        TamperProtection.EnsureWatchdogTask();
+                    ApplyRemovableDriveAndEnginePrefs();
+                    return;
+                }
+
+                AppLogger.Warn("ServiceContainer", "Service plateforme injoignable — repli RTP locale");
+            }
+
+            if (ExclusionSettings.Current.RealTimeEnabled)
+            {
+                RealTimeProtection.Start();
+                if (UserPreferences.Current.ProcessMonitorEnabled)
+                    ProcessStartMonitor.Start();
+            }
+            else
+            {
+                RealTimeProtection.Stop();
+                ProcessStartMonitor.Stop();
+            }
+
+            if (UserPreferences.Current.TamperProtectionEnabled)
+                TamperProtection.EnsureWatchdogTask();
+            else
+                TamperProtection.DeleteWatchdogTask();
+
+            ApplyRemovableDriveAndEnginePrefs();
+        }
+
+        private void ApplyRemovableDriveAndEnginePrefs()
+        {
             if (UserPreferences.Current.GameModeAutoEnabled)
                 DistractionFreeMonitor.Start();
             else
@@ -260,8 +373,16 @@ namespace optiSCAN.Services
             ScanEngine = new ClamAvScanEngineAdapter(ClamAv);
             Actions = new AntivirusActions(this);
             ThreatReputation = new ThreatReputationService();
+            CloudThreatIntel = new CloudThreatIntelService(ThreatReputation);
             SecurityPosture = new SecurityPostureService();
+            SignatureStatus = new SignatureStatusService(FreshclamUpdater, RulesUpdater, Yara);
             RealTimeProtection = new RealTimeProtection(Orchestrator, Quarantine, Notifications);
+            ProcessStartMonitor = new ProcessStartMonitor(
+                Orchestrator,
+                Quarantine,
+                Notifications,
+                () => RealTimeProtection.IsPaused);
+            TamperProtection = new TamperProtectionService();
             RemovableDriveScan = new RemovableDriveScanService(Orchestrator, Quarantine, Notifications, Logger);
             ScheduledScan = new ScheduledScanService();
 
@@ -301,6 +422,8 @@ namespace optiSCAN.Services
             _exportScanSessionPdfHandlers = null;
             try { RealTimeProtection.Dispose(); }
             catch (Exception ex) { AppLogger.Warn("ServiceContainer", "RealTimeProtection.Dispose", ex); }
+            try { ProcessStartMonitor.Dispose(); }
+            catch (Exception ex) { AppLogger.Warn("ServiceContainer", "ProcessStartMonitor.Dispose", ex); }
             try { RemovableDriveScan.Dispose(); }
             catch (Exception ex) { AppLogger.Warn("ServiceContainer", "RemovableDriveScan.Dispose", ex); }
             try { FreshclamUpdater.DisableAutoUpdate(); }

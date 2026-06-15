@@ -128,6 +128,12 @@ namespace optiSCAN.Views
                 var ex = ExclusionSettings.Current;
                 if (chkRealtimeProtection != null)
                     chkRealtimeProtection.IsChecked = ex.RealTimeEnabled;
+                if (chkProcessMonitor != null)
+                    chkProcessMonitor.IsChecked = prefs.ProcessMonitorEnabled;
+                if (chkTamperProtection != null)
+                    chkTamperProtection.IsChecked = prefs.TamperProtectionEnabled;
+                if (chkPlatformProtection != null)
+                    chkPlatformProtection.IsChecked = prefs.UsePlatformProtectionService;
                 if (chkRemovableDriveScan != null)
                     chkRemovableDriveScan.IsChecked = prefs.RemovableDriveScanEnabled;
                 if (chkRemovableDriveDetailed != null)
@@ -137,10 +143,14 @@ namespace optiSCAN.Views
 
                 if (chkAutoQuarantine != null)
                     chkAutoQuarantine.IsChecked = ex.AutoQuarantineEnabled;
+                if (chkBackupBeforeQuarantine != null)
+                    chkBackupBeforeQuarantine.IsChecked = prefs.BackupBeforeQuarantine;
 
                 var c = ServiceContainer.Default;
                 if (chkAutoUpdate != null)
                     chkAutoUpdate.IsChecked = prefs.SignatureAutoUpdateEnabled;
+                if (chkAggressiveSignatures != null)
+                    chkAggressiveSignatures.IsChecked = prefs.AggressiveSignatureUpdates;
 
                 if (chkUseClamd != null)
                     chkUseClamd.IsChecked = prefs.UseClamdEngine;
@@ -269,6 +279,30 @@ namespace optiSCAN.Views
 
                 case "RealtimeProtection":
                     c.ApplyRealtimeProtection(isOn);
+                    break;
+
+                case "ProcessMonitor":
+                    c.ApplyProcessMonitor(isOn);
+                    break;
+
+                case "TamperProtection":
+                    c.ApplyTamperProtection(isOn);
+                    break;
+
+                case "PlatformProtection":
+                    c.ApplyPlatformProtectionService(isOn);
+                    break;
+
+                case "BackupBeforeQuarantine":
+                    prefs.BackupBeforeQuarantine = isOn;
+                    prefs.Save();
+                    break;
+
+                case "AggressiveSignatures":
+                    prefs.AggressiveSignatureUpdates = isOn;
+                    prefs.Save();
+                    if (prefs.SignatureAutoUpdateEnabled)
+                        c.ApplySignatureAutoUpdate(true);
                     break;
 
                 case "RemovableDriveScan":

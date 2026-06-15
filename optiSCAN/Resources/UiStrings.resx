@@ -343,7 +343,25 @@
   <data name="Opt_LangRestartMessage" xml:space="preserve"><value>optiSCAN va redémarrer pour afficher l'interface dans la langue choisie.</value></data>
   <data name="Opt_Antivirus" xml:space="preserve"><value>Antivirus</value></data>
   <data name="Opt_Rtp" xml:space="preserve"><value>Protection temps réel</value></data>
-  <data name="Opt_RtpSub" xml:space="preserve"><value>ProgramData, Temp Windows et extensions à risque — pas l'intégralité du profil utilisateur.</value></data>
+  <data name="Opt_RtpSub" xml:space="preserve"><value>Dossiers du scan rapide (Temp, démarrage, Prefetch…) et extensions à risque élargies.</value></data>
+  <data name="Opt_ProcessMonitor" xml:space="preserve"><value>Surveillance des lancements de processus</value></data>
+  <data name="Opt_ProcessMonitorSub" xml:space="preserve"><value>Analyse les exécutables et scripts au démarrage (WMI) — complète la protection fichier.</value></data>
+  <data name="Opt_TamperProtection" xml:space="preserve"><value>Protection anti-manipulation</value></data>
+  <data name="Opt_TamperProtectionSub" xml:space="preserve"><value>Relance optiSCAN en arrière-plan si la protection temps réel est attendue mais l'application est arrêtée.</value></data>
+  <data name="Opt_PlatformProtection" xml:space="preserve"><value>Service Windows de protection système</value></data>
+  <data name="Opt_PlatformProtectionSub" xml:space="preserve"><value>Moteur RTP/AMSI/minifilter dans optiSCAN.Service (IPC v8). Nécessite des droits administrateur à l'installation.</value></data>
+  <data name="Repair_Quarantined" xml:space="preserve"><value>Fichier mis en quarantaine.</value></data>
+  <data name="Repair_QuarantineFailed" xml:space="preserve"><value>Échec de la quarantaine.</value></data>
+  <data name="Opt_BackupBeforeQuarantine" xml:space="preserve"><value>Copie de sécurité avant quarantaine</value></data>
+  <data name="Opt_BackupBeforeQuarantineSub" xml:space="preserve"><value>Conserve une copie locale (32 Mo max.) dans %LocalAppData%\optiSCAN\SafetyBackups.</value></data>
+  <data name="Opt_AggressiveSignatures" xml:space="preserve"><value>Mises à jour signatures renforcées</value></data>
+  <data name="Opt_AggressiveSignaturesSub" xml:space="preserve"><value>ClamAV toutes les 2 h et règles YARA toutes les 12 h (au lieu de 4 h / 24 h).</value></data>
+  <data name="Main_GuardSession" xml:space="preserve"><value>Session de protection en arrière-plan active.</value></data>
+  <data name="Remed_Step_Quarantine" xml:space="preserve"><value>Mettre en quarantaine le fichier suspect.</value></data>
+  <data name="Remed_Step_NoRun" xml:space="preserve"><value>Ne pas exécuter à nouveau ce programme tant qu'il n'est pas analysé.</value></data>
+  <data name="Remed_Step_YaraReview" xml:space="preserve"><value>Vérifier la règle YARA déclenchée (faux positif possible sur outils légitimes).</value></data>
+  <data name="Remed_Step_Restore" xml:space="preserve"><value>En cas d'erreur, restaurer depuis la quarantaine ou la copie de sécurité.</value></data>
+  <data name="Remed_Step_NoRepairNote" xml:space="preserve"><value>ClamAV ne répare pas les binaires infectés : seule l'isolement ou la suppression est possible.</value></data>
   <data name="Opt_RemovableScan" xml:space="preserve"><value>Analyser les clés USB et cartes SD</value></data>
   <data name="Opt_RemovableScanSub" xml:space="preserve"><value>Lance une analyse automatique à l'insertion (lecteurs de moins de 64 Go par défaut).</value></data>
   <data name="Opt_RemovableDetailed" xml:space="preserve"><value>Analyse USB complète</value></data>

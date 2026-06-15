@@ -47,3 +47,6 @@ publish/
 # Dossier output de l'installer
 installer/output/
 
+# Échantillons EICAR temporaires (tests d'intégration YARA)
+.eicar-test/
+
