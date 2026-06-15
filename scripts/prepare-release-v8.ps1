@@ -61,11 +61,18 @@ if (-not $SkipTests) {
 
 Invoke-Step 'dotnet publish' {
     $csproj = Join-Path $root 'optiSCAN\optiSCAN.csproj'
+    $svc = Join-Path $root 'optiSCAN.Service\optiSCAN.Service.csproj'
     if ($SelfContained) {
         dotnet publish $csproj -c Release -r win-x64 --self-contained true `
             -p:PublishSingleFile=false -o $pubDir
+        dotnet publish $svc -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=false -o $pubDir
     } else {
         dotnet publish $csproj -c Release /p:PublishProfile=FolderProfile
+        dotnet publish $svc -c Release -r win-x64 --self-contained false `
+            -o (Join-Path $root "optiSCAN.Service\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64")
+        Copy-Item (Join-Path $root "optiSCAN.Service\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\optiSCAN.Service.exe") `
+            (Join-Path $pubDir 'optiSCAN.Service.exe') -ErrorAction SilentlyContinue
     }
 }
 

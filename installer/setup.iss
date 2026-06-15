@@ -82,6 +82,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon";   Description: "Créer une icône sur le Bureau";                              GroupDescription: "Icônes supplémentaires"
 Name: "startupicon";   Description: "Lancer optiSCAN au démarrage de Windows";                   GroupDescription: "Options avancées"; Flags: unchecked
 Name: "autoUpdateSig"; Description: "Activer les mises à jour auto des signatures (recommandé)"; GroupDescription: "Antivirus ClamAV"; Flags: checkedonce
+Name: "platformservice"; Description: "Installer le service Windows de protection système v8 (RTP/AMSI/IPC)"; GroupDescription: "Protection avancée v8"; Flags: checkedonce
 
 [Files]
 ; ── Application principale ───────────────────────────────────────────────────
@@ -103,6 +104,10 @@ Source: "..\optiSCAN\clamav\database\*"; DestDir: "{app}\clamav\database"; Flags
 ; ── YARA ─────────────────────────────────────────────────────────────────────
 Source: "..\optiSCAN\rules\*"; DestDir: "{app}\rules"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
 Source: "..\optiSCAN\yara\*"; DestDir: "{app}\yara"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+; ── Service Windows + composants natifs (optionnels si non compilés) ───────────
+Source: "{#AppPublishSource}\optiSCAN.Service.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\native\optiSCAN.AmsiProvider\x64\Release\optiSCAN.AmsiProvider.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\native\optiSCAN.Minifilter\x64\optiSCAN.Minifilter.sys"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
@@ -225,6 +230,7 @@ var
   UserDataLocal: string;
   UserDataRoaming: string;
   Response: Integer;
+  ResultCode: Integer;
 begin
   if CurUninstallStep = usPostUninstall then
   begin
@@ -232,8 +238,16 @@ begin
     RegDeleteKeyIncludingSubkeys(HKCU, 'Software\optiSCAN');
     RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\*\shell\Scanner avec optiSCAN');
     RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\*\shell\Scan with optiSCAN');
+    RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\Directory\shell\Scanner avec optiSCAN');
+    RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\Directory\shell\Scan with optiSCAN');
     RegDeleteKeyIncludingSubkeys(HKCR, '*\shell\Scanner avec optiSCAN');
     RegDeleteKeyIncludingSubkeys(HKCR, '*\shell\Scan with optiSCAN');
+    RegDeleteKeyIncludingSubkeys(HKCR, 'Directory\shell\Scanner avec optiSCAN');
+    RegDeleteKeyIncludingSubkeys(HKCR, 'Directory\shell\Scan with optiSCAN');
+
+    Exec('fltmc.exe', 'unload optiSCANMinifilter', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec('sc.exe', 'stop optiSCANProtectionV8', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec('sc.exe', 'delete optiSCANProtectionV8', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 
     // 2. Proposition : suppression des données utilisateur (quarantaine,
     //    historique, préférences, logs). On demande explicitement car
@@ -303,12 +317,20 @@ begin
 
   RegDeleteKeyIncludingSubkeys(HKCR, '*\shell\Scanner avec optiSCAN');
   RegDeleteKeyIncludingSubkeys(HKCR, '*\shell\Scan with optiSCAN');
+  RegDeleteKeyIncludingSubkeys(HKCR, 'Directory\shell\Scanner avec optiSCAN');
+  RegDeleteKeyIncludingSubkeys(HKCR, 'Directory\shell\Scan with optiSCAN');
   RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\*\shell\Scanner avec optiSCAN');
   RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\*\shell\Scan with optiSCAN');
+  RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\Directory\shell\Scanner avec optiSCAN');
+  RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\Directory\shell\Scan with optiSCAN');
 
   RegWriteStringValue(HKCU, 'Software\Classes\*\shell\' + MenuName, '', MenuName);
   RegWriteStringValue(HKCU, 'Software\Classes\*\shell\' + MenuName, 'Icon', ExePath + ',0');
   RegWriteStringValue(HKCU, 'Software\Classes\*\shell\' + MenuName + '\command', '', Cmd);
+
+  RegWriteStringValue(HKCU, 'Software\Classes\Directory\shell\' + MenuName, '', MenuName);
+  RegWriteStringValue(HKCU, 'Software\Classes\Directory\shell\' + MenuName, 'Icon', ExePath + ',0');
+  RegWriteStringValue(HKCU, 'Software\Classes\Directory\shell\' + MenuName + '\command', '', Cmd);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -316,11 +338,21 @@ var
   ConfPath: string;
   Content: AnsiString;
   ShouldReset: Boolean;
+  ResultCode: Integer;
 begin
   if CurStep = ssPostInstall then
   begin
     WriteInstallerUiCulture();
     RegisterExplorerContextMenu();
+    if IsTaskSelected('platformservice') then
+    begin
+      if FileExists(ExpandConstant('{app}\optiSCAN.Service.exe')) then
+      begin
+        Exec('sc.exe', 'create optiSCANProtectionV8 binPath= "\"' + ExpandConstant('{app}\optiSCAN.Service.exe') + '\"" start= auto DisplayName= "optiSCAN Protection v8"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+        Exec('sc.exe', 'description optiSCANProtectionV8 "Moteur de protection optiSCAN v8 (RTP, AMSI, IPC)"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+        Exec('sc.exe', 'start optiSCANProtectionV8', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      end;
+    end;
   end;
 
   if CurStep = ssInstall then
