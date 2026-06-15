@@ -352,6 +352,17 @@
   <data name="Opt_PlatformProtectionSub" xml:space="preserve"><value>RTP/AMSI/minifilter engine in optiSCAN.Service (v8 IPC). Requires administrator rights at install time.</value></data>
   <data name="Repair_Quarantined" xml:space="preserve"><value>File quarantined.</value></data>
   <data name="Repair_QuarantineFailed" xml:space="preserve"><value>Quarantine failed.</value></data>
+  <data name="Platform_StatusTitle" xml:space="preserve"><value>System protection v8</value></data>
+  <data name="Platform_IpcActive" xml:space="preserve"><value>IPC service / remote engine active</value></data>
+  <data name="Platform_IpcInactive" xml:space="preserve"><value>IPC service unreachable (local RTP fallback possible)</value></data>
+  <data name="Platform_IpcDisabled" xml:space="preserve"><value>Windows service disabled (RTP in application)</value></data>
+  <data name="Platform_AmsiDllMissing" xml:space="preserve"><value>AMSI: optiSCAN.AmsiProvider.dll missing</value></data>
+  <data name="Platform_AmsiNotRegistered" xml:space="preserve"><value>AMSI: provider not registered (admin required)</value></data>
+  <data name="Platform_AmsiRegistered" xml:space="preserve"><value>AMSI: provider registered</value></data>
+  <data name="Platform_DefenderMayOverride" xml:space="preserve"><value>Defender active — may take AMSI priority on scripts</value></data>
+  <data name="Platform_MinifilterLoaded" xml:space="preserve"><value>Kernel minifilter loaded</value></data>
+  <data name="Platform_MinifilterNotLoaded" xml:space="preserve"><value>Minifilter present but not loaded (test signing / admin)</value></data>
+  <data name="Platform_MinifilterAbsent" xml:space="preserve"><value>Kernel minifilter absent (stub — PE not intercepted)</value></data>
   <data name="Opt_BackupBeforeQuarantine" xml:space="preserve"><value>Safety backup before quarantine</value></data>
   <data name="Opt_BackupBeforeQuarantineSub" xml:space="preserve"><value>Keeps a local copy (32 MB max.) in %LocalAppData%\optiSCAN\SafetyBackups.</value></data>
   <data name="Opt_AggressiveSignatures" xml:space="preserve"><value>Aggressive signature updates</value></data>

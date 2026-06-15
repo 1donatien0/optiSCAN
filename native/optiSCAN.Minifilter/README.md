@@ -6,6 +6,7 @@ Driver noyau `optiSCAN.Minifilter.sys` pour interception des accès fichiers **a
 
 Le dépôt fournit :
 
+- `filter.c` — squelette `DriverEntry` / `FltRegisterFilter` (compilation avec `OPTISCAN_MINIFILTER_BUILD`)
 - `optiSCAN.Minifilter.inf` — métadonnées d'installation
 - `MinifilterUserBridge.cs` — pont user-mode côté C#
 - Documentation WDK pour compilation hors CI

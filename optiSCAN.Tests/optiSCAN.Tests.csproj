@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\optiSCAN\optiSCAN.csproj" />
+    <ProjectReference Include="..\optiSCAN.Platform\optiSCAN.Platform.csproj" />
   </ItemGroup>
 
 </Project>

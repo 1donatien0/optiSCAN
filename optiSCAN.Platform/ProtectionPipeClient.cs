@@ -70,19 +70,8 @@ public sealed class ProtectionPipeClient : IDisposable
         var bytes = Encoding.UTF8.GetBytes(payload);
         await pipe.WriteAsync(bytes, linked.Token).ConfigureAwait(false);
         await pipe.FlushAsync(linked.Token).ConfigureAwait(false);
-        pipe.WaitForPipeDrain();
 
-        using var ms = new MemoryStream();
-        var buf = new byte[4096];
-        while (true)
-        {
-            var read = await pipe.ReadAsync(buf, linked.Token).ConfigureAwait(false);
-            if (read <= 0)
-                break;
-            ms.Write(buf, 0, read);
-        }
-
-        var text = Encoding.UTF8.GetString(ms.ToArray());
+        var text = await ProtectionPipeJsonFraming.ReadJsonPayloadAsync(pipe, linked.Token).ConfigureAwait(false);
         return JsonSerializer.Deserialize<ProtectionPipeResponse>(text, JsonOptions)
             ?? ProtectionPipeResponse.Error("Réponse IPC invalide");
     }

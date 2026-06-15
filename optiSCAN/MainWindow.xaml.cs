@@ -697,6 +697,7 @@ namespace optiSCAN
                 SignatureAutoUpdateEnabled = UserPreferences.Current.SignatureAutoUpdateEnabled,
             });
             overview.UpdateSecurityPosture(posture);
+            overview.UpdatePlatformProtectionStatus(PlatformProtectionStatusService.Evaluate());
         }
 
         public async Task RefreshAntivirusDataAsync()

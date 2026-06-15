@@ -6,9 +6,9 @@ namespace optiSCAN.Services;
 /// <summary>Réputation cloud (VirusTotal) avec cache local pour enrichir la détection.</summary>
 public sealed class CloudThreatIntelService
 {
-    private readonly ThreatReputationService _reputation;
+    private readonly IThreatReputationService _reputation;
 
-    public CloudThreatIntelService(ThreatReputationService reputation) => _reputation = reputation;
+    public CloudThreatIntelService(IThreatReputationService reputation) => _reputation = reputation;
 
     public async Task<string?> EnrichThreatAsync(ThreatInfo threat, CancellationToken ct = default)
     {

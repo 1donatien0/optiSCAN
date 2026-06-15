@@ -1,19 +1,12 @@
 using System.Runtime.Versioning;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace optiSCAN.Services
 {
     /// <summary>
     /// Regroupe les services à longue durée de vie (singleton <see cref="Default"/>).
-    /// MainWindow et <see cref="optiSCAN.ViewModels.ScanViewModel"/> s’appuient sur les mêmes
-    /// instances (moteurs, journaux, quarantaine) pour éviter double charge mémoire, caches
-    /// divergents et abonnements dupliqués.
+    /// Construction via <see cref="Microsoft.Extensions.DependencyInjection"/> (v8).
     /// </summary>
-    /// <remarks>
-    /// Pas de Microsoft.Extensions.DependencyInjection : choix volontaire pour une app WPF
-    /// desktop à cycle de vie unique (singleton <see cref="Default"/>, construction explicite
-    /// dans le constructeur privé). Un conteneur DI n’apporterait pas de scopes ici ; les tests
-    /// peuvent substituer via <see cref="IScanEngine"/> / instances passées à <see cref="ScanOrchestrator"/>.
-    /// </remarks>
     [SupportedOSPlatform("windows")]
     public sealed class ServiceContainer
     {
@@ -22,6 +15,7 @@ namespace optiSCAN.Services
 
         public static ServiceContainer Default => _default.Value;
 
+        private readonly IServiceProvider _services;
         private bool _shutdownDone;
 
         // ── Services singleton ───────────────────────────────────────────────────
@@ -354,40 +348,37 @@ namespace optiSCAN.Services
 
         private ServiceContainer()
         {
-            // Ordre de construction : du plus indépendant au plus dépendant.
-            ClamAv = new ClamAvEngine();
-            var clamdEngine = new ClamdEngine();
-            ClamAvBackend = new CompositeClamAvBackend(clamdEngine, ClamAv);
-            Yara = new YaraEngine();
-            FreshclamUpdater = new FreshclamUpdater();
-            RulesUpdater = new YaraForgeUpdater();
-            Quarantine = new QuarantineManager();
-            Logger = new ScanLogManager();
-            ActivityLog = new ActivityLogService(Logger);
+            var collection = new ServiceCollection();
+            DependencyInjection.ServiceRegistration.AddOptiscanCoreServices(collection);
+            _services = collection.BuildServiceProvider();
+
+            ClamAv = _services.GetRequiredService<ClamAvEngine>();
+            ClamAvBackend = _services.GetRequiredService<CompositeClamAvBackend>();
+            Yara = _services.GetRequiredService<YaraEngine>();
+            FreshclamUpdater = _services.GetRequiredService<FreshclamUpdater>();
+            RulesUpdater = _services.GetRequiredService<YaraForgeUpdater>();
+            Quarantine = _services.GetRequiredService<QuarantineManager>();
+            Logger = _services.GetRequiredService<ScanLogManager>();
+            ActivityLog = _services.GetRequiredService<ActivityLogService>();
+            Notifications = _services.GetRequiredService<NotificationService>();
+            Orchestrator = _services.GetRequiredService<ScanOrchestrator>();
+            ScanEngine = _services.GetRequiredService<IScanEngine>();
+            ThreatReputation = _services.GetRequiredService<ThreatReputationService>();
+            CloudThreatIntel = _services.GetRequiredService<CloudThreatIntelService>();
+            SecurityPosture = _services.GetRequiredService<ISecurityPostureService>();
+            SignatureStatus = _services.GetRequiredService<SignatureStatusService>();
+            RealTimeProtection = _services.GetRequiredService<RealTimeProtection>();
+            ProcessStartMonitor = _services.GetRequiredService<ProcessStartMonitor>();
+            TamperProtection = _services.GetRequiredService<TamperProtectionService>();
+            RemovableDriveScan = _services.GetRequiredService<RemovableDriveScanService>();
+            ScheduledScan = _services.GetRequiredService<ScheduledScanService>();
+
             Logger.BindActivityLog(ActivityLog);
             Quarantine.BindActivityLog(ActivityLog);
             ActivityLog.EnsureMigrated(Quarantine);
-            Notifications = new NotificationService();
-
-            Orchestrator = new ScanOrchestrator(ClamAvBackend, Yara);
-            ScanEngine = new ClamAvScanEngineAdapter(ClamAv);
             Actions = new AntivirusActions(this);
-            ThreatReputation = new ThreatReputationService();
-            CloudThreatIntel = new CloudThreatIntelService(ThreatReputation);
-            SecurityPosture = new SecurityPostureService();
-            SignatureStatus = new SignatureStatusService(FreshclamUpdater, RulesUpdater, Yara);
-            RealTimeProtection = new RealTimeProtection(Orchestrator, Quarantine, Notifications);
-            ProcessStartMonitor = new ProcessStartMonitor(
-                Orchestrator,
-                Quarantine,
-                Notifications,
-                () => RealTimeProtection.IsPaused);
-            TamperProtection = new TamperProtectionService();
-            RemovableDriveScan = new RemovableDriveScanService(Orchestrator, Quarantine, Notifications, Logger);
-            ScheduledScan = new ScheduledScanService();
 
-            // Timers MAJ signatures : état restauré depuis UserPreferences (ApplyPreferencesOnStartup).
-            AppLogger.Info("ServiceContainer", "Services initialisés");
+            AppLogger.Info("ServiceContainer", "Services initialisés (DI)");
 
             var yara = Yara;
             _ = Task.Run(async () =>
@@ -436,6 +427,8 @@ namespace optiSCAN.Services
             catch (Exception ex) { AppLogger.Warn("ServiceContainer", "DistractionFreeMonitor.Stop", ex); }
             (ClamAv as IDisposable)?.Dispose();
             (Yara as IDisposable)?.Dispose();
+            if (_services is IDisposable disposable)
+                disposable.Dispose();
             AppLogger.Info("ServiceContainer", "Services fermés");
         }
     }

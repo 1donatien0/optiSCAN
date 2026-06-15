@@ -352,6 +352,17 @@
   <data name="Opt_PlatformProtectionSub" xml:space="preserve"><value>Moteur RTP/AMSI/minifilter dans optiSCAN.Service (IPC v8). Nécessite des droits administrateur à l'installation.</value></data>
   <data name="Repair_Quarantined" xml:space="preserve"><value>Fichier mis en quarantaine.</value></data>
   <data name="Repair_QuarantineFailed" xml:space="preserve"><value>Échec de la quarantaine.</value></data>
+  <data name="Platform_StatusTitle" xml:space="preserve"><value>Protection système v8</value></data>
+  <data name="Platform_IpcActive" xml:space="preserve"><value>Service IPC / moteur distant actif</value></data>
+  <data name="Platform_IpcInactive" xml:space="preserve"><value>Service IPC injoignable (repli RTP locale possible)</value></data>
+  <data name="Platform_IpcDisabled" xml:space="preserve"><value>Service Windows désactivé (RTP dans l'application)</value></data>
+  <data name="Platform_AmsiDllMissing" xml:space="preserve"><value>AMSI : DLL optiSCAN.AmsiProvider.dll absente</value></data>
+  <data name="Platform_AmsiNotRegistered" xml:space="preserve"><value>AMSI : fournisseur non enregistré (admin requis)</value></data>
+  <data name="Platform_AmsiRegistered" xml:space="preserve"><value>AMSI : fournisseur enregistré</value></data>
+  <data name="Platform_DefenderMayOverride" xml:space="preserve"><value>Defender actif — peut prendre la priorité AMSI sur les scripts</value></data>
+  <data name="Platform_MinifilterLoaded" xml:space="preserve"><value>Minifilter noyau chargé</value></data>
+  <data name="Platform_MinifilterNotLoaded" xml:space="preserve"><value>Minifilter présent mais non chargé (test signing / admin)</value></data>
+  <data name="Platform_MinifilterAbsent" xml:space="preserve"><value>Minifilter noyau absent (stub — PE non interceptés)</value></data>
   <data name="Opt_BackupBeforeQuarantine" xml:space="preserve"><value>Copie de sécurité avant quarantaine</value></data>
   <data name="Opt_BackupBeforeQuarantineSub" xml:space="preserve"><value>Conserve une copie locale (32 Mo max.) dans %LocalAppData%\optiSCAN\SafetyBackups.</value></data>
   <data name="Opt_AggressiveSignatures" xml:space="preserve"><value>Mises à jour signatures renforcées</value></data>

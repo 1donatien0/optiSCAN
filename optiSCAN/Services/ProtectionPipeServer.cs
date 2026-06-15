@@ -80,20 +80,10 @@ public sealed class ProtectionPipeServer : IDisposable
 
     private async Task HandleClientAsync(NamedPipeServerStream pipe, CancellationToken ct)
     {
-        using var ms = new MemoryStream();
-        var buf = new byte[8192];
-        while (true)
-        {
-            var read = await pipe.ReadAsync(buf, ct).ConfigureAwait(false);
-            if (read <= 0)
-                break;
-            ms.Write(buf, 0, read);
-        }
-
         ProtectionPipeResponse response;
         try
         {
-            var text = Encoding.UTF8.GetString(ms.ToArray());
+            var text = await ProtectionPipeJsonFraming.ReadJsonPayloadAsync(pipe, ct).ConfigureAwait(false);
             var request = JsonSerializer.Deserialize<ProtectionPipeRequest>(text, JsonOptions)
                 ?? throw new InvalidOperationException("Requête IPC vide");
             response = await DispatchAsync(request, ct).ConfigureAwait(false);
@@ -106,7 +96,6 @@ public sealed class ProtectionPipeServer : IDisposable
         var outBytes = Encoding.UTF8.GetBytes(JsonSerializer.Serialize(response, JsonOptions));
         await pipe.WriteAsync(outBytes, ct).ConfigureAwait(false);
         await pipe.FlushAsync(ct).ConfigureAwait(false);
-        pipe.WaitForPipeDrain();
     }
 
     private async Task<ProtectionPipeResponse> DispatchAsync(ProtectionPipeRequest request, CancellationToken ct)

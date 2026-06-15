@@ -97,7 +97,7 @@ optiSCAN.Service.exe  →  optiSCAN.exe --service-host
 ├── README.md                          ← Ce fichier (guide complet)
 ├── docs/
 │   └── README.md                      ← Index doc (renvoie vers ce README)
-├── .github/workflows/ci.yml           ← Build, tests (208), publish (main)
+├── .github/workflows/ci.yml           ← Build, tests (220), publish (main)
 ├── scripts/
 │   ├── fetch-runtime-deps.ps1         ← Télécharge ClamAV + YARA (CI / dev)
 │   ├── prepare-release-v8.ps1         ← Chaîne complète release v8
@@ -631,7 +631,7 @@ Sortie publish : `optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x6
 
 ### Ordre recommandé (équipe)
 
-1. Gel fonctionnel : `.\scripts\validate-release-readiness.ps1` (ou `dotnet test` Release — **208** tests).
+1. Gel fonctionnel : `.\scripts\validate-release-readiness.ps1` (ou `dotnet test` Release — **220** tests).
 2. Dépendances : `.\scripts\fetch-runtime-deps.ps1` (+ `-RunFreshclam` pour l’installateur).
 3. Publish local : `.\scripts\prepare-release-v8.ps1` (ou étapes manuelles ci-dessous).
 4. VM propre : installer `optiSCAN_Setup_v8.0.0.exe` ; scan, RTP, clamd, posture, FR/EN.
@@ -682,7 +682,7 @@ optiSCAN_Setup_v8.0.0.exe
 
 ### Checklist binaire (bloquant)
 
-- [ ] `dotnet test` Release — **208** tests OK
+- [ ] `dotnet test` Release — **220** tests OK
 - [ ] `.\scripts\verify-runtime-deps.ps1` — vert sur dossier publish
 - [ ] `clamscan.exe`, `freshclam.exe`, **`clamd.exe`**, `yara64.exe`, règles `.yar`
 - [ ] `clamav\database\` — au moins un `main.cvd` / `daily.cvd` (via freshclam)
@@ -701,7 +701,7 @@ Pipeline : [`.github/workflows/ci.yml`](.github/workflows/ci.yml).
 
 **Freshclam en CI** : génère un `freshclam.conf` minimal dans `clamav\x64\` (non versionné dans Git, comme en production via `FreshclamUpdater`). **Erreur connue (corrigée)** : `Can't open/parse freshclam.conf` si freshclam est lancé sans `--config-file`.
 
-**Repères de couverture tests (release, 208 au total — voir checklist)** :
+**Repères de couverture tests (release, 220 au total — voir checklist)** :
 
 | Module | Fichier de tests |
 |--------|------------------|
@@ -783,7 +783,7 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 - **Thème Windows** — `SyncWindowsTheme` par défaut ; case Options (thème opposé à Windows) ; `ThemeManager.Initialize()` dans `MainWindow` avant `InitializeComponent`
 - **clamd** — `CompositeClamAvBackend`, TCP `127.0.0.1:3310`, repli `clamscan.exe`
 - **Posture /100**, **VirusTotal**, **mode jeu** — voir [§13](#13-sécurité-posture-et-menaces) et Options
-- **Tests** — **208** tests Release — [§12](#12-audit-et-qualité) ; i18n **621** clés FR/EN
+- **Tests** — **220** tests Release — [§12](#12-audit-et-qualité) ; i18n **621** clés FR/EN
 
 ### v7.0 — Lifting UI Donaby + identité visuelle
 
@@ -879,7 +879,7 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 | Architecture | 8/10 | `CompositeClamAvBackend`, posture injectable ; recommandations accueil extraites |
 | Sécurité locale | 8/10 | Quarantaine AES-GCM ; historique `.dat` DPAPI ; `optiSCAN.log` diagnostic (chemins redacted, pas de secret critique) |
 | UI / Donaby | 8/10 | Accueil posture ; VT optionnel |
-| Tests & CI | 9/10 | **208** tests (posture, accueil, historique/timeline, USB, `SecureStore`) ; coverage Cobertura |
+| Tests & CI | 9/10 | **220** tests (posture, accueil, historique/timeline, USB, `SecureStore`) ; coverage Cobertura |
 | Release Inno | 7/10 | Pipeline CI OK |
 
 **Dettes ouvertes (résumé)** : tests intégration clamd/schtasks réels ; signature Authenticode optionnelle. Voir §12.1 pour le reste (maintenabilité, choix volontaires).
