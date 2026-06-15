@@ -101,6 +101,15 @@ jobs:
           -p:PublishSingleFile=false
           --output publish/win-x64
 
+      - name: Publish protection service (win-x64)
+        run: >
+          dotnet publish optiSCAN.Service/optiSCAN.Service.csproj
+          --configuration Release
+          --runtime win-x64
+          --self-contained true
+          -p:PublishSingleFile=false
+          --output publish/win-x64
+
       - name: Stage runtime deps into publish folder
         shell: pwsh
         run: pwsh -File scripts/stage-runtime-deps.ps1 -PublishDir publish/win-x64

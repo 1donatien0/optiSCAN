@@ -21,14 +21,6 @@ namespace optiSCAN.Services
         private bool _disposed;
         private int _suspendCount;
 
-        // Dossiers système à surveiller (pas C:\Users en entier — trop d'événements avec sous-dossiers).
-        private static readonly string[] DefaultWatchFolders = new[]
-        {
-            @"C:\ProgramData",
-            @"C:\Windows\Temp",
-            @"C:\Windows\Downloaded Program Files"
-        };
-
         // Délai d'attente après création/modification (éviter les scans sur écriture partielle)
         private static readonly TimeSpan StabilizationDelay = TimeSpan.FromMilliseconds(500);
 
@@ -46,6 +38,9 @@ namespace optiSCAN.Services
         }
 
         private bool IsSuspended => Volatile.Read(ref _suspendCount) > 0;
+
+        /// <summary>Vrai pendant un scan manuel ou USB (surveillance processus en pause).</summary>
+        public bool IsPaused => IsSuspended;
 
         public RealTimeProtection(ScanOrchestrator orchestrator, QuarantineManager quarantineManager, NotificationService notifications)
         {
@@ -65,16 +60,8 @@ namespace optiSCAN.Services
         {
             if (_isEnabled) return;
 
-            foreach (var folder in DefaultWatchFolders)
-            {
-                if (Directory.Exists(folder))
-                    AddWatcher(folder);
-            }
-
-            // Ajouter le dossier Desktop et Downloads de l'utilisateur
-            var userProfile = Environment.GetFolderPath(Environment.SpecialFolder.UserProfile);
-            AddWatcher(Path.Combine(userProfile, "Desktop"));
-            AddWatcher(Path.Combine(userProfile, "Downloads"));
+            foreach (var folder in RealTimeWatchPaths.GetWatchFolders())
+                AddWatcher(folder);
 
             // Cleanup périodique du cache : toutes les 5 min, on supprime les
             // entrées de plus de 5 min. Indépendant de l'arrivée d'événements,
@@ -114,6 +101,9 @@ namespace optiSCAN.Services
 
         private void AddWatcher(string path)
         {
+            if (ExclusionSettings.Current.IsFolderExcluded(path))
+                return;
+
             try
             {
                 var watcher = new FileSystemWatcher(path)
@@ -284,6 +274,9 @@ namespace optiSCAN.Services
 
                         if (ExclusionSettings.Current.AutoQuarantineEnabled)
                         {
+                            if (UserPreferences.Current.BackupBeforeQuarantine)
+                                ThreatRemediationService.TryCreateSafetyCopy(threat);
+
                             // Quarantaine automatique activée par l'utilisateur
                             if (_quarantineManager.Quarantine(threat))
                             {

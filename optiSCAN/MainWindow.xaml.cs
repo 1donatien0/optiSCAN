@@ -42,6 +42,7 @@ namespace optiSCAN
         private readonly HistoryExportService _historyExport = new();
         private FreshclamUpdater? _freshclamUpdater;
         private YaraForgeUpdater? _rulesUpdater;
+        private SignatureStatusService? _signatureStatus;
 
         private readonly Services.NavigationService _navigationService = new();
         private Services.NavigationRefreshCoordinator? _navRefreshCoordinator;
@@ -54,11 +55,6 @@ namespace optiSCAN
         private bool _lastStatusIsError;
         private bool _lastStatusIsWarning;
         private string? _lastStatusIconKind;
-
-        // ── Cache TTL signatures (évite de relire le disque à chaque navigation) ──
-        private DateTime _lastSigRefreshAt = DateTime.MinValue;
-        private static readonly TimeSpan SigCacheTtl = TimeSpan.FromSeconds(30);
-        private (string ClamVer, string ClamWhen, string YaraVer, string YaraWhen)? _sigCache;
 
         // Après InitializeComponent / RegisterPanels, le constructeur assigne
         // ServiceContainer.Default.Navigation : les vues naviguent sans référencer MainWindow.
@@ -93,6 +89,7 @@ namespace optiSCAN
                 _antivirusOrchestrator = c.Orchestrator;
                 _freshclamUpdater = c.FreshclamUpdater;
                 _rulesUpdater = c.RulesUpdater;
+                _signatureStatus = c.SignatureStatus;
 
                 _freshclamUpdater.UpdateOutput += SurSortieFreshclam;
                 _rulesUpdater.UpdateOutput += SurSortieMisesAJourRegles;
@@ -101,14 +98,14 @@ namespace optiSCAN
                 _freshclamUpdater.UpdateCompleted += (_, _) =>
                     Dispatcher.InvokeAsync(async () =>
                     {
-                        InvalidateSigCache();
+                        _signatureStatus?.InvalidateCache();
                         await RefreshSignaturesDisplayAsync(forceRefresh: true);
                         RefreshLiveFooter();
                     });
                 _rulesUpdater.UpdateCompleted += (_, _) =>
                     Dispatcher.InvokeAsync(async () =>
                     {
-                        InvalidateSigCache();
+                        _signatureStatus?.InvalidateCache();
                         await RefreshSignaturesDisplayAsync(forceRefresh: true);
                         RefreshLiveFooter();
                     });
@@ -135,6 +132,7 @@ namespace optiSCAN
                 c.ReviewHistorySessionRequested += SurDemandeRevueSessionHistorique;
                 c.OpenQuarantineTabRequested += SurDemandeOngletQuarantaine;
                 c.RealTimeProtection.ThreatDetected += SurMenaceTempsReelDetectee;
+                c.ProcessStartMonitor.ThreatDetected += SurMenaceTempsReelDetectee;
                 c.RemovableDriveScan.ThreatDetected += SurMenaceTempsReelDetectee;
                 c.RemovableDriveScan.ScanStatusChanged += SurStatutAnalyseUsb;
                 c.Notifications.ToastActivated -= SurActivationToast;
@@ -150,6 +148,7 @@ namespace optiSCAN
 
                 // IPC : une seconde instance envoie un message Windows pour réafficher cette fenêtre (IpcManager).
                 IpcManager.HookShowMessage(this, ShowWindow);
+                IpcManager.HookShellScanRequest(this, SurDemandeScanExplorateur);
 
                 ThemeManager.ThemeChanged += SurChangementTheme;
                 UpdateThemeToggleTooltip(ThemeManager.IsDarkTheme);
@@ -182,6 +181,27 @@ namespace optiSCAN
         private void ShowWindowFromTray()
         {
             ShowWindow();
+        }
+
+        private void SurDemandeScanExplorateur()
+        {
+            Dispatcher.BeginInvoke(async () =>
+            {
+                var path = ShellScanRequest.TryConsume();
+                if (!string.IsNullOrWhiteSpace(path))
+                    await RunShellScanAsync(path);
+                ShowWindow();
+            }, DispatcherPriority.Normal);
+        }
+
+        private async Task RunShellScanAsync(string path)
+        {
+            if (ViewModel == null || !ShellScanArguments.IsValidScanTarget(path))
+                return;
+
+            _navigationService.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
+            ShowWindow();
+            await ViewModel.RequestContextMenuScanAsync(path);
         }
 
         private void ExitFromTray()
@@ -238,8 +258,23 @@ namespace optiSCAN
                 _navigationService.NavigateTo(OptiscanStrings.PanelIds.Overview);
 
                 SetStatus(OptiscanStrings.UiMessages.ProtectionActive);
-                OnboardingService.ShowIfNeeded(this);
+                if (!App.GuardSession)
+                    OnboardingService.ShowIfNeeded(this);
                 _ = WarmUpYaraRulesAsync();
+
+                if (App.GuardSession)
+                {
+                    ShowInTaskbar = false;
+                    WindowState = WindowState.Minimized;
+                    Hide();
+                    SetStatus(LocalizationService.GetString("Main_GuardSession"));
+                }
+                else if (!string.IsNullOrWhiteSpace(App.PendingShellScanPath))
+                {
+                    var shellPath = App.PendingShellScanPath;
+                    App.PendingShellScanPath = null;
+                    await RunShellScanAsync(shellPath);
+                }
             }
             catch (Exception ex)
             {
@@ -392,6 +427,7 @@ namespace optiSCAN
             c.OpenQuarantineTabRequested -= SurDemandeOngletQuarantaine;
             c.FocusAntivirusSignaturesRequested -= SurDemandeFocusSignaturesAntivirus;
             c.RealTimeProtection.ThreatDetected -= SurMenaceTempsReelDetectee;
+            c.ProcessStartMonitor.ThreatDetected -= SurMenaceTempsReelDetectee;
             c.RemovableDriveScan.ThreatDetected -= SurMenaceTempsReelDetectee;
             c.RemovableDriveScan.ScanStatusChanged -= SurStatutAnalyseUsb;
             c.Notifications.ToastActivated -= SurActivationToast;
@@ -675,7 +711,8 @@ namespace optiSCAN
 
             var lastScan = sessions.Count > 0 ? sessions[0].StartedAt : (DateTime?)null;
             bool rtpOn = ExclusionSettings.Current.RealTimeEnabled;
-            bool rtpRun = ServiceContainer.Default.RealTimeProtection.IsEnabled;
+            bool rtpRun = ServiceContainer.Default.RealTimeProtection.IsEnabled
+                || PlatformProtectionBootstrap.IsRemoteProtectionActive();
 
             var posture = ServiceContainer.Default.SecurityPosture.Evaluate(new SecurityPostureContext
             {
@@ -688,6 +725,7 @@ namespace optiSCAN
                 SignatureAutoUpdateEnabled = UserPreferences.Current.SignatureAutoUpdateEnabled,
             });
             overview.UpdateSecurityPosture(posture);
+            overview.UpdatePlatformProtectionStatus(PlatformProtectionStatusService.Evaluate());
         }
 
         public async Task RefreshAntivirusDataAsync()
@@ -698,54 +736,27 @@ namespace optiSCAN
             await RefreshSignaturesDisplayAsync();
         }
 
-        /// <summary>
-        /// Invalide le cache TTL des signatures (à appeler après une MAJ effective).
-        /// </summary>
-        private void InvalidateSigCache()
-        {
-            _lastSigRefreshAt = DateTime.MinValue;
-            _sigCache = null;
-        }
-
         /// <summary>Rafraîchit les versions de signatures (onglet Antivirus + ViewModel).</summary>
         private async Task RefreshSignaturesDisplayAsync(bool forceRefresh = false)
         {
-            // Cache TTL : on relit le disque seulement si le cache est expiré ou forcé.
-            string clamVer, clamWhen, yaraVer, yaraWhen;
-            if (!forceRefresh && _sigCache.HasValue && (DateTime.UtcNow - _lastSigRefreshAt) < SigCacheTtl)
-            {
-                (clamVer, clamWhen, yaraVer, yaraWhen) = _sigCache.Value;
-            }
-            else
-            {
-                clamVer  = _freshclamUpdater != null
-                    ? await _freshclamUpdater.GetLocalDatabaseVersionAsync().ConfigureAwait(true)
-                    : "—";
-                clamWhen = _freshclamUpdater?.GetLastSignatureChangeDisplay()  ?? "—";
-                yaraVer  = _rulesUpdater?.GetRulesPackVersionDisplay()         ?? "—";
-                yaraWhen = _rulesUpdater?.GetRulesLastUpdateDisplay()          ?? "—";
-                _sigCache = (clamVer, clamWhen, yaraVer, yaraWhen);
-                _lastSigRefreshAt = DateTime.UtcNow;
-            }
+            if (_signatureStatus == null)
+                return;
 
-            (panelAntivirus as Views.AntivirusView)?.UpdateSignaturesPanel(yaraVer, yaraWhen, clamVer, clamWhen);
-            (panelOverview as Views.OverviewControl)?.UpdateSignaturesSummary(yaraVer, yaraWhen, clamVer, clamWhen);
+            var snapshot = await _signatureStatus.GetSnapshotAsync(forceRefresh).ConfigureAwait(true);
+
+            (panelAntivirus as Views.AntivirusView)?.UpdateSignaturesPanel(
+                snapshot.YaraPackVersion,
+                snapshot.YaraLastUpdateDisplay,
+                snapshot.ClamDatabaseVersion,
+                snapshot.ClamLastUpdateDisplay);
+            (panelOverview as Views.OverviewControl)?.UpdateSignaturesSummary(
+                snapshot.YaraPackVersion,
+                snapshot.YaraLastUpdateDisplay,
+                snapshot.ClamDatabaseVersion,
+                snapshot.ClamLastUpdateDisplay);
 
             if (ViewModel != null)
-            {
-                ViewModel.DbVersion = clamVer;
-                ViewModel.RulesPackVersion = yaraVer;
-                ViewModel.LastUpdateDisplay = clamWhen == "—" ? LocalizationService.GetString("Vm_Never") : clamWhen;
-                ViewModel.RulesLastUpdateDisplay = yaraWhen == "—" ? LocalizationService.GetString("Vm_Never") : yaraWhen;
-                // Synchronise YaraRulesCount et YaraStatus : omis auparavant, ce qui
-                // laissait le VM avec des valeurs obsolètes après une MAJ manuelle.
-                var rulesCount = _yaraEngine?.RulesCount ?? 0;
-                ViewModel.YaraRulesCount = rulesCount;
-                ViewModel.YaraStatus = (_yaraEngine?.IsAvailable ?? false)
-                    ? LocalizationService.Format("Vm_YaraOperational", rulesCount)
-                    : LocalizationService.GetString("Vm_YaraUnavailable");
-                ViewModel.RefreshProtectionStatus();
-            }
+                snapshot.ApplyToScanViewModel(ViewModel);
 
             RefreshOverviewProtectionAndRecommendations();
         }
@@ -1050,7 +1061,7 @@ namespace optiSCAN
                     _rulesUpdater,
                     line => antivirusView?.AppendSignatureLog(line)).ConfigureAwait(true);
 
-                InvalidateSigCache();
+                _signatureStatus?.InvalidateCache();
                 await RefreshSignaturesDisplayAsync(forceRefresh: true);
             }
             catch (Exception ex)

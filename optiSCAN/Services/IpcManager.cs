@@ -17,7 +17,13 @@ namespace optiSCAN.Services
             NativeMethods.RegisterWindowMessage(
                 $"WM_SHOWME_OPTISCAN_{Process.GetCurrentProcess().SessionId}"));
 
+        private static readonly Lazy<int> WmShellScanLazy = new(() =>
+            NativeMethods.RegisterWindowMessage(
+                $"WM_SHELLSCAN_OPTISCAN_{Process.GetCurrentProcess().SessionId}"));
+
         public static int WM_SHOWME => WmShowMeLazy.Value;
+
+        public static int WM_SHELL_SCAN => WmShellScanLazy.Value;
 
         /// <summary>
         /// Envoie le message « remonte la fenêtre » aux fenêtres top-level de la session courante.
@@ -27,11 +33,24 @@ namespace optiSCAN.Services
             NativeMethods.PostMessage((IntPtr)HWND_BROADCAST, WM_SHOWME, IntPtr.Zero, IntPtr.Zero);
         }
 
+        /// <summary>Demande à l'instance principale de lancer un scan menu contextuel.</summary>
+        public static void NotifyShellScanRequest()
+        {
+            NativeMethods.PostMessage((IntPtr)HWND_BROADCAST, WM_SHELL_SCAN, IntPtr.Zero, IntPtr.Zero);
+        }
+
         /// <summary>
         /// Branche un hook WndProc sur la fenêtre passée pour détecter le
         /// message WM_SHOWME et exécuter <paramref name="onShow"/>.
         /// </summary>
-        public static void HookShowMessage(Window window, Action onShow)
+        public static void HookShowMessage(Window window, Action onShow) =>
+            HookMessage(window, WM_SHOWME, onShow);
+
+        /// <summary>Écoute les demandes de scan depuis une seconde instance (Explorateur).</summary>
+        public static void HookShellScanRequest(Window window, Action onShellScan) =>
+            HookMessage(window, WM_SHELL_SCAN, onShellScan);
+
+        private static void HookMessage(Window window, int messageId, Action handler)
         {
             window.SourceInitialized += (_, _) =>
             {
@@ -39,9 +58,9 @@ namespace optiSCAN.Services
                 {
                     src.AddHook((IntPtr h, int m, IntPtr w, IntPtr l, ref bool handled) =>
                     {
-                        if (m == WM_SHOWME)
+                        if (m == messageId)
                         {
-                            try { onShow(); } catch (Exception ex) { AppLogger.Warn("IpcManager", "onShow", ex); }
+                            try { handler(); } catch (Exception ex) { AppLogger.Warn("IpcManager", "HookMessage", ex); }
                             handled = true;
                         }
                         return IntPtr.Zero;

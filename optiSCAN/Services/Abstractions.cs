@@ -111,4 +111,10 @@ namespace optiSCAN.Services
         DateTime? GetNextRunTime();
         bool RunNow();
     }
+
+    /// <summary>Réputation cloud (VirusTotal) pour enrichissement des menaces.</summary>
+    public interface IThreatReputationService
+    {
+        Task<ThreatReputationService.ReputationResult> LookupFileAsync(string filePath, CancellationToken ct = default);
+    }
 }

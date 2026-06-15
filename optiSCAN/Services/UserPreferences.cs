@@ -105,6 +105,21 @@ namespace optiSCAN.Services
         /// <summary>Clé API VirusTotal (optionnelle, stockée chiffrée via SecureStore).</summary>
         public string VirusTotalApiKey { get; set; } = string.Empty;
 
+        /// <summary>Surveille les lancements de processus (WMI) en complément de la RTP fichier.</summary>
+        public bool ProcessMonitorEnabled { get; set; } = true;
+
+        /// <summary>Copie de sécurité locale avant quarantaine automatique.</summary>
+        public bool BackupBeforeQuarantine { get; set; }
+
+        /// <summary>Tâche planifiée de relance si la protection est coupée (watchdog).</summary>
+        public bool TamperProtectionEnabled { get; set; } = true;
+
+        /// <summary>MAJ signatures plus fréquentes (2 h ClamAV, 12 h YARA).</summary>
+        public bool AggressiveSignatureUpdates { get; set; }
+
+        /// <summary>Utiliser le service Windows / --service-host pour la protection système.</summary>
+        public bool UsePlatformProtectionService { get; set; } = true;
+
         /// <summary>
         /// Seuil (jours) au-delà duquel une suggestion de nettoyage est affichée sur l'accueil.
         /// Valeur par défaut : <see cref="RecommendationThresholds.CleanSuggestThresholdDays"/>.

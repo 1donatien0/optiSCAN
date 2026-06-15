@@ -1,3 +1,4 @@
+using optiSCAN.Localization;
 using optiSCAN.Services;
 
 namespace optiSCAN.Tests;
@@ -20,6 +21,7 @@ public sealed class ProtectionStatusEvaluatorTests
     [Fact]
     public void GetBadgeText_returns_french_labels()
     {
+        LocalizationService.ApplyCulture("fr-FR");
         Assert.Equal("Actif", ProtectionStatusEvaluator.GetBadgeText(ProtectionBadgeLevel.Active));
         Assert.Equal("Dégradé", ProtectionStatusEvaluator.GetBadgeText(ProtectionBadgeLevel.Degraded));
         Assert.Equal("Inactif", ProtectionStatusEvaluator.GetBadgeText(ProtectionBadgeLevel.Inactive));
