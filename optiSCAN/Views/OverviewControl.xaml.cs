@@ -154,6 +154,51 @@ namespace optiSCAN.Views
             });
         }
 
+        public void UpdatePlatformProtectionStatus(PlatformProtectionStatusReport report)
+        {
+            Dispatcher.InvokeAsync(() =>
+            {
+                if (platformStatusPanel == null)
+                    return;
+
+                platformStatusPanel.Children.Clear();
+                foreach (var item in report.Components)
+                {
+                    var brush = item.State switch
+                    {
+                        PlatformComponentState.Active => (Brush)FindResource("SuccessGreen"),
+                        PlatformComponentState.Warning => (Brush)FindResource("AlertGold"),
+                        PlatformComponentState.Inactive => (Brush)FindResource("TextMuted"),
+                        _ => (Brush)FindResource("TextDark"),
+                    };
+
+                    var row = new StackPanel
+                    {
+                        Orientation = System.Windows.Controls.Orientation.Horizontal,
+                        Margin = new Thickness(0, 0, 0, 4),
+                    };
+                    row.Children.Add(new TextBlock
+                    {
+                        Text = "●",
+                        Foreground = brush,
+                        FontSize = (double)FindResource("FontSize.Micro"),
+                        Margin = new Thickness(0, 0, 6, 0),
+                        VerticalAlignment = VerticalAlignment.Center,
+                    });
+                    row.Children.Add(new TextBlock
+                    {
+                        Text = LocalizationService.GetString(item.LabelKey),
+                        TextWrapping = TextWrapping.Wrap,
+                        FontSize = (double)FindResource("FontSize.Micro"),
+                        LineHeight = 14,
+                        Foreground = (Brush)FindResource("TextDark"),
+                        VerticalAlignment = VerticalAlignment.Center,
+                    });
+                    platformStatusPanel.Children.Add(row);
+                }
+            });
+        }
+
         private void PostureFix_Click(object sender, RoutedEventArgs e)
         {
             if (sender is not Hyperlink link || link.Tag is not string uri)
