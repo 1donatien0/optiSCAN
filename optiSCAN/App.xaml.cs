@@ -19,6 +19,9 @@ namespace optiSCAN
         /// <summary>Session garde : RTP active, fenêtre masquée (systray).</summary>
         public static bool GuardSession { get; private set; }
 
+        /// <summary>Chemin en attente depuis le menu contextuel Explorateur (<c>--scan</c>).</summary>
+        public static string? PendingShellScanPath { get; internal set; }
+
         /// <summary>
         /// Appelé au démarrage de l'application. Gère dans l'ordre :
         /// le mode headless (scan sans UI), puis le contrôle d'instance unique,
@@ -27,6 +30,17 @@ namespace optiSCAN
         protected override async void OnStartup(StartupEventArgs e)
         {
             LocalizationService.Initialize();
+
+            if (ShellScanArguments.TryGetScanPath(e.Args, out var shellPath)
+                && ElevationHelper.NeedsElevation(shellPath)
+                && !ElevationHelper.IsRunningElevated())
+            {
+                if (ElevationHelper.RelaunchElevated(ShellScanArguments.Scan, shellPath))
+                {
+                    Shutdown();
+                    return;
+                }
+            }
 
             // ── Mode headless ────────────────────────────────────────────────
             // Détecté en premier pour éviter d'afficher la fenêtre principale.
@@ -85,6 +99,13 @@ namespace optiSCAN
 
             if (!createdNew)
             {
+                if (ShellScanArguments.TryGetScanPath(e.Args, out var existingScanPath)
+                    && ShellScanArguments.IsValidScanTarget(existingScanPath))
+                {
+                    ShellScanRequest.Publish(existingScanPath);
+                    Services.IpcManager.NotifyShellScanRequest();
+                }
+
                 // Une autre instance tourne : on lui demande de remonter sa fenêtre
                 // via le message broadcast géré par IpcManager.
                 Services.IpcManager.NotifyShowExistingInstance();
@@ -92,6 +113,12 @@ namespace optiSCAN
                 _instanceMutex = null;
                 Shutdown();
                 return;
+            }
+
+            if (ShellScanArguments.TryGetScanPath(e.Args, out var pendingShellPath)
+                && ShellScanArguments.IsValidScanTarget(pendingShellPath))
+            {
+                PendingShellScanPath = pendingShellPath;
             }
 
             GuardSession = headlessMode == HeadlessScanArguments.Mode.Guard

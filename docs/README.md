@@ -10,7 +10,7 @@
 | Accueil stats / recommandations | [§4.11](../README.md#411-vue-densemble-dashboard) |
 | Scan USB/SD | [§5](../README.md#5-services-avancés-modules-complémentaires) · `RemovableDriveScanService` |
 | Thème Windows | [§2.2](../README.md#22-thememanager) |
-| Audit, tests (220) | [§12](../README.md#12-audit-et-qualité) |
+| Audit, tests (229) | [§12](../README.md#12-audit-et-qualité) |
 | Posture /100 | [§13](../README.md#13-sécurité-posture-et-menaces) |
 | Branches `main` / `dev` | [Branches Git](../README.md#branches-git) |
 

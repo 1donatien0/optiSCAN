@@ -631,6 +631,7 @@
   <data name="Av_PickFolder" xml:space="preserve"><value>Sélectionnez le dossier à analyser</value></data>
   <data name="Av_PickFile" xml:space="preserve"><value>Sélectionnez un fichier à analyser</value></data>
   <data name="Shell_ScanWith" xml:space="preserve"><value>Scanner avec optiSCAN</value></data>
+  <data name="ShellScan_InvalidPath" xml:space="preserve"><value>Élément introuvable ou inaccessible : {0}</value></data>
   <data name="Opt_SchedLoading" xml:space="preserve"><value>Chargement de la tâche planifiée…</value></data>
   <data name="Opt_SchedUacHint" xml:space="preserve"><value>Le scan planifié s'exécute sans interface (--fullscan). Sans droits administrateur, certains dossiers système ne sont pas analysés. Utilisez « Exécuter en tant qu'administrateur » sur l'accueil pour une couverture maximale.</value></data>
   <data name="Opt_HighContrast" xml:space="preserve"><value>Contraste renforcé</value></data>

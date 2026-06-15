@@ -148,6 +148,7 @@ namespace optiSCAN
 
                 // IPC : une seconde instance envoie un message Windows pour réafficher cette fenêtre (IpcManager).
                 IpcManager.HookShowMessage(this, ShowWindow);
+                IpcManager.HookShellScanRequest(this, SurDemandeScanExplorateur);
 
                 ThemeManager.ThemeChanged += SurChangementTheme;
                 UpdateThemeToggleTooltip(ThemeManager.IsDarkTheme);
@@ -180,6 +181,27 @@ namespace optiSCAN
         private void ShowWindowFromTray()
         {
             ShowWindow();
+        }
+
+        private void SurDemandeScanExplorateur()
+        {
+            Dispatcher.BeginInvoke(async () =>
+            {
+                var path = ShellScanRequest.TryConsume();
+                if (!string.IsNullOrWhiteSpace(path))
+                    await RunShellScanAsync(path);
+                ShowWindow();
+            }, DispatcherPriority.Normal);
+        }
+
+        private async Task RunShellScanAsync(string path)
+        {
+            if (ViewModel == null || !ShellScanArguments.IsValidScanTarget(path))
+                return;
+
+            _navigationService.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
+            ShowWindow();
+            await ViewModel.RequestContextMenuScanAsync(path);
         }
 
         private void ExitFromTray()
@@ -246,6 +268,12 @@ namespace optiSCAN
                     WindowState = WindowState.Minimized;
                     Hide();
                     SetStatus(LocalizationService.GetString("Main_GuardSession"));
+                }
+                else if (!string.IsNullOrWhiteSpace(App.PendingShellScanPath))
+                {
+                    var shellPath = App.PendingShellScanPath;
+                    App.PendingShellScanPath = null;
+                    await RunShellScanAsync(shellPath);
                 }
             }
             catch (Exception ex)

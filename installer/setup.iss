@@ -238,8 +238,12 @@ begin
     RegDeleteKeyIncludingSubkeys(HKCU, 'Software\optiSCAN');
     RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\*\shell\Scanner avec optiSCAN');
     RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\*\shell\Scan with optiSCAN');
+    RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\Directory\shell\Scanner avec optiSCAN');
+    RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\Directory\shell\Scan with optiSCAN');
     RegDeleteKeyIncludingSubkeys(HKCR, '*\shell\Scanner avec optiSCAN');
     RegDeleteKeyIncludingSubkeys(HKCR, '*\shell\Scan with optiSCAN');
+    RegDeleteKeyIncludingSubkeys(HKCR, 'Directory\shell\Scanner avec optiSCAN');
+    RegDeleteKeyIncludingSubkeys(HKCR, 'Directory\shell\Scan with optiSCAN');
 
     Exec('fltmc.exe', 'unload optiSCANMinifilter', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Exec('sc.exe', 'stop optiSCANProtectionV8', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
@@ -313,12 +317,20 @@ begin
 
   RegDeleteKeyIncludingSubkeys(HKCR, '*\shell\Scanner avec optiSCAN');
   RegDeleteKeyIncludingSubkeys(HKCR, '*\shell\Scan with optiSCAN');
+  RegDeleteKeyIncludingSubkeys(HKCR, 'Directory\shell\Scanner avec optiSCAN');
+  RegDeleteKeyIncludingSubkeys(HKCR, 'Directory\shell\Scan with optiSCAN');
   RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\*\shell\Scanner avec optiSCAN');
   RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\*\shell\Scan with optiSCAN');
+  RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\Directory\shell\Scanner avec optiSCAN');
+  RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\Directory\shell\Scan with optiSCAN');
 
   RegWriteStringValue(HKCU, 'Software\Classes\*\shell\' + MenuName, '', MenuName);
   RegWriteStringValue(HKCU, 'Software\Classes\*\shell\' + MenuName, 'Icon', ExePath + ',0');
   RegWriteStringValue(HKCU, 'Software\Classes\*\shell\' + MenuName + '\command', '', Cmd);
+
+  RegWriteStringValue(HKCU, 'Software\Classes\Directory\shell\' + MenuName, '', MenuName);
+  RegWriteStringValue(HKCU, 'Software\Classes\Directory\shell\' + MenuName, 'Icon', ExePath + ',0');
+  RegWriteStringValue(HKCU, 'Software\Classes\Directory\shell\' + MenuName + '\command', '', Cmd);
 end;
 
 procedure CurStepChanged(CurStep: TSetupStep);

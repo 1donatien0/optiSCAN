@@ -631,6 +631,7 @@
   <data name="Av_PickFolder" xml:space="preserve"><value>Select the folder to scan</value></data>
   <data name="Av_PickFile" xml:space="preserve"><value>Select the file to scan</value></data>
   <data name="Shell_ScanWith" xml:space="preserve"><value>Scan with optiSCAN</value></data>
+  <data name="ShellScan_InvalidPath" xml:space="preserve"><value>Item not found or inaccessible: {0}</value></data>
   <data name="Opt_SchedLoading" xml:space="preserve"><value>Loading scheduled task…</value></data>
   <data name="Opt_SchedUacHint" xml:space="preserve"><value>The scheduled scan runs headless (--fullscan). Without administrator rights, some system folders are skipped. Use Run as administrator on Home for full coverage.</value></data>
   <data name="Opt_HighContrast" xml:space="preserve"><value>High contrast</value></data>
