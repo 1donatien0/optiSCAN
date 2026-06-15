@@ -16,6 +16,12 @@ namespace optiSCAN
         private static Mutex? _instanceMutex;
         private const string MutexName = "Global\\optiSCAN_UniqueInstance";
 
+        /// <summary>Session garde : RTP active, fenêtre masquée (systray).</summary>
+        public static bool GuardSession { get; private set; }
+
+        /// <summary>Chemin en attente depuis le menu contextuel Explorateur (<c>--scan</c>).</summary>
+        public static string? PendingShellScanPath { get; internal set; }
+
         /// <summary>
         /// Appelé au démarrage de l'application. Gère dans l'ordre :
         /// le mode headless (scan sans UI), puis le contrôle d'instance unique,
@@ -25,12 +31,48 @@ namespace optiSCAN
         {
             LocalizationService.Initialize();
 
+            if (ShellScanArguments.TryGetScanPath(e.Args, out var shellPath)
+                && ElevationHelper.NeedsElevation(shellPath)
+                && !ElevationHelper.IsRunningElevated())
+            {
+                if (ElevationHelper.RelaunchElevated(ShellScanArguments.Scan, shellPath))
+                {
+                    Shutdown();
+                    return;
+                }
+            }
+
             // ── Mode headless ────────────────────────────────────────────────
             // Détecté en premier pour éviter d'afficher la fenêtre principale.
             // ScheduledScanService crée la tâche schtasks avec --fullscan --quiet ;
             // sans ce parsing, l'app se lançait simplement avec son UI.
             var headlessMode = HeadlessScanArguments.ParseMode(e.Args);
-            if (headlessMode != HeadlessScanArguments.Mode.None)
+            if (headlessMode == HeadlessScanArguments.Mode.Watchdog)
+            {
+                ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                base.OnStartup(e);
+                TamperProtectionService.RunWatchdogCheck();
+                Shutdown();
+                return;
+            }
+
+            if (headlessMode == HeadlessScanArguments.Mode.ServiceHost)
+            {
+                bool createdService;
+                _instanceMutex = new Mutex(true, "Global\\optiSCAN_ServiceHost", out createdService);
+                if (!createdService)
+                {
+                    Shutdown();
+                    return;
+                }
+
+                ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                await RunServiceHostAsync();
+                Shutdown();
+                return;
+            }
+
+            if (headlessMode is HeadlessScanArguments.Mode.FullScan or HeadlessScanArguments.Mode.QuickScan)
             {
                 bool createdHeadless;
                 _instanceMutex = new Mutex(true, MutexName, out createdHeadless);
@@ -57,6 +99,13 @@ namespace optiSCAN
 
             if (!createdNew)
             {
+                if (ShellScanArguments.TryGetScanPath(e.Args, out var existingScanPath)
+                    && ShellScanArguments.IsValidScanTarget(existingScanPath))
+                {
+                    ShellScanRequest.Publish(existingScanPath);
+                    Services.IpcManager.NotifyShellScanRequest();
+                }
+
                 // Une autre instance tourne : on lui demande de remonter sa fenêtre
                 // via le message broadcast géré par IpcManager.
                 Services.IpcManager.NotifyShowExistingInstance();
@@ -65,6 +114,15 @@ namespace optiSCAN
                 Shutdown();
                 return;
             }
+
+            if (ShellScanArguments.TryGetScanPath(e.Args, out var pendingShellPath)
+                && ShellScanArguments.IsValidScanTarget(pendingShellPath))
+            {
+                PendingShellScanPath = pendingShellPath;
+            }
+
+            GuardSession = headlessMode == HeadlessScanArguments.Mode.Guard
+                || headlessMode == HeadlessScanArguments.Mode.ServiceHost;
 
             base.OnStartup(e);
             // Thème : ThemeManager.Initialize() dans MainWindow (avant InitializeComponent).
@@ -137,6 +195,31 @@ namespace optiSCAN
                 // En mode headless, pas d'UI pour afficher l'erreur — log only.
                 try { new ScanLogManager().WriteToLog($"[Headless] FATAL: {ex}"); }
                 catch { /* dernier recours */ }
+            }
+        }
+
+        private static async Task RunServiceHostAsync()
+        {
+            try
+            {
+                using var host = new ProtectionServiceHost();
+                host.Start();
+                new ScanLogManager().WriteToLog("[ServiceHost] Protection système active (IPC + RTP + processus)");
+
+                var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                AppDomain.CurrentDomain.ProcessExit += (_, _) => tcs.TrySetResult();
+                Console.CancelKeyPress += (_, e) =>
+                {
+                    e.Cancel = true;
+                    tcs.TrySetResult();
+                };
+                await tcs.Task.ConfigureAwait(false);
+                await host.StopAsync().ConfigureAwait(false);
+            }
+            catch (Exception ex)
+            {
+                try { new ScanLogManager().WriteToLog($"[ServiceHost] FATAL: {ex}"); }
+                catch { /* ignore */ }
             }
         }
 

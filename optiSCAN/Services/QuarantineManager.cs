@@ -145,6 +145,9 @@ namespace optiSCAN.Services
         {
             try
             {
+                if (UserPreferences.Current.BackupBeforeQuarantine)
+                    ThreatRemediationService.TryCreateSafetyCopy(threat);
+
                 var id = Guid.NewGuid().ToString("N");
                 var qPath = Path.Combine(_quarantineDir, id + ".quar");
 

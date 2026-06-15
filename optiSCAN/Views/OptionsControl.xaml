@@ -197,6 +197,63 @@
                             </StackPanel>
                         </StackPanel>
 
+                        <!-- Surveillance processus -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                            <CheckBox x:Name="chkProcessMonitor"
+                                      IsChecked="True"
+                                      VerticalAlignment="Top"
+                                      Margin="0,2,16,0"
+                                      Checked="CheckOption_Changed"
+                                      Unchecked="CheckOption_Changed"
+                                      Tag="ProcessMonitor"/>
+                            <StackPanel>
+                                <TextBlock Text="{loc:Loc Key=Opt_ProcessMonitor}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextDark}"/>
+                                <TextBlock Text="{loc:Loc Key=Opt_ProcessMonitorSub}"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                           Margin="0,3,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Anti-manipulation -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                            <CheckBox x:Name="chkTamperProtection"
+                                      IsChecked="True"
+                                      VerticalAlignment="Top"
+                                      Margin="0,2,16,0"
+                                      Checked="CheckOption_Changed"
+                                      Unchecked="CheckOption_Changed"
+                                      Tag="TamperProtection"/>
+                            <StackPanel>
+                                <TextBlock Text="{loc:Loc Key=Opt_TamperProtection}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextDark}"/>
+                                <TextBlock Text="{loc:Loc Key=Opt_TamperProtectionSub}"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                           Margin="0,3,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <!-- Service Windows / protection système v8 -->
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                            <CheckBox x:Name="chkPlatformProtection"
+                                      IsChecked="True"
+                                      VerticalAlignment="Top"
+                                      Margin="0,2,16,0"
+                                      Checked="CheckOption_Changed"
+                                      Unchecked="CheckOption_Changed"
+                                      Tag="PlatformProtection"/>
+                            <StackPanel>
+                                <TextBlock Text="{loc:Loc Key=Opt_PlatformProtection}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextDark}"/>
+                                <TextBlock Text="{loc:Loc Key=Opt_PlatformProtectionSub}"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                           Margin="0,3,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+
                         <!-- Scan lecteurs amovibles -->
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                             <CheckBox x:Name="chkRemovableDriveScan"
@@ -251,7 +308,7 @@
                         </StackPanel>
 
                         <!-- Quarantaine automatique -->
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                             <CheckBox x:Name="chkAutoQuarantine"
                                       IsChecked="False"
                                       VerticalAlignment="Top"
@@ -264,6 +321,23 @@
                                            FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
                                            Foreground="{DynamicResource TextDark}"/>
                                 <TextBlock Text="{loc:Loc Key=Opt_AutoQuarSub}"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                           Margin="0,3,0,0" TextWrapping="Wrap"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Margin="32,0,0,20">
+                            <CheckBox x:Name="chkBackupBeforeQuarantine"
+                                      VerticalAlignment="Top"
+                                      Margin="0,2,16,0"
+                                      Checked="CheckOption_Changed"
+                                      Unchecked="CheckOption_Changed"
+                                      Tag="BackupBeforeQuarantine"/>
+                            <StackPanel>
+                                <TextBlock Text="{loc:Loc Key=Opt_BackupBeforeQuarantine}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextDark}"/>
+                                <TextBlock Text="{loc:Loc Key=Opt_BackupBeforeQuarantineSub}"
                                            FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
                                            Margin="0,3,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
@@ -321,7 +395,7 @@
                         </StackPanel>
 
                         <!-- Mise à jour auto -->
-                        <StackPanel Orientation="Horizontal">
+                        <StackPanel Orientation="Horizontal" Margin="0,0,0,12">
                             <CheckBox x:Name="chkAutoUpdate"
                                       IsChecked="True"
                                       VerticalAlignment="Top"
@@ -336,6 +410,23 @@
                                 <TextBlock Text="{loc:Loc Key=Opt_AutoSigSub}"
                                            FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
                                            Margin="0,3,0,0"/>
+                            </StackPanel>
+                        </StackPanel>
+
+                        <StackPanel Orientation="Horizontal" Margin="32,0,0,0">
+                            <CheckBox x:Name="chkAggressiveSignatures"
+                                      VerticalAlignment="Top"
+                                      Margin="0,2,16,0"
+                                      Checked="CheckOption_Changed"
+                                      Unchecked="CheckOption_Changed"
+                                      Tag="AggressiveSignatures"/>
+                            <StackPanel>
+                                <TextBlock Text="{loc:Loc Key=Opt_AggressiveSignatures}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextDark}"/>
+                                <TextBlock Text="{loc:Loc Key=Opt_AggressiveSignaturesSub}"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                           Margin="0,3,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
                         </StackPanel>
 

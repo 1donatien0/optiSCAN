@@ -361,6 +361,16 @@
                             </StackPanel>
                         </Border>
 
+                        <Border Background="{DynamicResource SurfaceBg}"
+                                CornerRadius="8" Padding="10,8" Margin="0,0,0,8">
+                            <StackPanel>
+                                <TextBlock Text="{loc:Loc Key=Platform_StatusTitle}"
+                                           FontSize="{DynamicResource FontSize.Caption}" FontWeight="Bold"
+                                           Foreground="{DynamicResource TextMuted}"/>
+                                <StackPanel x:Name="platformStatusPanel" Margin="0,6,0,0"/>
+                            </StackPanel>
+                        </Border>
+
                         <Border x:Name="brRecHygiene" Background="{DynamicResource AlertBg}"
                                 CornerRadius="8" Padding="10,8">
                             <Grid>

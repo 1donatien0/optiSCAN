@@ -30,7 +30,7 @@ namespace optiSCAN.ViewModels
 
             _activeScanSessionId = Guid.NewGuid();
 
-            if (type is ScanType.QuickScan or ScanType.FullScan)
+            if (type is ScanType.QuickScan or ScanType.FullScan or ScanType.File or ScanType.Folder)
             {
                 ServiceContainer.Default.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
                 DisplayScanProgressRequested?.Invoke(this, EventArgs.Empty);
@@ -321,6 +321,19 @@ namespace optiSCAN.ViewModels
                         : LocalizationService.GetString("Vm_SigEngineUnavailable");
                 RefreshProtectionStatus();
             });
+        }
+
+        /// <summary>Scan déclenché depuis le menu contextuel Explorateur (fichier ou dossier).</summary>
+        public async Task RequestContextMenuScanAsync(string path)
+        {
+            if (!ShellScanArguments.IsValidScanTarget(path))
+            {
+                StatusMessage = LocalizationService.Format("ShellScan_InvalidPath", path);
+                return;
+            }
+
+            var type = ShellScanArguments.ResolveScanType(path);
+            await StartScanAsync(type, path).ConfigureAwait(true);
         }
     }
 }
