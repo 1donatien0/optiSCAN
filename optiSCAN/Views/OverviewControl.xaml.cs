@@ -230,7 +230,7 @@ namespace optiSCAN.Views
                 AppLogger.Warn("OverviewControl", $"PostureFix — tous les replis ont échoué ({uri})", lastEx);
         }
 
-        private static bool TryNavigatePosturePanel(string uri)
+        private bool TryNavigatePosturePanel(string uri)
         {
             const string prefix = "optiscan://panel/";
             if (!uri.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
@@ -257,7 +257,7 @@ namespace optiSCAN.Views
                 panelId = OptiscanStrings.PanelIds.Overview;
             }
 
-            ServiceContainer.Views.Navigation?.NavigateTo(panelId);
+            (_services ?? ServiceContainer.Views).Navigation?.NavigateTo(panelId);
             return true;
         }
 

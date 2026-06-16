@@ -792,13 +792,10 @@ namespace optiSCAN.Views
 
 
         private void BtnManageInAv_Click(object sender, RoutedEventArgs e) =>
-
             OpenAntivirusQuarantineTab();
 
-
-
-        private static void OpenAntivirusQuarantineTab() =>
-            ServiceContainer.UiEvents.RequestOpenQuarantineTab();
+        private void OpenAntivirusQuarantineTab() =>
+            _uiEvents.RequestOpenQuarantineTab();
 
 
 

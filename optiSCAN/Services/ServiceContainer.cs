@@ -6,6 +6,9 @@ namespace optiSCAN.Services
     /// <summary>
     /// Regroupe les services à longue durée de vie (singleton <see cref="Default"/>).
     /// Construction via <see cref="Microsoft.Extensions.DependencyInjection"/> (v8).
+    /// Points d'entrée légitimes pour <see cref="Default"/> / <see cref="UiEvents"/> / <see cref="Views"/> :
+    /// <see cref="App"/> (bootstrap), <see cref="ProtectionServiceHost"/>,
+    /// <see cref="ViewModels.ScanViewModel"/> sans paramètre, et repli avant <c>Bind</c> des vues.
     /// </summary>
     [SupportedOSPlatform("windows")]
     public sealed class ServiceContainer : IViewServices

@@ -62,6 +62,8 @@ namespace optiSCAN
         private bool _lastStatusIsWarning;
         private string? _lastStatusIconKind;
 
+        private IUiEventBus UiBus => _container ?? ServiceContainer.Default;
+
         // Après InitializeComponent / RegisterPanels, le constructeur assigne
         // IViewServices.Navigation : les vues naviguent sans référencer MainWindow.
 
@@ -139,7 +141,7 @@ namespace optiSCAN
                     historyPanel.Bind(c);
                 BindViewPanels(c);
 
-                var ui = ServiceContainer.UiEvents;
+                var ui = UiBus;
                 // Écoute les demandes de mise à jour émises par les vues
                 // (ex. carte "Update" d'OverviewControl).
                 ui.RequestSignatureUpdate += SurDemandeMiseAJourSignatures;
@@ -317,7 +319,7 @@ namespace optiSCAN
             if (panelHistory != null) _navigationService.RegisterPanel(OptiscanStrings.PanelIds.History, panelHistory);
             if (panelOptions != null) _navigationService.RegisterPanel(OptiscanStrings.PanelIds.Options, panelOptions);
 
-            var ui = ServiceContainer.UiEvents;
+            var ui = UiBus;
             ui.FocusAntivirusSignaturesRequested -= SurDemandeFocusSignaturesAntivirus;
             ui.FocusAntivirusSignaturesRequested += SurDemandeFocusSignaturesAntivirus;
 
@@ -423,7 +425,7 @@ namespace optiSCAN
         private void UnhookServiceContainerEvents()
         {
             var c = _container!;
-            var ui = ServiceContainer.UiEvents;
+            var ui = UiBus;
             ui.RequestSignatureUpdate -= SurDemandeMiseAJourSignatures;
             ui.ScanHistoryViewsRefreshRequested -= SurDemandeRafraichissementHistorique;
             ui.ExportScanHistoryHtmlRequested -= SurDemandeExportHistoriqueHtml;
