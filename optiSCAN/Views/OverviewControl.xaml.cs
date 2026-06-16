@@ -56,7 +56,8 @@ namespace optiSCAN.Views
                 if (txtProtectionStatsBody == null) return;
 
                 var now = DateTime.Now;
-                int totalLifetime = UserPreferences.Current.TotalScansCount;
+                int totalLifetime = (_services?.UserPreferencesAccessor ?? new DefaultUserPreferencesAccessor())
+                    .Current.TotalScansCount;
                 var cult = CultureInfo.CurrentCulture;
 
                 txtProtectionStatsBody.Text = OverviewProtectionStatsFormatter.Format(

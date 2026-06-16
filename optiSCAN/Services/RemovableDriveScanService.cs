@@ -310,7 +310,8 @@ namespace optiSCAN.Services
                     root,
                     RemovableDriveDiscovery.QuickScanMaxFiles,
                     ct,
-                    RiskyFileEnumTimeout),
+                    RiskyFileEnumTimeout,
+                    _exclusions),
                 ct).ConfigureAwait(false);
 
             AppLogger.Info("RemovableDriveScan",
@@ -543,7 +544,8 @@ namespace optiSCAN.Services
             string root,
             int maxFiles,
             CancellationToken ct,
-            TimeSpan? enumerationTimeout = null)
+            TimeSpan? enumerationTimeout = null,
+            IExclusionSettingsAccessor? exclusions = null)
         {
             var list = new List<string>(Math.Min(maxFiles, 256));
             if (!Directory.Exists(root) || maxFiles <= 0)
@@ -552,7 +554,7 @@ namespace optiSCAN.Services
             var deadline = enumerationTimeout.HasValue
                 ? DateTime.UtcNow + enumerationTimeout.Value
                 : DateTime.MaxValue;
-            var excl = ExclusionSettings.Current;
+            var excl = (exclusions ?? new DefaultExclusionSettingsAccessor()).Current;
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var ext in RiskyFileExtensions.All)

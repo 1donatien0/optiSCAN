@@ -1,5 +1,6 @@
 using System.Runtime.Versioning;
 using Microsoft.Extensions.DependencyInjection;
+using optiSCAN.Localization;
 
 namespace optiSCAN.Services
 {
@@ -88,6 +89,10 @@ namespace optiSCAN.Services
 
         public Models.ThreatInfo? FindKnownThreat(string filePath) =>
             string.IsNullOrEmpty(filePath) ? null : ThreatLookup?.Invoke(filePath);
+
+        public IUserPreferencesAccessor UserPreferencesAccessor => _userPreferences;
+
+        public IExclusionSettingsAccessor ExclusionSettingsAccessor => _exclusionSettings;
 
         /// <summary>
         /// Émis par une vue qui veut déclencher une mise à jour manuelle des
@@ -355,6 +360,7 @@ namespace optiSCAN.Services
 
             DistractionFreeMonitor.Initialize(_userPreferences);
             PlatformProtectionBootstrap.Initialize(_userPreferences);
+            LocalizationService.ConfigurePreferencesAccessor(_userPreferences);
 
             ClamAv = _services.GetRequiredService<ClamAvEngine>();
             ClamAvBackend = _services.GetRequiredService<CompositeClamAvBackend>();

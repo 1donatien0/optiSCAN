@@ -22,5 +22,9 @@ public interface IViewServices : IUiEventBus
 
     NotificationService Notifications { get; }
 
+    IUserPreferencesAccessor UserPreferencesAccessor { get; }
+
+    IExclusionSettingsAccessor ExclusionSettingsAccessor { get; }
+
     ThreatInfo? FindKnownThreat(string filePath);
 }

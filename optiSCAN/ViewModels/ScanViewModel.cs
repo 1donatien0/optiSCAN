@@ -32,6 +32,8 @@ namespace optiSCAN.ViewModels
         private readonly INavigationService? _navigation;
         private readonly RealTimeProtection _realTimeProtection;
         private readonly NotificationService _notifications;
+        private readonly IUserPreferencesAccessor _prefs;
+        private readonly IExclusionSettingsAccessor _exclusions;
 
         private CancellationTokenSource? _cts;
         private long _scanEpoch;
@@ -343,6 +345,8 @@ namespace optiSCAN.ViewModels
             _navigation = container.Navigation;
             _realTimeProtection = container.RealTimeProtection;
             _notifications = container.Notifications;
+            _prefs = container.UserPreferencesAccessor;
+            _exclusions = container.ExclusionSettingsAccessor;
             _dbVersion = VersionDisplayHelper.UnknownLabel;
 
             _updater.UpdateOutput += SurAjoutSortieMiseAJour;
@@ -462,7 +466,7 @@ namespace optiSCAN.ViewModels
                 IsClamAvAvailable,
                 _yara.IsAvailable,
                 YaraRulesCount,
-                ExclusionSettings.Current.RealTimeEnabled,
+                _exclusions.Current.RealTimeEnabled,
                 _realTimeProtection.IsEnabled);
         }
 

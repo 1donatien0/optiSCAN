@@ -38,7 +38,8 @@ namespace optiSCAN
         private ShellScanCoordinator? _shellScanCoordinator;
 
         private readonly ServiceContainer _container = ServiceContainer.Default;
-        private readonly ExportCoordinator _exportCoordinator = new();
+        private readonly ExportCoordinator _exportCoordinator = new(
+            new HistoryExportService(ServiceContainer.Default.UserPreferencesAccessor));
         private readonly OverviewRefreshCoordinator _overviewRefresh = new();
         private readonly MainWindowServiceEventCoordinator _serviceEvents = new();
         private SidebarSyncCoordinator? _sidebarSync;
@@ -554,10 +555,10 @@ namespace optiSCAN
                 CleanHistory: cleanHist,
                 ScanHistory: sessions,
                 LastFreshclamUpdate: _container.FreshclamUpdater.GetLastSignatureUpdateTime(),
-                RealTimeProtectionEnabled: ExclusionSettings.Current.RealTimeEnabled,
+                RealTimeProtectionEnabled: _container.ExclusionSettingsAccessor.Current.RealTimeEnabled,
                 RealTimeProtectionRunning: _container.RealTimeProtection.IsEnabled
                     || PlatformProtectionBootstrap.IsRemoteProtectionActive(),
-                SignatureAutoUpdateEnabled: UserPreferences.Current.SignatureAutoUpdateEnabled,
+                SignatureAutoUpdateEnabled: _container.UserPreferencesAccessor.Current.SignatureAutoUpdateEnabled,
                 SecurityPosture: _container.SecurityPosture);
         }
 

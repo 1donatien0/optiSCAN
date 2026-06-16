@@ -64,7 +64,7 @@ namespace optiSCAN.ViewModels
 
                 LastResult = result;
                 _logger.SaveScanResult(result);
-                var prefs = UserPreferences.Current;
+                var prefs = _prefs.Current;
                 prefs.FavoriteScanType = type;
                 if (type is ScanType.File or ScanType.Folder && !string.IsNullOrWhiteSpace(path))
                     prefs.AddRecentTarget(path, type);
@@ -85,7 +85,7 @@ namespace optiSCAN.ViewModels
                 });
 
                 int autoQuarantined = 0;
-                if (ExclusionSettings.Current.AutoQuarantineEnabled && result.Threats.Count > 0)
+                if (_exclusions.Current.AutoQuarantineEnabled && result.Threats.Count > 0)
                 {
                     autoQuarantined = _quarantine.QuarantineAll(result.Threats, result.SessionId);
                     WpfApp.Current?.Dispatcher.Invoke(LoadQuarantine);
@@ -98,7 +98,7 @@ namespace optiSCAN.ViewModels
                 FilesScanned = result.FilesScanned;
                 ThreatsFound = result.Threats.Count;
 
-                if (UserPreferences.Current.ActionNotificationsEnabled)
+                if (_prefs.Current.ActionNotificationsEnabled)
                 {
                     _notifications.ShowScanCompleted(
                         result.Threats.Count,

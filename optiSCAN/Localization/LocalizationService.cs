@@ -21,6 +21,8 @@ namespace optiSCAN.Localization
             "optiSCAN.Resources.UiStrings",
             Assembly.GetExecutingAssembly());
 
+        private static IUserPreferencesAccessor _prefs = new DefaultUserPreferencesAccessor();
+
         public static CultureInfo CurrentCulture { get; private set; } = CultureInfo.GetCultureInfo("fr-FR");
 
         public static bool IsEnglish =>
@@ -32,6 +34,12 @@ namespace optiSCAN.Localization
             ApplyCulture(cultureName);
             PersistCultureIfNeeded(cultureName);
             ShellContextMenuSupport.ApplyForCurrentCulture();
+        }
+
+        /// <summary>Branche l'accesseur DI (appelé depuis <see cref="ServiceContainer"/>).</summary>
+        public static void ConfigurePreferencesAccessor(IUserPreferencesAccessor preferences)
+        {
+            _prefs = preferences;
         }
 
         public static string GetString(string key)
@@ -63,7 +71,7 @@ namespace optiSCAN.Localization
             var normalized = NormalizeCultureName(cultureName);
             try
             {
-                var prefs = UserPreferences.Current;
+                var prefs = _prefs.Current;
                 prefs.UiCulture = normalized;
                 prefs.Save();
             }
@@ -114,7 +122,7 @@ namespace optiSCAN.Localization
         {
             try
             {
-                var prefs = UserPreferences.Current;
+                var prefs = _prefs.Current;
                 if (!string.IsNullOrWhiteSpace(prefs.UiCulture))
                     return prefs.UiCulture;
             }
@@ -134,7 +142,7 @@ namespace optiSCAN.Localization
         {
             try
             {
-                var prefs = UserPreferences.Current;
+                var prefs = _prefs.Current;
                 if (string.IsNullOrWhiteSpace(prefs.UiCulture))
                 {
                     prefs.UiCulture = NormalizeCultureName(cultureName);

@@ -146,7 +146,7 @@ namespace optiSCAN
                 logger.WriteToLog($"[Headless] Démarrage — mode {mode}, quiet={quiet}");
 
                 DistractionFreeMonitor.Start();
-                if (UserPreferences.Current.GameModeAutoEnabled
+                if (container.UserPreferencesAccessor.Current.GameModeAutoEnabled
                     && DistractionFreeMonitor.ShouldSuppressNotifications())
                 {
                     logger.WriteToLog("[Headless] Scan reporté — mode jeu / plein écran actif.");
@@ -170,7 +170,7 @@ namespace optiSCAN
 
                 // Quarantaine automatique en mode headless si l'utilisateur l'a
                 // configurée — sinon les menaces sont simplement journalisées.
-                if (ExclusionSettings.Current.AutoQuarantineEnabled)
+                if (container.ExclusionSettingsAccessor.Current.AutoQuarantineEnabled)
                 {
                     int q = quarantine.QuarantineAll(result.Threats, result.SessionId);
                     logger.WriteToLog($"[Headless] Quarantaine automatique : {q} fichier(s)");

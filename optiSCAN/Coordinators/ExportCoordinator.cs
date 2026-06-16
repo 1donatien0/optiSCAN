@@ -6,7 +6,12 @@ namespace optiSCAN.Coordinators;
 /// <summary>Export HTML/PDF déclenché depuis le bus UI (<see cref="IUiEventBus"/>).</summary>
 public sealed class ExportCoordinator
 {
-    private readonly HistoryExportService _export = new();
+    private readonly HistoryExportService _export;
+
+    public ExportCoordinator(HistoryExportService? export = null)
+    {
+        _export = export ?? new HistoryExportService();
+    }
 
     public void TryExportHtml(ExportContext ctx)
     {
