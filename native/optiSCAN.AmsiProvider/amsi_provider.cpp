@@ -1,9 +1,48 @@
 #include <windows.h>
 #include <amsi.h>
 #include <objbase.h>
+#include <wincrypt.h>
 #include <string>
 #include <vector>
 #include "pipe_client.h"
+
+#pragma comment(lib, "crypt32.lib")
+
+namespace
+{
+    std::string EncodeBase64(const BYTE* data, DWORD size)
+    {
+        if (size == 0)
+            return {};
+
+        DWORD encodedLen = 0;
+        if (!CryptBinaryToStringA(
+                data,
+                size,
+                CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF,
+                nullptr,
+                &encodedLen))
+        {
+            return {};
+        }
+
+        std::string encoded(encodedLen, '\0');
+        if (!CryptBinaryToStringA(
+                data,
+                size,
+                CRYPT_STRING_BASE64 | CRYPT_STRING_NOCRLF,
+                encoded.data(),
+                &encodedLen))
+        {
+            return {};
+        }
+
+        while (!encoded.empty() && encoded.back() == '\0')
+            encoded.pop_back();
+
+        return encoded;
+    }
+}
 
 // GUID : {A8F4E2B1-9C3D-4E5F-8A7B-1C2D3E4F5A6B}
 static const CLSID CLSID_OptiscanAmsiProvider =
@@ -53,20 +92,9 @@ public:
         if (FAILED(stream->Read(data.data(), static_cast<ULONG>(data.size()), &read)) || read == 0)
             return S_OK;
 
-        // Encodage base64 minimal (stub — production : utiliser CryptBinaryToString)
-        static const char* b64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-        std::string b64data;
-        b64data.reserve((read + 2) / 3 * 4);
-        for (ULONG i = 0; i < read; i += 3)
-        {
-            const unsigned a = data[i];
-            const unsigned b = (i + 1 < read) ? data[i + 1] : 0;
-            const unsigned c = (i + 2 < read) ? data[i + 2] : 0;
-            b64data.push_back(b64[(a >> 2) & 0x3F]);
-            b64data.push_back(b64[((a & 0x3) << 4) | ((b >> 4) & 0xF)]);
-            b64data.push_back((i + 1 < read) ? b64[((b & 0xF) << 2) | ((c >> 6) & 0x3)] : '=');
-            b64data.push_back((i + 2 < read) ? b64[c & 0x3F] : '=');
-        }
+        const std::string b64data = EncodeBase64(data.data(), read);
+        if (b64data.empty())
+            return S_OK;
 
         const std::string request = std::string(R"({"op":"scan_buffer","buffer_b64":")") + b64data + R"(","content_name":"amsi_buffer"})";
         std::string response;

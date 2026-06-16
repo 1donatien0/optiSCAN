@@ -1,21 +1,35 @@
 using System.Runtime.Versioning;
 using Microsoft.Extensions.DependencyInjection;
+using optiSCAN.Localization;
 
 namespace optiSCAN.Services
 {
     /// <summary>
     /// Regroupe les services à longue durée de vie (singleton <see cref="Default"/>).
     /// Construction via <see cref="Microsoft.Extensions.DependencyInjection"/> (v8).
+    /// Points d'entrée légitimes pour <see cref="Default"/> : <see cref="App"/> (bootstrap),
+    /// <see cref="ProtectionServiceHost"/>, et <see cref="ViewModels.ScanViewModel"/> sans paramètre (designer).
+    /// Les vues reçoivent <see cref="IViewServices"/> / <see cref="IOptionsServices"/> via <c>Bind()</c>.
+    /// Le bus UI est implémenté par <see cref="UiEventBus"/> (singleton DI partagé).
     /// </summary>
     [SupportedOSPlatform("windows")]
-    public sealed class ServiceContainer
+    public sealed class ServiceContainer : IViewServices, IHistoryServices, IOptionsServices, IProtectionServiceHostDependencies
     {
         private static readonly Lazy<ServiceContainer> _default =
             new(() => new ServiceContainer(), LazyThreadSafetyMode.ExecutionAndPublication);
 
         public static ServiceContainer Default => _default.Value;
 
+        /// <summary>Bus UI (événements inter-panneaux) — même instance que <see cref="Default"/>.</summary>
+        public static IUiEventBus UiEvents => Default._uiEventBus;
+
+        /// <summary>Façade vues (bus + services) — même instance que <see cref="Default"/>.</summary>
+        public static IViewServices Views => Default;
+
         private readonly IServiceProvider _services;
+        private readonly UiEventBus _uiEventBus;
+        private readonly IUserPreferencesAccessor _userPreferences;
+        private readonly IExclusionSettingsAccessor _exclusionSettings;
         private bool _shutdownDone;
 
         // ── Services singleton ───────────────────────────────────────────────────
@@ -76,29 +90,36 @@ namespace optiSCAN.Services
         public Models.ThreatInfo? FindKnownThreat(string filePath) =>
             string.IsNullOrEmpty(filePath) ? null : ThreatLookup?.Invoke(filePath);
 
+        public IUserPreferencesAccessor UserPreferencesAccessor => _userPreferences;
+
+        public IExclusionSettingsAccessor ExclusionSettingsAccessor => _exclusionSettings;
+
         /// <summary>
         /// Émis par une vue qui veut déclencher une mise à jour manuelle des
         /// signatures (ex. carte « Mise à jour » de l’accueil). Écouté par MainWindow.
         /// Évite que les vues appellent directement BtnManualUpdateSignatures_Click.
         /// </summary>
-        public event EventHandler? RequestSignatureUpdate;
+        public event EventHandler? RequestSignatureUpdate
+        {
+            add => _uiEventBus.RequestSignatureUpdate += value;
+            remove => _uiEventBus.RequestSignatureUpdate -= value;
+        }
 
-        public void TriggerSignatureUpdate() =>
-            RequestSignatureUpdate?.Invoke(this, EventArgs.Empty);
+        public void TriggerSignatureUpdate() => _uiEventBus.TriggerSignatureUpdate();
 
         /// <summary>Active ou arrête la protection temps réel et persiste dans <see cref="ExclusionSettings"/>.</summary>
         public void ApplyRealtimeProtection(bool enabled)
         {
-            ExclusionSettings.Current.RealTimeEnabled = enabled;
-            ExclusionSettings.Current.Save();
+            _exclusionSettings.Current.RealTimeEnabled = enabled;
+            _exclusionSettings.Current.Save();
 
-            if (UserPreferences.Current.UsePlatformProtectionService
+            if (_userPreferences.Current.UsePlatformProtectionService
                 && PlatformProtectionBootstrap.IsRemoteProtectionActive())
             {
                 if (enabled)
                 {
                     PlatformProtectionBootstrap.EnsurePlatformProtectionRunning();
-                    if (UserPreferences.Current.TamperProtectionEnabled)
+                    if (_userPreferences.Current.TamperProtectionEnabled)
                         TamperProtection.EnsureWatchdogTask();
                 }
                 RequestProtectionStateRefresh();
@@ -108,9 +129,9 @@ namespace optiSCAN.Services
             if (enabled)
             {
                 RealTimeProtection.Start();
-                if (UserPreferences.Current.ProcessMonitorEnabled)
+                if (_userPreferences.Current.ProcessMonitorEnabled)
                     ProcessStartMonitor.Start();
-                if (UserPreferences.Current.TamperProtectionEnabled)
+                if (_userPreferences.Current.TamperProtectionEnabled)
                     TamperProtection.EnsureWatchdogTask();
             }
             else
@@ -125,8 +146,8 @@ namespace optiSCAN.Services
         /// <summary>Active le service Windows de protection système (v8).</summary>
         public void ApplyPlatformProtectionService(bool enabled)
         {
-            UserPreferences.Current.UsePlatformProtectionService = enabled;
-            UserPreferences.Current.Save();
+            _userPreferences.Current.UsePlatformProtectionService = enabled;
+            _userPreferences.Current.Save();
 
             if (enabled)
             {
@@ -141,10 +162,10 @@ namespace optiSCAN.Services
             else
             {
                 PlatformProtectionBootstrap.TryStopWindowsService();
-                if (ExclusionSettings.Current.RealTimeEnabled)
+                if (_exclusionSettings.Current.RealTimeEnabled)
                 {
                     RealTimeProtection.Start();
-                    if (UserPreferences.Current.ProcessMonitorEnabled)
+                    if (_userPreferences.Current.ProcessMonitorEnabled)
                         ProcessStartMonitor.Start();
                 }
             }
@@ -155,8 +176,8 @@ namespace optiSCAN.Services
         /// <summary>Active ou arrête la surveillance des lecteurs amovibles.</summary>
         public void ApplyRemovableDriveScan(bool enabled)
         {
-            UserPreferences.Current.RemovableDriveScanEnabled = enabled;
-            UserPreferences.Current.Save();
+            _userPreferences.Current.RemovableDriveScanEnabled = enabled;
+            _userPreferences.Current.Save();
             if (enabled) RemovableDriveScan.Start();
             else RemovableDriveScan.Stop();
             RequestProtectionStateRefresh();
@@ -165,25 +186,25 @@ namespace optiSCAN.Services
         /// <summary>Persiste la quarantaine automatique (RTP + mode headless).</summary>
         public void ApplyAutoQuarantine(bool enabled)
         {
-            ExclusionSettings.Current.AutoQuarantineEnabled = enabled;
-            ExclusionSettings.Current.Save();
+            _exclusionSettings.Current.AutoQuarantineEnabled = enabled;
+            _exclusionSettings.Current.Save();
         }
 
         /// <summary>Active ou coupe les timers freshclam / règles YARA.</summary>
         public void ApplySignatureAutoUpdate(bool enabled)
         {
-            SignatureUpdatePolicy.ApplyAutoUpdateTimers(FreshclamUpdater, RulesUpdater, enabled);
-            UserPreferences.Current.SignatureAutoUpdateEnabled = enabled;
-            UserPreferences.Current.Save();
+            SignatureUpdatePolicy.ApplyAutoUpdateTimers(FreshclamUpdater, RulesUpdater, enabled, _userPreferences);
+            _userPreferences.Current.SignatureAutoUpdateEnabled = enabled;
+            _userPreferences.Current.Save();
             RequestProtectionStateRefresh();
         }
 
         /// <summary>Active ou arrête la surveillance des créations de processus.</summary>
         public void ApplyProcessMonitor(bool enabled)
         {
-            UserPreferences.Current.ProcessMonitorEnabled = enabled;
-            UserPreferences.Current.Save();
-            if (enabled && ExclusionSettings.Current.RealTimeEnabled)
+            _userPreferences.Current.ProcessMonitorEnabled = enabled;
+            _userPreferences.Current.Save();
+            if (enabled && _exclusionSettings.Current.RealTimeEnabled)
                 ProcessStartMonitor.Start();
             else
                 ProcessStartMonitor.Stop();
@@ -193,38 +214,34 @@ namespace optiSCAN.Services
         /// <summary>Enregistre ou supprime la tâche watchdog anti-manipulation.</summary>
         public void ApplyTamperProtection(bool enabled)
         {
-            UserPreferences.Current.TamperProtectionEnabled = enabled;
-            UserPreferences.Current.Save();
+            _userPreferences.Current.TamperProtectionEnabled = enabled;
+            _userPreferences.Current.Save();
             if (enabled)
                 TamperProtection.EnsureWatchdogTask();
             else
                 TamperProtection.DeleteWatchdogTask();
         }
 
-        private EventHandler? _protectionStateRefreshHandlers;
-
-        /// <summary>Demande aux vues bindées de recalculer le badge de protection.</summary>
         public event EventHandler? ProtectionStateRefreshRequested
         {
-            add => _protectionStateRefreshHandlers += value;
-            remove => _protectionStateRefreshHandlers -= value;
+            add => _uiEventBus.ProtectionStateRefreshRequested += value;
+            remove => _uiEventBus.ProtectionStateRefreshRequested -= value;
         }
 
-        public void RequestProtectionStateRefresh() =>
-            _protectionStateRefreshHandlers?.Invoke(this, EventArgs.Empty);
+        public void RequestProtectionStateRefresh() => _uiEventBus.RequestProtectionStateRefresh();
 
         /// <summary>Restaure RTP et MAJ auto selon les préférences persistées (appel au démarrage UI).</summary>
         public void ApplyPreferencesOnStartup()
         {
-            ApplySignatureAutoUpdate(UserPreferences.Current.SignatureAutoUpdateEnabled);
-            SignatureUpdatePolicy.ScheduleStartupRefreshIfStale(this);
+            ApplySignatureAutoUpdate(_userPreferences.Current.SignatureAutoUpdateEnabled);
+            SignatureUpdatePolicy.ScheduleStartupRefreshIfStale(this, _userPreferences);
 
-            if (UserPreferences.Current.UsePlatformProtectionService)
+            if (_userPreferences.Current.UsePlatformProtectionService)
             {
                 PlatformProtectionBootstrap.EnsurePlatformProtectionRunning();
                 if (PlatformProtectionBootstrap.IsRemoteProtectionActive())
                 {
-                    if (UserPreferences.Current.TamperProtectionEnabled)
+                    if (_userPreferences.Current.TamperProtectionEnabled)
                         TamperProtection.EnsureWatchdogTask();
                     ApplyRemovableDriveAndEnginePrefs();
                     return;
@@ -233,10 +250,10 @@ namespace optiSCAN.Services
                 AppLogger.Warn("ServiceContainer", "Service plateforme injoignable — repli RTP locale");
             }
 
-            if (ExclusionSettings.Current.RealTimeEnabled)
+            if (_exclusionSettings.Current.RealTimeEnabled)
             {
                 RealTimeProtection.Start();
-                if (UserPreferences.Current.ProcessMonitorEnabled)
+                if (_userPreferences.Current.ProcessMonitorEnabled)
                     ProcessStartMonitor.Start();
             }
             else
@@ -245,7 +262,7 @@ namespace optiSCAN.Services
                 ProcessStartMonitor.Stop();
             }
 
-            if (UserPreferences.Current.TamperProtectionEnabled)
+            if (_userPreferences.Current.TamperProtectionEnabled)
                 TamperProtection.EnsureWatchdogTask();
             else
                 TamperProtection.DeleteWatchdogTask();
@@ -255,12 +272,12 @@ namespace optiSCAN.Services
 
         private void ApplyRemovableDriveAndEnginePrefs()
         {
-            if (UserPreferences.Current.GameModeAutoEnabled)
+            if (_userPreferences.Current.GameModeAutoEnabled)
                 DistractionFreeMonitor.Start();
             else
                 DistractionFreeMonitor.Stop();
 
-            if (UserPreferences.Current.UseClamdEngine)
+            if (_userPreferences.Current.UseClamdEngine)
             {
                 _ = Task.Run(async () =>
                 {
@@ -269,88 +286,81 @@ namespace optiSCAN.Services
                 });
             }
 
-            if (UserPreferences.Current.RemovableDriveScanEnabled)
+            if (_userPreferences.Current.RemovableDriveScanEnabled)
                 RemovableDriveScan.Start();
             else
                 RemovableDriveScan.Stop();
         }
 
-        // Demandes UI (export, onglet Signatures, etc.) : événements nommés plutôt que des
-        // callbacks assignables après coup — si personne n’est abonné, l’appel est simplement ignoré.
+        // Demandes UI (export, onglet Signatures, etc.) : déléguées à <see cref="UiEventBus"/>.
 
-        private EventHandler? _focusAntivirusSignaturesHandlers;
-        /// <summary>Demande d’afficher l’onglet Signatures (écouteur : <see cref="optiSCAN.MainWindow"/>).</summary>
         public event EventHandler? FocusAntivirusSignaturesRequested
         {
-            add => _focusAntivirusSignaturesHandlers += value;
-            remove => _focusAntivirusSignaturesHandlers -= value;
+            add => _uiEventBus.FocusAntivirusSignaturesRequested += value;
+            remove => _uiEventBus.FocusAntivirusSignaturesRequested -= value;
         }
 
-        /// <summary>Demande d’afficher l’onglet Signatures dans Analyser (panneau Antivirus).</summary>
         public void RequestFocusAntivirusSignaturesTab() =>
-            _focusAntivirusSignaturesHandlers?.Invoke(this, EventArgs.Empty);
+            _uiEventBus.RequestFocusAntivirusSignaturesTab();
 
-        private EventHandler? _scanHistoryViewsRefreshHandlers;
-        /// <summary>Synchronise grilles d’historique et libellé « dernière analyse » (vues multiples).</summary>
         public event EventHandler? ScanHistoryViewsRefreshRequested
         {
-            add => _scanHistoryViewsRefreshHandlers += value;
-            remove => _scanHistoryViewsRefreshHandlers -= value;
+            add => _uiEventBus.ScanHistoryViewsRefreshRequested += value;
+            remove => _uiEventBus.ScanHistoryViewsRefreshRequested -= value;
         }
 
-        /// <summary>Demande un rafraîchissement des vues d’historique (thread UI : écouteur).</summary>
         public void RequestScanHistoryViewsRefresh() =>
-            _scanHistoryViewsRefreshHandlers?.Invoke(this, EventArgs.Empty);
+            _uiEventBus.RequestScanHistoryViewsRefresh();
 
-        private EventHandler? _exportScanHistoryHtmlHandlers;
-        /// <summary>Demande l’export HTML du rapport (écouteur : <see cref="optiSCAN.MainWindow"/>).</summary>
         public event EventHandler? ExportScanHistoryHtmlRequested
         {
-            add => _exportScanHistoryHtmlHandlers += value;
-            remove => _exportScanHistoryHtmlHandlers -= value;
+            add => _uiEventBus.ExportScanHistoryHtmlRequested += value;
+            remove => _uiEventBus.ExportScanHistoryHtmlRequested -= value;
         }
 
         public void RequestExportScanHistoryHtml() =>
-            _exportScanHistoryHtmlHandlers?.Invoke(this, EventArgs.Empty);
+            _uiEventBus.RequestExportScanHistoryHtml();
 
-        private EventHandler<Models.ScanSession>? _exportScanSessionPdfHandlers;
-        /// <summary>Export PDF d'une session d'historique précise (pas seulement la dernière).</summary>
         public event EventHandler<Models.ScanSession>? ExportScanSessionPdfRequested
         {
-            add => _exportScanSessionPdfHandlers += value;
-            remove => _exportScanSessionPdfHandlers -= value;
+            add => _uiEventBus.ExportScanSessionPdfRequested += value;
+            remove => _uiEventBus.ExportScanSessionPdfRequested -= value;
         }
 
         public void RequestExportScanSessionPdf(Models.ScanSession session) =>
-            _exportScanSessionPdfHandlers?.Invoke(this, session);
+            _uiEventBus.RequestExportScanSessionPdf(session);
 
-        private EventHandler<Models.ScanSession>? _reviewHistorySessionHandlers;
-        /// <summary>Charge les menaces d'une session historique dans Analyse (écouteur : MainWindow).</summary>
         public event EventHandler<Models.ScanSession>? ReviewHistorySessionRequested
         {
-            add => _reviewHistorySessionHandlers += value;
-            remove => _reviewHistorySessionHandlers -= value;
+            add => _uiEventBus.ReviewHistorySessionRequested += value;
+            remove => _uiEventBus.ReviewHistorySessionRequested -= value;
         }
 
         public void RequestReviewHistorySession(Models.ScanSession session) =>
-            _reviewHistorySessionHandlers?.Invoke(this, session);
+            _uiEventBus.RequestReviewHistorySession(session);
 
-        private EventHandler? _openQuarantineTabHandlers;
-        /// <summary>Ouvre l'onglet Quarantaine de l'Antivirus (écouteur : MainWindow).</summary>
         public event EventHandler? OpenQuarantineTabRequested
         {
-            add => _openQuarantineTabHandlers += value;
-            remove => _openQuarantineTabHandlers -= value;
+            add => _uiEventBus.OpenQuarantineTabRequested += value;
+            remove => _uiEventBus.OpenQuarantineTabRequested -= value;
         }
 
         public void RequestOpenQuarantineTab() =>
-            _openQuarantineTabHandlers?.Invoke(this, EventArgs.Empty);
+            _uiEventBus.RequestOpenQuarantineTab();
 
         private ServiceContainer()
         {
             var collection = new ServiceCollection();
             DependencyInjection.ServiceRegistration.AddOptiscanCoreServices(collection);
             _services = collection.BuildServiceProvider();
+
+            _uiEventBus = _services.GetRequiredService<UiEventBus>();
+            _userPreferences = _services.GetRequiredService<IUserPreferencesAccessor>();
+            _exclusionSettings = _services.GetRequiredService<IExclusionSettingsAccessor>();
+
+            DistractionFreeMonitor.Initialize(_userPreferences);
+            PlatformProtectionBootstrap.Initialize(_userPreferences);
+            LocalizationService.ConfigurePreferencesAccessor(_userPreferences);
 
             ClamAv = _services.GetRequiredService<ClamAvEngine>();
             ClamAvBackend = _services.GetRequiredService<CompositeClamAvBackend>();
@@ -398,6 +408,12 @@ namespace optiSCAN.Services
             });
         }
 
+        IScheduledScanService IViewServices.ScheduledScan => ScheduledScan;
+
+        IExclusionSettingsAccessor IProtectionServiceHostDependencies.ExclusionSettingsAccessor => _exclusionSettings;
+
+        IUserPreferencesAccessor IProtectionServiceHostDependencies.UserPreferencesAccessor => _userPreferences;
+
         /// <summary>
         /// Libère proprement tous les services disposables.
 /// Appelé depuis App.OnExit.
@@ -407,10 +423,7 @@ namespace optiSCAN.Services
             if (_shutdownDone)
                 return;
             _shutdownDone = true;
-            _focusAntivirusSignaturesHandlers = null;
-            _scanHistoryViewsRefreshHandlers = null;
-            _exportScanHistoryHtmlHandlers = null;
-            _exportScanSessionPdfHandlers = null;
+            _uiEventBus.ClearHandlers();
             try { RealTimeProtection.Dispose(); }
             catch (Exception ex) { AppLogger.Warn("ServiceContainer", "RealTimeProtection.Dispose", ex); }
             try { ProcessStartMonitor.Dispose(); }

@@ -7,9 +7,12 @@ namespace optiSCAN.Services
     /// <summary>Premier lancement : parcours court en 3 étapes (v7).</summary>
     public static class OnboardingService
     {
-        public static void ShowIfNeeded(Window owner)
+        public static void ShowIfNeeded(Window owner, IViewServices ui) =>
+            ShowIfNeeded(owner, ui, null);
+
+        public static void ShowIfNeeded(Window owner, IViewServices ui, IUserPreferencesAccessor? preferences)
         {
-            var prefs = UserPreferences.Current;
+            var prefs = (preferences ?? new DefaultUserPreferencesAccessor()).Current;
             if (prefs.OnboardingCompleted)
                 return;
 
@@ -39,10 +42,9 @@ namespace optiSCAN.Services
                 MessageBoxImage.Question);
             if (step2 == MessageBoxResult.Yes)
             {
-                var c = ServiceContainer.Default;
-                c.Navigation?.NavigateTo(Strings.OptiscanStrings.PanelIds.Antivirus);
-                c.RequestFocusAntivirusSignaturesTab();
-                c.TriggerSignatureUpdate();
+                ui.Navigation?.NavigateTo(Strings.OptiscanStrings.PanelIds.Antivirus);
+                ui.RequestFocusAntivirusSignaturesTab();
+                ui.TriggerSignatureUpdate();
             }
 
             MessageBox.Show(

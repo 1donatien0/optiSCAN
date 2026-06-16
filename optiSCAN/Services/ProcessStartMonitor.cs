@@ -31,12 +31,19 @@ namespace optiSCAN.Services
 
         public event EventHandler<ThreatInfo>? ThreatDetected;
 
+        private readonly IUserPreferencesAccessor _prefs;
+        private readonly IExclusionSettingsAccessor _exclusions;
+
         public ProcessStartMonitor(
             ScanOrchestrator orchestrator,
             QuarantineManager quarantineManager,
             NotificationService notifications,
-            Func<bool>? isSuspended = null)
+            Func<bool>? isSuspended = null,
+            IUserPreferencesAccessor? preferences = null,
+            IExclusionSettingsAccessor? exclusions = null)
         {
+            _prefs = preferences ?? new DefaultUserPreferencesAccessor();
+            _exclusions = exclusions ?? new DefaultExclusionSettingsAccessor();
             _orchestrator = orchestrator;
             _quarantineManager = quarantineManager;
             _notifications = notifications;
@@ -167,7 +174,7 @@ namespace optiSCAN.Services
             _recentScans[filePath] = now;
 
             await Task.Delay(400).ConfigureAwait(false);
-            if (!File.Exists(filePath) || ExclusionSettings.Current.IsFileExcluded(filePath))
+            if (!File.Exists(filePath) || _exclusions.Current.IsFileExcluded(filePath))
                 return;
 
             await _scanSemaphore.WaitAsync().ConfigureAwait(false);
@@ -177,9 +184,9 @@ namespace optiSCAN.Services
                 foreach (var threat in result.Threats)
                 {
                     _notifications.ShowThreatDetected(threat);
-                    if (ExclusionSettings.Current.AutoQuarantineEnabled)
+                    if (_exclusions.Current.AutoQuarantineEnabled)
                     {
-                        if (UserPreferences.Current.BackupBeforeQuarantine)
+                        if (_prefs.Current.BackupBeforeQuarantine)
                             ThreatRemediationService.TryCreateSafetyCopy(threat);
 
                         if (_quarantineManager.Quarantine(threat))

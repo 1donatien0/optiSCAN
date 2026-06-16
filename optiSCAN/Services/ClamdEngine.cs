@@ -11,9 +11,15 @@ namespace optiSCAN.Services
     {
         private readonly ClamAvEngine _fallbackProbe;
         private readonly object _parseLock = new();
+        private readonly IUserPreferencesAccessor _prefs;
+        private readonly IExclusionSettingsAccessor _exclusions;
 
-        public ClamdEngine()
+        public ClamdEngine(
+            IUserPreferencesAccessor? preferences = null,
+            IExclusionSettingsAccessor? exclusions = null)
         {
+            _prefs = preferences ?? new DefaultUserPreferencesAccessor();
+            _exclusions = exclusions ?? new DefaultExclusionSettingsAccessor();
             _fallbackProbe = new ClamAvEngine();
         }
 
@@ -24,7 +30,7 @@ namespace optiSCAN.Services
 
         public async Task<bool> TryEnsureReadyAsync(CancellationToken ct = default)
         {
-            if (!UserPreferences.Current.UseClamdEngine)
+            if (!_prefs.Current.UseClamdEngine)
                 return false;
             if (!ClamdHost.Shared.IsBinaryPresent)
                 return false;
@@ -142,7 +148,7 @@ namespace optiSCAN.Services
                 {
                     if (ct.IsCancellationRequested) break;
                     lock (_parseLock)
-                        ClamScanLineParser.ProcessLine(line, result, progress);
+                        ClamScanLineParser.ProcessLine(line, result, progress, _exclusions);
                 }
 
                 result.FinishedAt = DateTime.Now;

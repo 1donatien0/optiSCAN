@@ -1,10 +1,13 @@
+using optiSCAN.Localization;
 using optiSCAN.Models;
 using optiSCAN.Services;
 
 namespace optiSCAN.Tests;
 
+[Collection("Localization")]
 public sealed class OverviewProtectionStatsFormatterTests
 {
+    public OverviewProtectionStatsFormatterTests() => LocalizationService.ApplyCulture("fr-FR");
     private static ScanSession Session(int daysAgo, int threats = 0, int files = 100) =>
         new()
         {

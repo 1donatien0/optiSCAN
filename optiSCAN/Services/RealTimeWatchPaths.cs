@@ -13,7 +13,7 @@ namespace optiSCAN.Services
             @"C:\Windows\Downloaded Program Files",
         };
 
-        public static IReadOnlyList<string> GetWatchFolders()
+        public static IReadOnlyList<string> GetWatchFolders(IExclusionSettingsAccessor? exclusions = null)
         {
             var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
@@ -23,9 +23,9 @@ namespace optiSCAN.Services
             foreach (var path in ScanTargets.QuickScanTargets())
                 TryAdd(folders, path);
 
-            var exclusions = ExclusionSettings.Current;
+            var excl = (exclusions ?? new DefaultExclusionSettingsAccessor()).Current;
             return folders
-                .Where(p => !exclusions.IsFolderExcluded(p))
+                .Where(p => !excl.IsFolderExcluded(p))
                 .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }

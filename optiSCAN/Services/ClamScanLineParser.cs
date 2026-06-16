@@ -20,7 +20,11 @@ namespace optiSCAN.Services
         private static readonly Regex StatsRegex =
             new(@"^([\w\s]+):\s+([\d.]+)", RegexOptions.Compiled);
 
-        public static void ProcessLine(string line, ScanResult result, IProgress<ScanProgress>? progress)
+        public static void ProcessLine(
+            string line,
+            ScanResult result,
+            IProgress<ScanProgress>? progress,
+            IExclusionSettingsAccessor? exclusions = null)
         {
             if (string.IsNullOrWhiteSpace(line)) return;
 
@@ -30,7 +34,7 @@ namespace optiSCAN.Services
                 var filePath = infectedMatch.Groups[1].Value.Trim();
                 var virusName = infectedMatch.Groups[2].Value.Trim();
 
-                if (ExclusionSettings.Current.IsFileExcluded(filePath))
+                if ((exclusions ?? new DefaultExclusionSettingsAccessor()).Current.IsFileExcluded(filePath))
                     return;
 
                 long fileSize = -1;

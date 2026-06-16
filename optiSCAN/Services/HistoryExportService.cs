@@ -7,8 +7,15 @@ using SaveFileDialog = Microsoft.Win32.SaveFileDialog;
 namespace optiSCAN.Services
 {
     /// <summary>Export HTML/PDF de l'historique — logique extraite de <see cref="MainWindow"/>.</summary>
-    public sealed class HistoryExportService
+    public sealed class HistoryExportService : IHistoryExportService
     {
+        private readonly IUserPreferencesAccessor _prefs;
+
+        public HistoryExportService(IUserPreferencesAccessor? preferences = null)
+        {
+            _prefs = preferences ?? new DefaultUserPreferencesAccessor();
+        }
+
         public HistoryExportResult TryExportHtml(
             Window owner,
             ScanLogManager? logManager,
@@ -29,7 +36,7 @@ namespace optiSCAN.Services
 
                 var html = new HtmlExportService();
                 var hist = logManager?.GetHistory() ?? Array.Empty<ScanSession>();
-                html.ExportFullReport(hist, threats, quarantine, UserPreferences.Current, dlg.FileName);
+                html.ExportFullReport(hist, threats, quarantine, _prefs.Current, dlg.FileName);
                 return HistoryExportResult.Succeeded(
                     LocalizationService.Format("Status_HtmlSaved", dlg.FileName));
             }

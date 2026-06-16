@@ -17,8 +17,11 @@ namespace optiSCAN.Views
     /// <summary>
     /// Vue d'ensemble : hero (protection + dernière analyse), actions, statistiques et recommandations.
     /// </summary>
-    public partial class OverviewControl : System.Windows.Controls.UserControl
+    public partial class OverviewControl : System.Windows.Controls.UserControl, IOverviewPanel
     {
+        private IViewServices? _services;
+
+        public void Bind(IViewServices services) => _services = services;
         public OverviewControl()
         {
             InitializeComponent();
@@ -53,7 +56,8 @@ namespace optiSCAN.Views
                 if (txtProtectionStatsBody == null) return;
 
                 var now = DateTime.Now;
-                int totalLifetime = UserPreferences.Current.TotalScansCount;
+                int totalLifetime = (_services?.UserPreferencesAccessor ?? new DefaultUserPreferencesAccessor())
+                    .Current.TotalScansCount;
                 var cult = CultureInfo.CurrentCulture;
 
                 txtProtectionStatsBody.Text = OverviewProtectionStatsFormatter.Format(
@@ -227,7 +231,7 @@ namespace optiSCAN.Views
                 AppLogger.Warn("OverviewControl", $"PostureFix — tous les replis ont échoué ({uri})", lastEx);
         }
 
-        private static bool TryNavigatePosturePanel(string uri)
+        private bool TryNavigatePosturePanel(string uri)
         {
             const string prefix = "optiscan://panel/";
             if (!uri.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
@@ -254,7 +258,7 @@ namespace optiSCAN.Views
                 panelId = OptiscanStrings.PanelIds.Overview;
             }
 
-            ServiceContainer.Default.Navigation?.NavigateTo(panelId);
+            _services!.Navigation?.NavigateTo(panelId);
             return true;
         }
 
@@ -459,26 +463,23 @@ namespace optiSCAN.Views
 
             if (target == null) return;
 
-            var container = Services.ServiceContainer.Default;
-
             if (target == OptiscanStrings.ActionIds.Update)
             {
-                container.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
-                container.RequestFocusAntivirusSignaturesTab();
-                container.TriggerSignatureUpdate();
+                _services!.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
+                _services.RequestFocusAntivirusSignaturesTab();
+                _services.TriggerSignatureUpdate();
             }
             else
             {
-                container.Navigation?.NavigateTo(target);
+                _services!.Navigation?.NavigateTo(target);
             }
         }
 
-        private static void NavigateToSignaturesAndUpdate()
+        private void NavigateToSignaturesAndUpdate()
         {
-            var container = Services.ServiceContainer.Default;
-            container.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
-            container.RequestFocusAntivirusSignaturesTab();
-            container.TriggerSignatureUpdate();
+            _services!.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
+            _services.RequestFocusAntivirusSignaturesTab();
+            _services.TriggerSignatureUpdate();
         }
     }
 }

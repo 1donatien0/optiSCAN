@@ -1,3 +1,4 @@
+using Moq;
 using optiSCAN.Models;
 using optiSCAN.Services;
 
@@ -5,6 +6,13 @@ namespace optiSCAN.Tests;
 
 public sealed class AntivirusActionsTests
 {
+    private static AntivirusActions CreateIsolatedActions()
+    {
+        var qDir = Path.Combine(Path.GetTempPath(), "optiscan_act_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(qDir);
+        return new AntivirusActions(new QuarantineManager(qDir));
+    }
+
     [Fact]
     public void DeleteThreatFile_deletes_existing_file_on_disk()
     {
@@ -15,7 +23,7 @@ public sealed class AntivirusActionsTests
 
         try
         {
-            var actions = new AntivirusActions(ServiceContainer.Default);
+            var actions = CreateIsolatedActions();
             var result = actions.DeleteThreatFile(file);
 
             Assert.True(result.Success);
@@ -30,7 +38,7 @@ public sealed class AntivirusActionsTests
     [Fact]
     public void DeleteThreatFile_refuses_sensitive_system_path()
     {
-        var actions = new AntivirusActions(ServiceContainer.Default);
+        var actions = CreateIsolatedActions();
         var path = Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.System),
             "optiscan_delete_test_should_not_run.exe");
@@ -44,7 +52,7 @@ public sealed class AntivirusActionsTests
     [Fact]
     public void DeleteThreatFile_reports_missing_when_file_already_gone()
     {
-        var actions = new AntivirusActions(ServiceContainer.Default);
+        var actions = CreateIsolatedActions();
         var path = Path.Combine(Path.GetTempPath(), "optiscan_missing_" + Guid.NewGuid().ToString("N") + ".bin");
 
         var result = actions.DeleteThreatFile(path);
@@ -109,6 +117,40 @@ public sealed class AntivirusActionsTests
     }
 
     [Fact]
+    public void QuarantineThreat_uses_injected_threat_lookup_when_path_only()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "optiscan_qlookup_" + Guid.NewGuid().ToString("N"));
+        var qDir = Path.Combine(root, "quarantine");
+        var sample = Path.Combine(root, "known.bin");
+        Directory.CreateDirectory(root);
+        File.WriteAllBytes(sample, [0x01]);
+
+        try
+        {
+            var qm = new QuarantineManager(qDir);
+            var known = new ThreatInfo
+            {
+                FilePath = sample,
+                VirusName = "Lookup.Test",
+                FileSize = 1,
+                DetectedAt = DateTime.UtcNow,
+            };
+            var actions = new AntivirusActions(
+                qm,
+                threatLookup: path => string.Equals(path, sample, StringComparison.OrdinalIgnoreCase) ? known : null);
+
+            var result = actions.QuarantineThreat(sample);
+
+            Assert.True(result.Success);
+            Assert.Equal("Lookup.Test", qm.GetEntries()[0].VirusName);
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { /* best effort */ }
+        }
+    }
+
+    [Fact]
     public void IgnoreThreat_adds_file_to_exclusions_without_deleting_it()
     {
         var dir = Path.Combine(Path.GetTempPath(), "optiscan_ign_" + Guid.NewGuid().ToString("N"));
@@ -116,7 +158,7 @@ public sealed class AntivirusActionsTests
         var file = Path.Combine(dir, "keep.me");
         File.WriteAllText(file, "data");
 
-        var actions = new AntivirusActions(ServiceContainer.Default);
+        var actions = CreateIsolatedActions();
 
         try
         {
@@ -201,6 +243,31 @@ public sealed class AntivirusActionsTests
         finally
         {
             try { Directory.Delete(root, recursive: true); } catch { /* best effort */ }
+        }
+    }
+
+    [Fact]
+    public void StopAllUpdates_cancels_both_signature_updaters()
+    {
+        var qDir = Path.Combine(Path.GetTempPath(), "optiscan_stop_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(qDir);
+
+        try
+        {
+            var freshclam = new Mock<ISignatureUpdateCanceller>(MockBehavior.Strict);
+            var rules = new Mock<ISignatureUpdateCanceller>(MockBehavior.Strict);
+            freshclam.Setup(x => x.CancelUpdate());
+            rules.Setup(x => x.CancelUpdate());
+
+            var actions = new AntivirusActions(new QuarantineManager(qDir), freshclam.Object, rules.Object);
+            actions.StopAllUpdates();
+
+            freshclam.Verify(x => x.CancelUpdate(), Times.Once);
+            rules.Verify(x => x.CancelUpdate(), Times.Once);
+        }
+        finally
+        {
+            try { Directory.Delete(qDir, recursive: true); } catch { /* best effort */ }
         }
     }
 }
