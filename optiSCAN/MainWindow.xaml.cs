@@ -47,7 +47,9 @@ namespace optiSCAN
         private FreshclamUpdater? _freshclamUpdater;
         private YaraForgeUpdater? _rulesUpdater;
         private SignatureStatusService? _signatureStatus;
-
+        private ServiceContainer? _container;
+        private RealTimeProtection? _realTimeProtection;
+        private ISecurityPostureService? _securityPosture;
         private readonly Services.NavigationService _navigationService = new();
         private Services.NavigationRefreshCoordinator? _navRefreshCoordinator;
         private readonly SignatureUpdateUiRunner _signatureUpdateRunner = new();
@@ -61,7 +63,7 @@ namespace optiSCAN
         private string? _lastStatusIconKind;
 
         // Après InitializeComponent / RegisterPanels, le constructeur assigne
-        // ServiceContainer.Default.Navigation : les vues naviguent sans référencer MainWindow.
+        // IViewServices.Navigation : les vues naviguent sans référencer MainWindow.
 
         public MainWindow()
         {
@@ -88,7 +90,10 @@ namespace optiSCAN
                     });
 
                 // Services partagés via le singleton applicatif (mêmes instances que ScanViewModel).
-                var c = ServiceContainer.Default;
+                var c = _container!;
+                _container = c;
+                _realTimeProtection = c.RealTimeProtection;
+                _securityPosture = c.SecurityPosture;
                 _clamAvEngine = c.ClamAv;
                 _yaraEngine = c.Yara;
                 _logManager = c.Logger;
@@ -231,7 +236,7 @@ namespace optiSCAN
                 (panelOverview as Views.OverviewControl)?.ApplyElevationBanner();
                 try
                 {
-                    ServiceContainer.Default.ApplyPreferencesOnStartup();
+                    _container!.ApplyPreferencesOnStartup();
                 }
                 catch (Exception ex)
                 {
@@ -245,7 +250,7 @@ namespace optiSCAN
 
                 SetStatus(OptiscanStrings.UiMessages.ProtectionActive);
                 if (!App.GuardSession)
-                    OnboardingService.ShowIfNeeded(this);
+                    OnboardingService.ShowIfNeeded(this, _container!);
                 _ = WarmUpYaraRulesAsync();
 
                 if (App.GuardSession)
@@ -271,12 +276,12 @@ namespace optiSCAN
         }
 
         /// <summary>Compile les règles YARA en arrière-plan pour éviter le blocage au premier scan.</summary>
-        private static async Task WarmUpYaraRulesAsync()
+        private async Task WarmUpYaraRulesAsync()
         {
             try
             {
-                var yara = ServiceContainer.Default.Yara;
-                if (!yara.IsAvailable || yara.HasCompiled)
+                var yara = _yaraEngine;
+                if (yara == null || !yara.IsAvailable || yara.HasCompiled)
                     return;
                 await yara.CompileRulesAsync(CancellationToken.None).ConfigureAwait(false);
             }
@@ -417,7 +422,7 @@ namespace optiSCAN
 
         private void UnhookServiceContainerEvents()
         {
-            var c = ServiceContainer.Default;
+            var c = _container!;
             var ui = ServiceContainer.UiEvents;
             ui.RequestSignatureUpdate -= SurDemandeMiseAJourSignatures;
             ui.ScanHistoryViewsRefreshRequested -= SurDemandeRafraichissementHistorique;
@@ -519,7 +524,7 @@ namespace optiSCAN
                     : ThemeUiBrushes.Get("DangerRed", icoSidebarClamAv);
             }
 
-            var clamMode = ServiceContainer.Default.ClamActiveEngine;
+            var clamMode = _container!.ClamActiveEngine;
             (panelOverview as IOverviewPanel)?.UpdateAntivirusCardStatus(clamAvOk, yaraRules, clamMode);
         }
 
@@ -619,7 +624,7 @@ namespace optiSCAN
         /// </remarks>
         private void HandleToastActivation(ToastActivationEventArgs e)
         {
-            var c = ServiceContainer.Default;
+            var c = _container!;
             switch (e.Action.ToLowerInvariant())
             {
                 case "quarantine":
@@ -704,10 +709,10 @@ namespace optiSCAN
                 ScanHistory: sessions,
                 LastFreshclamUpdate: _freshclamUpdater?.GetLastSignatureUpdateTime(),
                 RealTimeProtectionEnabled: ExclusionSettings.Current.RealTimeEnabled,
-                RealTimeProtectionRunning: ServiceContainer.Default.RealTimeProtection.IsEnabled
+                RealTimeProtectionRunning: (_realTimeProtection?.IsEnabled ?? false)
                     || PlatformProtectionBootstrap.IsRemoteProtectionActive(),
                 SignatureAutoUpdateEnabled: UserPreferences.Current.SignatureAutoUpdateEnabled,
-                SecurityPosture: ServiceContainer.Default.SecurityPosture);
+                SecurityPosture: _securityPosture!);
         }
 
         public async Task RefreshAntivirusDataAsync()
@@ -980,7 +985,7 @@ namespace optiSCAN
                 ViewModel?.Dispose();
 
                 // Container partagé : c'est lui qui possède les services maintenant.
-                ServiceContainer.Default.Shutdown();
+                _container!.Shutdown();
             }
             catch (Exception ex)
             {

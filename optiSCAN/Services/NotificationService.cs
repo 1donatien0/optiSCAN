@@ -10,6 +10,8 @@ namespace optiSCAN.Services
     /// </summary>
     public class NotificationService
     {
+        private static NotificationService? _activationTarget;
+
         private bool _toastsEnabled = true;
         private static bool _activationHooked;
 
@@ -18,6 +20,7 @@ namespace optiSCAN.Services
 
         public NotificationService()
         {
+            _activationTarget = this;
             EnsureActivationHook();
         }
 
@@ -44,6 +47,7 @@ namespace optiSCAN.Services
         internal static void ResetActivationHookForTests()
         {
             _activationHooked = false;
+            _activationTarget = null;
         }
 
         private static void SurActivationToastStatic(ToastNotificationActivatedEventArgsCompat e)
@@ -56,7 +60,7 @@ namespace optiSCAN.Services
                 var virus = parsed.Get("virus");
 
                 var args = new ToastActivationEventArgs(action, file, virus);
-                ServiceContainer.Default.Notifications.DispatchActivation(args);
+                _activationTarget?.DispatchActivation(args);
             }
             catch (Exception ex)
             {

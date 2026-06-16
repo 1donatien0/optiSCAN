@@ -3,21 +3,26 @@ using optiSCAN.Models;
 namespace optiSCAN.Services;
 
 /// <summary>Gestion des menaces détectées par le moteur --service-host (sans UI).</summary>
-internal static class ServiceHostThreatHandler
+internal sealed class ServiceHostThreatHandler
 {
-    public static void OnThreatDetected(object? sender, ThreatInfo threat)
+    private readonly ServiceContainer _container;
+
+    public ServiceHostThreatHandler(ServiceContainer container) =>
+        _container = container;
+
+    public void OnThreatDetected(object? sender, ThreatInfo threat)
     {
         try
         {
             if (ExclusionSettings.Current.AutoQuarantineEnabled)
             {
-                var repair = ThreatRepairService.TryRemediate(threat, ServiceContainer.Default.Quarantine);
-                ServiceContainer.Default.Logger.WriteToLog(
+                var repair = ThreatRepairService.TryRemediate(threat, _container.Quarantine);
+                _container.Logger.WriteToLog(
                     $"[ServiceHost] Remédiation {threat.FilePath}: {repair.Message}");
             }
             else
             {
-                ServiceContainer.Default.Logger.WriteToLog(
+                _container.Logger.WriteToLog(
                     $"[ServiceHost] Menace {threat.VirusName} — {threat.FilePath}");
             }
 
@@ -29,15 +34,15 @@ internal static class ServiceHostThreatHandler
         }
     }
 
-    private static async Task EnrichCloudAsync(ThreatInfo threat)
+    private async Task EnrichCloudAsync(ThreatInfo threat)
     {
         try
         {
-            var summary = await ServiceContainer.Default.CloudThreatIntel
+            var summary = await _container.CloudThreatIntel
                 .EnrichThreatAsync(threat).ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(summary))
             {
-                ServiceContainer.Default.Logger.WriteToLog(
+                _container.Logger.WriteToLog(
                     $"[ServiceHost] Réputation cloud — {threat.FilePath}: {summary}");
             }
         }

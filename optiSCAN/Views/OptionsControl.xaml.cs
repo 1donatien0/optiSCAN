@@ -46,10 +46,10 @@ namespace optiSCAN.Views
             };
         }
 
-        public void Bind(ServiceContainer shell) => _shell = shell;
+        private ServiceContainer Shell => _shell ?? throw new InvalidOperationException("OptionsControl.Bind() must be called before use.");
+        private IScheduledScanService ScheduledScan => Shell.ScheduledScan;
 
-        private IScheduledScanService ScheduledScan => _shell?.ScheduledScan
-            ?? ServiceContainer.Views.ScheduledScan;
+        public void Bind(ServiceContainer shell) => _shell = shell;
 
         private void SurChangementTheme(object? sender, bool isDark) => SyncThemeControls();
 
@@ -151,7 +151,7 @@ namespace optiSCAN.Views
                 if (chkBackupBeforeQuarantine != null)
                     chkBackupBeforeQuarantine.IsChecked = prefs.BackupBeforeQuarantine;
 
-                var c = _shell ?? ServiceContainer.Default;
+                var c = Shell;
                 if (chkAutoUpdate != null)
                     chkAutoUpdate.IsChecked = prefs.SignatureAutoUpdateEnabled;
                 if (chkAggressiveSignatures != null)
@@ -242,7 +242,7 @@ namespace optiSCAN.Views
             if (sender is not WpfCheckBox cb) return;
             bool isOn = cb.IsChecked == true;
             var prefs = UserPreferences.Current;
-            var c = _shell ?? ServiceContainer.Default;
+            var c = Shell;
 
             switch (cb.Tag as string)
             {
