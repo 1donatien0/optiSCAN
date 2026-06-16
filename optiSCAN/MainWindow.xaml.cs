@@ -54,6 +54,10 @@ namespace optiSCAN
         private readonly AntivirusSidebarCoordinator _antivirusSidebar = new();
         private readonly UsbScanStatusCoordinator _usbScanStatus = new();
         private readonly HistoryRefreshCoordinator _historyRefresh = new();
+        private readonly AntivirusActionResultCoordinator _antivirusActionResult = new();
+        private readonly RealTimeThreatCoordinator _realTimeThreat = new();
+        private readonly WindowTrayBehaviorCoordinator _windowTrayBehavior = new();
+        private readonly MainWindowShutdownCoordinator _shutdown = new();
         private readonly RoutedCommand _quickScanShortcutCommand = new();
         private bool _isClosing = false;
         private bool _wasScanning;
@@ -450,12 +454,14 @@ namespace optiSCAN
 
         private void SurMenaceTempsReelDetectee(object? sender, ThreatInfo threat)
         {
-            Dispatcher.BeginInvoke(new Action(() =>
-            {
-                ViewModel?.AppendLiveThreat(threat);
-                RefreshQuarantineList();
-                RefreshOverviewProtectionAndRecommendations();
-            }), DispatcherPriority.Background);
+            Dispatcher.BeginInvoke(() =>
+                _realTimeThreat.Handle(threat, new RealTimeThreatCoordinator.Host
+                {
+                    ViewModel = ViewModel,
+                    RefreshQuarantineList = RefreshQuarantineList,
+                    RefreshOverviewProtection = RefreshOverviewProtectionAndRecommendations,
+                }),
+                DispatcherPriority.Background);
         }
 
         private void SurStatutAnalyseUsb(object? sender, RemovableDriveScanStatusEventArgs e)
@@ -472,15 +478,14 @@ namespace optiSCAN
         private void SurActionAntivirusTerminee(object? sender, ActionResult result)
         {
             Dispatcher.BeginInvoke(() =>
-            {
-                SetStatus(result.Message, isError: result.IsError, isWarning: result.IsWarning);
-                if (result.Success)
+                _antivirusActionResult.Handle(result, new AntivirusActionResultCoordinator.Host
                 {
-                    RefreshQuarantineList();
-                    RefreshHistory();
-                    (panelAntivirus as Views.AntivirusView)?.RefreshAllData();
-                }
-            }, DispatcherPriority.Normal);
+                    SetStatus = (msg, err, warn) => SetStatus(msg, isError: err, isWarning: warn),
+                    RefreshQuarantineList = RefreshQuarantineList,
+                    RefreshHistory = RefreshHistory,
+                    AntivirusPanel = panelAntivirus as Views.AntivirusView,
+                }),
+                DispatcherPriority.Normal);
         }
 
         private void SurActivationToast(object? sender, ToastActivationEventArgs e)
@@ -508,27 +513,8 @@ namespace optiSCAN
             if (panelOverview is not IOverviewPanel overview)
                 return;
 
-            _overviewRefresh.RefreshProtectionAndRecommendations(BuildOverviewRefreshContext(overview));
-        }
-
-        private OverviewRefreshContext BuildOverviewRefreshContext(IOverviewPanel overview)
-        {
-            var cleanHist = _container.Logger.GetCleanHistory();
-            var sessions = _container.Logger.GetHistory();
-
-            return new OverviewRefreshContext(
-                overview,
-                ClamInstalled: _container.ClamAv.IsClamAvInstalled(),
-                YaraRulesCount: _container.Yara.RulesCount,
-                YaraAvailable: _container.Yara.IsAvailable,
-                CleanHistory: cleanHist,
-                ScanHistory: sessions,
-                LastFreshclamUpdate: _container.FreshclamUpdater.GetLastSignatureUpdateTime(),
-                RealTimeProtectionEnabled: _container.ExclusionSettingsAccessor.Current.RealTimeEnabled,
-                RealTimeProtectionRunning: _container.RealTimeProtection.IsEnabled
-                    || PlatformProtectionBootstrap.IsRemoteProtectionActive(),
-                SignatureAutoUpdateEnabled: _container.UserPreferencesAccessor.Current.SignatureAutoUpdateEnabled,
-                SecurityPosture: _container.SecurityPosture);
+            _overviewRefresh.RefreshProtectionAndRecommendations(
+                OverviewRefreshContextBuilder.FromContainer(overview, _container));
         }
 
         public async Task RefreshAntivirusDataAsync()
@@ -665,51 +651,42 @@ namespace optiSCAN
         {
             if (WindowState == WindowState.Minimized)
             {
-                Hide();
-                SetStatus(OptiscanStrings.UiMessages.ProtectionReducedTray);
+                _windowTrayBehavior.OnMinimized(new WindowTrayBehaviorCoordinator.Host
+                {
+                    HideWindow = Hide,
+                    SetTrayStatus = msg => SetStatus(msg),
+                });
             }
         }
 
         // ── Fermeture ────────────────────────────────────────────────────────────
         private void SurFermetureFenetre(object? sender, CancelEventArgs e)
         {
-            if (!_isClosing)
+            if (_windowTrayBehavior.TryCancelClose(_isClosing, e, new WindowTrayBehaviorCoordinator.Host
+                {
+                    HideWindow = Hide,
+                    SetTrayStatus = msg => SetStatus(msg),
+                }))
             {
-                e.Cancel = true;
-                Hide();
-                SetStatus(OptiscanStrings.UiMessages.ProtectionReducedTray);
+                return;
             }
-            else
-            {
-                PerformCleanShutdown();
-            }
+
+            PerformCleanShutdown();
         }
 
         private void PerformCleanShutdown()
         {
-            try
+            _shutdown.PerformCleanShutdown(new MainWindowShutdownCoordinator.Host
             {
-                _trayCoordinator.Dispose();
-
-                _signatureRefresh?.Detach();
-
-                UnhookServiceContainerEvents();
-
-                if (ViewModel != null)
-                    ViewModel.PropertyChanged -= SurChangementProprieteScanViewModel;
-                _navRefreshCoordinator?.Detach();
-                _sidebarSync?.Detach();
-
-                // Dispose du ViewModel (CTS, abonnements, timers)
-                ViewModel?.Dispose();
-
-                // Container partagé : c'est lui qui possède les services maintenant.
-                _container.Shutdown();
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Warn("MainWindow", "PerformCleanShutdown", ex);
-            }
+                Tray = _trayCoordinator,
+                SignatureRefresh = _signatureRefresh,
+                UnhookServiceEvents = UnhookServiceContainerEvents,
+                ViewModel = ViewModel,
+                ViewModelPropertyChanged = SurChangementProprieteScanViewModel,
+                NavRefresh = _navRefreshCoordinator,
+                SidebarSync = _sidebarSync,
+                Container = _container,
+            });
         }
 
         // ── Quarantaine ──────────────────────────────────────────────────────────

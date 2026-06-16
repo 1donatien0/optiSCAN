@@ -159,6 +159,17 @@ jobs:
         shell: pwsh
         run: pwsh -File installer/build-release-setup.ps1 -SkipPublish -PublishDir publish/win-x64
 
+      - name: Generate SBOM (CycloneDX)
+        shell: pwsh
+        run: pwsh -File scripts/generate-sbom.ps1 -OutputDir sbom
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: optiSCAN-sbom-${{ github.sha }}
+          path: sbom/*.json
+          retention-days: 90
+
       - name: Upload publish artifact
         uses: actions/upload-artifact@v4
         with:

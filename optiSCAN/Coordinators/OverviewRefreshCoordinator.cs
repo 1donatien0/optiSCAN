@@ -83,3 +83,24 @@ public sealed class OverviewRefreshCoordinator
         ctx.AfterSignaturesRefreshed?.Invoke();
     }
 }
+
+/// <summary>Construit <see cref="OverviewRefreshContext"/> depuis le container applicatif.</summary>
+public static class OverviewRefreshContextBuilder
+{
+    public static OverviewRefreshContext FromContainer(IOverviewPanel panel, ServiceContainer container)
+    {
+        return new OverviewRefreshContext(
+            panel,
+            ClamInstalled: container.ClamAv.IsClamAvInstalled(),
+            YaraRulesCount: container.Yara.RulesCount,
+            YaraAvailable: container.Yara.IsAvailable,
+            CleanHistory: container.Logger.GetCleanHistory(),
+            ScanHistory: container.Logger.GetHistory(),
+            LastFreshclamUpdate: container.FreshclamUpdater.GetLastSignatureUpdateTime(),
+            RealTimeProtectionEnabled: container.ExclusionSettingsAccessor.Current.RealTimeEnabled,
+            RealTimeProtectionRunning: container.RealTimeProtection.IsEnabled
+                || PlatformProtectionBootstrap.IsRemoteProtectionActive(),
+            SignatureAutoUpdateEnabled: container.UserPreferencesAccessor.Current.SignatureAutoUpdateEnabled,
+            SecurityPosture: container.SecurityPosture);
+    }
+}
