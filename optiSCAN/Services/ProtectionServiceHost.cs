@@ -6,17 +6,19 @@ namespace optiSCAN.Services;
 /// <summary>Hôte de protection système (RTP, processus, IPC) pour --service-host.</summary>
 public sealed class ProtectionServiceHost : IDisposable
 {
+    private readonly ServiceContainer _container;
     private ProtectionPipeServer? _pipeServer;
     private ServiceHostThreatHandler? _threatHandler;
     private bool _started;
-    private ServiceContainer? _container;
+
+    public ProtectionServiceHost(ServiceContainer container) =>
+        _container = container;
 
     public void Start()
     {
         if (_started)
             return;
 
-        _container = ServiceContainer.Default;
         _container.ApplyPreferencesOnStartup();
 
         _threatHandler = new ServiceHostThreatHandler(_container);
@@ -40,7 +42,7 @@ public sealed class ProtectionServiceHost : IDisposable
         if (!_started)
             return;
 
-        if (_container != null && _threatHandler != null)
+        if (_threatHandler != null)
         {
             _container.RealTimeProtection.ThreatDetected -= _threatHandler.OnThreatDetected;
             _container.ProcessStartMonitor.ThreatDetected -= _threatHandler.OnThreatDetected;
@@ -51,10 +53,9 @@ public sealed class ProtectionServiceHost : IDisposable
         if (_pipeServer != null)
             await _pipeServer.StopAsync().ConfigureAwait(false);
 
-        _container?.Shutdown();
+        _container.Shutdown();
         _threatHandler = null;
         _started = false;
-        _container = null;
     }
 
     public void Dispose() => _ = StopAsync();

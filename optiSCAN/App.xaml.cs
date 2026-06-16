@@ -201,7 +201,7 @@ namespace optiSCAN
         {
             try
             {
-                using var host = new ProtectionServiceHost();
+                using var host = new ProtectionServiceHost(ServiceContainer.Default);
                 host.Start();
                 new ScanLogManager().WriteToLog("[ServiceHost] Protection système active (IPC + RTP + processus)");
 

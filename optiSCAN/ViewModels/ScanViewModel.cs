@@ -325,8 +325,8 @@ namespace optiSCAN.ViewModels
 
         // ── Constructeur ─────────────────────────────────────────────────────────
 
-        // Sans paramètre : utilise ServiceContainer.Default (mêmes services que MainWindow).
-        // Le constructeur avec injection de container reste pour les tests ou scénarios avancés.
+        // Constructeur sans paramètre : designer WPF / repli uniquement — injecter ServiceContainer en production.
+        [Obsolete("Designer WPF uniquement — injecter ServiceContainer en production.")]
         public ScanViewModel() : this(ServiceContainer.Default) { }
 
         public ScanViewModel(ServiceContainer container)
