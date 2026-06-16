@@ -54,18 +54,29 @@ jobs:
           path: TestResults/**/coverage.cobertura.xml
           retention-days: 14
 
-      - name: Code coverage summary (non-blocking)
+      - name: Code coverage summary and threshold
         if: always()
-        continue-on-error: true
         shell: pwsh
         run: |
+          $floor = 0.30
+          $target = 0.50
           $file = Get-ChildItem -Path TestResults -Recurse -Filter coverage.cobertura.xml -ErrorAction SilentlyContinue | Select-Object -First 1
-          if (-not $file) { Write-Host "No coverage file found."; exit 0 }
+          if (-not $file) {
+            Write-Host "No coverage file found — skipping threshold."
+            exit 0
+          }
           [xml]$xml = Get-Content $file.FullName
           $lineRate = [double]$xml.coverage.'line-rate'
           $branchRate = [double]$xml.coverage.'branch-rate'
-          Write-Host ("Line coverage: {0:P1}" -f $lineRate)
+          Write-Host ("Line coverage: {0:P1} (floor {1:P0}, target {2:P0})" -f $lineRate, $floor, $target)
           Write-Host ("Branch coverage: {0:P1}" -f $branchRate)
+          if ($lineRate -lt $target) {
+            Write-Host "::warning::Line coverage below progressive target ($([int]($target * 100))%)."
+          }
+          if ($lineRate -lt $floor) {
+            Write-Error "Line coverage below minimum floor."
+            exit 1
+          }
 
       - name: Build (Debug)
         run: dotnet build optiSCAN.sln --configuration Debug --no-restore

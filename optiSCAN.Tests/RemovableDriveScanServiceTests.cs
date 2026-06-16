@@ -51,9 +51,45 @@ public sealed class RemovableDriveScanServiceTests
         }
     }
 
-    private static RemovableDriveScanService CreateService(out ScanLogManager logger, IUiEventBus? ui = null)
+    [Fact]
+    public async Task RunScanAsync_raises_ThreatDetected_when_scan_finds_malware()
     {
-        var orch = new ScanOrchestrator(new FakeClamBackend(), new FakeYaraBackend());
+        var root = Path.Combine(Path.GetTempPath(), "optiscan_usb_threat_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var sample = Path.Combine(root, "malware.exe");
+        await File.WriteAllBytesAsync(sample, [0x4D, 0x5A]);
+
+        ThreatInfo? detected = null;
+        var ui = new Mock<IUiEventBus>(MockBehavior.Strict);
+        ui.Setup(u => u.RequestScanHistoryViewsRefresh());
+
+        using var service = CreateService(out _, ui.Object, new ThreatClamBackend());
+        service.ThreatDetected += (_, t) => detected = t;
+
+        var detailed = UserPreferences.Current.RemovableDriveScanDetailed;
+        var enabled = UserPreferences.Current.RemovableDriveScanEnabled;
+        try
+        {
+            UserPreferences.Current.RemovableDriveScanDetailed = false;
+            UserPreferences.Current.RemovableDriveScanEnabled = true;
+            await InvokeRunScanAsync(service, root);
+            Assert.NotNull(detected);
+            Assert.Equal("USB.Test", detected!.VirusName);
+        }
+        finally
+        {
+            UserPreferences.Current.RemovableDriveScanDetailed = detailed;
+            UserPreferences.Current.RemovableDriveScanEnabled = enabled;
+            try { Directory.Delete(root, recursive: true); } catch { /* best effort */ }
+        }
+    }
+
+    private static RemovableDriveScanService CreateService(
+        out ScanLogManager logger,
+        IUiEventBus? ui = null,
+        IClamAvOrchestratorBackend? clam = null)
+    {
+        var orch = new ScanOrchestrator(clam ?? new FakeClamBackend(), new FakeYaraBackend());
         var qDir = Path.Combine(Path.GetTempPath(), "optiscan_usb_q_" + Guid.NewGuid().ToString("N"));
         var q = new QuarantineManager(qDir);
         logger = new ScanLogManager(Path.Combine(Path.GetTempPath(), "optiscan_usb_log_" + Guid.NewGuid().ToString("N")));
@@ -102,5 +138,35 @@ public sealed class RemovableDriveScanServiceTests
             Task.FromResult(new List<YaraMatch>());
         public Task<List<YaraMatch>> ScanFilesAsync(IReadOnlyList<string> files, IProgress<string>? progress = null, CancellationToken ct = default) =>
             Task.FromResult(new List<YaraMatch>());
+    }
+
+    private sealed class ThreatClamBackend : IClamAvOrchestratorBackend
+    {
+        public bool IsClamAvInstalled() => true;
+        public Task<ScanResult> ScanFileAsync(string filePath, IProgress<ScanProgress>? progress = null, CancellationToken ct = default) =>
+            Task.FromResult(ThreatResult(filePath, ScanType.File));
+        public Task<ScanResult> ScanFolderAsync(string folderPath, IProgress<ScanProgress>? progress = null, CancellationToken ct = default) =>
+            Task.FromResult(ThreatResult(folderPath, ScanType.Folder));
+        public Task<ScanResult> ScanFileListAsync(IReadOnlyList<string> files, string targetPath, IProgress<ScanProgress>? progress = null, CancellationToken ct = default) =>
+            Task.FromResult(ThreatResult(targetPath, ScanType.RemovableDrive, files.Count));
+
+        private static ScanResult ThreatResult(string target, ScanType type, int files = 1) => new()
+        {
+            Type = type,
+            TargetPath = target,
+            Status = ScanStatus.Completed,
+            FilesScanned = files,
+            StartedAt = DateTime.UtcNow,
+            FinishedAt = DateTime.UtcNow,
+            Threats =
+            [
+                new ThreatInfo
+                {
+                    FilePath = Path.Combine(target.TrimEnd('\\'), "malware.exe"),
+                    VirusName = "USB.Test",
+                    FileSize = 2,
+                },
+            ],
+        };
     }
 }
