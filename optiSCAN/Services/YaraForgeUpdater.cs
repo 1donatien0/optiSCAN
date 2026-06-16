@@ -21,7 +21,7 @@ namespace optiSCAN.Services
     ///      prochain scan.
     ///   5. Expose EnableAutoUpdate() pour planifier des vérifications périodiques.
     /// </summary>
-    public class YaraForgeUpdater
+    public class YaraForgeUpdater : ISignatureUpdateCanceller, ISignatureAutoUpdateTarget
     {
         // ── Constantes ────────────────────────────────────────────────────────────
 

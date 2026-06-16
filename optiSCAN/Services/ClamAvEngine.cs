@@ -17,11 +17,13 @@ namespace optiSCAN.Services
         private readonly string _clamavDir;
         private readonly string _clamscanExe;
         private readonly object _parseLock = new();
+        private readonly IExclusionSettingsAccessor _exclusions;
 
         // ── Construction ─────────────────────────────────────────────────────────
 
-        public ClamAvEngine(string? clamavDir = null)
+        public ClamAvEngine(string? clamavDir = null, IExclusionSettingsAccessor? exclusions = null)
         {
+            _exclusions = exclusions ?? new DefaultExclusionSettingsAccessor();
             _clamavDir = clamavDir ?? ClamAvDatabasePaths.ResolveClamAvBinDir("clamscan.exe");
             _clamscanExe = Path.Combine(_clamavDir, "clamscan.exe");
         }
@@ -317,7 +319,7 @@ namespace optiSCAN.Services
 
         private void ParseScanLineCore(
             string line, ScanResult result, IProgress<ScanProgress>? progress) =>
-            ClamScanLineParser.ProcessLine(line, result, progress);
+            ClamScanLineParser.ProcessLine(line, result, progress, _exclusions);
 
         // ── Helpers ──────────────────────────────────────────────────────────────
 

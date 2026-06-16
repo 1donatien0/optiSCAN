@@ -32,7 +32,7 @@ namespace optiSCAN.ViewModels
 
             if (type is ScanType.QuickScan or ScanType.FullScan or ScanType.File or ScanType.Folder)
             {
-                ServiceContainer.Default.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
+                _navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
                 DisplayScanProgressRequested?.Invoke(this, EventArgs.Empty);
             }
 
@@ -45,7 +45,7 @@ namespace optiSCAN.ViewModels
             var epoch = Interlocked.Increment(ref _scanEpoch);
             var progress = new Progress<ScanProgress>(p => SurChangementProgressionScan(p, epoch));
 
-            ServiceContainer.Default.RealTimeProtection.Suspend();
+            _realTimeProtection.Suspend();
             try
             {
                 ScanResult result = type switch
@@ -64,7 +64,7 @@ namespace optiSCAN.ViewModels
 
                 LastResult = result;
                 _logger.SaveScanResult(result);
-                var prefs = UserPreferences.Current;
+                var prefs = _prefs.Current;
                 prefs.FavoriteScanType = type;
                 if (type is ScanType.File or ScanType.Folder && !string.IsNullOrWhiteSpace(path))
                     prefs.AddRecentTarget(path, type);
@@ -73,7 +73,7 @@ namespace optiSCAN.ViewModels
                 prefs.IncrementScanCount(type);
                 RefreshRecentTargets();
                 LoadHistory();
-                ServiceContainer.Default.RequestScanHistoryViewsRefresh();
+                _uiEvents.RequestScanHistoryViewsRefresh();
 
                 WpfApp.Current?.Dispatcher.Invoke(() =>
                 {
@@ -85,11 +85,11 @@ namespace optiSCAN.ViewModels
                 });
 
                 int autoQuarantined = 0;
-                if (ExclusionSettings.Current.AutoQuarantineEnabled && result.Threats.Count > 0)
+                if (_exclusions.Current.AutoQuarantineEnabled && result.Threats.Count > 0)
                 {
                     autoQuarantined = _quarantine.QuarantineAll(result.Threats, result.SessionId);
                     WpfApp.Current?.Dispatcher.Invoke(LoadQuarantine);
-                    ServiceContainer.Default.RequestScanHistoryViewsRefresh();
+                    _uiEvents.RequestScanHistoryViewsRefresh();
                 }
 
                 StatusMessage = autoQuarantined > 0
@@ -98,9 +98,9 @@ namespace optiSCAN.ViewModels
                 FilesScanned = result.FilesScanned;
                 ThreatsFound = result.Threats.Count;
 
-                if (UserPreferences.Current.ActionNotificationsEnabled)
+                if (_prefs.Current.ActionNotificationsEnabled)
                 {
-                    ServiceContainer.Default.Notifications.ShowScanCompleted(
+                    _notifications.ShowScanCompleted(
                         result.Threats.Count,
                         result.FilesScanned);
                 }
@@ -124,7 +124,7 @@ namespace optiSCAN.ViewModels
                 ScanProgressDetail = string.Empty;
                 _cts?.Dispose();
                 _cts = null;
-                ServiceContainer.Default.RealTimeProtection.Resume();
+                _realTimeProtection.Resume();
             }
         }
 

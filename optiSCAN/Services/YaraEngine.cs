@@ -29,6 +29,7 @@ namespace optiSCAN.Services
         // Permet de détecter qu'un .yar a été modifié depuis la dernière compilation
         // sans attendre la suppression manuelle de _compiled.yarc.
         private readonly string _compiledStampPath;
+        private readonly IExclusionSettingsAccessor _exclusions;
 
         /// <summary>Limite de caractères capturés depuis la sortie standard de yara.</summary>
         private const int MaxYaraStdoutCaptureChars = 2_000_000;
@@ -45,8 +46,12 @@ namespace optiSCAN.Services
 
         // ── Constructeur ─────────────────────────────────────────────────────────
 
-        public YaraEngine(string? yaraDir = null, string? rulesDir = null)
+        public YaraEngine(
+            string? yaraDir = null,
+            string? rulesDir = null,
+            IExclusionSettingsAccessor? exclusions = null)
         {
+            _exclusions = exclusions ?? new DefaultExclusionSettingsAccessor();
             var baseDir = AppDomain.CurrentDomain.BaseDirectory;
             var arch = Environment.Is64BitProcess ? "64" : "32";
 
@@ -252,7 +257,7 @@ namespace optiSCAN.Services
         {
             var matches = new List<YaraMatch>();
             if (!IsAvailable || !File.Exists(filePath)) return matches;
-            if (ExclusionSettings.Current.IsFileExcluded(filePath)) return matches;
+            if (_exclusions.Current.IsFileExcluded(filePath)) return matches;
 
             // Tenter compilation si pas encore fait
             if (!HasCompiled)
@@ -306,7 +311,7 @@ namespace optiSCAN.Services
                 for (var j = i; j < files.Count && batch.Count < batchSize; j++)
                 {
                     var path = files[j];
-                    if (File.Exists(path) && !ExclusionSettings.Current.IsFileExcluded(path))
+                    if (File.Exists(path) && !_exclusions.Current.IsFileExcluded(path))
                         batch.Add(path);
                 }
 
@@ -480,7 +485,7 @@ namespace optiSCAN.Services
                     var matchedPath = line[(spaceIdx + 1)..].Trim();
 
                     if (!string.IsNullOrEmpty(ruleName) && !string.IsNullOrEmpty(matchedPath)
-                        && !ExclusionSettings.Current.IsFileExcluded(matchedPath))
+                        && !_exclusions.Current.IsFileExcluded(matchedPath))
                         matches.Add(new YaraMatch { RuleName = ruleName, FilePath = matchedPath });
                 }
             }

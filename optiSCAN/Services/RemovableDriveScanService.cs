@@ -25,6 +25,10 @@ namespace optiSCAN.Services
         private readonly QuarantineManager _quarantine;
         private readonly NotificationService _notifications;
         private readonly ScanLogManager _logger;
+        private readonly RealTimeProtection _realTimeProtection;
+        private readonly IUiEventBus _uiEvents;
+        private readonly IUserPreferencesAccessor _prefs;
+        private readonly IExclusionSettingsAccessor _exclusions;
         private readonly HashSet<string> _knownRoots = new(StringComparer.OrdinalIgnoreCase);
         private readonly SemaphoreSlim _scanLock = new(1, 1);
         private readonly object _lifecycleLock = new();
@@ -43,12 +47,20 @@ namespace optiSCAN.Services
             ScanOrchestrator orchestrator,
             QuarantineManager quarantine,
             NotificationService notifications,
-            ScanLogManager logger)
+            ScanLogManager logger,
+            RealTimeProtection realTimeProtection,
+            IUiEventBus uiEvents,
+            IUserPreferencesAccessor? preferences = null,
+            IExclusionSettingsAccessor? exclusions = null)
         {
             _orchestrator = orchestrator;
             _quarantine = quarantine;
             _notifications = notifications;
             _logger = logger;
+            _realTimeProtection = realTimeProtection;
+            _uiEvents = uiEvents;
+            _prefs = preferences ?? new DefaultUserPreferencesAccessor();
+            _exclusions = exclusions ?? new DefaultExclusionSettingsAccessor();
         }
 
         public void Start()
@@ -144,7 +156,7 @@ namespace optiSCAN.Services
 
         private async Task ScheduleScanNewDrivesAsync()
         {
-            if (!UserPreferences.Current.RemovableDriveScanEnabled)
+            if (!_prefs.Current.RemovableDriveScanEnabled)
                 return;
 
             try
@@ -165,19 +177,19 @@ namespace optiSCAN.Services
 
         private async Task ScanRootIfEligibleAsync(string root)
         {
-            if (!UserPreferences.Current.RemovableDriveScanEnabled)
+            if (!_prefs.Current.RemovableDriveScanEnabled)
                 return;
 
             if (!RemovableDriveDiscovery.TryGetDriveInfo(root, out var drive))
                 return;
 
-            if (!RemovableDriveDiscovery.IsWithinSizeLimit(drive.TotalSize, UserPreferences.Current.RemovableDriveMaxSizeGb))
+            if (!RemovableDriveDiscovery.IsWithinSizeLimit(drive.TotalSize, _prefs.Current.RemovableDriveMaxSizeGb))
             {
                 AppLogger.Info("RemovableDriveScan", $"Lecteur ignoré (taille) : {root}");
                 return;
             }
 
-            if (ExclusionSettings.Current.IsFolderExcluded(root))
+            if (_exclusions.Current.IsFolderExcluded(root))
             {
                 AppLogger.Info("RemovableDriveScan", $"Lecteur exclu : {root}");
                 return;
@@ -203,18 +215,18 @@ namespace optiSCAN.Services
         private async Task RunScanAsync(string root)
         {
             var driveLabel = RemovableDriveDiscovery.GetDriveDisplayLabel(root);
-            var detailed = UserPreferences.Current.RemovableDriveScanDetailed;
+            var detailed = _prefs.Current.RemovableDriveScanDetailed;
             AppLogger.Info("RemovableDriveScan", $"Analyse du lecteur {root}… (mode {(detailed ? "complet" : "rapide")})");
 
             NotifyScanStatus(RemovableDriveScanPhase.Started, root, driveLabel, 0, 0);
 
-            if (UserPreferences.Current.ActionNotificationsEnabled)
+            if (_prefs.Current.ActionNotificationsEnabled)
                 _notifications.ShowRemovableDriveScanStarted(driveLabel);
 
             ScanResult? result = null;
             var scanSucceeded = false;
 
-            ServiceContainer.Default.RealTimeProtection.Suspend();
+            _realTimeProtection.Suspend();
             try
             {
                 using var cts = new CancellationTokenSource(detailed ? DetailedScanTimeout : QuickScanTimeout);
@@ -237,12 +249,12 @@ namespace optiSCAN.Services
                 if (scanSucceeded && result != null)
                 {
                     _logger.SaveScanResult(result);
-                    UserPreferences.Current.IncrementScanCount(ScanType.RemovableDrive);
-                    ServiceContainer.Default.RequestScanHistoryViewsRefresh();
+                    _prefs.Current.IncrementScanCount(ScanType.RemovableDrive);
+                    _uiEvents.RequestScanHistoryViewsRefresh();
 
                     if (result.Threats.Count > 0)
                     {
-                        if (ExclusionSettings.Current.AutoQuarantineEnabled)
+                        if (_exclusions.Current.AutoQuarantineEnabled)
                         {
                             int n = 0;
                             foreach (var threat in result.Threats.ToList())
@@ -256,7 +268,7 @@ namespace optiSCAN.Services
                             if (n > 0)
                             {
                                 AppLogger.Info("RemovableDriveScan", $"{n} fichier(s) mis en quarantaine sur {root}.");
-                                ServiceContainer.Default.RequestScanHistoryViewsRefresh();
+                                _uiEvents.RequestScanHistoryViewsRefresh();
                             }
                         }
 
@@ -264,14 +276,14 @@ namespace optiSCAN.Services
                             ThreatDetected?.Invoke(this, threat);
                     }
 
-                    if (UserPreferences.Current.ActionNotificationsEnabled)
+                    if (_prefs.Current.ActionNotificationsEnabled)
                         _notifications.ShowRemovableDriveScanCompleted(
                             driveLabel, result.Threats.Count, result.FilesScanned);
                 }
             }
             finally
             {
-                ServiceContainer.Default.RealTimeProtection.Resume();
+                _realTimeProtection.Resume();
 
                 var phase = scanSucceeded ? RemovableDriveScanPhase.Completed : RemovableDriveScanPhase.Failed;
                 var threats = result?.Threats.Count ?? 0;
@@ -298,7 +310,8 @@ namespace optiSCAN.Services
                     root,
                     RemovableDriveDiscovery.QuickScanMaxFiles,
                     ct,
-                    RiskyFileEnumTimeout),
+                    RiskyFileEnumTimeout,
+                    _exclusions),
                 ct).ConfigureAwait(false);
 
             AppLogger.Info("RemovableDriveScan",
@@ -531,7 +544,8 @@ namespace optiSCAN.Services
             string root,
             int maxFiles,
             CancellationToken ct,
-            TimeSpan? enumerationTimeout = null)
+            TimeSpan? enumerationTimeout = null,
+            IExclusionSettingsAccessor? exclusions = null)
         {
             var list = new List<string>(Math.Min(maxFiles, 256));
             if (!Directory.Exists(root) || maxFiles <= 0)
@@ -540,7 +554,7 @@ namespace optiSCAN.Services
             var deadline = enumerationTimeout.HasValue
                 ? DateTime.UtcNow + enumerationTimeout.Value
                 : DateTime.MaxValue;
-            var excl = ExclusionSettings.Current;
+            var excl = (exclusions ?? new DefaultExclusionSettingsAccessor()).Current;
             var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
             foreach (var ext in RiskyFileExtensions.All)

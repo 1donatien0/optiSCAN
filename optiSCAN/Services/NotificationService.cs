@@ -10,14 +10,20 @@ namespace optiSCAN.Services
     /// </summary>
     public class NotificationService
     {
+        private static NotificationService? _activationTarget;
+
         private bool _toastsEnabled = true;
         private static bool _activationHooked;
 
         /// <summary>Émis sur le thread du callback toolkit — le handler doit marshaler vers l'UI WPF.</summary>
         public event EventHandler<ToastActivationEventArgs>? ToastActivated;
 
-        public NotificationService()
+        private readonly IUserPreferencesAccessor _prefs;
+
+        public NotificationService(IUserPreferencesAccessor? preferences = null)
         {
+            _prefs = preferences ?? new DefaultUserPreferencesAccessor();
+            _activationTarget = this;
             EnsureActivationHook();
         }
 
@@ -30,7 +36,7 @@ namespace optiSCAN.Services
         /// <summary>Aligne l'état sur <see cref="UserPreferences.ActionNotificationsEnabled"/>.</summary>
         public void SyncFromUserPreferences()
         {
-            _toastsEnabled = UserPreferences.Current.ActionNotificationsEnabled;
+            _toastsEnabled = _prefs.Current.ActionNotificationsEnabled;
         }
 
         private static void EnsureActivationHook()
@@ -44,6 +50,7 @@ namespace optiSCAN.Services
         internal static void ResetActivationHookForTests()
         {
             _activationHooked = false;
+            _activationTarget = null;
         }
 
         private static void SurActivationToastStatic(ToastNotificationActivatedEventArgsCompat e)
@@ -56,7 +63,7 @@ namespace optiSCAN.Services
                 var virus = parsed.Get("virus");
 
                 var args = new ToastActivationEventArgs(action, file, virus);
-                ServiceContainer.Default.Notifications.DispatchActivation(args);
+                _activationTarget?.DispatchActivation(args);
             }
             catch (Exception ex)
             {

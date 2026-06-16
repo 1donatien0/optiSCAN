@@ -1,0 +1,23 @@
+# Normalisation des fins de ligne (évite les diffs CRLF/LF fantômes entre Windows et CI).
+* text=auto
+
+*.cs     text diff=csharp
+*.csproj text
+*.props  text
+*.targets text
+*.sln    text
+*.xaml   text
+*.cpp    text
+*.h      text
+*.yml    text
+*.md     text
+*.json   text
+*.ps1    text
+*.sh     text eol=lf
+
+*.png    binary
+*.ico    binary
+*.dll    binary
+*.exe    binary
+*.zip    binary
+*.crt    binary

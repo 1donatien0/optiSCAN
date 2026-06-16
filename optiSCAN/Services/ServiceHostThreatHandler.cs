@@ -3,21 +3,43 @@ using optiSCAN.Models;
 namespace optiSCAN.Services;
 
 /// <summary>Gestion des menaces détectées par le moteur --service-host (sans UI).</summary>
-internal static class ServiceHostThreatHandler
+internal sealed class ServiceHostThreatHandler
 {
-    public static void OnThreatDetected(object? sender, ThreatInfo threat)
+    private readonly IServiceHostThreatContext _context;
+    private readonly IExclusionSettingsAccessor _exclusions;
+    private readonly IUserPreferencesAccessor _prefs;
+
+    public ServiceHostThreatHandler(IProtectionServiceHostDependencies container)
+        : this(
+            (IServiceHostThreatContext)container,
+            container.ExclusionSettingsAccessor,
+            container.UserPreferencesAccessor)
+    {
+    }
+
+    internal ServiceHostThreatHandler(
+        IServiceHostThreatContext context,
+        IExclusionSettingsAccessor exclusions,
+        IUserPreferencesAccessor preferences)
+    {
+        _context = context;
+        _exclusions = exclusions;
+        _prefs = preferences;
+    }
+
+    public void OnThreatDetected(object? sender, ThreatInfo threat)
     {
         try
         {
-            if (ExclusionSettings.Current.AutoQuarantineEnabled)
+            if (_exclusions.Current.AutoQuarantineEnabled)
             {
-                var repair = ThreatRepairService.TryRemediate(threat, ServiceContainer.Default.Quarantine);
-                ServiceContainer.Default.Logger.WriteToLog(
+                var repair = ThreatRepairService.TryRemediate(threat, _context.Quarantine, _prefs);
+                _context.Logger.WriteToLog(
                     $"[ServiceHost] Remédiation {threat.FilePath}: {repair.Message}");
             }
             else
             {
-                ServiceContainer.Default.Logger.WriteToLog(
+                _context.Logger.WriteToLog(
                     $"[ServiceHost] Menace {threat.VirusName} — {threat.FilePath}");
             }
 
@@ -29,15 +51,15 @@ internal static class ServiceHostThreatHandler
         }
     }
 
-    private static async Task EnrichCloudAsync(ThreatInfo threat)
+    private async Task EnrichCloudAsync(ThreatInfo threat)
     {
         try
         {
-            var summary = await ServiceContainer.Default.CloudThreatIntel
+            var summary = await _context.CloudThreatIntel
                 .EnrichThreatAsync(threat).ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(summary))
             {
-                ServiceContainer.Default.Logger.WriteToLog(
+                _context.Logger.WriteToLog(
                     $"[ServiceHost] Réputation cloud — {threat.FilePath}: {summary}");
             }
         }

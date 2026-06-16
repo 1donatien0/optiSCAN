@@ -27,7 +27,7 @@ jobs:
       - name: Restore NuGet packages
         run: dotnet restore optiSCAN.sln
 
-      - name: Build (Release)
+      - name: Build (Release, warnings as errors)
         run: dotnet build optiSCAN.sln --configuration Release --no-restore
 
       - name: Run tests (Release)
@@ -35,6 +35,7 @@ jobs:
           dotnet test optiSCAN.Tests/optiSCAN.Tests.csproj
           --configuration Release
           --no-build
+          --settings optiSCAN.Tests/coverlet.runsettings
           --logger "trx;LogFileName=test-results.trx"
           --results-directory TestResults
           --collect:"XPlat Code Coverage"
@@ -53,6 +54,30 @@ jobs:
           name: coverage-report
           path: TestResults/**/coverage.cobertura.xml
           retention-days: 14
+
+      - name: Code coverage summary and threshold
+        if: always()
+        shell: pwsh
+        run: |
+          $floor = 0.40
+          $target = 0.50
+          $file = Get-ChildItem -Path TestResults -Recurse -Filter coverage.cobertura.xml -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $file) {
+            Write-Error "No coverage file found."
+            exit 1
+          }
+          [xml]$xml = Get-Content $file.FullName
+          $lineRate = [double]$xml.coverage.'line-rate'
+          $branchRate = [double]$xml.coverage.'branch-rate'
+          Write-Host ("Line coverage: {0:P1} (floor {1:P0}, target {2:P0})" -f $lineRate, $floor, $target)
+          Write-Host ("Branch coverage: {0:P1}" -f $branchRate)
+          if ($lineRate -lt $target) {
+            Write-Host "::warning::Line coverage below progressive target ($([int]($target * 100))%)."
+          }
+          if ($lineRate -lt $floor) {
+            Write-Error "Line coverage below minimum floor."
+            exit 1
+          }
 
       - name: Build (Debug)
         run: dotnet build optiSCAN.sln --configuration Debug --no-restore
@@ -92,6 +117,11 @@ jobs:
         shell: pwsh
         run: pwsh -File scripts/fetch-runtime-deps.ps1 -RunFreshclam -FreshclamTimeoutMinutes 45
 
+      - name: Build AMSI provider (x64 Release)
+        shell: pwsh
+        continue-on-error: true
+        run: pwsh -File scripts/build-amsi.ps1
+
       - name: Publish win-x64 (self-contained)
         run: >
           dotnet publish optiSCAN/optiSCAN.csproj
@@ -114,6 +144,10 @@ jobs:
         shell: pwsh
         run: pwsh -File scripts/stage-runtime-deps.ps1 -PublishDir publish/win-x64
 
+      - name: Stage AMSI provider DLL
+        shell: pwsh
+        run: pwsh -File scripts/stage-amsi.ps1 -PublishDir publish/win-x64
+
       - name: Verify runtime dependencies (ClamAV + YARA)
         shell: pwsh
         run: pwsh -File scripts/verify-runtime-deps.ps1 -PublishDir publish/win-x64
@@ -124,6 +158,17 @@ jobs:
       - name: Build installer (Inno Setup)
         shell: pwsh
         run: pwsh -File installer/build-release-setup.ps1 -SkipPublish -PublishDir publish/win-x64
+
+      - name: Generate SBOM (CycloneDX)
+        shell: pwsh
+        run: pwsh -File scripts/generate-sbom.ps1 -OutputDir sbom
+
+      - name: Upload SBOM artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: optiSCAN-sbom-${{ github.sha }}
+          path: sbom/*.json
+          retention-days: 90
 
       - name: Upload publish artifact
         uses: actions/upload-artifact@v4
