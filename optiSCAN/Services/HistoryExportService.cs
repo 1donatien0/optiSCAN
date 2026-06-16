@@ -7,7 +7,7 @@ using SaveFileDialog = Microsoft.Win32.SaveFileDialog;
 namespace optiSCAN.Services
 {
     /// <summary>Export HTML/PDF de l'historique — logique extraite de <see cref="MainWindow"/>.</summary>
-    public sealed class HistoryExportService
+    public sealed class HistoryExportService : IHistoryExportService
     {
         private readonly IUserPreferencesAccessor _prefs;
 

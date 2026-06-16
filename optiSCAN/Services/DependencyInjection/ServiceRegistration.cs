@@ -81,8 +81,9 @@ public static class ServiceRegistration
                 sp.GetRequiredService<IUiEventBus>(),
                 sp.GetRequiredService<IUserPreferencesAccessor>(),
                 sp.GetRequiredService<IExclusionSettingsAccessor>()));
+        services.AddSingleton<IHistoryExportService, HistoryExportService>();
         services.AddSingleton<HistoryExportService>(sp =>
-            new HistoryExportService(sp.GetRequiredService<IUserPreferencesAccessor>()));
+            (HistoryExportService)sp.GetRequiredService<IHistoryExportService>());
         services.AddSingleton<ScheduledScanService>();
         return services;
     }

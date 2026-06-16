@@ -19,7 +19,7 @@ namespace optiSCAN.Services
 
         private static System.Threading.Timer? _timer;
         private static volatile bool _active;
-        private static DateTime _lastCheckUtc = DateTime.MinValue;
+        private static long _lastCheckUtcTicks;
         private static IUserPreferencesAccessor _prefs = new DefaultUserPreferencesAccessor();
 
         public static bool IsActive => _active;
@@ -48,10 +48,13 @@ namespace optiSCAN.Services
         {
             if (!_prefs.Current.GameModeAutoEnabled)
                 return false;
-            if ((DateTime.UtcNow - _lastCheckUtc) > TimeSpan.FromSeconds(25))
+            if ((DateTime.UtcNow - LastCheckUtc) > TimeSpan.FromSeconds(25))
                 Refresh();
             return _active;
         }
+
+        private static DateTime LastCheckUtc =>
+            new(Volatile.Read(ref _lastCheckUtcTicks), DateTimeKind.Utc);
 
         /// <summary>Heuristique nom de processus « jeu » (tests unitaires).</summary>
         internal static bool IsKnownGameProcessName(string processName) =>
@@ -62,12 +65,12 @@ namespace optiSCAN.Services
         {
             Stop();
             _active = active;
-            _lastCheckUtc = DateTime.UtcNow;
+            Volatile.Write(ref _lastCheckUtcTicks, DateTime.UtcNow.Ticks);
         }
 
         private static void Refresh()
         {
-            _lastCheckUtc = DateTime.UtcNow;
+            Volatile.Write(ref _lastCheckUtcTicks, DateTime.UtcNow.Ticks);
             try
             {
                 _active = IsForegroundFullscreen() || IsKnownGameProcessRunning();
