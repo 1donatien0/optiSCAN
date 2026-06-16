@@ -50,6 +50,10 @@ namespace optiSCAN
         private readonly ToastActivationCoordinator _toastActivation = new();
         private readonly StatusFooterCoordinator _statusFooter = new();
         private readonly MainWindowStartupCoordinator _startup = new();
+        private readonly ManualSignatureUpdateCoordinator _manualSignatureUpdate = new();
+        private readonly AntivirusSidebarCoordinator _antivirusSidebar = new();
+        private readonly UsbScanStatusCoordinator _usbScanStatus = new();
+        private readonly HistoryRefreshCoordinator _historyRefresh = new();
         private readonly RoutedCommand _quickScanShortcutCommand = new();
         private bool _isClosing = false;
         private bool _wasScanning;
@@ -408,30 +412,18 @@ namespace optiSCAN
             _ = RefreshAntivirusStatusCoreAsync();
         }
 
-        private async Task RefreshAntivirusStatusCoreAsync()
+        private Task RefreshAntivirusStatusCoreAsync() =>
+            _antivirusSidebar.RefreshAsync(BuildAntivirusSidebarHost());
+
+        private AntivirusSidebarCoordinator.Host BuildAntivirusSidebarHost() => new()
         {
-            bool clamAvOk = await Task.Run(() => _container.ClamAv.IsClamAvInstalled()).ConfigureAwait(true);
-            int yaraRules = _container.Yara.RulesCount;
-
-            if (txtSidebarClamAvBadge != null)
-            {
-                txtSidebarClamAvBadge.Text = clamAvOk ? LocalizationService.GetString("Main_ClamBadgeActive") : LocalizationService.GetString("Main_ClamBadgeMissing");
-                txtSidebarClamAvBadge.Foreground = clamAvOk
-                    ? ThemeUiBrushes.Get("SuccessGreen", txtSidebarClamAvBadge)
-                    : ThemeUiBrushes.Get("DangerRed", txtSidebarClamAvBadge);
-            }
-
-            if (icoSidebarClamAv != null)
-            {
-                icoSidebarClamAv.Kind = clamAvOk ? PackIconKind.ShieldCheck : PackIconKind.ShieldOff;
-                icoSidebarClamAv.Foreground = clamAvOk
-                    ? ThemeUiBrushes.Get("SuccessGreen", icoSidebarClamAv)
-                    : ThemeUiBrushes.Get("DangerRed", icoSidebarClamAv);
-            }
-
-            var clamMode = _container.ClamActiveEngine;
-            (panelOverview as IOverviewPanel)?.UpdateAntivirusCardStatus(clamAvOk, yaraRules, clamMode);
-        }
+            IsClamAvInstalled = () => _container.ClamAv.IsClamAvInstalled(),
+            GetYaraRulesCount = () => _container.Yara.RulesCount,
+            GetClamActiveEngine = () => _container.ClamActiveEngine,
+            OverviewPanel = panelOverview as IOverviewPanel,
+            SidebarClamBadge = txtSidebarClamAvBadge,
+            SidebarClamIcon = icoSidebarClamAv,
+        };
 
         private void RefreshQuarantineList()
         {
@@ -446,21 +438,14 @@ namespace optiSCAN
 
         private void RefreshHistory()
         {
-            var sessions = _container.Logger.GetHistory();
-            (panelHistory as Views.HistoryControl)?.RefreshTimeline();
-            ApplyLastScanSummary(sessions);
-            (panelOverview as Views.OverviewControl)?.UpdateProtectionStatistics(sessions);
-            RefreshOverviewProtectionAndRecommendations();
-        }
-
-        /// <summary>Synchronise « Dernière analyse » (vue d’ensemble + colonne Antivirus) avec l’historique réel.</summary>
-        private void ApplyLastScanSummary(IReadOnlyList<ScanSession> sessions)
-        {
-            ScanSession? last = sessions.Count == 0
-                ? null
-                : sessions.OrderByDescending(s => s.StartedAt).First();
-            (panelOverview as Views.OverviewControl)?.UpdateLastScanSummary(last);
-            (panelAntivirus as Views.AntivirusView)?.UpdateLastScanDisplay(last?.StartedAt);
+            _historyRefresh.Refresh(new HistoryRefreshCoordinator.Host
+            {
+                Logger = _container.Logger,
+                HistoryPanel = panelHistory as Views.HistoryControl,
+                OverviewPanel = panelOverview as Views.OverviewControl,
+                AntivirusPanel = panelAntivirus as Views.AntivirusView,
+                RefreshOverviewProtection = RefreshOverviewProtectionAndRecommendations,
+            });
         }
 
         private void SurMenaceTempsReelDetectee(object? sender, ThreatInfo threat)
@@ -476,28 +461,12 @@ namespace optiSCAN
         private void SurStatutAnalyseUsb(object? sender, RemovableDriveScanStatusEventArgs e)
         {
             Dispatcher.BeginInvoke(() =>
-            {
-                if (e.Phase == RemovableDriveScanPhase.Started)
+                _usbScanStatus.Handle(e, new UsbScanStatusCoordinator.Host
                 {
-                    SetStatus(
-                        LocalizationService.Format("Status_UsbScanStarting", e.DriveLabel),
-                        iconKindName: UiIconKinds.Refresh);
-                    return;
-                }
-
-                if (e.Phase == RemovableDriveScanPhase.Failed)
-                {
-                    SetStatus(
-                        LocalizationService.Format("Status_UsbScanFailed", e.DriveLabel),
-                        isError: true);
-                    return;
-                }
-
-                SetStatus(
-                    LocalizationService.Format("Status_UsbScanComplete", e.DriveLabel, e.FilesScanned, e.ThreatsFound),
-                    isWarning: e.ThreatsFound > 0,
-                    iconKindName: e.ThreatsFound > 0 ? null : UiIconKinds.Success);
-            }, DispatcherPriority.Background);
+                    SetStatus = (text, isError, isWarning, icon) =>
+                        SetStatus(text, isError, isWarning, icon),
+                }),
+                DispatcherPriority.Background);
         }
 
         private void SurActionAntivirusTerminee(object? sender, ActionResult result)
@@ -757,73 +726,35 @@ namespace optiSCAN
 
         private async void BtnManualUpdateSignatures_Click(object sender, RoutedEventArgs e)
         {
-            // Deux déclenchements rapprochés (carte Vue d'ensemble + bouton, ou double-clic)
-            // lançaient un second flux qui voyait « déjà en cours » et dont le finally
-            // remettait l'UI à l'état « terminé » pendant que le premier flux continuait.
-            if (!_signatureUpdateRunner.TryEnterUpdate())
-            {
-                SetStatus(OptiscanStrings.StatusUpdates.SignaturesUpdateAlreadyRunning, isWarning: true);
-                return;
-            }
-
-            SetStatus(OptiscanStrings.StatusUpdates.FullSignaturesUpdateStarting, iconKindName: UiIconKinds.Refresh);
-            RefreshLiveFooter();
             var antivirusView = panelAntivirus as Views.AntivirusView;
-            var completedOk = true;
-
-            try
+            await _manualSignatureUpdate.RunAsync(new ManualSignatureUpdateCoordinator.Host
             {
-                await Task.Yield();
-
-                if (antivirusView != null)
-                    antivirusView.SetSignatureUpdating(true);
-
-                completedOk = await _signatureUpdateRunner.RunFullUpdateAsync(
-                    _container.FreshclamUpdater,
-                    _container.RulesUpdater,
-                    line => antivirusView?.AppendSignatureLog(line)).ConfigureAwait(true);
-
-                _container.SignatureStatus.InvalidateCache();
-                await RefreshSignaturesDisplayAsync(forceRefresh: true);
-            }
-            catch (Exception ex)
-            {
-                completedOk = false;
-                AppLogger.Error("MainWindow", "BtnManualUpdateSignatures_Click", ex);
-                antivirusView?.AppendSignatureLog(UiLogText.Error($"Erreur : {ex.Message}"));
-                SetStatus(LocalizationService.Format("Status_UpdateError", ex.Message), isError: true);
-            }
-            finally
-            {
-                antivirusView?.SetSignatureUpdating(false);
-                await RefreshSignaturesDisplayAsync(); // inclut désormais YaraRulesCount + YaraStatus
-                if (completedOk)
-                    SetStatus(OptiscanStrings.StatusUpdates.FullSignaturesUpdateFinished);
-                else
-                    SetStatus(OptiscanStrings.StatusUpdates.FullSignaturesUpdateFinishedWithErrors, isWarning: true);
-
-                RefreshLiveFooter();
-                _signatureUpdateRunner.ReleaseUpdate();
-            }
+                Runner = _signatureUpdateRunner,
+                Freshclam = _container.FreshclamUpdater,
+                Rules = _container.RulesUpdater,
+                SignatureStatus = _container.SignatureStatus,
+                SetStatus = (text, isError, isWarning, icon) =>
+                    SetStatus(text, isError, isWarning, icon),
+                RefreshLiveFooter = RefreshLiveFooter,
+                RefreshSignaturesDisplayAsync = force => RefreshSignaturesDisplayAsync(force),
+                SetSignatureUpdating = updating => antivirusView?.SetSignatureUpdating(updating),
+                AppendSignatureLog = line => antivirusView?.AppendSignatureLog(line),
+            }).ConfigureAwait(true);
         }
 
         /// <summary>Annule la mise à jour de signatures en cours (freshclam.exe + règles YARA).</summary>
         public void BtnStopUpdateSignatures_Click(object sender, RoutedEventArgs e)
         {
-            SetStatus(OptiscanStrings.StatusUpdates.SignaturesUpdateStopping, iconKindName: UiIconKinds.Stop);
             var antivirusView = panelAntivirus as Views.AntivirusView;
-
-            // Annulation effective des process en cours (freshclam.exe + règles YARA).
-            // Sans cet appel, le bouton ne faisait que masquer le spinner pendant
-            // que freshclam continuait à tourner en arrière-plan.
-            try { _container.FreshclamUpdater.CancelUpdate(); }
-            catch (Exception ex) { AppLogger.Warn("MainWindow", "CancelUpdate ClamAV", ex); }
-
-            try { _container.RulesUpdater.CancelUpdate(); }
-            catch (Exception ex) { AppLogger.Warn("MainWindow", "CancelUpdate règles", ex); }
-
-            antivirusView?.AppendSignatureLog(LocalizationService.GetString("Status_SigInterrupted"));
-            antivirusView?.SetSignatureUpdating(false);
+            _manualSignatureUpdate.Stop(new ManualSignatureUpdateCoordinator.StopHost
+            {
+                Freshclam = _container.FreshclamUpdater,
+                Rules = _container.RulesUpdater,
+                SetStatus = (text, isError, isWarning, icon) =>
+                    SetStatus(text, isError, isWarning, icon),
+                AppendSignatureLog = msg => antivirusView?.AppendSignatureLog(msg),
+                SetSignatureUpdating = updating => antivirusView?.SetSignatureUpdating(updating),
+            });
         }
     }
 }
