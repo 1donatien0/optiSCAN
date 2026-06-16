@@ -9,6 +9,7 @@ namespace optiSCAN.Services
     /// Points d'entrée légitimes pour <see cref="Default"/> / <see cref="UiEvents"/> / <see cref="Views"/> :
     /// <see cref="App"/> (bootstrap), <see cref="ProtectionServiceHost"/>,
     /// <see cref="ViewModels.ScanViewModel"/> sans paramètre, et repli avant <c>Bind</c> des vues.
+    /// Le bus UI est implémenté par <see cref="UiEventBus"/> (singleton DI partagé).
     /// </summary>
     [SupportedOSPlatform("windows")]
     public sealed class ServiceContainer : IViewServices
@@ -19,12 +20,13 @@ namespace optiSCAN.Services
         public static ServiceContainer Default => _default.Value;
 
         /// <summary>Bus UI (événements inter-panneaux) — même instance que <see cref="Default"/>.</summary>
-        public static IUiEventBus UiEvents => Default;
+        public static IUiEventBus UiEvents => Default._uiEventBus;
 
         /// <summary>Façade vues (bus + services) — même instance que <see cref="Default"/>.</summary>
         public static IViewServices Views => Default;
 
         private readonly IServiceProvider _services;
+        private readonly UiEventBus _uiEventBus;
         private bool _shutdownDone;
 
         // ── Services singleton ───────────────────────────────────────────────────
@@ -90,10 +92,13 @@ namespace optiSCAN.Services
         /// signatures (ex. carte « Mise à jour » de l’accueil). Écouté par MainWindow.
         /// Évite que les vues appellent directement BtnManualUpdateSignatures_Click.
         /// </summary>
-        public event EventHandler? RequestSignatureUpdate;
+        public event EventHandler? RequestSignatureUpdate
+        {
+            add => _uiEventBus.RequestSignatureUpdate += value;
+            remove => _uiEventBus.RequestSignatureUpdate -= value;
+        }
 
-        public void TriggerSignatureUpdate() =>
-            RequestSignatureUpdate?.Invoke(this, EventArgs.Empty);
+        public void TriggerSignatureUpdate() => _uiEventBus.TriggerSignatureUpdate();
 
         /// <summary>Active ou arrête la protection temps réel et persiste dans <see cref="ExclusionSettings"/>.</summary>
         public void ApplyRealtimeProtection(bool enabled)
@@ -210,17 +215,13 @@ namespace optiSCAN.Services
                 TamperProtection.DeleteWatchdogTask();
         }
 
-        private EventHandler? _protectionStateRefreshHandlers;
-
-        /// <summary>Demande aux vues bindées de recalculer le badge de protection.</summary>
         public event EventHandler? ProtectionStateRefreshRequested
         {
-            add => _protectionStateRefreshHandlers += value;
-            remove => _protectionStateRefreshHandlers -= value;
+            add => _uiEventBus.ProtectionStateRefreshRequested += value;
+            remove => _uiEventBus.ProtectionStateRefreshRequested -= value;
         }
 
-        public void RequestProtectionStateRefresh() =>
-            _protectionStateRefreshHandlers?.Invoke(this, EventArgs.Empty);
+        public void RequestProtectionStateRefresh() => _uiEventBus.RequestProtectionStateRefresh();
 
         /// <summary>Restaure RTP et MAJ auto selon les préférences persistées (appel au démarrage UI).</summary>
         public void ApplyPreferencesOnStartup()
@@ -284,82 +285,69 @@ namespace optiSCAN.Services
                 RemovableDriveScan.Stop();
         }
 
-        // Demandes UI (export, onglet Signatures, etc.) : événements nommés plutôt que des
-        // callbacks assignables après coup — si personne n’est abonné, l’appel est simplement ignoré.
+        // Demandes UI (export, onglet Signatures, etc.) : déléguées à <see cref="UiEventBus"/>.
 
-        private EventHandler? _focusAntivirusSignaturesHandlers;
-        /// <summary>Demande d’afficher l’onglet Signatures (écouteur : <see cref="optiSCAN.MainWindow"/>).</summary>
         public event EventHandler? FocusAntivirusSignaturesRequested
         {
-            add => _focusAntivirusSignaturesHandlers += value;
-            remove => _focusAntivirusSignaturesHandlers -= value;
+            add => _uiEventBus.FocusAntivirusSignaturesRequested += value;
+            remove => _uiEventBus.FocusAntivirusSignaturesRequested -= value;
         }
 
-        /// <summary>Demande d’afficher l’onglet Signatures dans Analyser (panneau Antivirus).</summary>
         public void RequestFocusAntivirusSignaturesTab() =>
-            _focusAntivirusSignaturesHandlers?.Invoke(this, EventArgs.Empty);
+            _uiEventBus.RequestFocusAntivirusSignaturesTab();
 
-        private EventHandler? _scanHistoryViewsRefreshHandlers;
-        /// <summary>Synchronise grilles d’historique et libellé « dernière analyse » (vues multiples).</summary>
         public event EventHandler? ScanHistoryViewsRefreshRequested
         {
-            add => _scanHistoryViewsRefreshHandlers += value;
-            remove => _scanHistoryViewsRefreshHandlers -= value;
+            add => _uiEventBus.ScanHistoryViewsRefreshRequested += value;
+            remove => _uiEventBus.ScanHistoryViewsRefreshRequested -= value;
         }
 
-        /// <summary>Demande un rafraîchissement des vues d’historique (thread UI : écouteur).</summary>
         public void RequestScanHistoryViewsRefresh() =>
-            _scanHistoryViewsRefreshHandlers?.Invoke(this, EventArgs.Empty);
+            _uiEventBus.RequestScanHistoryViewsRefresh();
 
-        private EventHandler? _exportScanHistoryHtmlHandlers;
-        /// <summary>Demande l’export HTML du rapport (écouteur : <see cref="optiSCAN.MainWindow"/>).</summary>
         public event EventHandler? ExportScanHistoryHtmlRequested
         {
-            add => _exportScanHistoryHtmlHandlers += value;
-            remove => _exportScanHistoryHtmlHandlers -= value;
+            add => _uiEventBus.ExportScanHistoryHtmlRequested += value;
+            remove => _uiEventBus.ExportScanHistoryHtmlRequested -= value;
         }
 
         public void RequestExportScanHistoryHtml() =>
-            _exportScanHistoryHtmlHandlers?.Invoke(this, EventArgs.Empty);
+            _uiEventBus.RequestExportScanHistoryHtml();
 
-        private EventHandler<Models.ScanSession>? _exportScanSessionPdfHandlers;
-        /// <summary>Export PDF d'une session d'historique précise (pas seulement la dernière).</summary>
         public event EventHandler<Models.ScanSession>? ExportScanSessionPdfRequested
         {
-            add => _exportScanSessionPdfHandlers += value;
-            remove => _exportScanSessionPdfHandlers -= value;
+            add => _uiEventBus.ExportScanSessionPdfRequested += value;
+            remove => _uiEventBus.ExportScanSessionPdfRequested -= value;
         }
 
         public void RequestExportScanSessionPdf(Models.ScanSession session) =>
-            _exportScanSessionPdfHandlers?.Invoke(this, session);
+            _uiEventBus.RequestExportScanSessionPdf(session);
 
-        private EventHandler<Models.ScanSession>? _reviewHistorySessionHandlers;
-        /// <summary>Charge les menaces d'une session historique dans Analyse (écouteur : MainWindow).</summary>
         public event EventHandler<Models.ScanSession>? ReviewHistorySessionRequested
         {
-            add => _reviewHistorySessionHandlers += value;
-            remove => _reviewHistorySessionHandlers -= value;
+            add => _uiEventBus.ReviewHistorySessionRequested += value;
+            remove => _uiEventBus.ReviewHistorySessionRequested -= value;
         }
 
         public void RequestReviewHistorySession(Models.ScanSession session) =>
-            _reviewHistorySessionHandlers?.Invoke(this, session);
+            _uiEventBus.RequestReviewHistorySession(session);
 
-        private EventHandler? _openQuarantineTabHandlers;
-        /// <summary>Ouvre l'onglet Quarantaine de l'Antivirus (écouteur : MainWindow).</summary>
         public event EventHandler? OpenQuarantineTabRequested
         {
-            add => _openQuarantineTabHandlers += value;
-            remove => _openQuarantineTabHandlers -= value;
+            add => _uiEventBus.OpenQuarantineTabRequested += value;
+            remove => _uiEventBus.OpenQuarantineTabRequested -= value;
         }
 
         public void RequestOpenQuarantineTab() =>
-            _openQuarantineTabHandlers?.Invoke(this, EventArgs.Empty);
+            _uiEventBus.RequestOpenQuarantineTab();
 
         private ServiceContainer()
         {
             var collection = new ServiceCollection();
             DependencyInjection.ServiceRegistration.AddOptiscanCoreServices(collection);
             _services = collection.BuildServiceProvider();
+
+            _uiEventBus = _services.GetRequiredService<UiEventBus>();
 
             ClamAv = _services.GetRequiredService<ClamAvEngine>();
             ClamAvBackend = _services.GetRequiredService<CompositeClamAvBackend>();
@@ -418,10 +406,7 @@ namespace optiSCAN.Services
             if (_shutdownDone)
                 return;
             _shutdownDone = true;
-            _focusAntivirusSignaturesHandlers = null;
-            _scanHistoryViewsRefreshHandlers = null;
-            _exportScanHistoryHtmlHandlers = null;
-            _exportScanSessionPdfHandlers = null;
+            _uiEventBus.ClearHandlers();
             try { RealTimeProtection.Dispose(); }
             catch (Exception ex) { AppLogger.Warn("ServiceContainer", "RealTimeProtection.Dispose", ex); }
             try { ProcessStartMonitor.Dispose(); }

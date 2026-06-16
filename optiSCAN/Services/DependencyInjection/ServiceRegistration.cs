@@ -7,6 +7,8 @@ public static class ServiceRegistration
 {
     public static IServiceCollection AddOptiscanCoreServices(this IServiceCollection services)
     {
+        services.AddSingleton<UiEventBus>();
+        services.AddSingleton<IUiEventBus>(sp => sp.GetRequiredService<UiEventBus>());
         services.AddSingleton<ClamAvEngine>();
         services.AddSingleton<ClamdEngine>();
         services.AddSingleton<CompositeClamAvBackend>(sp =>
@@ -54,7 +56,8 @@ public static class ServiceRegistration
                 sp.GetRequiredService<QuarantineManager>(),
                 sp.GetRequiredService<NotificationService>(),
                 sp.GetRequiredService<ScanLogManager>(),
-                sp.GetRequiredService<RealTimeProtection>()));
+                sp.GetRequiredService<RealTimeProtection>(),
+                sp.GetRequiredService<IUiEventBus>()));
         services.AddSingleton<ScheduledScanService>();
         return services;
     }

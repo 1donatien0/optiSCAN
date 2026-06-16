@@ -44,6 +44,7 @@ namespace optiSCAN
         private QuarantineManager? _quarantineManager;
         private readonly ExportCoordinator _exportCoordinator = new();
         private readonly OverviewRefreshCoordinator _overviewRefresh = new();
+        private readonly MainWindowServiceEventCoordinator _serviceEvents = new();
         private FreshclamUpdater? _freshclamUpdater;
         private YaraForgeUpdater? _rulesUpdater;
         private SignatureStatusService? _signatureStatus;
@@ -92,8 +93,8 @@ namespace optiSCAN
                     });
 
                 // Services partagés via le singleton applicatif (mêmes instances que ScanViewModel).
-                var c = _container!;
-                _container = c;
+                _container = ServiceContainer.Default;
+                var c = _container;
                 _realTimeProtection = c.RealTimeProtection;
                 _securityPosture = c.SecurityPosture;
                 _clamAvEngine = c.ClamAv;
@@ -141,24 +142,19 @@ namespace optiSCAN
                     historyPanel.Bind(c);
                 BindViewPanels(c);
 
-                var ui = UiBus;
-                // Écoute les demandes de mise à jour émises par les vues
-                // (ex. carte "Update" d'OverviewControl).
-                ui.RequestSignatureUpdate += SurDemandeMiseAJourSignatures;
-                ui.ScanHistoryViewsRefreshRequested += SurDemandeRafraichissementHistorique;
-                ui.ExportScanHistoryHtmlRequested += SurDemandeExportHistoriqueHtml;
-                ui.ExportScanSessionPdfRequested += SurDemandeExportSessionScanPdf;
-                ui.ReviewHistorySessionRequested += SurDemandeRevueSessionHistorique;
-                ui.OpenQuarantineTabRequested += SurDemandeOngletQuarantaine;
-                c.RealTimeProtection.ThreatDetected += SurMenaceTempsReelDetectee;
-                c.ProcessStartMonitor.ThreatDetected += SurMenaceTempsReelDetectee;
-                c.RemovableDriveScan.ThreatDetected += SurMenaceTempsReelDetectee;
-                c.RemovableDriveScan.ScanStatusChanged += SurStatutAnalyseUsb;
-                c.Notifications.ToastActivated -= SurActivationToast;
-                c.Notifications.ToastActivated += SurActivationToast;
-                c.Notifications.SyncFromUserPreferences();
-                c.Actions.ActionCompleted -= SurActionAntivirusTerminee;
-                c.Actions.ActionCompleted += SurActionAntivirusTerminee;
+                _serviceEvents.Attach(
+                    c,
+                    UiBus,
+                    SurDemandeMiseAJourSignatures,
+                    SurDemandeRafraichissementHistorique,
+                    SurDemandeExportHistoriqueHtml,
+                    SurDemandeExportSessionScanPdf,
+                    SurDemandeRevueSessionHistorique,
+                    SurDemandeOngletQuarantaine,
+                    SurMenaceTempsReelDetectee,
+                    SurStatutAnalyseUsb,
+                    SurActivationToast,
+                    SurActionAntivirusTerminee);
 
                 _shellScanCoordinator = new ShellScanCoordinator(
                     Dispatcher,
@@ -424,21 +420,9 @@ namespace optiSCAN
 
         private void UnhookServiceContainerEvents()
         {
-            var c = _container!;
             var ui = UiBus;
-            ui.RequestSignatureUpdate -= SurDemandeMiseAJourSignatures;
-            ui.ScanHistoryViewsRefreshRequested -= SurDemandeRafraichissementHistorique;
-            ui.ExportScanHistoryHtmlRequested -= SurDemandeExportHistoriqueHtml;
-            ui.ExportScanSessionPdfRequested -= SurDemandeExportSessionScanPdf;
-            ui.ReviewHistorySessionRequested -= SurDemandeRevueSessionHistorique;
-            ui.OpenQuarantineTabRequested -= SurDemandeOngletQuarantaine;
             ui.FocusAntivirusSignaturesRequested -= SurDemandeFocusSignaturesAntivirus;
-            c.RealTimeProtection.ThreatDetected -= SurMenaceTempsReelDetectee;
-            c.ProcessStartMonitor.ThreatDetected -= SurMenaceTempsReelDetectee;
-            c.RemovableDriveScan.ThreatDetected -= SurMenaceTempsReelDetectee;
-            c.RemovableDriveScan.ScanStatusChanged -= SurStatutAnalyseUsb;
-            c.Notifications.ToastActivated -= SurActivationToast;
-            c.Actions.ActionCompleted -= SurActionAntivirusTerminee;
+            _serviceEvents.Detach();
         }
 
         // ── Navigation ───────────────────────────────────────────────────────────
