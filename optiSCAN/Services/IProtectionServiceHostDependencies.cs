@@ -11,6 +11,8 @@ public interface IProtectionServiceHostDependencies : IServiceHostThreatContext
 
     IExclusionSettingsAccessor ExclusionSettingsAccessor { get; }
 
+    IUserPreferencesAccessor UserPreferencesAccessor { get; }
+
     ScanOrchestrator Orchestrator { get; }
 
     void ApplyPreferencesOnStartup();

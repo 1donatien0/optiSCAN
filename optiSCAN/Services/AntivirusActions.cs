@@ -16,13 +16,15 @@ namespace optiSCAN.Services
         private readonly ISignatureUpdateCanceller? _freshclam;
         private readonly ISignatureUpdateCanceller? _rules;
         private readonly Func<string, ThreatInfo?>? _threatLookup;
+        private readonly IExclusionSettingsAccessor _exclusions;
 
         public AntivirusActions(ServiceContainer container)
             : this(
                 container.Quarantine,
                 container.FreshclamUpdater,
                 container.RulesUpdater,
-                container.FindKnownThreat)
+                container.FindKnownThreat,
+                ((IProtectionServiceHostDependencies)container).ExclusionSettingsAccessor)
         {
         }
 
@@ -31,12 +33,14 @@ namespace optiSCAN.Services
             QuarantineManager quarantine,
             ISignatureUpdateCanceller? freshclam = null,
             ISignatureUpdateCanceller? rules = null,
-            Func<string, ThreatInfo?>? threatLookup = null)
+            Func<string, ThreatInfo?>? threatLookup = null,
+            IExclusionSettingsAccessor? exclusions = null)
         {
             _quarantine = quarantine;
             _freshclam = freshclam;
             _rules = rules;
             _threatLookup = threatLookup;
+            _exclusions = exclusions ?? new DefaultExclusionSettingsAccessor();
         }
 
         public event EventHandler<ActionResult>? ActionCompleted;
@@ -104,9 +108,9 @@ namespace optiSCAN.Services
             if (string.IsNullOrWhiteSpace(filePath))
                 return Complete(false, LocalizationService.GetString("Av_Action_InvalidPath"), isError: true);
 
-            if (!ExclusionSettings.Current.AddFile(filePath))
+            if (!_exclusions.Current.AddFile(filePath))
             {
-                if (ExclusionSettings.Current.IsFileExcluded(filePath))
+                if (_exclusions.Current.IsFileExcluded(filePath))
                     return Complete(true,
                         LocalizationService.Format("Av_Action_AlreadyExcluded", Path.GetFileName(filePath)),
                         isWarning: true);

@@ -403,6 +403,8 @@ namespace optiSCAN.Services
 
         IExclusionSettingsAccessor IProtectionServiceHostDependencies.ExclusionSettingsAccessor => _exclusionSettings;
 
+        IUserPreferencesAccessor IProtectionServiceHostDependencies.UserPreferencesAccessor => _userPreferences;
+
         /// <summary>
         /// Libère proprement tous les services disposables.
 /// Appelé depuis App.OnExit.

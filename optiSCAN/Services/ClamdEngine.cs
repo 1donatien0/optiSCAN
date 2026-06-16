@@ -11,9 +11,11 @@ namespace optiSCAN.Services
     {
         private readonly ClamAvEngine _fallbackProbe;
         private readonly object _parseLock = new();
+        private readonly IUserPreferencesAccessor _prefs;
 
-        public ClamdEngine()
+        public ClamdEngine(IUserPreferencesAccessor? preferences = null)
         {
+            _prefs = preferences ?? new DefaultUserPreferencesAccessor();
             _fallbackProbe = new ClamAvEngine();
         }
 
@@ -24,7 +26,7 @@ namespace optiSCAN.Services
 
         public async Task<bool> TryEnsureReadyAsync(CancellationToken ct = default)
         {
-            if (!UserPreferences.Current.UseClamdEngine)
+            if (!_prefs.Current.UseClamdEngine)
                 return false;
             if (!ClamdHost.Shared.IsBinaryPresent)
                 return false;

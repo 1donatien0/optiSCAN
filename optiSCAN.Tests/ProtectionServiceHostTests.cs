@@ -52,6 +52,7 @@ public sealed class ProtectionServiceHostTests
         public ProcessStartMonitor ProcessStartMonitor { get; }
         public RemovableDriveScanService RemovableDriveScan { get; }
         public IExclusionSettingsAccessor ExclusionSettingsAccessor { get; } = new DefaultExclusionSettingsAccessor();
+        public IUserPreferencesAccessor UserPreferencesAccessor { get; } = new DefaultUserPreferencesAccessor();
         public ScanOrchestrator Orchestrator => _orchestrator;
         public QuarantineManager Quarantine => _quarantine;
         public ScanLogManager Logger => _logger;

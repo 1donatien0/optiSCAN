@@ -18,9 +18,12 @@ public static class ThreatRepairService
         public bool UsedDefenderFallback { get; init; }
     }
 
-    public static RepairResult TryRemediate(ThreatInfo threat, QuarantineManager quarantine)
+    public static RepairResult TryRemediate(
+        ThreatInfo threat,
+        QuarantineManager quarantine,
+        IUserPreferencesAccessor? preferences = null)
     {
-        if (UserPreferences.Current.BackupBeforeQuarantine)
+        if ((preferences ?? new DefaultUserPreferencesAccessor()).Current.BackupBeforeQuarantine)
             ThreatRemediationService.TryCreateSafetyCopy(threat);
 
         if (quarantine.Quarantine(threat))

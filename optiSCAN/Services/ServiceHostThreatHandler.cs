@@ -7,18 +7,24 @@ internal sealed class ServiceHostThreatHandler
 {
     private readonly IServiceHostThreatContext _context;
     private readonly IExclusionSettingsAccessor _exclusions;
+    private readonly IUserPreferencesAccessor _prefs;
 
     public ServiceHostThreatHandler(IProtectionServiceHostDependencies container)
-        : this((IServiceHostThreatContext)container, container.ExclusionSettingsAccessor)
+        : this(
+            (IServiceHostThreatContext)container,
+            container.ExclusionSettingsAccessor,
+            container.UserPreferencesAccessor)
     {
     }
 
     internal ServiceHostThreatHandler(
         IServiceHostThreatContext context,
-        IExclusionSettingsAccessor exclusions)
+        IExclusionSettingsAccessor exclusions,
+        IUserPreferencesAccessor preferences)
     {
         _context = context;
         _exclusions = exclusions;
+        _prefs = preferences;
     }
 
     public void OnThreatDetected(object? sender, ThreatInfo threat)
@@ -27,7 +33,7 @@ internal sealed class ServiceHostThreatHandler
         {
             if (_exclusions.Current.AutoQuarantineEnabled)
             {
-                var repair = ThreatRepairService.TryRemediate(threat, _context.Quarantine);
+                var repair = ThreatRepairService.TryRemediate(threat, _context.Quarantine, _prefs);
                 _context.Logger.WriteToLog(
                     $"[ServiceHost] Remédiation {threat.FilePath}: {repair.Message}");
             }

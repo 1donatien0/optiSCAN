@@ -12,7 +12,8 @@ public static class ServiceRegistration
         services.AddSingleton<UiEventBus>();
         services.AddSingleton<IUiEventBus>(sp => sp.GetRequiredService<UiEventBus>());
         services.AddSingleton<ClamAvEngine>();
-        services.AddSingleton<ClamdEngine>();
+        services.AddSingleton<ClamdEngine>(sp =>
+            new ClamdEngine(sp.GetRequiredService<IUserPreferencesAccessor>()));
         services.AddSingleton<CompositeClamAvBackend>(sp =>
             new CompositeClamAvBackend(sp.GetRequiredService<ClamdEngine>(), sp.GetRequiredService<ClamAvEngine>()));
         services.AddSingleton<YaraEngine>();
@@ -26,11 +27,16 @@ public static class ServiceRegistration
         services.AddSingleton<NotificationService>(sp =>
             new NotificationService(sp.GetRequiredService<IUserPreferencesAccessor>()));
         services.AddSingleton<ScanOrchestrator>(sp =>
-            new ScanOrchestrator(sp.GetRequiredService<CompositeClamAvBackend>(), sp.GetRequiredService<YaraEngine>()));
+            new ScanOrchestrator(
+                sp.GetRequiredService<CompositeClamAvBackend>(),
+                sp.GetRequiredService<YaraEngine>(),
+                sp.GetRequiredService<IUserPreferencesAccessor>(),
+                sp.GetRequiredService<IExclusionSettingsAccessor>()));
         services.AddSingleton<ClamAvScanEngineAdapter>(sp =>
             new ClamAvScanEngineAdapter(sp.GetRequiredService<ClamAvEngine>()));
         services.AddSingleton<IScanEngine>(sp => sp.GetRequiredService<ClamAvScanEngineAdapter>());
-        services.AddSingleton<ThreatReputationService>();
+        services.AddSingleton<ThreatReputationService>(sp =>
+            new ThreatReputationService(preferences: sp.GetRequiredService<IUserPreferencesAccessor>()));
         services.AddSingleton<IThreatReputationService>(sp => sp.GetRequiredService<ThreatReputationService>());
         services.AddSingleton<CloudThreatIntelService>();
         services.AddSingleton<ISecurityPostureService, SecurityPostureService>();
@@ -57,7 +63,10 @@ public static class ServiceRegistration
                 sp.GetRequiredService<IUserPreferencesAccessor>(),
                 sp.GetRequiredService<IExclusionSettingsAccessor>());
         });
-        services.AddSingleton<TamperProtectionService>();
+        services.AddSingleton<TamperProtectionService>(sp =>
+            new TamperProtectionService(
+                sp.GetRequiredService<IUserPreferencesAccessor>(),
+                sp.GetRequiredService<IExclusionSettingsAccessor>()));
         services.AddSingleton<RemovableDriveScanService>(sp =>
             new RemovableDriveScanService(
                 sp.GetRequiredService<ScanOrchestrator>(),

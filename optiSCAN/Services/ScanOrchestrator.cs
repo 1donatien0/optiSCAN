@@ -19,6 +19,8 @@ namespace optiSCAN.Services
     {
         private readonly IClamAvOrchestratorBackend _clamAv;
         private readonly IYaraOrchestratorBackend _yara;
+        private readonly IUserPreferencesAccessor _prefs;
+        private readonly IExclusionSettingsAccessor _exclusions;
 
         // ── État ─────────────────────────────────────────────────────────────────
 
@@ -41,10 +43,16 @@ namespace optiSCAN.Services
         {
         }
 
-        internal ScanOrchestrator(IClamAvOrchestratorBackend? clamAv = null, IYaraOrchestratorBackend? yara = null)
+        internal ScanOrchestrator(
+            IClamAvOrchestratorBackend? clamAv = null,
+            IYaraOrchestratorBackend? yara = null,
+            IUserPreferencesAccessor? preferences = null,
+            IExclusionSettingsAccessor? exclusions = null)
         {
             _clamAv = clamAv ?? new ClamAvEngine();
             _yara = yara ?? new YaraEngine();
+            _prefs = preferences ?? new DefaultUserPreferencesAccessor();
+            _exclusions = exclusions ?? new DefaultExclusionSettingsAccessor();
         }
 
         // ── API publique ─────────────────────────────────────────────────────────
@@ -55,7 +63,7 @@ namespace optiSCAN.Services
         /// </summary>
         public Task<ScanResult> ScanFileAsync(string filePath, IProgress<ScanProgress>? progress = null, CancellationToken ct = default)
         {
-            if (ExclusionSettings.Current.IsFileExcluded(filePath))
+            if (_exclusions.Current.IsFileExcluded(filePath))
             {
                 return Task.FromResult(new ScanResult
                 {
@@ -88,7 +96,7 @@ namespace optiSCAN.Services
             bool scanEnginesSequentially = false)
         {
             var filtered = files
-                .Where(f => !ExclusionSettings.Current.IsFileExcluded(f))
+                .Where(f => !_exclusions.Current.IsFileExcluded(f))
                 .Distinct(StringComparer.OrdinalIgnoreCase)
                 .ToList();
 
@@ -117,7 +125,7 @@ namespace optiSCAN.Services
         public Task<ScanResult> FullScanAsync(IProgress<ScanProgress>? progress = null, CancellationToken ct = default)
             => RunMultiTargetPipelineAsync(
                 ScanType.FullScan,
-                ScanTargets.FullScanTargets(UserPreferences.Current.IncludeRemovableInFullScan),
+                ScanTargets.FullScanTargets(_prefs.Current.IncludeRemovableInFullScan),
                 progress,
                 ct);
 
@@ -216,7 +224,7 @@ namespace optiSCAN.Services
                 return result;
             }
 
-            if (ExclusionSettings.Current.IsFileExcluded(filePath))
+            if (_exclusions.Current.IsFileExcluded(filePath))
             {
                 result.Status = ScanStatus.Completed;
                 result.FinishedAt = DateTime.Now;
@@ -227,7 +235,7 @@ namespace optiSCAN.Services
             try
             {
                 var allMatches = await _yara.ScanFileAsync(filePath, ct);
-                var excl = ExclusionSettings.Current;
+                var excl = _exclusions.Current;
                 var matches = allMatches
                     .FindAll(m => !excl.IsFileExcluded(m.FilePath) && !excl.IsRuleExcluded(m.RuleName));
 
@@ -324,7 +332,7 @@ namespace optiSCAN.Services
                 });
 
                 var allMatches = await _yara.ScanFilesAsync(files, yaraProgress, ct).ConfigureAwait(false);
-                var exclusions = ExclusionSettings.Current;
+                var exclusions = _exclusions.Current;
                 var filteredMatches = allMatches
                     .Where(m => !exclusions.IsFileExcluded(m.FilePath))
                     .Where(m => !exclusions.IsRuleExcluded(m.RuleName))
@@ -421,7 +429,7 @@ namespace optiSCAN.Services
                         foreach (var file in Directory.EnumerateFiles(folderPath, "*.*", SearchOption.AllDirectories))
                         {
                             if (ct.IsCancellationRequested) break;
-                            if (ExclusionSettings.Current.IsFileExcluded(file))
+                            if (_exclusions.Current.IsFileExcluded(file))
                                 continue;
                             if (++total >= CountCap) { total = UnknownTotalFiles; break; }
                         }
@@ -478,7 +486,7 @@ namespace optiSCAN.Services
                 var allMatches = await _yara.ScanFolderAsync(folderPath, yaraProgress, ct);
 
                 // Filtre exclusions (dossiers + règles ignorées).
-                var exclusions = ExclusionSettings.Current;
+                var exclusions = _exclusions.Current;
                 var filteredMatches = allMatches
                     .Where(m => !exclusions.IsFileExcluded(m.FilePath))
                     .Where(m => !exclusions.IsRuleExcluded(m.RuleName))
