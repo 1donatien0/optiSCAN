@@ -23,6 +23,29 @@ public sealed class RealTimeProtectionTests
   }
 
   [Fact]
+  public void Dispose_can_be_called_twice()
+  {
+    var orch = new ScanOrchestrator(new FakeClam(), new FakeYara());
+    var rtp = new RealTimeProtection(orch, new QuarantineManager(), new NotificationService());
+    rtp.Start();
+    rtp.Dispose();
+    rtp.Dispose();
+    Assert.False(rtp.IsEnabled);
+  }
+
+  [Fact]
+  public void Resume_below_zero_clamps_suspend_count()
+  {
+    var orch = new ScanOrchestrator(new FakeClam(), new FakeYara());
+    var rtp = new RealTimeProtection(orch, new QuarantineManager(), new NotificationService());
+
+    rtp.Resume();
+    rtp.Resume();
+    Assert.False(rtp.IsPaused);
+    rtp.Dispose();
+  }
+
+  [Fact]
   public void Suspend_Resume_controls_IsPaused()
   {
     var orch = new ScanOrchestrator(new FakeClam(), new FakeYara());

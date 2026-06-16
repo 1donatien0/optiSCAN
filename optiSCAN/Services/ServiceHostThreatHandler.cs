@@ -5,10 +5,15 @@ namespace optiSCAN.Services;
 /// <summary>Gestion des menaces détectées par le moteur --service-host (sans UI).</summary>
 internal sealed class ServiceHostThreatHandler
 {
-    private readonly ServiceContainer _container;
+    private readonly IServiceHostThreatContext _context;
 
-    public ServiceHostThreatHandler(ServiceContainer container) =>
-        _container = container;
+    public ServiceHostThreatHandler(ServiceContainer container)
+        : this((IServiceHostThreatContext)container)
+    {
+    }
+
+    internal ServiceHostThreatHandler(IServiceHostThreatContext context) =>
+        _context = context;
 
     public void OnThreatDetected(object? sender, ThreatInfo threat)
     {
@@ -16,13 +21,13 @@ internal sealed class ServiceHostThreatHandler
         {
             if (ExclusionSettings.Current.AutoQuarantineEnabled)
             {
-                var repair = ThreatRepairService.TryRemediate(threat, _container.Quarantine);
-                _container.Logger.WriteToLog(
+                var repair = ThreatRepairService.TryRemediate(threat, _context.Quarantine);
+                _context.Logger.WriteToLog(
                     $"[ServiceHost] Remédiation {threat.FilePath}: {repair.Message}");
             }
             else
             {
-                _container.Logger.WriteToLog(
+                _context.Logger.WriteToLog(
                     $"[ServiceHost] Menace {threat.VirusName} — {threat.FilePath}");
             }
 
@@ -38,11 +43,11 @@ internal sealed class ServiceHostThreatHandler
     {
         try
         {
-            var summary = await _container.CloudThreatIntel
+            var summary = await _context.CloudThreatIntel
                 .EnrichThreatAsync(threat).ConfigureAwait(false);
             if (!string.IsNullOrWhiteSpace(summary))
             {
-                _container.Logger.WriteToLog(
+                _context.Logger.WriteToLog(
                     $"[ServiceHost] Réputation cloud — {threat.FilePath}: {summary}");
             }
         }

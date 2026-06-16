@@ -12,7 +12,7 @@ namespace optiSCAN.Services
     /// Le bus UI est implémenté par <see cref="UiEventBus"/> (singleton DI partagé).
     /// </summary>
     [SupportedOSPlatform("windows")]
-    public sealed class ServiceContainer : IViewServices, IHistoryServices
+    public sealed class ServiceContainer : IViewServices, IHistoryServices, IProtectionServiceHostDependencies
     {
         private static readonly Lazy<ServiceContainer> _default =
             new(() => new ServiceContainer(), LazyThreadSafetyMode.ExecutionAndPublication);
