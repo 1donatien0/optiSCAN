@@ -31,8 +31,13 @@ namespace optiSCAN.ViewModels
         private ActivityEntry? _selectedEntry;
         private object? _selectionKey;
 
+        public HistoryViewModel(IHistoryServices services)
+            : this(services.ActivityLog, services.Quarantine, services.Logger)
+        {
+        }
+
         public HistoryViewModel(ServiceContainer container)
-            : this(container.ActivityLog, container.Quarantine, container.Logger)
+            : this((IHistoryServices)container)
         {
         }
 

@@ -32,11 +32,12 @@ public static class PlatformProtectionStatusService
 {
     private const string AmsiProviderGuid = "{A8F4E2B1-9C3D-4E5F-8A7B-1C2D3E4F5A6B}";
 
-    public static PlatformProtectionStatusReport Evaluate()
+    public static PlatformProtectionStatusReport Evaluate(IUserPreferencesAccessor? preferences = null)
     {
         var items = new List<PlatformComponentStatus>();
+        var prefs = (preferences ?? new DefaultUserPreferencesAccessor()).Current;
 
-        if (UserPreferences.Current.UsePlatformProtectionService)
+        if (prefs.UsePlatformProtectionService)
         {
             var ipc = PlatformProtectionBootstrap.IsRemoteProtectionActive();
             items.Add(new PlatformComponentStatus

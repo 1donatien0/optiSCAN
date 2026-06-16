@@ -20,4 +20,18 @@ public sealed class ServiceRegistrationTests
     Assert.NotNull(rtp);
     Assert.False(rtp.IsEnabled);
   }
+
+  [Fact]
+  public void AddOptiscanCoreServices_resolves_preference_accessors()
+  {
+    var services = new ServiceCollection();
+    services.AddOptiscanCoreServices();
+    using var provider = services.BuildServiceProvider();
+
+    var prefs = provider.GetRequiredService<IUserPreferencesAccessor>();
+    var exclusions = provider.GetRequiredService<IExclusionSettingsAccessor>();
+
+    Assert.NotNull(prefs.Current);
+    Assert.NotNull(exclusions.Current);
+  }
 }

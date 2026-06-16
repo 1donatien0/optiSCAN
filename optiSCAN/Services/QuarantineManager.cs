@@ -50,11 +50,13 @@ namespace optiSCAN.Services
         private QuarantineDocument _doc;
         private readonly object _lock = new();
         private ActivityLogService? _activityLog;
+        private readonly IUserPreferencesAccessor _prefs;
 
         // ── Construction ─────────────────────────────────────────────────────────
 
-        public QuarantineManager(string? quarantineDir = null)
+        public QuarantineManager(string? quarantineDir = null, IUserPreferencesAccessor? preferences = null)
         {
+            _prefs = preferences ?? new DefaultUserPreferencesAccessor();
             _quarantineDir = quarantineDir ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "optiSCAN", "Quarantine");
@@ -145,7 +147,7 @@ namespace optiSCAN.Services
         {
             try
             {
-                if (UserPreferences.Current.BackupBeforeQuarantine)
+                if (_prefs.Current.BackupBeforeQuarantine)
                     ThreatRemediationService.TryCreateSafetyCopy(threat);
 
                 var id = Guid.NewGuid().ToString("N");
@@ -299,6 +301,14 @@ namespace optiSCAN.Services
                         Path.GetFileNameWithoutExtension(entry.FileName) + "_restored" +
                         Path.GetExtension(entry.FileName));
                 }
+
+                if (!IsResolvedPathUnderDirectory(destPath, destinationFolder))
+                {
+                    AppLogger.Warn("QuarantineManager",
+                        $"RestoreTo: chemin hors dossier autorisé ({destPath})");
+                    return false;
+                }
+
                 return RestoreToPath(entry, destPath);
             }
             catch (Exception ex)
@@ -370,6 +380,17 @@ namespace optiSCAN.Services
             }
         }
 
+        /// <summary>Vérifie que <paramref name="candidatePath"/> résolu reste sous <paramref name="destinationFolder"/>.</summary>
+        internal static bool IsResolvedPathUnderDirectory(string candidatePath, string destinationFolder)
+        {
+            var root = Path.GetFullPath(destinationFolder);
+            if (!root.EndsWith(Path.DirectorySeparatorChar))
+                root += Path.DirectorySeparatorChar;
+
+            var full = Path.GetFullPath(candidatePath);
+            return full.StartsWith(root, StringComparison.OrdinalIgnoreCase);
+        }
+
         /// <summary>Refuse la restauration vers les emplacements système critiques (tests via InternalsVisibleTo).</summary>
         internal static bool IsSensitivePath(string fullPath)
         {
@@ -380,6 +401,9 @@ namespace optiSCAN.Services
                 Environment.GetFolderPath(Environment.SpecialFolder.Windows),      // C:\Windows
                 Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
                 Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), // ProgramData
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu),
+                Environment.GetFolderPath(Environment.SpecialFolder.Startup),
             };
 
             foreach (var f in forbidden)

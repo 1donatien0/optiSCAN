@@ -10,28 +10,25 @@ namespace optiSCAN.Services
     /// </summary>
     internal static class AppInstallPaths
     {
-        private static string? _cachedRoot;
+        private static readonly Lazy<string> CachedRoot = new(ResolveRoot, LazyThreadSafetyMode.ExecutionAndPublication);
 
         /// <summary>Racine normalisée sans slash final (Path.GetFullPath).</summary>
-        public static string GetInstallRoot()
-        {
-            if (_cachedRoot != null)
-                return _cachedRoot;
+        public static string GetInstallRoot() => CachedRoot.Value;
 
+        private static string ResolveRoot()
+        {
             var baseDir = AppContext.BaseDirectory;
             if (string.IsNullOrWhiteSpace(baseDir))
                 baseDir = AppDomain.CurrentDomain.BaseDirectory;
 
             try
             {
-                _cachedRoot = Path.GetFullPath(baseDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                return Path.GetFullPath(baseDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
             }
             catch
             {
-                _cachedRoot = baseDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                return baseDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             }
-
-            return _cachedRoot;
         }
 
         /// <summary>Vrai si <paramref name="path"/> désigne un fichier ou dossier sous la racine d’installation.</summary>

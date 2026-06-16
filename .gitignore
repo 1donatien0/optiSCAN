@@ -19,10 +19,12 @@ packages/
 
 # Microsoft Word (audits / brouillons — doc : README.md §12)
 *.docx
+audit_optiSCAN_v8.docx
 ~$*.docx
 
 # Sorties de test / publish locales (racine)
 test-*.txt
+TestResults/
 artifacts/
 _build_verify/
 

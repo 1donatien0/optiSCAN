@@ -14,15 +14,21 @@ namespace optiSCAN.Services
         private const string WatchdogTaskName = "optiSCAN_Watchdog";
 
         private readonly string _exePath;
+        private readonly IUserPreferencesAccessor _prefs;
+        private readonly IExclusionSettingsAccessor _exclusions;
 
-        public TamperProtectionService()
+        public TamperProtectionService(
+            IUserPreferencesAccessor? preferences = null,
+            IExclusionSettingsAccessor? exclusions = null)
         {
+            _prefs = preferences ?? new DefaultUserPreferencesAccessor();
+            _exclusions = exclusions ?? new DefaultExclusionSettingsAccessor();
             _exePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "optiSCAN.exe");
         }
 
         public bool EnsureWatchdogTask()
         {
-            if (!UserPreferences.Current.TamperProtectionEnabled)
+            if (!_prefs.Current.TamperProtectionEnabled)
                 return DeleteWatchdogTask();
 
             try
@@ -90,10 +96,12 @@ namespace optiSCAN.Services
         /// <summary>Exécuté par <c>--watchdog</c> : relance la protection si RTP attendue mais aucune instance.</summary>
         public static void RunWatchdogCheck()
         {
-            if (!ExclusionSettings.Current.RealTimeEnabled || !UserPreferences.Current.TamperProtectionEnabled)
+            var exclusions = new DefaultExclusionSettingsAccessor();
+            var prefs = new DefaultUserPreferencesAccessor();
+            if (!exclusions.Current.RealTimeEnabled || !prefs.Current.TamperProtectionEnabled)
                 return;
 
-            if (UserPreferences.Current.UsePlatformProtectionService)
+            if (prefs.Current.UsePlatformProtectionService)
             {
                 if (PlatformProtectionBootstrap.IsRemoteProtectionActive())
                     return;

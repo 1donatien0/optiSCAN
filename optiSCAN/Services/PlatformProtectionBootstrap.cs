@@ -12,8 +12,16 @@ public static class PlatformProtectionBootstrap
     public const string ServiceName = "optiSCANProtectionV8";
     public const string ServiceDisplayName = "optiSCAN Protection v8";
 
+    private static IUserPreferencesAccessor _prefs = new DefaultUserPreferencesAccessor();
+
+    public static void Initialize(IUserPreferencesAccessor? preferences = null)
+    {
+        if (preferences != null)
+            _prefs = preferences;
+    }
+
     public static bool IsPlatformModeEnabled() =>
-        UserPreferences.Current.UsePlatformProtectionService;
+        _prefs.Current.UsePlatformProtectionService;
 
     public static bool IsRemoteProtectionActive()
     {

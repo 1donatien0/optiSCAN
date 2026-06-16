@@ -12,7 +12,12 @@ namespace optiSCAN.Services
         /// Fusionne deux résultats moteur. Statistiques : un seul compteur de fichiers/octets
         /// (<see cref="ScanResult.FilesScanned"/> = max des moteurs, octets = ClamAV).
         /// </summary>
-        public static ScanResult Merge(ScanType type, string target, ScanResult clamResult, ScanResult yaraResult)
+        public static ScanResult Merge(
+            ScanType type,
+            string target,
+            ScanResult clamResult,
+            ScanResult yaraResult,
+            IExclusionSettingsAccessor? exclusions = null)
         {
             var merged = new ScanResult
             {
@@ -28,7 +33,7 @@ namespace optiSCAN.Services
                     : ScanStatus.Completed
             };
 
-            var excl = ExclusionSettings.Current;
+            var excl = (exclusions ?? new DefaultExclusionSettingsAccessor()).Current;
             var clamByPath = AggregateThreatsByPath(
                 clamResult.Threats.Where(t => !excl.IsFileExcluded(t.FilePath)));
             var yaraByPath = AggregateThreatsByPath(

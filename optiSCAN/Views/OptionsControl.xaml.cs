@@ -21,10 +21,16 @@ namespace optiSCAN.Views
     public partial class OptionsControl : System.Windows.Controls.UserControl
     {
         private readonly ObservableCollection<string> _exclusions = new();
-        private IScheduledScanService ScheduledScan => ServiceContainer.Default.ScheduledScan;
+        private IOptionsServices? _services;
         private bool _suppressPreferenceEvents;
         private string? _languageTagBeforeDropDown;
         private int _favoriteScanIndexBeforeDropDown;
+
+        private IUserPreferencesAccessor Prefs =>
+            (_services?.UserPreferencesAccessor ?? new DefaultUserPreferencesAccessor());
+
+        private IExclusionSettingsAccessor Excl =>
+            (_services?.ExclusionSettingsAccessor ?? new DefaultExclusionSettingsAccessor());
 
         public OptionsControl()
         {
@@ -36,7 +42,6 @@ namespace optiSCAN.Views
             {
                 ThemeManager.ThemeChanged += SurChangementTheme;
                 SyncThemeControls();
-                _ = LoadScheduledTaskStateAsync();
             };
             Unloaded += (_, _) => ThemeManager.ThemeChanged -= SurChangementTheme;
             IsVisibleChanged += (_, _) =>
@@ -44,6 +49,15 @@ namespace optiSCAN.Views
                 if (IsVisible)
                     SyncThemeControls();
             };
+        }
+
+        private IOptionsServices Services => _services ?? throw new InvalidOperationException("OptionsControl.Bind() must be called before use.");
+        private IScheduledScanService ScheduledScan => Services.ScheduledScan;
+
+        public void Bind(IOptionsServices services)
+        {
+            _services = services;
+            _ = LoadScheduledTaskStateAsync();
         }
 
         private void SurChangementTheme(object? sender, bool isDark) => SyncThemeControls();
@@ -105,14 +119,14 @@ namespace optiSCAN.Views
             _suppressPreferenceEvents = true;
             try
             {
-                var prefs = UserPreferences.Current;
+                var prefs = Prefs.Current;
                 if (chkNotifications != null)
                     chkNotifications.IsChecked = prefs.ActionNotificationsEnabled;
                 if (chkAutoStart != null)
                     chkAutoStart.IsChecked = IsAutoStartRegistered();
 
                 if (cmbUiLanguage != null)
-                    SelectUiLanguageCombo(UserPreferences.Current.UiCulture);
+                    SelectUiLanguageCombo(Prefs.Current.UiCulture);
 
                 if (cmbFavoriteScan != null)
                 {
@@ -125,7 +139,7 @@ namespace optiSCAN.Views
                     };
                 }
 
-                var ex = ExclusionSettings.Current;
+                var ex = Excl.Current;
                 if (chkRealtimeProtection != null)
                     chkRealtimeProtection.IsChecked = ex.RealTimeEnabled;
                 if (chkProcessMonitor != null)
@@ -146,7 +160,6 @@ namespace optiSCAN.Views
                 if (chkBackupBeforeQuarantine != null)
                     chkBackupBeforeQuarantine.IsChecked = prefs.BackupBeforeQuarantine;
 
-                var c = ServiceContainer.Default;
                 if (chkAutoUpdate != null)
                     chkAutoUpdate.IsChecked = prefs.SignatureAutoUpdateEnabled;
                 if (chkAggressiveSignatures != null)
@@ -236,8 +249,8 @@ namespace optiSCAN.Views
             if (_suppressPreferenceEvents) return;
             if (sender is not WpfCheckBox cb) return;
             bool isOn = cb.IsChecked == true;
-            var prefs = UserPreferences.Current;
-            var c = ServiceContainer.Default;
+            var prefs = Prefs.Current;
+            var c = Services;
 
             switch (cb.Tag as string)
             {
@@ -465,7 +478,7 @@ namespace optiSCAN.Views
             if (cmbFavoriteScan.SelectedIndex == _favoriteScanIndexBeforeDropDown)
                 return;
 
-            var prefs = UserPreferences.Current;
+            var prefs = Prefs.Current;
             prefs.FavoriteScanType = cmbFavoriteScan.SelectedIndex switch
             {
                 1 => ScanType.FullScan,
@@ -535,7 +548,7 @@ namespace optiSCAN.Views
                 System.Windows.MessageBox.Show(LocalizationService.GetString("Opt_ExclNeedFolder"), LocalizationService.GetString("App_TitleShort"), MessageBoxButton.OK, MessageBoxImage.Information);
                 return;
             }
-            if (ExclusionSettings.Current.AddFolder(path) && !_exclusions.Contains(path))
+            if (Excl.Current.AddFolder(path) && !_exclusions.Contains(path))
                 _exclusions.Add(path);
             if (txtNewExclusion != null) txtNewExclusion.Text = string.Empty;
         }
@@ -596,7 +609,7 @@ namespace optiSCAN.Views
                 if (!_exclusions.Contains(path))
                 {
                     _exclusions.Add(path);
-                    ExclusionSettings.Current.AddFolder(path);
+                    Excl.Current.AddFolder(path);
                 }
             }
         }
@@ -606,15 +619,15 @@ namespace optiSCAN.Views
             if (sender is WpfButton btn && btn.Tag is string path)
             {
                 _exclusions.Remove(path);
-                ExclusionSettings.Current.RemoveFolder(path);
+                Excl.Current.RemoveFolder(path);
             }
         }
 
         private void PwdVirusTotalApiKey_Changed(object sender, RoutedEventArgs e)
         {
             if (_suppressPreferenceEvents) return;
-            UserPreferences.Current.VirusTotalApiKey = pwdVirusTotalApiKey?.Password ?? string.Empty;
-            UserPreferences.Current.Save();
+            Prefs.Current.VirusTotalApiKey = pwdVirusTotalApiKey?.Password ?? string.Empty;
+            Prefs.Current.Save();
         }
 
         /// <summary>N'autorise que les chiffres dans les TextBox de seuils.</summary>
@@ -639,7 +652,7 @@ namespace optiSCAN.Views
                 box.Text = value.ToString();
             }
 
-            var prefs = UserPreferences.Current;
+            var prefs = Prefs.Current;
             switch (box.Tag as string)
             {
                 case "CleanThreshold":
