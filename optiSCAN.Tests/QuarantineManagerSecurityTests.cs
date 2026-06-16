@@ -107,6 +107,64 @@ public sealed class QuarantineManagerSecurityTests
     }
 
     [Fact]
+    public void IsResolvedPathUnderDirectory_allows_file_inside_folder()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "optiscan_ut_scope_" + Guid.NewGuid().ToString("N"));
+        var inside = Path.Combine(root, "subdir", "file.bin");
+        Assert.True(QuarantineManager.IsResolvedPathUnderDirectory(inside, Path.Combine(root, "subdir")));
+    }
+
+    [Fact]
+    public void IsResolvedPathUnderDirectory_blocks_parent_escape()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "optiscan_ut_scope2_" + Guid.NewGuid().ToString("N"));
+        var escaped = Path.GetFullPath(Path.Combine(root, "..", "outside.bin"));
+        Assert.False(QuarantineManager.IsResolvedPathUnderDirectory(escaped, root));
+    }
+
+    [Fact]
+    public void IsResolvedPathUnderDirectory_blocks_prefix_folder_trick()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "optiscan_restore");
+        var sibling = Path.Combine(Path.GetTempPath(), "optiscan_restore-evil", "file.bin");
+        Assert.False(QuarantineManager.IsResolvedPathUnderDirectory(sibling, root));
+    }
+
+    [Fact]
+    public void RestoreTo_refuses_path_outside_destination_folder()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "optiscan_ut_restoreto_" + Guid.NewGuid().ToString("N"));
+        var qDir = Path.Combine(root, "q");
+        var destDir = Path.Combine(root, "dest");
+        var sample = Path.Combine(root, "sample.bin");
+        Directory.CreateDirectory(root);
+
+        try
+        {
+            File.WriteAllBytes(sample, [1, 2, 3]);
+            var qm = new QuarantineManager(qDir);
+            Assert.True(qm.Quarantine(new ThreatInfo
+            {
+                FilePath = sample,
+                VirusName = "Test",
+                FileSize = 3,
+                DetectedAt = DateTime.UtcNow,
+            }));
+
+            var entry = qm.GetEntries()[0];
+            entry.OriginalPath = "..";
+
+            Directory.CreateDirectory(destDir);
+            Assert.False(qm.RestoreTo(entry.Id, destDir));
+            Assert.Single(qm.GetEntries());
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { /* best effort */ }
+        }
+    }
+
+    [Fact]
     public void Restore_refuses_system32_destination()
     {
         var root = Path.Combine(Path.GetTempPath(), "optiscan_ut_restore_" + Guid.NewGuid().ToString("N"));

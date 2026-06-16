@@ -299,6 +299,14 @@ namespace optiSCAN.Services
                         Path.GetFileNameWithoutExtension(entry.FileName) + "_restored" +
                         Path.GetExtension(entry.FileName));
                 }
+
+                if (!IsResolvedPathUnderDirectory(destPath, destinationFolder))
+                {
+                    AppLogger.Warn("QuarantineManager",
+                        $"RestoreTo: chemin hors dossier autorisé ({destPath})");
+                    return false;
+                }
+
                 return RestoreToPath(entry, destPath);
             }
             catch (Exception ex)
@@ -368,6 +376,17 @@ namespace optiSCAN.Services
                 AppLogger.Warn("QuarantineManager", $"RestoreToPath ({entry.Id})", ex);
                 return false;
             }
+        }
+
+        /// <summary>Vérifie que <paramref name="candidatePath"/> résolu reste sous <paramref name="destinationFolder"/>.</summary>
+        internal static bool IsResolvedPathUnderDirectory(string candidatePath, string destinationFolder)
+        {
+            var root = Path.GetFullPath(destinationFolder);
+            if (!root.EndsWith(Path.DirectorySeparatorChar))
+                root += Path.DirectorySeparatorChar;
+
+            var full = Path.GetFullPath(candidatePath);
+            return full.StartsWith(root, StringComparison.OrdinalIgnoreCase);
         }
 
         /// <summary>Refuse la restauration vers les emplacements système critiques (tests via InternalsVisibleTo).</summary>
