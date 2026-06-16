@@ -11,11 +11,10 @@ public sealed class UsbScanStatusCoordinatorTests
     [Fact]
     public void Handle_started_sets_refresh_status()
     {
-        var coordinator = new UsbScanStatusCoordinator();
         string? text = null;
         string? icon = null;
 
-        coordinator.Handle(
+        UsbScanStatusCoordinator.Handle(
             new RemovableDriveScanStatusEventArgs(RemovableDriveScanPhase.Started, @"E:\", "USB", 0, 0),
             new UsbScanStatusCoordinator.Host
             {
@@ -30,10 +29,9 @@ public sealed class UsbScanStatusCoordinatorTests
     [Fact]
     public void Handle_complete_with_threats_sets_warning()
     {
-        var coordinator = new UsbScanStatusCoordinator();
         bool isWarning = false;
 
-        coordinator.Handle(
+        UsbScanStatusCoordinator.Handle(
             new RemovableDriveScanStatusEventArgs(RemovableDriveScanPhase.Completed, @"F:\", "Stick", 2, 12),
             new UsbScanStatusCoordinator.Host
             {
@@ -46,10 +44,9 @@ public sealed class UsbScanStatusCoordinatorTests
     [Fact]
     public void Handle_failed_sets_error()
     {
-        var coordinator = new UsbScanStatusCoordinator();
         bool isError = false;
 
-        coordinator.Handle(
+        UsbScanStatusCoordinator.Handle(
             new RemovableDriveScanStatusEventArgs(RemovableDriveScanPhase.Failed, @"G:\", "SD", 0, 0),
             new UsbScanStatusCoordinator.Host
             {

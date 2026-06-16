@@ -134,7 +134,7 @@ namespace optiSCAN
         /// Exécute un scan en mode headless (sans fenêtre WPF), persiste le résultat
         /// dans l'historique et déclenche la quarantaine automatique si configurée.
         /// </summary>
-        private async Task RunHeadlessAsync(HeadlessScanArguments.Mode mode, bool quiet)
+        private static async Task RunHeadlessAsync(HeadlessScanArguments.Mode mode, bool quiet)
         {
             try
             {

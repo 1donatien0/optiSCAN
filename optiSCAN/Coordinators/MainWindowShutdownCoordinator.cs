@@ -5,7 +5,7 @@ using System.ComponentModel;
 namespace optiSCAN.Coordinators;
 
 /// <summary>Libération tray, coordinateurs et <see cref="ServiceContainer"/> à la fermeture réelle.</summary>
-public sealed class MainWindowShutdownCoordinator
+public static class MainWindowShutdownCoordinator
 {
     public sealed class Host
     {
@@ -19,7 +19,7 @@ public sealed class MainWindowShutdownCoordinator
         public required ServiceContainer Container { get; init; }
     }
 
-    public void PerformCleanShutdown(Host host)
+    public static void PerformCleanShutdown(Host host)
     {
         try
         {

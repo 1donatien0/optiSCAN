@@ -8,8 +8,6 @@ namespace optiSCAN.Tests;
 
 public sealed class ToastActivationCoordinatorTests
 {
-    private readonly ToastActivationCoordinator _coordinator = new();
-
     [Fact]
     public void Handle_history_navigates_to_history_panel()
     {
@@ -33,7 +31,7 @@ public sealed class ToastActivationCoordinatorTests
             TriggerManualSignatureUpdate = () => { },
         };
 
-        _coordinator.Handle(new ToastActivationEventArgs("history", null, null), host);
+        ToastActivationCoordinator.Handle(new ToastActivationEventArgs("history", null, null), host);
         Assert.Equal(OptiscanStrings.PanelIds.History, navigated);
     }
 }

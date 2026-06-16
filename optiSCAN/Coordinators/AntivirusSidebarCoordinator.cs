@@ -8,7 +8,7 @@ using System.Windows.Media;
 namespace optiSCAN.Coordinators;
 
 /// <summary>Badges ClamAV de la barre latérale et carte antivirus de l'accueil.</summary>
-public sealed class AntivirusSidebarCoordinator
+public static class AntivirusSidebarCoordinator
 {
     public sealed class Host
     {
@@ -20,7 +20,7 @@ public sealed class AntivirusSidebarCoordinator
         public PackIcon? SidebarClamIcon { get; init; }
     }
 
-    public async Task RefreshAsync(Host host)
+    public static async Task RefreshAsync(Host host)
     {
         bool clamAvOk = await Task.Run(host.IsClamAvInstalled).ConfigureAwait(true);
         int yaraRules = host.GetYaraRulesCount();

@@ -5,7 +5,7 @@ using optiSCAN.Views;
 namespace optiSCAN.Coordinators;
 
 /// <summary>Statut et rafraîchissements après une action antivirus (quarantaine, ignore, etc.).</summary>
-public sealed class AntivirusActionResultCoordinator
+public static class AntivirusActionResultCoordinator
 {
     public sealed class Host
     {
@@ -15,7 +15,7 @@ public sealed class AntivirusActionResultCoordinator
         public AntivirusView? AntivirusPanel { get; init; }
     }
 
-    public void Handle(ActionResult result, Host host)
+    public static void Handle(ActionResult result, Host host)
     {
         host.SetStatus(result.Message, result.IsError, result.IsWarning);
         if (!result.Success)

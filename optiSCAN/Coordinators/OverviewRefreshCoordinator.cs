@@ -28,9 +28,9 @@ public sealed record SignaturesRefreshContext(
     Action? AfterSignaturesRefreshed);
 
 /// <summary>Rafraîchissement vue d'ensemble et signatures sans couplage XAML par nom.</summary>
-public sealed class OverviewRefreshCoordinator
+public static class OverviewRefreshCoordinator
 {
-    public void RefreshProtectionAndRecommendations(OverviewRefreshContext ctx)
+    public static void RefreshProtectionAndRecommendations(OverviewRefreshContext ctx)
     {
         bool protectedOk = ctx.ClamInstalled && (!ctx.YaraAvailable || ctx.YaraRulesCount > 0);
         ctx.Panel.UpdateProtectionHeadline(protectedOk);
@@ -62,7 +62,7 @@ public sealed class OverviewRefreshCoordinator
         ctx.Panel.UpdatePlatformProtectionStatus(PlatformProtectionStatusService.Evaluate());
     }
 
-    public async Task RefreshSignaturesAsync(SignaturesRefreshContext ctx, bool forceRefresh = false)
+    public static async Task RefreshSignaturesAsync(SignaturesRefreshContext ctx, bool forceRefresh = false)
     {
         var snapshot = await ctx.SignatureStatus.GetSnapshotAsync(forceRefresh).ConfigureAwait(false);
 

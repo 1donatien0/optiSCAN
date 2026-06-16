@@ -11,14 +11,12 @@ public sealed class HistoryDetailCoordinatorTests
     [Fact]
     public void HideDetailPanels_with_empty_view_does_not_throw()
     {
-        var coordinator = new HistoryDetailCoordinator();
-        coordinator.HideDetailPanels(new HistoryDetailView());
+        HistoryDetailCoordinator.HideDetailPanels(new HistoryDetailView());
     }
 
     [Fact]
     public void ShowCleanDetail_with_null_session_and_empty_view_does_not_throw()
     {
-        var coordinator = new HistoryDetailCoordinator();
-        coordinator.ShowCleanDetail(new HistoryDetailView(), session: null);
+        HistoryDetailCoordinator.ShowCleanDetail(new HistoryDetailView(), session: null);
     }
 }

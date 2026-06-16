@@ -4,14 +4,14 @@ using optiSCAN.Services;
 namespace optiSCAN.Coordinators;
 
 /// <summary>Messages de statut pour les analyses de lecteurs amovibles (USB).</summary>
-public sealed class UsbScanStatusCoordinator
+public static class UsbScanStatusCoordinator
 {
     public sealed class Host
     {
         public required Action<string, bool, bool, string?> SetStatus { get; init; }
     }
 
-    public void Handle(RemovableDriveScanStatusEventArgs e, Host host)
+    public static void Handle(RemovableDriveScanStatusEventArgs e, Host host)
     {
         if (e.Phase == RemovableDriveScanPhase.Started)
         {

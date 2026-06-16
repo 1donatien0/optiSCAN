@@ -44,8 +44,7 @@ namespace optiSCAN.Views
         private IHistoryServices? _history;
         private bool _bound;
         private bool _syncingFilterChips;
-        private readonly HistoryDetailCoordinator _detailCoordinator = new();
-        private readonly HistoryThreatRemediationCoordinator _threatRemediation = new();
+        private void HideDetailPanels() => HistoryDetailCoordinator.HideDetailPanels(_detailView);
         private readonly HistoryDetailView _detailView;
 
         public HistoryViewModel VM { get; private set; } = null!;
@@ -322,10 +321,6 @@ namespace optiSCAN.Views
 
 
 
-        private void HideDetailPanels() => _detailCoordinator.HideDetailPanels(_detailView);
-
-
-
         private void ShowEntryInfo(ActivityEntry entry)
 
         {
@@ -443,14 +438,14 @@ namespace optiSCAN.Views
             var rows = session?.Threats.Count > 0
                 ? VM.BuildThreatRows(session!.Threats)
                 : null;
-            _detailCoordinator.ShowScanDetail(_detailView, session, rows);
+            HistoryDetailCoordinator.ShowScanDetail(_detailView, session, rows);
         }
 
         private void ShowQuarantineDetail(ActivityEntry entry) =>
-            _detailCoordinator.ShowQuarantineDetail(_detailView, entry);
+            HistoryDetailCoordinator.ShowQuarantineDetail(_detailView, entry);
 
         private void ShowCleanDetail(CleanSession? session) =>
-            _detailCoordinator.ShowCleanDetail(_detailView, session);
+            HistoryDetailCoordinator.ShowCleanDetail(_detailView, session);
 
 
 
@@ -491,35 +486,35 @@ namespace optiSCAN.Views
         private void BtnHistQuarantineAll_Click(object sender, RoutedEventArgs e)
         {
             if (SelectedScanSession is not ScanSession session || session.Threats.Count == 0) return;
-            _threatRemediation.QuarantineAllThreats(History, VM, session, RefreshTimeline);
+            HistoryThreatRemediationCoordinator.QuarantineAllThreats(History, VM, session, RefreshTimeline);
         }
 
         private void BtnHistQuarantine_Click(object sender, RoutedEventArgs e)
         {
             if (FilePathFromSender(sender) is not string filePath ||
                 SelectedScanSession is not ScanSession session) return;
-            _threatRemediation.QuarantineThreat(History, VM, session, filePath, RefreshTimeline);
+            HistoryThreatRemediationCoordinator.QuarantineThreat(History, VM, session, filePath, RefreshTimeline);
         }
 
         private void BtnHistDismiss_Click(object sender, RoutedEventArgs e)
         {
             if (FilePathFromSender(sender) is not string filePath ||
                 SelectedScanSession is not ScanSession session) return;
-            _threatRemediation.DismissThreat(History, session, filePath, RefreshTimeline);
+            HistoryThreatRemediationCoordinator.DismissThreat(History, session, filePath, RefreshTimeline);
         }
 
         private void BtnHistIgnore_Click(object sender, RoutedEventArgs e)
         {
             if (FilePathFromSender(sender) is not string filePath ||
                 SelectedScanSession is not ScanSession session) return;
-            _threatRemediation.IgnoreThreat(History, session, filePath, RefreshTimeline);
+            HistoryThreatRemediationCoordinator.IgnoreThreat(History, session, filePath, RefreshTimeline);
         }
 
         private void BtnHistDelete_Click(object sender, RoutedEventArgs e)
         {
             if (FilePathFromSender(sender) is not string filePath ||
                 SelectedScanSession is not ScanSession session) return;
-            _threatRemediation.DeleteThreat(History, session, filePath, RefreshTimeline);
+            HistoryThreatRemediationCoordinator.DeleteThreat(History, session, filePath, RefreshTimeline);
         }
 
 

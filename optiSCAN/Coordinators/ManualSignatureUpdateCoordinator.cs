@@ -5,7 +5,7 @@ using optiSCAN.Strings;
 namespace optiSCAN.Coordinators;
 
 /// <summary>Mise à jour manuelle des signatures (boutons Accueil / Antivirus) — extrait de <see cref="optiSCAN.MainWindow"/>.</summary>
-public sealed class ManualSignatureUpdateCoordinator
+public static class ManualSignatureUpdateCoordinator
 {
     public sealed class Host
     {
@@ -20,7 +20,7 @@ public sealed class ManualSignatureUpdateCoordinator
         public Action<string>? AppendSignatureLog { get; init; }
     }
 
-    public async Task RunAsync(Host host)
+    public static async Task RunAsync(Host host)
     {
         if (!host.Runner.TryEnterUpdate())
         {
@@ -67,7 +67,7 @@ public sealed class ManualSignatureUpdateCoordinator
         }
     }
 
-    public void Stop(StopHost host)
+    public static void Stop(StopHost host)
     {
         host.SetStatus(OptiscanStrings.StatusUpdates.SignaturesUpdateStopping, false, false, UiIconKinds.Stop);
 

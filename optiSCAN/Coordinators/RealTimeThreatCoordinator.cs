@@ -4,7 +4,7 @@ using optiSCAN.ViewModels;
 namespace optiSCAN.Coordinators;
 
 /// <summary>Menaces RTP / processus / USB remontées dans le ViewModel et l'accueil.</summary>
-public sealed class RealTimeThreatCoordinator
+public static class RealTimeThreatCoordinator
 {
     public sealed class Host
     {
@@ -13,7 +13,7 @@ public sealed class RealTimeThreatCoordinator
         public required Action RefreshOverviewProtection { get; init; }
     }
 
-    public void Handle(ThreatInfo threat, Host host)
+    public static void Handle(ThreatInfo threat, Host host)
     {
         host.ViewModel?.AppendLiveThreat(threat);
         host.RefreshQuarantineList();

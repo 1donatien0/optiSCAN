@@ -40,26 +40,15 @@ namespace optiSCAN
         private readonly ServiceContainer _container = ServiceContainer.Default;
         private readonly ExportCoordinator _exportCoordinator = new(
             new HistoryExportService(ServiceContainer.Default.UserPreferencesAccessor));
-        private readonly OverviewRefreshCoordinator _overviewRefresh = new();
         private readonly MainWindowServiceEventCoordinator _serviceEvents = new();
         private SidebarSyncCoordinator? _sidebarSync;
         private SignatureRefreshCoordinator? _signatureRefresh;
         private readonly Services.NavigationService _navigationService = new();
         private Services.NavigationRefreshCoordinator? _navRefreshCoordinator;
         private readonly SignatureUpdateUiRunner _signatureUpdateRunner = new();
-        private readonly ToastActivationCoordinator _toastActivation = new();
         private readonly StatusFooterCoordinator _statusFooter = new();
-        private readonly MainWindowStartupCoordinator _startup = new();
-        private readonly ManualSignatureUpdateCoordinator _manualSignatureUpdate = new();
-        private readonly AntivirusSidebarCoordinator _antivirusSidebar = new();
-        private readonly UsbScanStatusCoordinator _usbScanStatus = new();
-        private readonly HistoryRefreshCoordinator _historyRefresh = new();
-        private readonly AntivirusActionResultCoordinator _antivirusActionResult = new();
-        private readonly RealTimeThreatCoordinator _realTimeThreat = new();
-        private readonly WindowTrayBehaviorCoordinator _windowTrayBehavior = new();
-        private readonly MainWindowShutdownCoordinator _shutdown = new();
         private readonly RoutedCommand _quickScanShortcutCommand = new();
-        private bool _isClosing = false;
+        private bool _isClosing;
         private bool _wasScanning;
 
         private IUiEventBus UiBus => _container;
@@ -194,7 +183,7 @@ namespace optiSCAN
         {
             try
             {
-                await _startup.RunAsync(new MainWindowStartupCoordinator.Host
+                await MainWindowStartupCoordinator.RunAsync(new MainWindowStartupCoordinator.Host
                 {
                     Container = _container,
                     Navigation = _navigationService,
@@ -417,7 +406,7 @@ namespace optiSCAN
         }
 
         private Task RefreshAntivirusStatusCoreAsync() =>
-            _antivirusSidebar.RefreshAsync(BuildAntivirusSidebarHost());
+            AntivirusSidebarCoordinator.RefreshAsync(BuildAntivirusSidebarHost());
 
         private AntivirusSidebarCoordinator.Host BuildAntivirusSidebarHost() => new()
         {
@@ -442,7 +431,7 @@ namespace optiSCAN
 
         private void RefreshHistory()
         {
-            _historyRefresh.Refresh(new HistoryRefreshCoordinator.Host
+            HistoryRefreshCoordinator.Refresh(new HistoryRefreshCoordinator.Host
             {
                 Logger = _container.Logger,
                 HistoryPanel = panelHistory as Views.HistoryControl,
@@ -455,7 +444,7 @@ namespace optiSCAN
         private void SurMenaceTempsReelDetectee(object? sender, ThreatInfo threat)
         {
             Dispatcher.BeginInvoke(() =>
-                _realTimeThreat.Handle(threat, new RealTimeThreatCoordinator.Host
+                RealTimeThreatCoordinator.Handle(threat, new RealTimeThreatCoordinator.Host
                 {
                     ViewModel = ViewModel,
                     RefreshQuarantineList = RefreshQuarantineList,
@@ -467,7 +456,7 @@ namespace optiSCAN
         private void SurStatutAnalyseUsb(object? sender, RemovableDriveScanStatusEventArgs e)
         {
             Dispatcher.BeginInvoke(() =>
-                _usbScanStatus.Handle(e, new UsbScanStatusCoordinator.Host
+                UsbScanStatusCoordinator.Handle(e, new UsbScanStatusCoordinator.Host
                 {
                     SetStatus = (text, isError, isWarning, icon) =>
                         SetStatus(text, isError, isWarning, icon),
@@ -478,7 +467,7 @@ namespace optiSCAN
         private void SurActionAntivirusTerminee(object? sender, ActionResult result)
         {
             Dispatcher.BeginInvoke(() =>
-                _antivirusActionResult.Handle(result, new AntivirusActionResultCoordinator.Host
+                AntivirusActionResultCoordinator.Handle(result, new AntivirusActionResultCoordinator.Host
                 {
                     SetStatus = (msg, err, warn) => SetStatus(msg, isError: err, isWarning: warn),
                     RefreshQuarantineList = RefreshQuarantineList,
@@ -490,7 +479,7 @@ namespace optiSCAN
 
         private void SurActivationToast(object? sender, ToastActivationEventArgs e)
         {
-            Dispatcher.BeginInvoke(() => _toastActivation.Handle(e, BuildToastHost()), DispatcherPriority.Normal);
+            Dispatcher.BeginInvoke(() => ToastActivationCoordinator.Handle(e, BuildToastHost()), DispatcherPriority.Normal);
         }
 
         private ToastActivationCoordinator.Host BuildToastHost() => new()
@@ -513,7 +502,7 @@ namespace optiSCAN
             if (panelOverview is not IOverviewPanel overview)
                 return;
 
-            _overviewRefresh.RefreshProtectionAndRecommendations(
+            OverviewRefreshCoordinator.RefreshProtectionAndRecommendations(
                 OverviewRefreshContextBuilder.FromContainer(overview, _container));
         }
 
@@ -528,7 +517,7 @@ namespace optiSCAN
         /// <summary>Rafraîchit les versions de signatures (onglet Antivirus + ViewModel).</summary>
         private async Task RefreshSignaturesDisplayAsync(bool forceRefresh = false)
         {
-            await _overviewRefresh.RefreshSignaturesAsync(
+            await OverviewRefreshCoordinator.RefreshSignaturesAsync(
                 new SignaturesRefreshContext(
                     _container.SignatureStatus,
                     panelOverview as IOverviewPanel,
@@ -651,7 +640,7 @@ namespace optiSCAN
         {
             if (WindowState == WindowState.Minimized)
             {
-                _windowTrayBehavior.OnMinimized(new WindowTrayBehaviorCoordinator.Host
+                WindowTrayBehaviorCoordinator.OnMinimized(new WindowTrayBehaviorCoordinator.Host
                 {
                     HideWindow = Hide,
                     SetTrayStatus = msg => SetStatus(msg),
@@ -662,7 +651,7 @@ namespace optiSCAN
         // ── Fermeture ────────────────────────────────────────────────────────────
         private void SurFermetureFenetre(object? sender, CancelEventArgs e)
         {
-            if (_windowTrayBehavior.TryCancelClose(_isClosing, e, new WindowTrayBehaviorCoordinator.Host
+            if (WindowTrayBehaviorCoordinator.TryCancelClose(_isClosing, e, new WindowTrayBehaviorCoordinator.Host
                 {
                     HideWindow = Hide,
                     SetTrayStatus = msg => SetStatus(msg),
@@ -676,7 +665,7 @@ namespace optiSCAN
 
         private void PerformCleanShutdown()
         {
-            _shutdown.PerformCleanShutdown(new MainWindowShutdownCoordinator.Host
+            MainWindowShutdownCoordinator.PerformCleanShutdown(new MainWindowShutdownCoordinator.Host
             {
                 Tray = _trayCoordinator,
                 SignatureRefresh = _signatureRefresh,
@@ -704,7 +693,7 @@ namespace optiSCAN
         private async void BtnManualUpdateSignatures_Click(object sender, RoutedEventArgs e)
         {
             var antivirusView = panelAntivirus as Views.AntivirusView;
-            await _manualSignatureUpdate.RunAsync(new ManualSignatureUpdateCoordinator.Host
+            await ManualSignatureUpdateCoordinator.RunAsync(new ManualSignatureUpdateCoordinator.Host
             {
                 Runner = _signatureUpdateRunner,
                 Freshclam = _container.FreshclamUpdater,
@@ -723,7 +712,7 @@ namespace optiSCAN
         public void BtnStopUpdateSignatures_Click(object sender, RoutedEventArgs e)
         {
             var antivirusView = panelAntivirus as Views.AntivirusView;
-            _manualSignatureUpdate.Stop(new ManualSignatureUpdateCoordinator.StopHost
+            ManualSignatureUpdateCoordinator.Stop(new ManualSignatureUpdateCoordinator.StopHost
             {
                 Freshclam = _container.FreshclamUpdater,
                 Rules = _container.RulesUpdater,

@@ -34,7 +34,7 @@ public sealed class OverviewRefreshCoordinatorTests
             SignatureAutoUpdateEnabled: true,
             SecurityPosture: posture.Object);
 
-        new OverviewRefreshCoordinator().RefreshProtectionAndRecommendations(ctx);
+        OverviewRefreshCoordinator.RefreshProtectionAndRecommendations(ctx);
 
         panel.Verify(p => p.UpdateProtectionHeadline(true, null), Times.Once);
         posture.Verify(s => s.Evaluate(It.IsAny<SecurityPostureContext>()), Times.Once);

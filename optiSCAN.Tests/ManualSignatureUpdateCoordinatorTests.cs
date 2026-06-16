@@ -12,12 +12,11 @@ public sealed class ManualSignatureUpdateCoordinatorTests
         var runner = new SignatureUpdateUiRunner();
         Assert.True(runner.TryEnterUpdate());
 
-        var coordinator = new ManualSignatureUpdateCoordinator();
         string? status = null;
 
         try
         {
-            await coordinator.RunAsync(new ManualSignatureUpdateCoordinator.Host
+            await ManualSignatureUpdateCoordinator.RunAsync(new ManualSignatureUpdateCoordinator.Host
             {
                 Runner = runner,
                 Freshclam = null!,

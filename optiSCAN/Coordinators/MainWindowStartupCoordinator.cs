@@ -7,7 +7,7 @@ using System.Windows;
 namespace optiSCAN.Coordinators;
 
 /// <summary>Orchestration du chargement initial de <see cref="MainWindow"/> (runtime, RTP, navigation).</summary>
-public sealed class MainWindowStartupCoordinator
+public static class MainWindowStartupCoordinator
 {
     public sealed class Host
     {
@@ -31,7 +31,7 @@ public sealed class MainWindowStartupCoordinator
         public required Action<Window, ServiceContainer> ShowOnboardingIfNeeded { get; init; }
     }
 
-    public async Task RunAsync(Host host)
+    public static async Task RunAsync(Host host)
     {
         host.RegisterPanels();
 

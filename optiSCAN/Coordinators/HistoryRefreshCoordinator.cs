@@ -5,7 +5,7 @@ using optiSCAN.Views;
 namespace optiSCAN.Coordinators;
 
 /// <summary>Synchronise historique, dernière analyse et statistiques d'accueil.</summary>
-public sealed class HistoryRefreshCoordinator
+public static class HistoryRefreshCoordinator
 {
     public sealed class Host
     {
@@ -16,7 +16,7 @@ public sealed class HistoryRefreshCoordinator
         public required Action RefreshOverviewProtection { get; init; }
     }
 
-    public void Refresh(Host host)
+    public static void Refresh(Host host)
     {
         var sessions = host.Logger.GetHistory();
         host.HistoryPanel?.RefreshTimeline();

@@ -6,9 +6,9 @@ using System.Windows;
 namespace optiSCAN.Coordinators;
 
 /// <summary>Affichage des panneaux détail (scan, quarantaine, nettoyage) dans Historique.</summary>
-public sealed class HistoryDetailCoordinator
+public static class HistoryDetailCoordinator
 {
-    public void HideDetailPanels(HistoryDetailView view)
+    public static void HideDetailPanels(HistoryDetailView view)
     {
         if (view.ThreatsGrid != null)
         {
@@ -26,7 +26,7 @@ public sealed class HistoryDetailCoordinator
             view.ThreatsLegacyText.Visibility = Visibility.Collapsed;
     }
 
-    public void ShowScanDetail(HistoryDetailView view, ScanSession? session, IReadOnlyList<HistoryThreatRow>? threatRows)
+    public static void ShowScanDetail(HistoryDetailView view, ScanSession? session, IReadOnlyList<HistoryThreatRow>? threatRows)
     {
         if (view.CleanLogPanel != null)
             view.CleanLogPanel.Visibility = Visibility.Collapsed;
@@ -54,7 +54,7 @@ public sealed class HistoryDetailCoordinator
             view.ThreatsLegacyText.Visibility = legacyOnly ? Visibility.Visible : Visibility.Collapsed;
     }
 
-    public void ShowQuarantineDetail(HistoryDetailView view, ActivityEntry entry)
+    public static void ShowQuarantineDetail(HistoryDetailView view, ActivityEntry entry)
     {
         if (view.ThreatsGrid != null)
             view.ThreatsGrid.Visibility = Visibility.Collapsed;
@@ -91,7 +91,7 @@ public sealed class HistoryDetailCoordinator
             view.BtnManageInAv.IsEnabled = entry.IsStillQuarantined;
     }
 
-    public void ShowCleanDetail(HistoryDetailView view, CleanSession? session)
+    public static void ShowCleanDetail(HistoryDetailView view, CleanSession? session)
     {
         if (view.ThreatsGrid != null)
             view.ThreatsGrid.Visibility = Visibility.Collapsed;

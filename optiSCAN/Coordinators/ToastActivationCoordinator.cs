@@ -5,7 +5,7 @@ using optiSCAN.Strings;
 namespace optiSCAN.Coordinators;
 
 /// <summary>Route les actions toast Windows vers navigation et services antivirus.</summary>
-public sealed class ToastActivationCoordinator
+public static class ToastActivationCoordinator
 {
     public sealed class Host
     {
@@ -21,7 +21,7 @@ public sealed class ToastActivationCoordinator
         public required Action TriggerManualSignatureUpdate { get; init; }
     }
 
-    public void Handle(ToastActivationEventArgs e, Host host)
+    public static void Handle(ToastActivationEventArgs e, Host host)
     {
         var c = host.Services;
         switch (e.Action.ToLowerInvariant())

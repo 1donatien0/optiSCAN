@@ -5,9 +5,9 @@ using optiSCAN.ViewModels;
 namespace optiSCAN.Coordinators;
 
 /// <summary>Actions de remédiation des menaces depuis l'historique (quarantaine, ignore, delete).</summary>
-public sealed class HistoryThreatRemediationCoordinator
+public static class HistoryThreatRemediationCoordinator
 {
-    public void QuarantineAllThreats(IHistoryServices history, HistoryViewModel vm, ScanSession session, Action refreshTimeline)
+    public static void QuarantineAllThreats(IHistoryServices history, HistoryViewModel vm, ScanSession session, Action refreshTimeline)
     {
         if (session.Threats.Count == 0)
             return;
@@ -28,7 +28,7 @@ public sealed class HistoryThreatRemediationCoordinator
             refreshTimeline();
     }
 
-    public void QuarantineThreat(
+    public static void QuarantineThreat(
         IHistoryServices history,
         HistoryViewModel vm,
         ScanSession session,
@@ -49,13 +49,13 @@ public sealed class HistoryThreatRemediationCoordinator
         }
     }
 
-    public void DismissThreat(IHistoryServices history, ScanSession session, string filePath, Action refreshTimeline)
+    public static void DismissThreat(IHistoryServices history, ScanSession session, string filePath, Action refreshTimeline)
     {
         history.Logger.TryRemoveThreatFromSession(session.SessionId, filePath);
         refreshTimeline();
     }
 
-    public void IgnoreThreat(
+    public static void IgnoreThreat(
         IHistoryServices history,
         ScanSession session,
         string filePath,
@@ -66,7 +66,7 @@ public sealed class HistoryThreatRemediationCoordinator
         refreshTimeline();
     }
 
-    public void DeleteThreat(
+    public static void DeleteThreat(
         IHistoryServices history,
         ScanSession session,
         string filePath,

@@ -8,11 +8,10 @@ public sealed class AntivirusActionResultCoordinatorTests
     [Fact]
     public void Handle_failure_only_sets_status()
     {
-        var coordinator = new AntivirusActionResultCoordinator();
         string? message = null;
         int historyRefreshes = 0;
 
-        coordinator.Handle(
+        AntivirusActionResultCoordinator.Handle(
             new ActionResult { Success = false, Message = "échec", IsError = true },
             new AntivirusActionResultCoordinator.Host
             {
@@ -28,11 +27,10 @@ public sealed class AntivirusActionResultCoordinatorTests
     [Fact]
     public void Handle_success_refreshes_lists()
     {
-        var coordinator = new AntivirusActionResultCoordinator();
         int quarantineRefreshes = 0;
         int historyRefreshes = 0;
 
-        coordinator.Handle(
+        AntivirusActionResultCoordinator.Handle(
             new ActionResult { Success = true, Message = "ok" },
             new AntivirusActionResultCoordinator.Host
             {

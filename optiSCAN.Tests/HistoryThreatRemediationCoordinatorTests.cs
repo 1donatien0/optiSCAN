@@ -8,8 +8,6 @@ namespace optiSCAN.Tests;
 
 public sealed class HistoryThreatRemediationCoordinatorTests
 {
-    private readonly HistoryThreatRemediationCoordinator _coordinator = new();
-
     [Fact]
     public void QuarantineThreat_removes_from_session_on_success()
     {
@@ -40,7 +38,7 @@ public sealed class HistoryThreatRemediationCoordinatorTests
 
         try
         {
-            _coordinator.QuarantineThreat(history.Object, vm, session, file, () => refreshes++);
+            HistoryThreatRemediationCoordinator.QuarantineThreat(history.Object, vm, session, file, () => refreshes++);
             Assert.Equal(1, refreshes);
             Assert.Empty(session.Threats);
         }

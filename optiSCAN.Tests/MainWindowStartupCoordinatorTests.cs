@@ -10,7 +10,6 @@ public sealed class MainWindowStartupCoordinatorTests
     [Fact]
     public async Task RunAsync_navigates_to_overview_and_sets_protection_active()
     {
-        var coordinator = new MainWindowStartupCoordinator();
         string? navigated = null;
         string? status = null;
         var nav = new Mock<INavigationService>();
@@ -37,7 +36,7 @@ public sealed class MainWindowStartupCoordinatorTests
             ShowOnboardingIfNeeded = (_, _) => { },
         };
 
-        await coordinator.RunAsync(host);
+        await MainWindowStartupCoordinator.RunAsync(host);
 
         Assert.Equal(OptiscanStrings.PanelIds.Overview, navigated);
         Assert.NotNull(status);

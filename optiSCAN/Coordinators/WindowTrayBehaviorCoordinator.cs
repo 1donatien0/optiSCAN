@@ -4,7 +4,7 @@ using optiSCAN.Strings;
 namespace optiSCAN.Coordinators;
 
 /// <summary>Réduit la fenêtre au systray (minimize / fermeture) sans arrêter la protection.</summary>
-public sealed class WindowTrayBehaviorCoordinator
+public static class WindowTrayBehaviorCoordinator
 {
     public sealed class Host
     {
@@ -12,14 +12,14 @@ public sealed class WindowTrayBehaviorCoordinator
         public required Action<string> SetTrayStatus { get; init; }
     }
 
-    public void OnMinimized(Host host)
+    public static void OnMinimized(Host host)
     {
         host.HideWindow();
         host.SetTrayStatus(OptiscanStrings.UiMessages.ProtectionReducedTray);
     }
 
     /// <returns><c>true</c> si la fermeture a été annulée (masquage systray).</returns>
-    public bool TryCancelClose(bool explicitExit, CancelEventArgs e, Host host)
+    public static bool TryCancelClose(bool explicitExit, CancelEventArgs e, Host host)
     {
         if (explicitExit)
             return false;
