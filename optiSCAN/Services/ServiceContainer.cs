@@ -27,6 +27,8 @@ namespace optiSCAN.Services
 
         private readonly IServiceProvider _services;
         private readonly UiEventBus _uiEventBus;
+        private readonly IUserPreferencesAccessor _userPreferences;
+        private readonly IExclusionSettingsAccessor _exclusionSettings;
         private bool _shutdownDone;
 
         // ── Services singleton ───────────────────────────────────────────────────
@@ -103,16 +105,16 @@ namespace optiSCAN.Services
         /// <summary>Active ou arrête la protection temps réel et persiste dans <see cref="ExclusionSettings"/>.</summary>
         public void ApplyRealtimeProtection(bool enabled)
         {
-            ExclusionSettings.Current.RealTimeEnabled = enabled;
-            ExclusionSettings.Current.Save();
+            _exclusionSettings.Current.RealTimeEnabled = enabled;
+            _exclusionSettings.Current.Save();
 
-            if (UserPreferences.Current.UsePlatformProtectionService
+            if (_userPreferences.Current.UsePlatformProtectionService
                 && PlatformProtectionBootstrap.IsRemoteProtectionActive())
             {
                 if (enabled)
                 {
                     PlatformProtectionBootstrap.EnsurePlatformProtectionRunning();
-                    if (UserPreferences.Current.TamperProtectionEnabled)
+                    if (_userPreferences.Current.TamperProtectionEnabled)
                         TamperProtection.EnsureWatchdogTask();
                 }
                 RequestProtectionStateRefresh();
@@ -122,9 +124,9 @@ namespace optiSCAN.Services
             if (enabled)
             {
                 RealTimeProtection.Start();
-                if (UserPreferences.Current.ProcessMonitorEnabled)
+                if (_userPreferences.Current.ProcessMonitorEnabled)
                     ProcessStartMonitor.Start();
-                if (UserPreferences.Current.TamperProtectionEnabled)
+                if (_userPreferences.Current.TamperProtectionEnabled)
                     TamperProtection.EnsureWatchdogTask();
             }
             else
@@ -139,8 +141,8 @@ namespace optiSCAN.Services
         /// <summary>Active le service Windows de protection système (v8).</summary>
         public void ApplyPlatformProtectionService(bool enabled)
         {
-            UserPreferences.Current.UsePlatformProtectionService = enabled;
-            UserPreferences.Current.Save();
+            _userPreferences.Current.UsePlatformProtectionService = enabled;
+            _userPreferences.Current.Save();
 
             if (enabled)
             {
@@ -155,10 +157,10 @@ namespace optiSCAN.Services
             else
             {
                 PlatformProtectionBootstrap.TryStopWindowsService();
-                if (ExclusionSettings.Current.RealTimeEnabled)
+                if (_exclusionSettings.Current.RealTimeEnabled)
                 {
                     RealTimeProtection.Start();
-                    if (UserPreferences.Current.ProcessMonitorEnabled)
+                    if (_userPreferences.Current.ProcessMonitorEnabled)
                         ProcessStartMonitor.Start();
                 }
             }
@@ -169,8 +171,8 @@ namespace optiSCAN.Services
         /// <summary>Active ou arrête la surveillance des lecteurs amovibles.</summary>
         public void ApplyRemovableDriveScan(bool enabled)
         {
-            UserPreferences.Current.RemovableDriveScanEnabled = enabled;
-            UserPreferences.Current.Save();
+            _userPreferences.Current.RemovableDriveScanEnabled = enabled;
+            _userPreferences.Current.Save();
             if (enabled) RemovableDriveScan.Start();
             else RemovableDriveScan.Stop();
             RequestProtectionStateRefresh();
@@ -179,25 +181,25 @@ namespace optiSCAN.Services
         /// <summary>Persiste la quarantaine automatique (RTP + mode headless).</summary>
         public void ApplyAutoQuarantine(bool enabled)
         {
-            ExclusionSettings.Current.AutoQuarantineEnabled = enabled;
-            ExclusionSettings.Current.Save();
+            _exclusionSettings.Current.AutoQuarantineEnabled = enabled;
+            _exclusionSettings.Current.Save();
         }
 
         /// <summary>Active ou coupe les timers freshclam / règles YARA.</summary>
         public void ApplySignatureAutoUpdate(bool enabled)
         {
             SignatureUpdatePolicy.ApplyAutoUpdateTimers(FreshclamUpdater, RulesUpdater, enabled);
-            UserPreferences.Current.SignatureAutoUpdateEnabled = enabled;
-            UserPreferences.Current.Save();
+            _userPreferences.Current.SignatureAutoUpdateEnabled = enabled;
+            _userPreferences.Current.Save();
             RequestProtectionStateRefresh();
         }
 
         /// <summary>Active ou arrête la surveillance des créations de processus.</summary>
         public void ApplyProcessMonitor(bool enabled)
         {
-            UserPreferences.Current.ProcessMonitorEnabled = enabled;
-            UserPreferences.Current.Save();
-            if (enabled && ExclusionSettings.Current.RealTimeEnabled)
+            _userPreferences.Current.ProcessMonitorEnabled = enabled;
+            _userPreferences.Current.Save();
+            if (enabled && _exclusionSettings.Current.RealTimeEnabled)
                 ProcessStartMonitor.Start();
             else
                 ProcessStartMonitor.Stop();
@@ -207,8 +209,8 @@ namespace optiSCAN.Services
         /// <summary>Enregistre ou supprime la tâche watchdog anti-manipulation.</summary>
         public void ApplyTamperProtection(bool enabled)
         {
-            UserPreferences.Current.TamperProtectionEnabled = enabled;
-            UserPreferences.Current.Save();
+            _userPreferences.Current.TamperProtectionEnabled = enabled;
+            _userPreferences.Current.Save();
             if (enabled)
                 TamperProtection.EnsureWatchdogTask();
             else
@@ -226,15 +228,15 @@ namespace optiSCAN.Services
         /// <summary>Restaure RTP et MAJ auto selon les préférences persistées (appel au démarrage UI).</summary>
         public void ApplyPreferencesOnStartup()
         {
-            ApplySignatureAutoUpdate(UserPreferences.Current.SignatureAutoUpdateEnabled);
+            ApplySignatureAutoUpdate(_userPreferences.Current.SignatureAutoUpdateEnabled);
             SignatureUpdatePolicy.ScheduleStartupRefreshIfStale(this);
 
-            if (UserPreferences.Current.UsePlatformProtectionService)
+            if (_userPreferences.Current.UsePlatformProtectionService)
             {
                 PlatformProtectionBootstrap.EnsurePlatformProtectionRunning();
                 if (PlatformProtectionBootstrap.IsRemoteProtectionActive())
                 {
-                    if (UserPreferences.Current.TamperProtectionEnabled)
+                    if (_userPreferences.Current.TamperProtectionEnabled)
                         TamperProtection.EnsureWatchdogTask();
                     ApplyRemovableDriveAndEnginePrefs();
                     return;
@@ -243,10 +245,10 @@ namespace optiSCAN.Services
                 AppLogger.Warn("ServiceContainer", "Service plateforme injoignable — repli RTP locale");
             }
 
-            if (ExclusionSettings.Current.RealTimeEnabled)
+            if (_exclusionSettings.Current.RealTimeEnabled)
             {
                 RealTimeProtection.Start();
-                if (UserPreferences.Current.ProcessMonitorEnabled)
+                if (_userPreferences.Current.ProcessMonitorEnabled)
                     ProcessStartMonitor.Start();
             }
             else
@@ -255,7 +257,7 @@ namespace optiSCAN.Services
                 ProcessStartMonitor.Stop();
             }
 
-            if (UserPreferences.Current.TamperProtectionEnabled)
+            if (_userPreferences.Current.TamperProtectionEnabled)
                 TamperProtection.EnsureWatchdogTask();
             else
                 TamperProtection.DeleteWatchdogTask();
@@ -265,12 +267,12 @@ namespace optiSCAN.Services
 
         private void ApplyRemovableDriveAndEnginePrefs()
         {
-            if (UserPreferences.Current.GameModeAutoEnabled)
+            if (_userPreferences.Current.GameModeAutoEnabled)
                 DistractionFreeMonitor.Start();
             else
                 DistractionFreeMonitor.Stop();
 
-            if (UserPreferences.Current.UseClamdEngine)
+            if (_userPreferences.Current.UseClamdEngine)
             {
                 _ = Task.Run(async () =>
                 {
@@ -279,7 +281,7 @@ namespace optiSCAN.Services
                 });
             }
 
-            if (UserPreferences.Current.RemovableDriveScanEnabled)
+            if (_userPreferences.Current.RemovableDriveScanEnabled)
                 RemovableDriveScan.Start();
             else
                 RemovableDriveScan.Stop();
@@ -348,6 +350,8 @@ namespace optiSCAN.Services
             _services = collection.BuildServiceProvider();
 
             _uiEventBus = _services.GetRequiredService<UiEventBus>();
+            _userPreferences = _services.GetRequiredService<IUserPreferencesAccessor>();
+            _exclusionSettings = _services.GetRequiredService<IExclusionSettingsAccessor>();
 
             ClamAv = _services.GetRequiredService<ClamAvEngine>();
             ClamAvBackend = _services.GetRequiredService<CompositeClamAvBackend>();

@@ -18,7 +18,7 @@ If you discover a security issue in optiSCAN, please report it privately:
 
 - **Quarantine**: AES-256-GCM encryption, HMAC-signed manifest, DPAPI-protected master key.
 - **Sensitive paths**: restore and IPC scan refuse System32, Windows, ProgramFiles, ProgramData, Startup.
-- **IPC pipe**: `shutdown` exige un jeton HMAC stocké sous `%ProgramData%\optiSCAN\` ; scan refuse les chemins sensibles.
+- **IPC pipe**: ACL (SYSTEM / Administrateurs / utilisateurs authentifiés) ; `shutdown` exige un jeton sous `%ProgramData%\optiSCAN\` ; scan refuse les chemins sensibles.
 - **Secrets**: user preferences (VirusTotal key) stored via DPAPI `SecureStore`; no credentials in the repository.
 - **CI**: Release builds treat warnings as errors; CodeQL (C# and native AMSI); Dependabot for NuGet and GitHub Actions.
 

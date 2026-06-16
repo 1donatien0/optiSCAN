@@ -7,6 +7,8 @@ public static class ServiceRegistration
 {
     public static IServiceCollection AddOptiscanCoreServices(this IServiceCollection services)
     {
+        services.AddSingleton<IUserPreferencesAccessor, DefaultUserPreferencesAccessor>();
+        services.AddSingleton<IExclusionSettingsAccessor, DefaultExclusionSettingsAccessor>();
         services.AddSingleton<UiEventBus>();
         services.AddSingleton<IUiEventBus>(sp => sp.GetRequiredService<UiEventBus>());
         services.AddSingleton<ClamAvEngine>();

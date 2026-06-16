@@ -65,12 +65,7 @@ public sealed class ProtectionPipeServer : IDisposable
     {
         while (!ct.IsCancellationRequested)
         {
-            await using var pipe = new NamedPipeServerStream(
-                _pipeName,
-                PipeDirection.InOut,
-                NamedPipeServerStream.MaxAllowedServerInstances,
-                PipeTransmissionMode.Byte,
-                PipeOptions.Asynchronous);
+            var pipe = ProtectionPipeAcl.CreateListeningStream(_pipeName);
             try
             {
                 await pipe.WaitForConnectionAsync(ct).ConfigureAwait(false);
@@ -84,6 +79,16 @@ public sealed class ProtectionPipeServer : IDisposable
             {
                 AppLogger.Warn("ProtectionPipeServer", "ListenLoop", ex);
                 await Task.Delay(250, ct).ConfigureAwait(false);
+            }
+            finally
+            {
+                try
+                {
+                    if (pipe.IsConnected)
+                        pipe.Disconnect();
+                }
+                catch { /* best effort */ }
+                await pipe.DisposeAsync().ConfigureAwait(false);
             }
         }
     }

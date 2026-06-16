@@ -117,6 +117,11 @@ jobs:
         shell: pwsh
         run: pwsh -File scripts/fetch-runtime-deps.ps1 -RunFreshclam -FreshclamTimeoutMinutes 45
 
+      - name: Build AMSI provider (x64 Release)
+        shell: pwsh
+        continue-on-error: true
+        run: pwsh -File scripts/build-amsi.ps1
+
       - name: Publish win-x64 (self-contained)
         run: >
           dotnet publish optiSCAN/optiSCAN.csproj
@@ -138,6 +143,10 @@ jobs:
       - name: Stage runtime deps into publish folder
         shell: pwsh
         run: pwsh -File scripts/stage-runtime-deps.ps1 -PublishDir publish/win-x64
+
+      - name: Stage AMSI provider DLL
+        shell: pwsh
+        run: pwsh -File scripts/stage-amsi.ps1 -PublishDir publish/win-x64
 
       - name: Verify runtime dependencies (ClamAV + YARA)
         shell: pwsh
