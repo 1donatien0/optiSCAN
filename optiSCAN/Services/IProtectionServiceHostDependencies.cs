@@ -9,6 +9,8 @@ public interface IProtectionServiceHostDependencies : IServiceHostThreatContext
 
     RemovableDriveScanService RemovableDriveScan { get; }
 
+    IExclusionSettingsAccessor ExclusionSettingsAccessor { get; }
+
     ScanOrchestrator Orchestrator { get; }
 
     void ApplyPreferencesOnStartup();

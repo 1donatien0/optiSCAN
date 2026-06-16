@@ -13,7 +13,7 @@ public sealed class SignatureUpdatePolicyTests
         freshclam.Setup(f => f.DisableAutoUpdate());
         rules.Setup(r => r.DisableAutoUpdate());
 
-        SignatureUpdatePolicy.ApplyAutoUpdateTimers(freshclam.Object, rules.Object, enabled: false);
+        SignatureUpdatePolicy.ApplyAutoUpdateTimers(freshclam.Object, rules.Object, enabled: false, new DefaultUserPreferencesAccessor());
 
         freshclam.Verify(f => f.DisableAutoUpdate(), Times.Once);
         rules.Verify(r => r.DisableAutoUpdate(), Times.Once);
@@ -29,7 +29,7 @@ public sealed class SignatureUpdatePolicyTests
         freshclam.Setup(f => f.EnableAutoUpdate(It.IsAny<TimeSpan?>()));
         rules.Setup(r => r.EnableAutoUpdate(It.IsAny<TimeSpan?>()));
 
-        SignatureUpdatePolicy.ApplyAutoUpdateTimers(freshclam.Object, rules.Object, enabled: true);
+        SignatureUpdatePolicy.ApplyAutoUpdateTimers(freshclam.Object, rules.Object, enabled: true, new DefaultUserPreferencesAccessor());
 
         freshclam.Verify(f => f.EnableAutoUpdate(It.IsAny<TimeSpan?>()), Times.Once);
         rules.Verify(r => r.EnableAutoUpdate(It.IsAny<TimeSpan?>()), Times.Once);

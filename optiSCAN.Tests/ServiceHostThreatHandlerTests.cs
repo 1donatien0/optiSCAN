@@ -15,7 +15,7 @@ public sealed class ServiceHostThreatHandlerTests
             logger,
             new CloudThreatIntelService(new FakeReputation()));
 
-        var handler = new ServiceHostThreatHandler(context);
+        var handler = new ServiceHostThreatHandler(context, new DefaultExclusionSettingsAccessor());
         var auto = ExclusionSettings.Current.AutoQuarantineEnabled;
         try
         {

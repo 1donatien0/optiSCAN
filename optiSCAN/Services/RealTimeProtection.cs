@@ -42,8 +42,18 @@ namespace optiSCAN.Services
         /// <summary>Vrai pendant un scan manuel ou USB (surveillance processus en pause).</summary>
         public bool IsPaused => IsSuspended;
 
-        public RealTimeProtection(ScanOrchestrator orchestrator, QuarantineManager quarantineManager, NotificationService notifications)
+        private readonly IUserPreferencesAccessor _prefs;
+        private readonly IExclusionSettingsAccessor _exclusions;
+
+        public RealTimeProtection(
+            ScanOrchestrator orchestrator,
+            QuarantineManager quarantineManager,
+            NotificationService notifications,
+            IUserPreferencesAccessor? preferences = null,
+            IExclusionSettingsAccessor? exclusions = null)
         {
+            _prefs = preferences ?? new DefaultUserPreferencesAccessor();
+            _exclusions = exclusions ?? new DefaultExclusionSettingsAccessor();
             _orchestrator = orchestrator;
             _quarantineManager = quarantineManager;
             _notifications = notifications;
@@ -101,7 +111,7 @@ namespace optiSCAN.Services
 
         private void AddWatcher(string path)
         {
-            if (ExclusionSettings.Current.IsFolderExcluded(path))
+            if (_exclusions.Current.IsFolderExcluded(path))
                 return;
 
             try
@@ -257,7 +267,7 @@ namespace optiSCAN.Services
             try
             {
                 // Ne pas rescanner un fichier individuellement exclu
-                if (ExclusionSettings.Current.IsFileExcluded(filePath))
+                if (_exclusions.Current.IsFileExcluded(filePath))
                 {
                     WriteLog($"[RTP] Fichier exclu, ignoré : {filePath}");
                     return;
@@ -272,9 +282,9 @@ namespace optiSCAN.Services
                         // Notification toast
                         _notifications.ShowThreatDetected(threat);
 
-                        if (ExclusionSettings.Current.AutoQuarantineEnabled)
+                        if (_exclusions.Current.AutoQuarantineEnabled)
                         {
-                            if (UserPreferences.Current.BackupBeforeQuarantine)
+                            if (_prefs.Current.BackupBeforeQuarantine)
                                 ThreatRemediationService.TryCreateSafetyCopy(threat);
 
                             // Quarantaine automatique activée par l'utilisateur

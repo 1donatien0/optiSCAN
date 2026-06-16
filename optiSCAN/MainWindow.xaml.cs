@@ -48,6 +48,7 @@ namespace optiSCAN
         private readonly SignatureUpdateUiRunner _signatureUpdateRunner = new();
         private readonly ToastActivationCoordinator _toastActivation = new();
         private readonly StatusFooterCoordinator _statusFooter = new();
+        private readonly MainWindowStartupCoordinator _startup = new();
         private readonly RoutedCommand _quickScanShortcutCommand = new();
         private bool _isClosing = false;
         private bool _wasScanning;
@@ -184,63 +185,34 @@ namespace optiSCAN
         {
             try
             {
-                // ── Enregistrement des panneaux de navigation ────────────────────
-                RegisterPanels();
-
-                RuntimeDependencies.LogReportIfIncomplete();
-                var runtimeReport = RuntimeDependencies.Evaluate();
-
-                bool clamAvOk = _container.ClamAv.IsClamAvInstalled();
-                if (!runtimeReport.IsClamAvReady)
-                    SetStatus(runtimeReport.BuildSummaryLine() + LocalizationService.GetString("Main_RuntimeHint"), isWarning: true);
-                else
-                    SetStatus(clamAvOk ? LocalizationService.GetString("Main_ClamOperational") : LocalizationService.GetString("Main_ClamNotFound"), isWarning: !clamAvOk);
-
-                RefreshAntivirusStatus();
-                RefreshQuarantineList();
-                RefreshHistory();
-                await RefreshSignaturesDisplayAsync();
-                // Bandeau élévation : affiché si optiSCAN tourne sans droits admin.
-                (panelOverview as Views.OverviewControl)?.ApplyElevationBanner();
-                try
+                await _startup.RunAsync(new MainWindowStartupCoordinator.Host
                 {
-                    _container.ApplyPreferencesOnStartup();
-                }
-                catch (Exception ex)
-                {
-                    AppLogger.Warn("MainWindow", "ApplyPreferencesOnStartup", ex);
-                }
-                ViewModel?.RefreshProtectionStatus();
-                RefreshOverviewProtectionAndRecommendations();
-
-                // Afficher la vue d'accueil par défaut
-                _navigationService.NavigateTo(OptiscanStrings.PanelIds.Overview);
-
-                SetStatus(OptiscanStrings.UiMessages.ProtectionActive);
-                if (!App.GuardSession)
-                    OnboardingService.ShowIfNeeded(this, _container);
-                _ = WarmUpYaraRulesAsync();
-
-                if (App.GuardSession)
-                {
-                    ShowInTaskbar = false;
-                    WindowState = WindowState.Minimized;
-                    Hide();
-                    SetStatus(LocalizationService.GetString("Main_GuardSession"));
-                }
-                else if (!string.IsNullOrWhiteSpace(App.PendingShellScanPath) && _shellScanCoordinator != null)
-                {
-                    var shellPath = App.PendingShellScanPath;
-                    App.PendingShellScanPath = null;
-                    await _shellScanCoordinator.RunShellScanAsync(shellPath);
-                }
+                    Container = _container,
+                    Navigation = _navigationService,
+                    ViewModel = ViewModel,
+                    Window = this,
+                    RegisterPanels = RegisterPanels,
+                    RefreshAntivirusStatus = RefreshAntivirusStatus,
+                    RefreshQuarantineList = RefreshQuarantineList,
+                    RefreshHistory = RefreshHistory,
+                    RefreshSignaturesDisplayAsync = () => RefreshSignaturesDisplayAsync(),
+                    RefreshOverviewProtection = RefreshOverviewProtectionAndRecommendations,
+                    ApplyElevationBanner = () => (panelOverview as Views.OverviewControl)?.ApplyElevationBanner(),
+                    SetStatus = (msg, err, warn) => SetStatus(msg, isError: err, isWarning: warn),
+                    WarmUpYaraRulesAsync = WarmUpYaraRulesAsync,
+                    ShowWindow = ShowWindow,
+                    ShellScan = _shellScanCoordinator,
+                    GuardSession = App.GuardSession,
+                    PendingShellScanPath = App.PendingShellScanPath,
+                    ShowOnboardingIfNeeded = OnboardingService.ShowIfNeeded,
+                }).ConfigureAwait(true);
+                App.PendingShellScanPath = null;
             }
             catch (Exception ex)
             {
                 AppLogger.Error("MainWindow", "SurChargementFenetrePrincipale", ex);
                 SetStatus(LocalizationService.Format("Status_Error", ex.Message), isError: true);
             }
-            await Task.CompletedTask;
         }
 
         /// <summary>Compile les règles YARA en arrière-plan pour éviter le blocage au premier scan.</summary>

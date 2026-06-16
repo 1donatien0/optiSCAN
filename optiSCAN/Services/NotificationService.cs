@@ -18,8 +18,11 @@ namespace optiSCAN.Services
         /// <summary>Émis sur le thread du callback toolkit — le handler doit marshaler vers l'UI WPF.</summary>
         public event EventHandler<ToastActivationEventArgs>? ToastActivated;
 
-        public NotificationService()
+        private readonly IUserPreferencesAccessor _prefs;
+
+        public NotificationService(IUserPreferencesAccessor? preferences = null)
         {
+            _prefs = preferences ?? new DefaultUserPreferencesAccessor();
             _activationTarget = this;
             EnsureActivationHook();
         }
@@ -33,7 +36,7 @@ namespace optiSCAN.Services
         /// <summary>Aligne l'état sur <see cref="UserPreferences.ActionNotificationsEnabled"/>.</summary>
         public void SyncFromUserPreferences()
         {
-            _toastsEnabled = UserPreferences.Current.ActionNotificationsEnabled;
+            _toastsEnabled = _prefs.Current.ActionNotificationsEnabled;
         }
 
         private static void EnsureActivationHook()

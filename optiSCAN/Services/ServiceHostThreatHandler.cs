@@ -6,20 +6,26 @@ namespace optiSCAN.Services;
 internal sealed class ServiceHostThreatHandler
 {
     private readonly IServiceHostThreatContext _context;
+    private readonly IExclusionSettingsAccessor _exclusions;
 
-    public ServiceHostThreatHandler(ServiceContainer container)
-        : this((IServiceHostThreatContext)container)
+    public ServiceHostThreatHandler(IProtectionServiceHostDependencies container)
+        : this((IServiceHostThreatContext)container, container.ExclusionSettingsAccessor)
     {
     }
 
-    internal ServiceHostThreatHandler(IServiceHostThreatContext context) =>
+    internal ServiceHostThreatHandler(
+        IServiceHostThreatContext context,
+        IExclusionSettingsAccessor exclusions)
+    {
         _context = context;
+        _exclusions = exclusions;
+    }
 
     public void OnThreatDetected(object? sender, ThreatInfo threat)
     {
         try
         {
-            if (ExclusionSettings.Current.AutoQuarantineEnabled)
+            if (_exclusions.Current.AutoQuarantineEnabled)
             {
                 var repair = ThreatRepairService.TryRemediate(threat, _context.Quarantine);
                 _context.Logger.WriteToLog(

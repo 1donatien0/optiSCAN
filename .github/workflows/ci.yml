@@ -59,7 +59,7 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          $floor = 0.32
+          $floor = 0.35
           $target = 0.50
           $file = Get-ChildItem -Path TestResults -Recurse -Filter coverage.cobertura.xml -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $file) {

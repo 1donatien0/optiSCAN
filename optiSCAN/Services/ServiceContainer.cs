@@ -188,7 +188,7 @@ namespace optiSCAN.Services
         /// <summary>Active ou coupe les timers freshclam / règles YARA.</summary>
         public void ApplySignatureAutoUpdate(bool enabled)
         {
-            SignatureUpdatePolicy.ApplyAutoUpdateTimers(FreshclamUpdater, RulesUpdater, enabled);
+            SignatureUpdatePolicy.ApplyAutoUpdateTimers(FreshclamUpdater, RulesUpdater, enabled, _userPreferences);
             _userPreferences.Current.SignatureAutoUpdateEnabled = enabled;
             _userPreferences.Current.Save();
             RequestProtectionStateRefresh();
@@ -229,7 +229,7 @@ namespace optiSCAN.Services
         public void ApplyPreferencesOnStartup()
         {
             ApplySignatureAutoUpdate(_userPreferences.Current.SignatureAutoUpdateEnabled);
-            SignatureUpdatePolicy.ScheduleStartupRefreshIfStale(this);
+            SignatureUpdatePolicy.ScheduleStartupRefreshIfStale(this, _userPreferences);
 
             if (_userPreferences.Current.UsePlatformProtectionService)
             {
@@ -400,6 +400,8 @@ namespace optiSCAN.Services
         }
 
         IScheduledScanService IViewServices.ScheduledScan => ScheduledScan;
+
+        IExclusionSettingsAccessor IProtectionServiceHostDependencies.ExclusionSettingsAccessor => _exclusionSettings;
 
         /// <summary>
         /// Libère proprement tous les services disposables.

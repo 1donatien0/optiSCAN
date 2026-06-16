@@ -26,7 +26,7 @@ public sealed class ProtectionServiceHost : IDisposable
 
         _container.ApplyPreferencesOnStartup();
 
-        _threatHandler = new ServiceHostThreatHandler(_container);
+        _threatHandler = new ServiceHostThreatHandler(_container, _container.ExclusionSettingsAccessor);
         _container.RealTimeProtection.ThreatDetected += _threatHandler.OnThreatDetected;
         _container.ProcessStartMonitor.ThreatDetected += _threatHandler.OnThreatDetected;
         _container.RemovableDriveScan.ThreatDetected += _threatHandler.OnThreatDetected;

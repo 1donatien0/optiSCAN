@@ -11,7 +11,8 @@ namespace optiSCAN.Services
         public static void ApplyAutoUpdateTimers(
             ISignatureAutoUpdateTarget freshclam,
             ISignatureAutoUpdateTarget rules,
-            bool enabled)
+            bool enabled,
+            IUserPreferencesAccessor preferences)
         {
             if (!enabled)
             {
@@ -20,17 +21,17 @@ namespace optiSCAN.Services
                 return;
             }
 
-            var aggressive = UserPreferences.Current.AggressiveSignatureUpdates;
+            var aggressive = preferences.Current.AggressiveSignatureUpdates;
             freshclam.EnableAutoUpdate(aggressive ? AggressiveClamInterval : StandardClamInterval);
             rules.EnableAutoUpdate(aggressive ? AggressiveYaraInterval : StandardYaraInterval);
         }
 
-        public static void ScheduleStartupRefreshIfStale(ServiceContainer container)
+        public static void ScheduleStartupRefreshIfStale(ServiceContainer container, IUserPreferencesAccessor preferences)
         {
-            if (!UserPreferences.Current.SignatureAutoUpdateEnabled)
+            if (!preferences.Current.SignatureAutoUpdateEnabled)
                 return;
 
-            var threshold = TimeSpan.FromDays(Math.Max(1, UserPreferences.Current.SignatureStaleThresholdDays));
+            var threshold = TimeSpan.FromDays(Math.Max(1, preferences.Current.SignatureStaleThresholdDays));
             _ = Task.Run(async () =>
             {
                 try

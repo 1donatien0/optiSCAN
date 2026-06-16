@@ -50,11 +50,13 @@ namespace optiSCAN.Services
         private QuarantineDocument _doc;
         private readonly object _lock = new();
         private ActivityLogService? _activityLog;
+        private readonly IUserPreferencesAccessor _prefs;
 
         // ── Construction ─────────────────────────────────────────────────────────
 
-        public QuarantineManager(string? quarantineDir = null)
+        public QuarantineManager(string? quarantineDir = null, IUserPreferencesAccessor? preferences = null)
         {
+            _prefs = preferences ?? new DefaultUserPreferencesAccessor();
             _quarantineDir = quarantineDir ?? Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "optiSCAN", "Quarantine");
@@ -145,7 +147,7 @@ namespace optiSCAN.Services
         {
             try
             {
-                if (UserPreferences.Current.BackupBeforeQuarantine)
+                if (_prefs.Current.BackupBeforeQuarantine)
                     ThreatRemediationService.TryCreateSafetyCopy(threat);
 
                 var id = Guid.NewGuid().ToString("N");

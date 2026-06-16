@@ -18,11 +18,13 @@ public static class ServiceRegistration
         services.AddSingleton<YaraEngine>();
         services.AddSingleton<FreshclamUpdater>();
         services.AddSingleton<YaraForgeUpdater>();
-        services.AddSingleton<QuarantineManager>();
+        services.AddSingleton<QuarantineManager>(sp =>
+            new QuarantineManager(preferences: sp.GetRequiredService<IUserPreferencesAccessor>()));
         services.AddSingleton<ScanLogManager>();
         services.AddSingleton<ActivityLogService>(sp =>
             new ActivityLogService(sp.GetRequiredService<ScanLogManager>()));
-        services.AddSingleton<NotificationService>();
+        services.AddSingleton<NotificationService>(sp =>
+            new NotificationService(sp.GetRequiredService<IUserPreferencesAccessor>()));
         services.AddSingleton<ScanOrchestrator>(sp =>
             new ScanOrchestrator(sp.GetRequiredService<CompositeClamAvBackend>(), sp.GetRequiredService<YaraEngine>()));
         services.AddSingleton<ClamAvScanEngineAdapter>(sp =>
@@ -41,7 +43,9 @@ public static class ServiceRegistration
             new RealTimeProtection(
                 sp.GetRequiredService<ScanOrchestrator>(),
                 sp.GetRequiredService<QuarantineManager>(),
-                sp.GetRequiredService<NotificationService>()));
+                sp.GetRequiredService<NotificationService>(),
+                sp.GetRequiredService<IUserPreferencesAccessor>(),
+                sp.GetRequiredService<IExclusionSettingsAccessor>()));
         services.AddSingleton<ProcessStartMonitor>(sp =>
         {
             var rtp = sp.GetRequiredService<RealTimeProtection>();
@@ -49,7 +53,9 @@ public static class ServiceRegistration
                 sp.GetRequiredService<ScanOrchestrator>(),
                 sp.GetRequiredService<QuarantineManager>(),
                 sp.GetRequiredService<NotificationService>(),
-                () => rtp.IsPaused);
+                () => rtp.IsPaused,
+                sp.GetRequiredService<IUserPreferencesAccessor>(),
+                sp.GetRequiredService<IExclusionSettingsAccessor>());
         });
         services.AddSingleton<TamperProtectionService>();
         services.AddSingleton<RemovableDriveScanService>(sp =>
@@ -59,7 +65,9 @@ public static class ServiceRegistration
                 sp.GetRequiredService<NotificationService>(),
                 sp.GetRequiredService<ScanLogManager>(),
                 sp.GetRequiredService<RealTimeProtection>(),
-                sp.GetRequiredService<IUiEventBus>()));
+                sp.GetRequiredService<IUiEventBus>(),
+                sp.GetRequiredService<IUserPreferencesAccessor>(),
+                sp.GetRequiredService<IExclusionSettingsAccessor>()));
         services.AddSingleton<ScheduledScanService>();
         return services;
     }
