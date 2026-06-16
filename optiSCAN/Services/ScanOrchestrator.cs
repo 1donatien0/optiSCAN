@@ -165,7 +165,7 @@ namespace optiSCAN.Services
 
             await Task.WhenAll(clamTask, yaraTask);
 
-            return ScanThreatMerger.Merge(type, target, await clamTask, await yaraTask);
+            return ScanThreatMerger.Merge(type, target, await clamTask, await yaraTask, _exclusions);
         }
 
         private async Task<ScanResult> RunFileListPipelineAsync(
@@ -185,13 +185,13 @@ namespace optiSCAN.Services
                 ct.ThrowIfCancellationRequested();
                 var yaraResult = await RunYaraOnFileListAsync(files, targetPath, engineProgress, ct)
                     .ConfigureAwait(false);
-                return ScanThreatMerger.Merge(type, targetPath, clamResult, yaraResult);
+                return ScanThreatMerger.Merge(type, targetPath, clamResult, yaraResult, _exclusions);
             }
 
             var clamTask = _clamAv.ScanFileListAsync(files, targetPath, engineProgress, ct);
             var yaraTask = RunYaraOnFileListAsync(files, targetPath, engineProgress, ct);
             await Task.WhenAll(clamTask, yaraTask).ConfigureAwait(false);
-            return ScanThreatMerger.Merge(type, targetPath, await clamTask, await yaraTask);
+            return ScanThreatMerger.Merge(type, targetPath, await clamTask, await yaraTask, _exclusions);
         }
 
         /// <summary>Délègue l'agrégation multi-cibles à <see cref="MultiTargetScanAggregator"/>.</summary>

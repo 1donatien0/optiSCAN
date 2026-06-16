@@ -96,10 +96,12 @@ namespace optiSCAN.Services
         /// <summary>Exécuté par <c>--watchdog</c> : relance la protection si RTP attendue mais aucune instance.</summary>
         public static void RunWatchdogCheck()
         {
-            if (!ExclusionSettings.Current.RealTimeEnabled || !UserPreferences.Current.TamperProtectionEnabled)
+            var exclusions = new DefaultExclusionSettingsAccessor();
+            var prefs = new DefaultUserPreferencesAccessor();
+            if (!exclusions.Current.RealTimeEnabled || !prefs.Current.TamperProtectionEnabled)
                 return;
 
-            if (UserPreferences.Current.UsePlatformProtectionService)
+            if (prefs.Current.UsePlatformProtectionService)
             {
                 if (PlatformProtectionBootstrap.IsRemoteProtectionActive())
                     return;

@@ -70,7 +70,7 @@ namespace optiSCAN.Services
         {
             if (_isEnabled) return;
 
-            foreach (var folder in RealTimeWatchPaths.GetWatchFolders())
+            foreach (var folder in RealTimeWatchPaths.GetWatchFolders(_exclusions))
                 AddWatcher(folder);
 
             // Cleanup périodique du cache : toutes les 5 min, on supprime les

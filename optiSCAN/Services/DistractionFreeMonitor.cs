@@ -20,8 +20,15 @@ namespace optiSCAN.Services
         private static System.Threading.Timer? _timer;
         private static volatile bool _active;
         private static DateTime _lastCheckUtc = DateTime.MinValue;
+        private static IUserPreferencesAccessor _prefs = new DefaultUserPreferencesAccessor();
 
         public static bool IsActive => _active;
+
+        public static void Initialize(IUserPreferencesAccessor? preferences = null)
+        {
+            if (preferences != null)
+                _prefs = preferences;
+        }
 
         public static void Start(TimeSpan? interval = null)
         {
@@ -39,7 +46,7 @@ namespace optiSCAN.Services
 
         public static bool ShouldSuppressNotifications()
         {
-            if (!UserPreferences.Current.GameModeAutoEnabled)
+            if (!_prefs.Current.GameModeAutoEnabled)
                 return false;
             if ((DateTime.UtcNow - _lastCheckUtc) > TimeSpan.FromSeconds(25))
                 Refresh();

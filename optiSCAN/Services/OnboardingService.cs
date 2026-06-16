@@ -7,9 +7,12 @@ namespace optiSCAN.Services
     /// <summary>Premier lancement : parcours court en 3 étapes (v7).</summary>
     public static class OnboardingService
     {
-        public static void ShowIfNeeded(Window owner, IViewServices ui)
+        public static void ShowIfNeeded(Window owner, IViewServices ui) =>
+            ShowIfNeeded(owner, ui, null);
+
+        public static void ShowIfNeeded(Window owner, IViewServices ui, IUserPreferencesAccessor? preferences)
         {
-            var prefs = UserPreferences.Current;
+            var prefs = (preferences ?? new DefaultUserPreferencesAccessor()).Current;
             if (prefs.OnboardingCompleted)
                 return;
 

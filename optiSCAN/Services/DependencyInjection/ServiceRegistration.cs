@@ -11,12 +11,16 @@ public static class ServiceRegistration
         services.AddSingleton<IExclusionSettingsAccessor, DefaultExclusionSettingsAccessor>();
         services.AddSingleton<UiEventBus>();
         services.AddSingleton<IUiEventBus>(sp => sp.GetRequiredService<UiEventBus>());
-        services.AddSingleton<ClamAvEngine>();
+        services.AddSingleton<ClamAvEngine>(sp =>
+            new ClamAvEngine(exclusions: sp.GetRequiredService<IExclusionSettingsAccessor>()));
         services.AddSingleton<ClamdEngine>(sp =>
-            new ClamdEngine(sp.GetRequiredService<IUserPreferencesAccessor>()));
+            new ClamdEngine(
+                sp.GetRequiredService<IUserPreferencesAccessor>(),
+                sp.GetRequiredService<IExclusionSettingsAccessor>()));
         services.AddSingleton<CompositeClamAvBackend>(sp =>
             new CompositeClamAvBackend(sp.GetRequiredService<ClamdEngine>(), sp.GetRequiredService<ClamAvEngine>()));
-        services.AddSingleton<YaraEngine>();
+        services.AddSingleton<YaraEngine>(sp =>
+            new YaraEngine(exclusions: sp.GetRequiredService<IExclusionSettingsAccessor>()));
         services.AddSingleton<FreshclamUpdater>();
         services.AddSingleton<YaraForgeUpdater>();
         services.AddSingleton<QuarantineManager>(sp =>

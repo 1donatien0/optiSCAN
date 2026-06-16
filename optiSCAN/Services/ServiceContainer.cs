@@ -353,6 +353,9 @@ namespace optiSCAN.Services
             _userPreferences = _services.GetRequiredService<IUserPreferencesAccessor>();
             _exclusionSettings = _services.GetRequiredService<IExclusionSettingsAccessor>();
 
+            DistractionFreeMonitor.Initialize(_userPreferences);
+            PlatformProtectionBootstrap.Initialize(_userPreferences);
+
             ClamAv = _services.GetRequiredService<ClamAvEngine>();
             ClamAvBackend = _services.GetRequiredService<CompositeClamAvBackend>();
             Yara = _services.GetRequiredService<YaraEngine>();
