@@ -54,6 +54,19 @@ jobs:
           path: TestResults/**/coverage.cobertura.xml
           retention-days: 14
 
+      - name: Code coverage summary (non-blocking)
+        if: always()
+        continue-on-error: true
+        shell: pwsh
+        run: |
+          $file = Get-ChildItem -Path TestResults -Recurse -Filter coverage.cobertura.xml -ErrorAction SilentlyContinue | Select-Object -First 1
+          if (-not $file) { Write-Host "No coverage file found."; exit 0 }
+          [xml]$xml = Get-Content $file.FullName
+          $lineRate = [double]$xml.coverage.'line-rate'
+          $branchRate = [double]$xml.coverage.'branch-rate'
+          Write-Host ("Line coverage: {0:P1}" -f $lineRate)
+          Write-Host ("Branch coverage: {0:P1}" -f $branchRate)
+
       - name: Build (Debug)
         run: dotnet build optiSCAN.sln --configuration Debug --no-restore
 
