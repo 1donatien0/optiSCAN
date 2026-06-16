@@ -3,8 +3,10 @@ using optiSCAN.Services;
 
 namespace optiSCAN.Tests;
 
+[Collection("Localization")]
 public sealed class ProtectionStatusEvaluatorTests
 {
+    public ProtectionStatusEvaluatorTests() => LocalizationService.ApplyCulture("fr-FR");
     [Theory]
     [InlineData(false, false, 0, true, true, ProtectionBadgeLevel.Inactive)]
     [InlineData(true, true, 0, true, true, ProtectionBadgeLevel.Degraded)]

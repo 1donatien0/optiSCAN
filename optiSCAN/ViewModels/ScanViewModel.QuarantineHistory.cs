@@ -32,7 +32,7 @@ namespace optiSCAN.ViewModels
                     threat.Status = ThreatStatus.Quarantined;
             }
             StatusMessage = LocalizationService.Format("Vm_QuarantineBatch", count);
-            ServiceContainer.Default.RequestScanHistoryViewsRefresh();
+            _uiEvents.RequestScanHistoryViewsRefresh();
         }
 
         /// <summary>Appelé après une quarantaine réussie pendant un scan en cours.</summary>
@@ -41,7 +41,7 @@ namespace optiSCAN.ViewModels
             if (string.IsNullOrWhiteSpace(filePath)) return;
             _quarantinedDuringScanPaths.Add(filePath);
             LoadQuarantine();
-            ServiceContainer.Default.RequestScanHistoryViewsRefresh();
+            _uiEvents.RequestScanHistoryViewsRefresh();
         }
 
         private bool IsPathCurrentlyQuarantined(string filePath) =>
@@ -104,7 +104,7 @@ namespace optiSCAN.ViewModels
 
         private void MigrateScanCountFromHistoryIfNeeded()
         {
-            var prefs = UserPreferences.Current;
+            var prefs = _prefs.Current;
             if (prefs.TotalScansCount > 0) return;
             int n = _logger.GetHistory().Count;
             if (n <= 0) return;
@@ -182,7 +182,7 @@ namespace optiSCAN.ViewModels
             WpfApp.Current?.Dispatcher.Invoke(() =>
             {
                 RecentTargets.Clear();
-                foreach (var t in UserPreferences.Current.RecentTargets)
+                foreach (var t in _prefs.Current.RecentTargets)
                     RecentTargets.Add(t);
             });
         }

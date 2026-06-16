@@ -134,7 +134,7 @@ namespace optiSCAN
         /// Exécute un scan en mode headless (sans fenêtre WPF), persiste le résultat
         /// dans l'historique et déclenche la quarantaine automatique si configurée.
         /// </summary>
-        private async Task RunHeadlessAsync(HeadlessScanArguments.Mode mode, bool quiet)
+        private static async Task RunHeadlessAsync(HeadlessScanArguments.Mode mode, bool quiet)
         {
             try
             {
@@ -146,7 +146,7 @@ namespace optiSCAN
                 logger.WriteToLog($"[Headless] Démarrage — mode {mode}, quiet={quiet}");
 
                 DistractionFreeMonitor.Start();
-                if (UserPreferences.Current.GameModeAutoEnabled
+                if (container.UserPreferencesAccessor.Current.GameModeAutoEnabled
                     && DistractionFreeMonitor.ShouldSuppressNotifications())
                 {
                     logger.WriteToLog("[Headless] Scan reporté — mode jeu / plein écran actif.");
@@ -170,7 +170,7 @@ namespace optiSCAN
 
                 // Quarantaine automatique en mode headless si l'utilisateur l'a
                 // configurée — sinon les menaces sont simplement journalisées.
-                if (ExclusionSettings.Current.AutoQuarantineEnabled)
+                if (container.ExclusionSettingsAccessor.Current.AutoQuarantineEnabled)
                 {
                     int q = quarantine.QuarantineAll(result.Threats, result.SessionId);
                     logger.WriteToLog($"[Headless] Quarantaine automatique : {q} fichier(s)");
@@ -181,8 +181,7 @@ namespace optiSCAN
                 {
                     try
                     {
-                        var notifs = new NotificationService();
-                        notifs.ShowScanCompleted(result.ThreatsFound, result.FilesScanned);
+                        container.Notifications.ShowScanCompleted(result.ThreatsFound, result.FilesScanned);
                     }
                     catch (Exception ex)
                     {
@@ -202,7 +201,7 @@ namespace optiSCAN
         {
             try
             {
-                using var host = new ProtectionServiceHost();
+                using var host = new ProtectionServiceHost(ServiceContainer.Default);
                 host.Start();
                 new ScanLogManager().WriteToLog("[ServiceHost] Protection système active (IPC + RTP + processus)");
 

@@ -1,0 +1,60 @@
+using optiSCAN.Converters;
+using optiSCAN.Models;
+using optiSCAN.Services;
+using System.Globalization;
+using System.Windows;
+
+namespace optiSCAN.Tests;
+
+public sealed class QuarantinePathVisibilityConverterTests
+{
+    [Fact]
+    public void Convert_visible_when_path_is_quarantined()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "optiscan_qvis_" + Guid.NewGuid().ToString("N"));
+        var qDir = Path.Combine(root, "quarantine");
+        var sample = Path.Combine(root, "file.bin");
+        Directory.CreateDirectory(root);
+        File.WriteAllBytes(sample, [1, 2, 3]);
+
+        try
+        {
+            var qm = new QuarantineManager(qDir);
+            qm.Quarantine(new ThreatInfo { FilePath = sample, VirusName = "Test" }, Guid.NewGuid());
+
+            var converter = new QuarantinePathVisibilityConverter { Quarantine = qm };
+            var result = converter.Convert(sample, typeof(Visibility), parameter: null!, CultureInfo.InvariantCulture);
+
+            Assert.Equal(Visibility.Visible, result);
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { /* best effort */ }
+        }
+    }
+
+    [Fact]
+    public void Convert_collapsed_for_NotQuarantined_when_path_is_quarantined()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "optiscan_qvis2_" + Guid.NewGuid().ToString("N"));
+        var qDir = Path.Combine(root, "quarantine");
+        var sample = Path.Combine(root, "file.bin");
+        Directory.CreateDirectory(root);
+        File.WriteAllBytes(sample, [1]);
+
+        try
+        {
+            var qm = new QuarantineManager(qDir);
+            qm.Quarantine(new ThreatInfo { FilePath = sample, VirusName = "Test" }, Guid.NewGuid());
+
+            var converter = new QuarantinePathVisibilityConverter { Quarantine = qm };
+            var result = converter.Convert(sample, typeof(Visibility), "NotQuarantined", CultureInfo.InvariantCulture);
+
+            Assert.Equal(Visibility.Collapsed, result);
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { /* best effort */ }
+        }
+    }
+}

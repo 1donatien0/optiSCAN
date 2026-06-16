@@ -26,9 +26,9 @@ namespace optiSCAN.Services
             public DateTime? LastCleanAt { get; init; }
         }
 
-        public static Result Build(Context ctx)
+        public static Result Build(Context ctx, IUserPreferencesAccessor? preferences = null)
         {
-            var prefs = UserPreferences.Current;
+            var prefs = (preferences ?? new DefaultUserPreferencesAccessor()).Current;
 
             bool suggestClean = !ctx.LastCleanAt.HasValue
                 || (DateTime.Now - ctx.LastCleanAt.Value).TotalDays > prefs.CleanSuggestThresholdDays;

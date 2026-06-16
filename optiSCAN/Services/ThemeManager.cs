@@ -19,6 +19,7 @@ namespace optiSCAN
         private static bool _highContrast;
         private static bool _watchingSystemEvents;
         private static bool? _lastWindowsDarkTheme;
+        private static IUserPreferencesAccessor _prefs = new DefaultUserPreferencesAccessor();
 
         public static event EventHandler<bool>? ThemeChanged;
 
@@ -42,9 +43,10 @@ namespace optiSCAN
         /// Charge et applique le thème sauvegardé dans UserPreferences.
         /// À appeler une seule fois au démarrage (thread UI).
         /// </summary>
-        public static void Initialize()
+        public static void Initialize(IUserPreferencesAccessor? preferences = null)
         {
-            var prefs = UserPreferences.Current;
+            _prefs = preferences ?? new DefaultUserPreferencesAccessor();
+            var prefs = _prefs.Current;
 
             bool systemHc = SystemParameters.HighContrast;
             _highContrast = systemHc || prefs.HighContrastEnabled;
@@ -108,7 +110,7 @@ namespace optiSCAN
         /// <summary>Active ou désactive le thème à contraste renforcé.</summary>
         public static void SetHighContrast(bool enabled)
         {
-            var prefs = UserPreferences.Current;
+            var prefs = _prefs.Current;
             prefs.HighContrastEnabled = enabled;
             prefs.Save();
             _highContrast = enabled || SystemParameters.HighContrast;
@@ -117,14 +119,14 @@ namespace optiSCAN
 
         /// <summary>Thème différent du mode Windows (case Options cochée).</summary>
         public static bool IsAlternateThemeEnabled =>
-            !UserPreferences.Current.SyncWindowsTheme;
+            !_prefs.Current.SyncWindowsTheme;
 
         /// <summary>Active ou repasse au suivi du thème Windows (case Options décochée).</summary>
         public static void SetAlternateThemeEnabled(bool enabled)
         {
             if (enabled)
             {
-                var prefs = UserPreferences.Current;
+                var prefs = _prefs.Current;
                 prefs.SyncWindowsTheme = false;
                 prefs.Save();
                 Apply(!IsWindowsAppsDarkTheme());
@@ -138,7 +140,7 @@ namespace optiSCAN
         /// </summary>
         public static void Toggle()
         {
-            if (UserPreferences.Current.SyncWindowsTheme)
+            if (_prefs.Current.SyncWindowsTheme)
                 SetAlternateThemeEnabled(true);
             else
                 Apply(!IsDarkTheme);
@@ -147,7 +149,7 @@ namespace optiSCAN
         /// <summary>Applique un thème en dérogation (ne suit plus Windows).</summary>
         public static void Apply(bool dark)
         {
-            var prefs = UserPreferences.Current;
+            var prefs = _prefs.Current;
             prefs.SyncWindowsTheme = false;
             prefs.DarkTheme = dark;
             prefs.Save();
@@ -157,7 +159,7 @@ namespace optiSCAN
         /// <summary>Active ou désactive le suivi du thème Windows.</summary>
         public static void SetSyncWithWindows(bool sync)
         {
-            var prefs = UserPreferences.Current;
+            var prefs = _prefs.Current;
             prefs.SyncWindowsTheme = sync;
             if (sync)
             {
@@ -213,7 +215,7 @@ namespace optiSCAN
             {
                 // 1. Contraste Renforcé système (priorité) — même sans SyncWindowsTheme
                 bool systemHc = SystemParameters.HighContrast;
-                bool newHc = systemHc || UserPreferences.Current.HighContrastEnabled;
+                bool newHc = systemHc || _prefs.Current.HighContrastEnabled;
                 bool hcChanged = _highContrast != newHc;
                 if (hcChanged)
                 {
@@ -222,7 +224,7 @@ namespace optiSCAN
                 }
 
                 // 2. Thème clair/sombre
-                if (!UserPreferences.Current.SyncWindowsTheme)
+                if (!_prefs.Current.SyncWindowsTheme)
                 {
                     // Thème affiché inchangé ; rafraîchir Options (libellé Thème clair / sombre).
                     ThemeChanged?.Invoke(null, _isDarkTheme);
@@ -235,7 +237,7 @@ namespace optiSCAN
 
                 _lastWindowsDarkTheme = dark;
                 IsDarkTheme = dark;
-                var prefs = UserPreferences.Current;
+                var prefs = _prefs.Current;
                 prefs.DarkTheme = dark;
                 prefs.Save();
             });

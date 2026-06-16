@@ -18,10 +18,14 @@ namespace optiSCAN.Services
         private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(6);
 
         private readonly HttpClient _http;
+        private readonly IUserPreferencesAccessor _prefs;
 
-        public ThreatReputationService(HttpClient? http = null)
+        public ThreatReputationService(
+            HttpClient? http = null,
+            IUserPreferencesAccessor? preferences = null)
         {
             _http = http ?? DefaultHttp;
+            _prefs = preferences ?? new DefaultUserPreferencesAccessor();
         }
 
         public sealed class ReputationResult
@@ -34,7 +38,7 @@ namespace optiSCAN.Services
 
         public async Task<ReputationResult> LookupFileAsync(string filePath, CancellationToken ct = default)
         {
-            var apiKey = UserPreferences.Current.VirusTotalApiKey?.Trim();
+            var apiKey = _prefs.Current.VirusTotalApiKey?.Trim();
             if (string.IsNullOrEmpty(apiKey))
             {
                 return new ReputationResult
@@ -136,4 +140,4 @@ namespace optiSCAN.Services
         internal static void ResetCacheForTests() => Cache.Clear();
     }
 }
-
+

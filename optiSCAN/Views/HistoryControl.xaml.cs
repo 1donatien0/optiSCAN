@@ -1,3 +1,4 @@
+using optiSCAN.Coordinators;
 using optiSCAN.Localization;
 
 using optiSCAN.Models;
@@ -40,36 +41,52 @@ namespace optiSCAN.Views
 
     {
 
-        private readonly AntivirusActions _actions = ServiceContainer.Default.Actions;
-
-        private readonly ScanLogManager _logger = ServiceContainer.Default.Logger;
-
+        private IHistoryServices? _history;
+        private bool _bound;
         private bool _syncingFilterChips;
+        private void HideDetailPanels() => HistoryDetailCoordinator.HideDetailPanels(_detailView);
+        private readonly HistoryDetailView _detailView;
 
+        public HistoryViewModel VM { get; private set; } = null!;
 
-
-        public HistoryViewModel VM { get; }
-
-
+        private IHistoryServices History => _history ?? throw new InvalidOperationException("HistoryControl.Bind() must be called before use.");
+        private IUiEventBus UiEvents => History;
+        private AntivirusActions Actions => History.Actions;
+        private ScanLogManager Logger => History.Logger;
 
         public HistoryControl()
-
         {
-
-            VM = new HistoryViewModel(ServiceContainer.Default);
-
             InitializeComponent();
-
-            DataContext = VM;
-
-
-
-            VM.PropertyChanged += OnViewModelPropertyChanged;
-
+            _detailView = new HistoryDetailView
+            {
+                ThreatsGrid = dgHistoryThreats,
+                CleanLogPanel = cleanLogPanel,
+                CleanLogText = txtCleanLog,
+                QuarantineDetailPanel = quarantineDetailPanel,
+                QuarTitle = txtQuarTitle,
+                QuarPath = txtQuarPath,
+                QuarMeta = txtQuarMeta,
+                QuarStatus = txtQuarStatus,
+                BtnManageInAv = btnManageInAv,
+                NoThreatsState = noThreatsState,
+                ThreatsLegacyText = txtHistThreatsLegacy,
+            };
             Loaded += OnLoaded;
-
             Unloaded += OnUnloaded;
+        }
 
+        /// <summary>Branche les services partagés (appelé par <see cref="optiSCAN.MainWindow"/> au démarrage).</summary>
+        public void Bind(IHistoryServices services)
+        {
+            if (_bound)
+                return;
+            _bound = true;
+            _history = services;
+            if (Resources["QuarantinePathVis"] is Converters.QuarantinePathVisibilityConverter quarantineVis)
+                quarantineVis.Quarantine = services.Quarantine;
+            VM = new HistoryViewModel(services);
+            DataContext = VM;
+            VM.PropertyChanged += OnViewModelPropertyChanged;
         }
 
 
@@ -92,7 +109,7 @@ namespace optiSCAN.Views
 
         {
 
-            ServiceContainer.Default.ScanHistoryViewsRefreshRequested += OnExternalRefreshRequested;
+            UiEvents.ScanHistoryViewsRefreshRequested += OnExternalRefreshRequested;
 
             RefreshTimeline();
 
@@ -104,7 +121,7 @@ namespace optiSCAN.Views
 
         {
 
-            ServiceContainer.Default.ScanHistoryViewsRefreshRequested -= OnExternalRefreshRequested;
+            UiEvents.ScanHistoryViewsRefreshRequested -= OnExternalRefreshRequested;
 
         }
 
@@ -304,40 +321,6 @@ namespace optiSCAN.Views
 
 
 
-        private void HideDetailPanels()
-
-        {
-
-            if (dgHistoryThreats != null)
-
-            {
-
-                dgHistoryThreats.ItemsSource = null;
-
-                dgHistoryThreats.Visibility = Visibility.Collapsed;
-
-            }
-
-            if (cleanLogPanel != null)
-
-                cleanLogPanel.Visibility = Visibility.Collapsed;
-
-            if (quarantineDetailPanel != null)
-
-                quarantineDetailPanel.Visibility = Visibility.Collapsed;
-
-            if (noThreatsState != null)
-
-                noThreatsState.Visibility = Visibility.Collapsed;
-
-            if (txtHistThreatsLegacy != null)
-
-                txtHistThreatsLegacy.Visibility = Visibility.Collapsed;
-
-        }
-
-
-
         private void ShowEntryInfo(ActivityEntry entry)
 
         {
@@ -451,184 +434,18 @@ namespace optiSCAN.Views
 
 
         private void ShowScanDetail(ScanSession? session)
-
         {
-
-            if (cleanLogPanel != null)
-
-                cleanLogPanel.Visibility = Visibility.Collapsed;
-
-            if (quarantineDetailPanel != null)
-
-                quarantineDetailPanel.Visibility = Visibility.Collapsed;
-
-
-
-            var hasStoredThreats = session?.Threats.Count > 0;
-
-            var sessionSelected = session != null;
-
-            var legacyOnly = sessionSelected && session!.ThreatsFound > 0 && session.Threats.Count == 0;
-
-
-
-            if (dgHistoryThreats != null)
-
-            {
-
-                dgHistoryThreats.ItemsSource = hasStoredThreats
-                    ? VM.BuildThreatRows(session!.Threats)
-                    : null;
-
-                dgHistoryThreats.Visibility = hasStoredThreats ? Visibility.Visible : Visibility.Collapsed;
-
-            }
-
-
-
-            if (noThreatsState != null)
-
-                noThreatsState.Visibility = (sessionSelected && !hasStoredThreats && !legacyOnly)
-
-                    ? Visibility.Visible : Visibility.Collapsed;
-
-
-
-            if (txtHistThreatsLegacy != null)
-
-                txtHistThreatsLegacy.Visibility = legacyOnly ? Visibility.Visible : Visibility.Collapsed;
-
+            var rows = session?.Threats.Count > 0
+                ? VM.BuildThreatRows(session!.Threats)
+                : null;
+            HistoryDetailCoordinator.ShowScanDetail(_detailView, session, rows);
         }
 
-
-
-        private void ShowQuarantineDetail(ActivityEntry entry)
-
-        {
-
-            if (dgHistoryThreats != null)
-
-                dgHistoryThreats.Visibility = Visibility.Collapsed;
-
-            if (cleanLogPanel != null)
-
-                cleanLogPanel.Visibility = Visibility.Collapsed;
-
-            if (noThreatsState != null)
-
-                noThreatsState.Visibility = Visibility.Collapsed;
-
-            if (txtHistThreatsLegacy != null)
-
-                txtHistThreatsLegacy.Visibility = Visibility.Collapsed;
-
-
-
-            if (quarantineDetailPanel == null)
-
-                return;
-
-
-
-            quarantineDetailPanel.Visibility = Visibility.Visible;
-
-            var q = entry.QuarantineEntry;
-
-
-
-            if (txtQuarTitle != null)
-
-                txtQuarTitle.Text = q?.FileName ?? entry.TypeDisplay;
-
-            if (txtQuarPath != null)
-
-                txtQuarPath.Text = q != null
-
-                    ? LocalizationService.Format("Hist_DetailQuarantinePath", q.OriginalPath)
-
-                    : entry.TargetDisplay;
-
-            if (txtQuarMeta != null && q != null)
-
-                txtQuarMeta.Text = LocalizationService.Format("Hist_DetailQuarantineMeta", q.VirusName, q.SizeDisplay);
-
-            if (txtQuarStatus != null)
-
-            {
-
-                txtQuarStatus.Text = entry.IsStillQuarantined
-
-                    ? LocalizationService.GetString("Hist_QuarantineStillActive")
-
-                    : LocalizationService.GetString("Hist_QuarantineHistorical");
-
-            }
-
-            if (btnManageInAv != null)
-
-                btnManageInAv.IsEnabled = entry.IsStillQuarantined;
-
-        }
-
-
-
-        private void ShowCleanDetail(CleanSession? session)
-
-        {
-
-            if (dgHistoryThreats != null)
-
-                dgHistoryThreats.Visibility = Visibility.Collapsed;
-
-            if (quarantineDetailPanel != null)
-
-                quarantineDetailPanel.Visibility = Visibility.Collapsed;
-
-            if (noThreatsState != null)
-
-                noThreatsState.Visibility = Visibility.Collapsed;
-
-            if (txtHistThreatsLegacy != null)
-
-                txtHistThreatsLegacy.Visibility = Visibility.Collapsed;
-
-
-
-            if (cleanLogPanel == null || txtCleanLog == null)
-
-                return;
-
-
-
-            cleanLogPanel.Visibility = Visibility.Visible;
-
-            if (session == null)
-
-            {
-
-                txtCleanLog.Text = LocalizationService.GetString("Hist_DetailSelectClean");
-
-                return;
-
-            }
-
-
-
-            txtCleanLog.Text = !string.IsNullOrWhiteSpace(session.OperationLog)
-
-                ? session.OperationLog
-
-                : LocalizationService.Format(
-
-                    "Hist_DetailCleanSummary",
-
-                    session.TargetsSummary ?? string.Empty,
-
-                    session.BytesDisplay ?? string.Empty,
-
-                    session.DurationDisplay ?? string.Empty);
-
-        }
+        private void ShowQuarantineDetail(ActivityEntry entry) =>
+            HistoryDetailCoordinator.ShowQuarantineDetail(_detailView, entry);
+
+        private void ShowCleanDetail(CleanSession? session) =>
+            HistoryDetailCoordinator.ShowCleanDetail(_detailView, session);
 
 
 
@@ -660,7 +477,7 @@ namespace optiSCAN.Views
 
             if (SelectedScanSession is not { Threats.Count: > 0 } session) return;
 
-            ServiceContainer.Default.RequestReviewHistorySession(session);
+            UiEvents.RequestReviewHistorySession(session);
 
         }
 
@@ -669,90 +486,35 @@ namespace optiSCAN.Views
         private void BtnHistQuarantineAll_Click(object sender, RoutedEventArgs e)
         {
             if (SelectedScanSession is not ScanSession session || session.Threats.Count == 0) return;
-
-            int count = 0;
-            foreach (var t in session.Threats.ToList())
-            {
-                if (!VM.IsThreatFileAccessible(t.FilePath))
-                    continue;
-                if (ServiceContainer.Default.Quarantine.Quarantine(t, session.SessionId))
-                {
-                    count++;
-                    _logger.TryRemoveThreatFromSession(session.SessionId, t.FilePath);
-                }
-            }
-
-            if (count > 0)
-                RefreshTimeline();
+            HistoryThreatRemediationCoordinator.QuarantineAllThreats(History, VM, session, RefreshTimeline);
         }
-
-
 
         private void BtnHistQuarantine_Click(object sender, RoutedEventArgs e)
         {
             if (FilePathFromSender(sender) is not string filePath ||
                 SelectedScanSession is not ScanSession session) return;
-
-            if (VM.IsFileStillQuarantined(filePath))
-            {
-                _logger.TryRemoveThreatFromSession(session.SessionId, filePath);
-                RefreshTimeline();
-                return;
-            }
-
-            if (_actions.QuarantineThreat(filePath, session.SessionId).Success)
-            {
-                _logger.TryRemoveThreatFromSession(session.SessionId, filePath);
-                RefreshTimeline();
-            }
+            HistoryThreatRemediationCoordinator.QuarantineThreat(History, VM, session, filePath, RefreshTimeline);
         }
 
         private void BtnHistDismiss_Click(object sender, RoutedEventArgs e)
         {
             if (FilePathFromSender(sender) is not string filePath ||
                 SelectedScanSession is not ScanSession session) return;
-            _logger.TryRemoveThreatFromSession(session.SessionId, filePath);
-            RefreshTimeline();
+            HistoryThreatRemediationCoordinator.DismissThreat(History, session, filePath, RefreshTimeline);
         }
-
-
 
         private void BtnHistIgnore_Click(object sender, RoutedEventArgs e)
-
         {
-
             if (FilePathFromSender(sender) is not string filePath ||
-
                 SelectedScanSession is not ScanSession session) return;
-
-            _actions.IgnoreThreat(filePath);
-
-            _logger.TryRemoveThreatFromSession(session.SessionId, filePath);
-
-            RefreshTimeline();
-
+            HistoryThreatRemediationCoordinator.IgnoreThreat(History, session, filePath, RefreshTimeline);
         }
 
-
-
         private void BtnHistDelete_Click(object sender, RoutedEventArgs e)
-
         {
-
             if (FilePathFromSender(sender) is not string filePath ||
-
                 SelectedScanSession is not ScanSession session) return;
-
-            if (_actions.DeleteThreatFile(filePath).Success)
-
-            {
-
-                _logger.TryRemoveThreatFromSession(session.SessionId, filePath);
-
-                RefreshTimeline();
-
-            }
-
+            HistoryThreatRemediationCoordinator.DeleteThreat(History, session, filePath, RefreshTimeline);
         }
 
 
@@ -790,26 +552,22 @@ namespace optiSCAN.Views
 
 
         private void BtnManageInAv_Click(object sender, RoutedEventArgs e) =>
-
             OpenAntivirusQuarantineTab();
 
-
-
-        private static void OpenAntivirusQuarantineTab() =>
-
-            ServiceContainer.Default.RequestOpenQuarantineTab();
+        private void OpenAntivirusQuarantineTab() =>
+            UiEvents.RequestOpenQuarantineTab();
 
 
 
         private void BtnOpenAntivirus_Click(object sender, RoutedEventArgs e) =>
 
-            ServiceContainer.Default.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
+            History.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
 
 
 
         private void BtnExportHtml_Click(object sender, RoutedEventArgs e) =>
 
-            ServiceContainer.Default.RequestExportScanHistoryHtml();
+            UiEvents.RequestExportScanHistoryHtml();
 
 
 
@@ -819,7 +577,7 @@ namespace optiSCAN.Views
 
             if (SelectedScanSession is ScanSession session)
 
-                ServiceContainer.Default.RequestExportScanSessionPdf(session);
+                UiEvents.RequestExportScanSessionPdf(session);
 
         }
 
