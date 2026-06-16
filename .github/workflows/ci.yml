@@ -30,6 +30,18 @@ jobs:
       - name: Build (Release)
         run: dotnet build optiSCAN.sln --configuration Release --no-restore
 
+      - name: Roslyn analyzer audit (warnings visible, non-blocking)
+        shell: pwsh
+        run: |
+          $output = dotnet build optiSCAN.sln --configuration Release --no-restore -v:n 2>&1 | Out-String
+          $ca = $output -split "`n" | Where-Object { $_ -match 'warning (CA|IDE)\d+' }
+          if ($ca) {
+            Write-Host "=== Analyzer warnings ($($ca.Count)) ==="
+            $ca | ForEach-Object { Write-Host $_ }
+          } else {
+            Write-Host "No CA/IDE analyzer warnings."
+          }
+
       - name: Run tests (Release)
         run: >
           dotnet test optiSCAN.Tests/optiSCAN.Tests.csproj

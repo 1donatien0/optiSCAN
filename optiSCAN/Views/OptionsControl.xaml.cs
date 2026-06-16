@@ -151,7 +151,6 @@ namespace optiSCAN.Views
                 if (chkBackupBeforeQuarantine != null)
                     chkBackupBeforeQuarantine.IsChecked = prefs.BackupBeforeQuarantine;
 
-                var c = Shell;
                 if (chkAutoUpdate != null)
                     chkAutoUpdate.IsChecked = prefs.SignatureAutoUpdateEnabled;
                 if (chkAggressiveSignatures != null)
