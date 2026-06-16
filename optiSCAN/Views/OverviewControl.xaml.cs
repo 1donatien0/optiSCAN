@@ -464,9 +464,10 @@ namespace optiSCAN.Views
 
             if (target == OptiscanStrings.ActionIds.Update)
             {
-                (_services ?? ServiceContainer.Views).Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
-                ServiceContainer.UiEvents.RequestFocusAntivirusSignaturesTab();
-                ServiceContainer.UiEvents.TriggerSignatureUpdate();
+                var ui = _services ?? ServiceContainer.Views;
+                ui.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
+                ui.RequestFocusAntivirusSignaturesTab();
+                ui.TriggerSignatureUpdate();
             }
             else
             {
@@ -476,9 +477,9 @@ namespace optiSCAN.Views
 
         private void NavigateToSignaturesAndUpdate()
         {
-            (_services ?? ServiceContainer.Views).Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
-            ServiceContainer.UiEvents.RequestFocusAntivirusSignaturesTab();
-            ServiceContainer.UiEvents.TriggerSignatureUpdate();
+            _services!.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
+            _services.RequestFocusAntivirusSignaturesTab();
+            _services.TriggerSignatureUpdate();
         }
     }
 }

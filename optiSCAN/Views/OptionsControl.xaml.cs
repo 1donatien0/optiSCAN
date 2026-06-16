@@ -36,7 +36,6 @@ namespace optiSCAN.Views
             {
                 ThemeManager.ThemeChanged += SurChangementTheme;
                 SyncThemeControls();
-                _ = LoadScheduledTaskStateAsync();
             };
             Unloaded += (_, _) => ThemeManager.ThemeChanged -= SurChangementTheme;
             IsVisibleChanged += (_, _) =>
@@ -49,7 +48,11 @@ namespace optiSCAN.Views
         private ServiceContainer Shell => _shell ?? throw new InvalidOperationException("OptionsControl.Bind() must be called before use.");
         private IScheduledScanService ScheduledScan => Shell.ScheduledScan;
 
-        public void Bind(ServiceContainer shell) => _shell = shell;
+        public void Bind(ServiceContainer shell)
+        {
+            _shell = shell;
+            _ = LoadScheduledTaskStateAsync();
+        }
 
         private void SurChangementTheme(object? sender, bool isDark) => SyncThemeControls();
 

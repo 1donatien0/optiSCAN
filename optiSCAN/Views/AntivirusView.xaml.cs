@@ -290,7 +290,7 @@ namespace optiSCAN.Views
                     VM?.NotifyThreatQuarantinedDuringScan(filePath);
                 }
                 VM?.LoadQuarantine(reset: true);
-                ServiceContainer.UiEvents.RequestScanHistoryViewsRefresh();
+                _services!.RequestScanHistoryViewsRefresh();
             }
         }
 
@@ -377,7 +377,7 @@ namespace optiSCAN.Views
 
         private void BtnManualUpdateSignatures_Click(object sender, RoutedEventArgs e)
         {
-            ServiceContainer.UiEvents.TriggerSignatureUpdate();
+            _services!.TriggerSignatureUpdate();
         }
 
         private void BtnStopUpdateSignatures_Click(object sender, RoutedEventArgs e)

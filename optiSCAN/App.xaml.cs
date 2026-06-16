@@ -181,8 +181,7 @@ namespace optiSCAN
                 {
                     try
                     {
-                        var notifs = new NotificationService();
-                        notifs.ShowScanCompleted(result.ThreatsFound, result.FilesScanned);
+                        container.Notifications.ShowScanCompleted(result.ThreatsFound, result.FilesScanned);
                     }
                     catch (Exception ex)
                     {

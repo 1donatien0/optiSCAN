@@ -804,7 +804,7 @@ namespace optiSCAN.Views
 
         private void BtnOpenAntivirus_Click(object sender, RoutedEventArgs e) =>
 
-            ServiceContainer.Views.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
+            _services!.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
 
 
 
