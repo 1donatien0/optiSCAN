@@ -13,7 +13,7 @@ namespace optiSCAN.Services
     /// Découverte automatique des chemins selon l'architecture (x64/x86) et
     /// l'installation système.
     /// </summary>
-    public class FreshclamUpdater : ISignatureUpdateCanceller
+    public class FreshclamUpdater : ISignatureUpdateCanceller, ISignatureAutoUpdateTarget
     {
         // ── Constantes ────────────────────────────────────────────────────────────
 

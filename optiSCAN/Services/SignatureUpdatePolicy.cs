@@ -8,7 +8,10 @@ namespace optiSCAN.Services
         private static readonly TimeSpan AggressiveClamInterval = TimeSpan.FromHours(2);
         private static readonly TimeSpan AggressiveYaraInterval = TimeSpan.FromHours(12);
 
-        public static void ApplyAutoUpdateTimers(FreshclamUpdater freshclam, YaraForgeUpdater rules, bool enabled)
+        public static void ApplyAutoUpdateTimers(
+            ISignatureAutoUpdateTarget freshclam,
+            ISignatureAutoUpdateTarget rules,
+            bool enabled)
         {
             if (!enabled)
             {

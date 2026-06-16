@@ -45,6 +45,7 @@ namespace optiSCAN
         private readonly ExportCoordinator _exportCoordinator = new();
         private readonly OverviewRefreshCoordinator _overviewRefresh = new();
         private readonly MainWindowServiceEventCoordinator _serviceEvents = new();
+        private SidebarSyncCoordinator? _sidebarSync;
         private FreshclamUpdater? _freshclamUpdater;
         private YaraForgeUpdater? _rulesUpdater;
         private SignatureStatusService? _signatureStatus;
@@ -57,7 +58,6 @@ namespace optiSCAN
         private readonly RoutedCommand _quickScanShortcutCommand = new();
         private bool _isClosing = false;
         private bool _wasScanning;
-        private bool _isSyncingSidebarSelection;
         private string? _lastStatusText;
         private bool _lastStatusIsError;
         private bool _lastStatusIsWarning;
@@ -329,42 +329,18 @@ namespace optiSCAN
                 refreshSignatures:      () => RefreshSignaturesDisplayAsync(),
                 refreshAntivirusData:   RefreshAntivirusDataAsync);
 
-            // SyncSidebarSelection reste dans MainWindow (manipulation UI directe).
-            _navigationService.Navigated -= SurNavigationNaviguee;
-            _navigationService.Navigated += SurNavigationNaviguee;
-        }
-
-        private void SurNavigationNaviguee(object? sender, string panelName) =>
-            Dispatcher.BeginInvoke(() => SyncSidebarSelection(panelName), DispatcherPriority.Background);
-
-        private void SyncSidebarSelection(string panelName)
-        {
-            _isSyncingSidebarSelection = true;
-            try
-            {
-                switch (panelName)
+            _sidebarSync?.Detach();
+            _sidebarSync = new SidebarSyncCoordinator(
+                _navigationService,
+                action => Dispatcher.BeginInvoke(action, DispatcherPriority.Background),
+                new Dictionary<string, Action>
                 {
-                    case OptiscanStrings.PanelIds.Overview:
-                        if (navOverview != null) navOverview.IsChecked = true;
-                        break;
-                    case OptiscanStrings.PanelIds.Clean:
-                        if (navClean != null) navClean.IsChecked = true;
-                        break;
-                    case OptiscanStrings.PanelIds.Antivirus:
-                        if (navAntivirus != null) navAntivirus.IsChecked = true;
-                        break;
-                    case OptiscanStrings.PanelIds.History:
-                        if (navHistory != null) navHistory.IsChecked = true;
-                        break;
-                    case OptiscanStrings.PanelIds.Options:
-                        if (navOptions != null) navOptions.IsChecked = true;
-                        break;
-                }
-            }
-            finally
-            {
-                _isSyncingSidebarSelection = false;
-            }
+                    [OptiscanStrings.PanelIds.Overview] = () => { if (navOverview != null) navOverview.IsChecked = true; },
+                    [OptiscanStrings.PanelIds.Clean] = () => { if (navClean != null) navClean.IsChecked = true; },
+                    [OptiscanStrings.PanelIds.Antivirus] = () => { if (navAntivirus != null) navAntivirus.IsChecked = true; },
+                    [OptiscanStrings.PanelIds.History] = () => { if (navHistory != null) navHistory.IsChecked = true; },
+                    [OptiscanStrings.PanelIds.Options] = () => { if (navOptions != null) navOptions.IsChecked = true; },
+                });
         }
 
         private void SurDemandeMiseAJourSignatures(object? sender, EventArgs e) =>
@@ -430,7 +406,7 @@ namespace optiSCAN
         /// <summary>Déclenché par un RadioButton NavItem coché dans la sidebar.</summary>
         private void NavItem_Checked(object sender, RoutedEventArgs e)
         {
-            if (_isSyncingSidebarSelection)
+            if (_sidebarSync?.IsSyncing == true)
                 return;
 
             if (sender is System.Windows.Controls.Primitives.ToggleButton tb
@@ -965,7 +941,8 @@ namespace optiSCAN
 
                 if (ViewModel != null)
                     ViewModel.PropertyChanged -= SurChangementProprieteScanViewModel;
-                _navigationService.Navigated -= SurNavigationNaviguee;
+                _navRefreshCoordinator?.Detach();
+                _sidebarSync?.Detach();
 
                 // Dispose du ViewModel (CTS, abonnements, timers)
                 ViewModel?.Dispose();

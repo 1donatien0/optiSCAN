@@ -69,6 +69,8 @@ namespace optiSCAN.Views
             _uiEvents = services;
             _actions = services.Actions;
             _logger = services.Logger;
+            if (Resources["QuarantinePathVis"] is Converters.QuarantinePathVisibilityConverter quarantineVis)
+                quarantineVis.Quarantine = services.Quarantine;
             VM = new HistoryViewModel(services);
             DataContext = VM;
             VM.PropertyChanged += OnViewModelPropertyChanged;
