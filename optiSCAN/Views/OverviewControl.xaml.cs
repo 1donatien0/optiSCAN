@@ -17,8 +17,11 @@ namespace optiSCAN.Views
     /// <summary>
     /// Vue d'ensemble : hero (protection + dernière analyse), actions, statistiques et recommandations.
     /// </summary>
-    public partial class OverviewControl : System.Windows.Controls.UserControl
+    public partial class OverviewControl : System.Windows.Controls.UserControl, IOverviewPanel
     {
+        private IViewServices? _services;
+
+        public void Bind(IViewServices services) => _services = services;
         public OverviewControl()
         {
             InitializeComponent();
@@ -254,7 +257,7 @@ namespace optiSCAN.Views
                 panelId = OptiscanStrings.PanelIds.Overview;
             }
 
-            ServiceContainer.Default.Navigation?.NavigateTo(panelId);
+            ServiceContainer.Views.Navigation?.NavigateTo(panelId);
             return true;
         }
 
@@ -459,26 +462,23 @@ namespace optiSCAN.Views
 
             if (target == null) return;
 
-            var container = Services.ServiceContainer.Default;
-
             if (target == OptiscanStrings.ActionIds.Update)
             {
-                container.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
-                container.RequestFocusAntivirusSignaturesTab();
-                container.TriggerSignatureUpdate();
+                (_services ?? ServiceContainer.Views).Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
+                ServiceContainer.UiEvents.RequestFocusAntivirusSignaturesTab();
+                ServiceContainer.UiEvents.TriggerSignatureUpdate();
             }
             else
             {
-                container.Navigation?.NavigateTo(target);
+                (_services ?? ServiceContainer.Views).Navigation?.NavigateTo(target);
             }
         }
 
-        private static void NavigateToSignaturesAndUpdate()
+        private void NavigateToSignaturesAndUpdate()
         {
-            var container = Services.ServiceContainer.Default;
-            container.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
-            container.RequestFocusAntivirusSignaturesTab();
-            container.TriggerSignatureUpdate();
+            (_services ?? ServiceContainer.Views).Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
+            ServiceContainer.UiEvents.RequestFocusAntivirusSignaturesTab();
+            ServiceContainer.UiEvents.TriggerSignatureUpdate();
         }
     }
 }

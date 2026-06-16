@@ -1,9 +1,11 @@
 using MaterialDesignThemes.Wpf;
+using optiSCAN.Coordinators;
 using optiSCAN.Localization;
 using optiSCAN.Models;
 using optiSCAN.Services;
 using optiSCAN.Strings;
 using optiSCAN.ViewModels;
+using optiSCAN.Views;
 using System.ComponentModel;
 using System.IO;
 using System.Linq;
@@ -32,14 +34,16 @@ namespace optiSCAN
         /// <summary>ViewModel partagé (scan, quarantaine, progression). DataContext de la fenêtre.</summary>
         public ScanViewModel? ViewModel { get; private set; }
 
-        private SystemTrayHost? _trayHost;
+        private readonly TrayCoordinator _trayCoordinator = new();
+        private ShellScanCoordinator? _shellScanCoordinator;
 
         private ClamAvEngine? _clamAvEngine;
         private YaraEngine? _yaraEngine;
         private ScanOrchestrator? _antivirusOrchestrator;
         private ScanLogManager? _logManager;
         private QuarantineManager? _quarantineManager;
-        private readonly HistoryExportService _historyExport = new();
+        private readonly ExportCoordinator _exportCoordinator = new();
+        private readonly OverviewRefreshCoordinator _overviewRefresh = new();
         private FreshclamUpdater? _freshclamUpdater;
         private YaraForgeUpdater? _rulesUpdater;
         private SignatureStatusService? _signatureStatus;
@@ -75,10 +79,13 @@ namespace optiSCAN
 
             try
             {
-                _trayHost = new SystemTrayHost();
-                _trayHost.Initialize(
-                    () => Dispatcher.Invoke(ShowWindowFromTray),
-                    () => Dispatcher.Invoke(ExitFromTray));
+                _trayCoordinator.Initialize(
+                    ShowWindow,
+                    () =>
+                    {
+                        _isClosing = true;
+                        Close();
+                    });
 
                 // Services partagés via le singleton applicatif (mêmes instances que ScanViewModel).
                 var c = ServiceContainer.Default;
@@ -120,17 +127,22 @@ namespace optiSCAN
                     string.Equals(t.FilePath, path, StringComparison.OrdinalIgnoreCase));
                 this.DataContext = ViewModel;
 
-                // Les vues utilisent c.Navigation (INavigationService) au lieu de caster MainWindow.
+                // Les vues utilisent ServiceContainer.Navigation (INavigationService) sans référencer MainWindow.
                 c.Navigation = _navigationService;
 
+                if (panelHistory is HistoryControl historyPanel)
+                    historyPanel.Bind(c);
+                BindViewPanels(c);
+
+                var ui = ServiceContainer.UiEvents;
                 // Écoute les demandes de mise à jour émises par les vues
                 // (ex. carte "Update" d'OverviewControl).
-                c.RequestSignatureUpdate += SurDemandeMiseAJourSignatures;
-                c.ScanHistoryViewsRefreshRequested += SurDemandeRafraichissementHistorique;
-                c.ExportScanHistoryHtmlRequested += SurDemandeExportHistoriqueHtml;
-                c.ExportScanSessionPdfRequested += SurDemandeExportSessionScanPdf;
-                c.ReviewHistorySessionRequested += SurDemandeRevueSessionHistorique;
-                c.OpenQuarantineTabRequested += SurDemandeOngletQuarantaine;
+                ui.RequestSignatureUpdate += SurDemandeMiseAJourSignatures;
+                ui.ScanHistoryViewsRefreshRequested += SurDemandeRafraichissementHistorique;
+                ui.ExportScanHistoryHtmlRequested += SurDemandeExportHistoriqueHtml;
+                ui.ExportScanSessionPdfRequested += SurDemandeExportSessionScanPdf;
+                ui.ReviewHistorySessionRequested += SurDemandeRevueSessionHistorique;
+                ui.OpenQuarantineTabRequested += SurDemandeOngletQuarantaine;
                 c.RealTimeProtection.ThreatDetected += SurMenaceTempsReelDetectee;
                 c.ProcessStartMonitor.ThreatDetected += SurMenaceTempsReelDetectee;
                 c.RemovableDriveScan.ThreatDetected += SurMenaceTempsReelDetectee;
@@ -141,6 +153,13 @@ namespace optiSCAN
                 c.Actions.ActionCompleted -= SurActionAntivirusTerminee;
                 c.Actions.ActionCompleted += SurActionAntivirusTerminee;
 
+                _shellScanCoordinator = new ShellScanCoordinator(
+                    Dispatcher,
+                    _navigationService,
+                    () => ViewModel,
+                    ShowWindow);
+                _shellScanCoordinator.Hook(this);
+
                 // Abonnement aux événements
                 this.Loaded += async (s, e) => await SurChargementFenetrePrincipale();
                 this.Closing += SurFermetureFenetre;
@@ -148,7 +167,6 @@ namespace optiSCAN
 
                 // IPC : une seconde instance envoie un message Windows pour réafficher cette fenêtre (IpcManager).
                 IpcManager.HookShowMessage(this, ShowWindow);
-                IpcManager.HookShellScanRequest(this, SurDemandeScanExplorateur);
 
                 ThemeManager.ThemeChanged += SurChangementTheme;
                 UpdateThemeToggleTooltip(ThemeManager.IsDarkTheme);
@@ -176,38 +194,6 @@ namespace optiSCAN
 
             // F5 : raccourci d'analyse rapide indiqué dans l'interface Antivirus.
             InputBindings.Add(new KeyBinding(_quickScanShortcutCommand, Key.F5, ModifierKeys.None));
-        }
-
-        private void ShowWindowFromTray()
-        {
-            ShowWindow();
-        }
-
-        private void SurDemandeScanExplorateur()
-        {
-            Dispatcher.BeginInvoke(async () =>
-            {
-                var path = ShellScanRequest.TryConsume();
-                if (!string.IsNullOrWhiteSpace(path))
-                    await RunShellScanAsync(path);
-                ShowWindow();
-            }, DispatcherPriority.Normal);
-        }
-
-        private async Task RunShellScanAsync(string path)
-        {
-            if (ViewModel == null || !ShellScanArguments.IsValidScanTarget(path))
-                return;
-
-            _navigationService.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
-            ShowWindow();
-            await ViewModel.RequestContextMenuScanAsync(path);
-        }
-
-        private void ExitFromTray()
-        {
-            _isClosing = true;
-            Close();
         }
 
         // ── Initialisation ───────────────────────────────────────────────────────
@@ -269,11 +255,11 @@ namespace optiSCAN
                     Hide();
                     SetStatus(LocalizationService.GetString("Main_GuardSession"));
                 }
-                else if (!string.IsNullOrWhiteSpace(App.PendingShellScanPath))
+                else if (!string.IsNullOrWhiteSpace(App.PendingShellScanPath) && _shellScanCoordinator != null)
                 {
                     var shellPath = App.PendingShellScanPath;
                     App.PendingShellScanPath = null;
-                    await RunShellScanAsync(shellPath);
+                    await _shellScanCoordinator.RunShellScanAsync(shellPath);
                 }
             }
             catch (Exception ex)
@@ -300,6 +286,18 @@ namespace optiSCAN
             }
         }
 
+        private void BindViewPanels(ServiceContainer c)
+        {
+            if (panelOverview is OverviewControl overview)
+                overview.Bind(c);
+            if (panelAntivirus is AntivirusView antivirus)
+                antivirus.Bind(c);
+            if (panelClean is CleanControl clean)
+                clean.Bind(c);
+            if (panelOptions is OptionsControl options)
+                options.Bind(c);
+        }
+
         /// <summary>
         /// Enregistre les 5 panneaux auprès du NavigationService.
         /// Appelé juste après <see cref="InitializeComponent"/> (avant tout <c>Checked</c> de la sidebar)
@@ -314,8 +312,9 @@ namespace optiSCAN
             if (panelHistory != null) _navigationService.RegisterPanel(OptiscanStrings.PanelIds.History, panelHistory);
             if (panelOptions != null) _navigationService.RegisterPanel(OptiscanStrings.PanelIds.Options, panelOptions);
 
-            ServiceContainer.Default.FocusAntivirusSignaturesRequested -= SurDemandeFocusSignaturesAntivirus;
-            ServiceContainer.Default.FocusAntivirusSignaturesRequested += SurDemandeFocusSignaturesAntivirus;
+            var ui = ServiceContainer.UiEvents;
+            ui.FocusAntivirusSignaturesRequested -= SurDemandeFocusSignaturesAntivirus;
+            ui.FocusAntivirusSignaturesRequested += SurDemandeFocusSignaturesAntivirus;
 
             // Le coordinateur gère les rafraîchissements par vue (extrait de MainWindow).
             _navRefreshCoordinator?.Detach();
@@ -419,13 +418,14 @@ namespace optiSCAN
         private void UnhookServiceContainerEvents()
         {
             var c = ServiceContainer.Default;
-            c.RequestSignatureUpdate -= SurDemandeMiseAJourSignatures;
-            c.ScanHistoryViewsRefreshRequested -= SurDemandeRafraichissementHistorique;
-            c.ExportScanHistoryHtmlRequested -= SurDemandeExportHistoriqueHtml;
-            c.ExportScanSessionPdfRequested -= SurDemandeExportSessionScanPdf;
-            c.ReviewHistorySessionRequested -= SurDemandeRevueSessionHistorique;
-            c.OpenQuarantineTabRequested -= SurDemandeOngletQuarantaine;
-            c.FocusAntivirusSignaturesRequested -= SurDemandeFocusSignaturesAntivirus;
+            var ui = ServiceContainer.UiEvents;
+            ui.RequestSignatureUpdate -= SurDemandeMiseAJourSignatures;
+            ui.ScanHistoryViewsRefreshRequested -= SurDemandeRafraichissementHistorique;
+            ui.ExportScanHistoryHtmlRequested -= SurDemandeExportHistoriqueHtml;
+            ui.ExportScanSessionPdfRequested -= SurDemandeExportSessionScanPdf;
+            ui.ReviewHistorySessionRequested -= SurDemandeRevueSessionHistorique;
+            ui.OpenQuarantineTabRequested -= SurDemandeOngletQuarantaine;
+            ui.FocusAntivirusSignaturesRequested -= SurDemandeFocusSignaturesAntivirus;
             c.RealTimeProtection.ThreatDetected -= SurMenaceTempsReelDetectee;
             c.ProcessStartMonitor.ThreatDetected -= SurMenaceTempsReelDetectee;
             c.RemovableDriveScan.ThreatDetected -= SurMenaceTempsReelDetectee;
@@ -520,7 +520,7 @@ namespace optiSCAN
             }
 
             var clamMode = ServiceContainer.Default.ClamActiveEngine;
-            (panelOverview as Views.OverviewControl)?.UpdateAntivirusCardStatus(clamAvOk, yaraRules, clamMode);
+            (panelOverview as IOverviewPanel)?.UpdateAntivirusCardStatus(clamAvOk, yaraRules, clamMode);
         }
 
         private void RefreshQuarantineList()
@@ -684,48 +684,30 @@ namespace optiSCAN
         /// <summary>Titre de protection, recommandations hygiène et activité (vue d’ensemble).</summary>
         private void RefreshOverviewProtectionAndRecommendations()
         {
-            var overview = panelOverview as Views.OverviewControl;
-            if (overview == null) return;
+            if (panelOverview is not IOverviewPanel overview)
+                return;
 
-            bool clam = _clamAvEngine?.IsClamAvInstalled() ?? false;
-            int yaraRules = _yaraEngine?.RulesCount ?? 0;
-            bool yaraAvail = _yaraEngine?.IsAvailable ?? false;
-            bool protectedOk = clam && (!yaraAvail || yaraRules > 0);
+            _overviewRefresh.RefreshProtectionAndRecommendations(BuildOverviewRefreshContext(overview));
+        }
 
-            overview.UpdateProtectionHeadline(protectedOk);
-
-            // Déléguer la logique de calcul à OverviewRecommendationsBuilder (testable sans UI).
+        private OverviewRefreshContext BuildOverviewRefreshContext(IOverviewPanel overview)
+        {
             var cleanHist = _logManager?.GetCleanHistory() ?? Array.Empty<CleanSession>();
             var sessions = _logManager?.GetHistory() ?? Array.Empty<ScanSession>();
 
-            var rec = OverviewRecommendationsBuilder.Build(new OverviewRecommendationsBuilder.Context
-            {
-                ClamInstalled = clam,
-                LastFreshclamUpdate = _freshclamUpdater?.GetLastSignatureUpdateTime(),
-                LastCleanAt = cleanHist.Count > 0 ? cleanHist[0].StartedAt : null,
-            });
-
-            overview.UpdateRecommendations(
-                rec.HygieneLine, rec.HygieneSeverity,
-                rec.ShowSigUpdateLink);
-
-            var lastScan = sessions.Count > 0 ? sessions[0].StartedAt : (DateTime?)null;
-            bool rtpOn = ExclusionSettings.Current.RealTimeEnabled;
-            bool rtpRun = ServiceContainer.Default.RealTimeProtection.IsEnabled
-                || PlatformProtectionBootstrap.IsRemoteProtectionActive();
-
-            var posture = ServiceContainer.Default.SecurityPosture.Evaluate(new SecurityPostureContext
-            {
-                ClamInstalled = clam,
-                YaraAvailable = yaraAvail,
-                YaraRulesCount = yaraRules,
-                RealTimeProtectionEnabled = rtpOn,
-                RealTimeProtectionRunning = rtpRun,
-                LastScanAt = lastScan,
-                SignatureAutoUpdateEnabled = UserPreferences.Current.SignatureAutoUpdateEnabled,
-            });
-            overview.UpdateSecurityPosture(posture);
-            overview.UpdatePlatformProtectionStatus(PlatformProtectionStatusService.Evaluate());
+            return new OverviewRefreshContext(
+                overview,
+                ClamInstalled: _clamAvEngine?.IsClamAvInstalled() ?? false,
+                YaraRulesCount: _yaraEngine?.RulesCount ?? 0,
+                YaraAvailable: _yaraEngine?.IsAvailable ?? false,
+                CleanHistory: cleanHist,
+                ScanHistory: sessions,
+                LastFreshclamUpdate: _freshclamUpdater?.GetLastSignatureUpdateTime(),
+                RealTimeProtectionEnabled: ExclusionSettings.Current.RealTimeEnabled,
+                RealTimeProtectionRunning: ServiceContainer.Default.RealTimeProtection.IsEnabled
+                    || PlatformProtectionBootstrap.IsRemoteProtectionActive(),
+                SignatureAutoUpdateEnabled: UserPreferences.Current.SignatureAutoUpdateEnabled,
+                SecurityPosture: ServiceContainer.Default.SecurityPosture);
         }
 
         public async Task RefreshAntivirusDataAsync()
@@ -742,23 +724,14 @@ namespace optiSCAN
             if (_signatureStatus == null)
                 return;
 
-            var snapshot = await _signatureStatus.GetSnapshotAsync(forceRefresh).ConfigureAwait(true);
-
-            (panelAntivirus as Views.AntivirusView)?.UpdateSignaturesPanel(
-                snapshot.YaraPackVersion,
-                snapshot.YaraLastUpdateDisplay,
-                snapshot.ClamDatabaseVersion,
-                snapshot.ClamLastUpdateDisplay);
-            (panelOverview as Views.OverviewControl)?.UpdateSignaturesSummary(
-                snapshot.YaraPackVersion,
-                snapshot.YaraLastUpdateDisplay,
-                snapshot.ClamDatabaseVersion,
-                snapshot.ClamLastUpdateDisplay);
-
-            if (ViewModel != null)
-                snapshot.ApplyToScanViewModel(ViewModel);
-
-            RefreshOverviewProtectionAndRecommendations();
+            await _overviewRefresh.RefreshSignaturesAsync(
+                new SignaturesRefreshContext(
+                    _signatureStatus,
+                    panelOverview as IOverviewPanel,
+                    panelAntivirus as IAntivirusSignaturesPanel,
+                    ViewModel,
+                    RefreshOverviewProtectionAndRecommendations),
+                forceRefresh).ConfigureAwait(true);
         }
 
         private void SurDemandeExportHistoriqueHtml(object? sender, EventArgs e) =>
@@ -767,23 +740,18 @@ namespace optiSCAN
         private void SurDemandeExportSessionScanPdf(object? sender, ScanSession session) =>
             Dispatcher.BeginInvoke(new Action(() => TryExportScanSessionPdf(session)), DispatcherPriority.Background);
 
-        private void TryExportScanReportHtml()
-        {
-            var result = _historyExport.TryExportHtml(
-                this,
-                _logManager,
-                ViewModel?.Threats ?? Enumerable.Empty<ThreatInfo>(),
-                _quarantineManager?.GetEntries() ?? Array.Empty<QuarantineEntry>());
-            if (!result.WasCancelled && !string.IsNullOrEmpty(result.Message))
-                SetStatus(result.Message, isError: result.IsError);
-        }
+        private ExportContext BuildExportContext() => new(
+            this,
+            _logManager,
+            ViewModel?.Threats ?? Enumerable.Empty<ThreatInfo>(),
+            _quarantineManager?.GetEntries() ?? Array.Empty<QuarantineEntry>(),
+            (msg, err, warn) => SetStatus(msg, isError: err, isWarning: warn));
 
-        private void TryExportScanSessionPdf(ScanSession session)
-        {
-            var result = _historyExport.TryExportSessionPdf(this, session);
-            if (!result.WasCancelled && !string.IsNullOrEmpty(result.Message))
-                SetStatus(result.Message, isError: result.IsError);
-        }
+        private void TryExportScanReportHtml() =>
+            _exportCoordinator.TryExportHtml(BuildExportContext());
+
+        private void TryExportScanSessionPdf(ScanSession session) =>
+            _exportCoordinator.TryExportSessionPdf(BuildExportContext(), session);
 
         // ── Statut ───────────────────────────────────────────────────────────────
         private void UpdateThemeToggleTooltip(bool isDark)
@@ -996,8 +964,7 @@ namespace optiSCAN
         {
             try
             {
-                _trayHost?.Dispose();
-                _trayHost = null;
+                _trayCoordinator.Dispose();
 
                 // Désabonnement local des events branchés ici
                 if (_freshclamUpdater != null) _freshclamUpdater.UpdateOutput -= SurSortieFreshclam;

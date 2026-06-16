@@ -15,7 +15,7 @@ namespace optiSCAN.Converters
         {
             var path = value as string;
             var isQuarantined = !string.IsNullOrWhiteSpace(path)
-                && ServiceContainer.Default.Quarantine.GetEntries()
+                && ServiceContainer.Views.Quarantine.GetEntries()
                     .Any(e => string.Equals(e.OriginalPath, path, StringComparison.OrdinalIgnoreCase));
 
             var showWhenNotQuarantined = string.Equals(

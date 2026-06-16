@@ -53,7 +53,8 @@ public static class ServiceRegistration
                 sp.GetRequiredService<ScanOrchestrator>(),
                 sp.GetRequiredService<QuarantineManager>(),
                 sp.GetRequiredService<NotificationService>(),
-                sp.GetRequiredService<ScanLogManager>()));
+                sp.GetRequiredService<ScanLogManager>(),
+                sp.GetRequiredService<RealTimeProtection>()));
         services.AddSingleton<ScheduledScanService>();
         return services;
     }

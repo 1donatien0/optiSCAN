@@ -40,36 +40,38 @@ namespace optiSCAN.Views
 
     {
 
-        private readonly AntivirusActions _actions = ServiceContainer.Default.Actions;
-
-        private readonly ScanLogManager _logger = ServiceContainer.Default.Logger;
-
+        private ServiceContainer? _services;
+        private IUiEventBus _uiEvents = ServiceContainer.UiEvents;
+        private AntivirusActions? _actions;
+        private ScanLogManager? _logger;
+        private bool _bound;
         private bool _syncingFilterChips;
 
+        public HistoryViewModel VM { get; private set; } = null!;
 
-
-        public HistoryViewModel VM { get; }
-
-
+        private AntivirusActions Actions => _actions ?? throw new InvalidOperationException("HistoryControl.Bind() must be called before use.");
+        private ScanLogManager Logger => _logger ?? throw new InvalidOperationException("HistoryControl.Bind() must be called before use.");
 
         public HistoryControl()
-
         {
-
-            VM = new HistoryViewModel(ServiceContainer.Default);
-
             InitializeComponent();
-
-            DataContext = VM;
-
-
-
-            VM.PropertyChanged += OnViewModelPropertyChanged;
-
             Loaded += OnLoaded;
-
             Unloaded += OnUnloaded;
+        }
 
+        /// <summary>Branche les services partagés (appelé par <see cref="optiSCAN.MainWindow"/> au démarrage).</summary>
+        public void Bind(ServiceContainer services)
+        {
+            if (_bound)
+                return;
+            _bound = true;
+            _services = services;
+            _uiEvents = services;
+            _actions = services.Actions;
+            _logger = services.Logger;
+            VM = new HistoryViewModel(services);
+            DataContext = VM;
+            VM.PropertyChanged += OnViewModelPropertyChanged;
         }
 
 
@@ -92,7 +94,7 @@ namespace optiSCAN.Views
 
         {
 
-            ServiceContainer.Default.ScanHistoryViewsRefreshRequested += OnExternalRefreshRequested;
+            _uiEvents.ScanHistoryViewsRefreshRequested += OnExternalRefreshRequested;
 
             RefreshTimeline();
 
@@ -104,7 +106,7 @@ namespace optiSCAN.Views
 
         {
 
-            ServiceContainer.Default.ScanHistoryViewsRefreshRequested -= OnExternalRefreshRequested;
+            _uiEvents.ScanHistoryViewsRefreshRequested -= OnExternalRefreshRequested;
 
         }
 
@@ -660,7 +662,7 @@ namespace optiSCAN.Views
 
             if (SelectedScanSession is not { Threats.Count: > 0 } session) return;
 
-            ServiceContainer.Default.RequestReviewHistorySession(session);
+            _uiEvents.RequestReviewHistorySession(session);
 
         }
 
@@ -675,10 +677,10 @@ namespace optiSCAN.Views
             {
                 if (!VM.IsThreatFileAccessible(t.FilePath))
                     continue;
-                if (ServiceContainer.Default.Quarantine.Quarantine(t, session.SessionId))
+                if (_services!.Quarantine.Quarantine(t, session.SessionId))
                 {
                     count++;
-                    _logger.TryRemoveThreatFromSession(session.SessionId, t.FilePath);
+                    Logger.TryRemoveThreatFromSession(session.SessionId, t.FilePath);
                 }
             }
 
@@ -695,14 +697,14 @@ namespace optiSCAN.Views
 
             if (VM.IsFileStillQuarantined(filePath))
             {
-                _logger.TryRemoveThreatFromSession(session.SessionId, filePath);
+                Logger.TryRemoveThreatFromSession(session.SessionId, filePath);
                 RefreshTimeline();
                 return;
             }
 
-            if (_actions.QuarantineThreat(filePath, session.SessionId).Success)
+            if (Actions.QuarantineThreat(filePath, session.SessionId).Success)
             {
-                _logger.TryRemoveThreatFromSession(session.SessionId, filePath);
+                Logger.TryRemoveThreatFromSession(session.SessionId, filePath);
                 RefreshTimeline();
             }
         }
@@ -711,7 +713,7 @@ namespace optiSCAN.Views
         {
             if (FilePathFromSender(sender) is not string filePath ||
                 SelectedScanSession is not ScanSession session) return;
-            _logger.TryRemoveThreatFromSession(session.SessionId, filePath);
+            Logger.TryRemoveThreatFromSession(session.SessionId, filePath);
             RefreshTimeline();
         }
 
@@ -725,9 +727,9 @@ namespace optiSCAN.Views
 
                 SelectedScanSession is not ScanSession session) return;
 
-            _actions.IgnoreThreat(filePath);
+            Actions.IgnoreThreat(filePath);
 
-            _logger.TryRemoveThreatFromSession(session.SessionId, filePath);
+            Logger.TryRemoveThreatFromSession(session.SessionId, filePath);
 
             RefreshTimeline();
 
@@ -743,11 +745,11 @@ namespace optiSCAN.Views
 
                 SelectedScanSession is not ScanSession session) return;
 
-            if (_actions.DeleteThreatFile(filePath).Success)
+            if (Actions.DeleteThreatFile(filePath).Success)
 
             {
 
-                _logger.TryRemoveThreatFromSession(session.SessionId, filePath);
+                Logger.TryRemoveThreatFromSession(session.SessionId, filePath);
 
                 RefreshTimeline();
 
@@ -796,20 +798,19 @@ namespace optiSCAN.Views
 
 
         private static void OpenAntivirusQuarantineTab() =>
-
-            ServiceContainer.Default.RequestOpenQuarantineTab();
+            ServiceContainer.UiEvents.RequestOpenQuarantineTab();
 
 
 
         private void BtnOpenAntivirus_Click(object sender, RoutedEventArgs e) =>
 
-            ServiceContainer.Default.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
+            ServiceContainer.Views.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
 
 
 
         private void BtnExportHtml_Click(object sender, RoutedEventArgs e) =>
 
-            ServiceContainer.Default.RequestExportScanHistoryHtml();
+            _uiEvents.RequestExportScanHistoryHtml();
 
 
 
@@ -819,7 +820,7 @@ namespace optiSCAN.Views
 
             if (SelectedScanSession is ScanSession session)
 
-                ServiceContainer.Default.RequestExportScanSessionPdf(session);
+                _uiEvents.RequestExportScanSessionPdf(session);
 
         }
 

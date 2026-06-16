@@ -25,6 +25,7 @@ namespace optiSCAN.Services
         private readonly QuarantineManager _quarantine;
         private readonly NotificationService _notifications;
         private readonly ScanLogManager _logger;
+        private readonly RealTimeProtection _realTimeProtection;
         private readonly HashSet<string> _knownRoots = new(StringComparer.OrdinalIgnoreCase);
         private readonly SemaphoreSlim _scanLock = new(1, 1);
         private readonly object _lifecycleLock = new();
@@ -43,12 +44,14 @@ namespace optiSCAN.Services
             ScanOrchestrator orchestrator,
             QuarantineManager quarantine,
             NotificationService notifications,
-            ScanLogManager logger)
+            ScanLogManager logger,
+            RealTimeProtection realTimeProtection)
         {
             _orchestrator = orchestrator;
             _quarantine = quarantine;
             _notifications = notifications;
             _logger = logger;
+            _realTimeProtection = realTimeProtection;
         }
 
         public void Start()
@@ -214,7 +217,7 @@ namespace optiSCAN.Services
             ScanResult? result = null;
             var scanSucceeded = false;
 
-            ServiceContainer.Default.RealTimeProtection.Suspend();
+            _realTimeProtection.Suspend();
             try
             {
                 using var cts = new CancellationTokenSource(detailed ? DetailedScanTimeout : QuickScanTimeout);
@@ -238,7 +241,7 @@ namespace optiSCAN.Services
                 {
                     _logger.SaveScanResult(result);
                     UserPreferences.Current.IncrementScanCount(ScanType.RemovableDrive);
-                    ServiceContainer.Default.RequestScanHistoryViewsRefresh();
+                    ServiceContainer.UiEvents.RequestScanHistoryViewsRefresh();
 
                     if (result.Threats.Count > 0)
                     {
@@ -256,7 +259,7 @@ namespace optiSCAN.Services
                             if (n > 0)
                             {
                                 AppLogger.Info("RemovableDriveScan", $"{n} fichier(s) mis en quarantaine sur {root}.");
-                                ServiceContainer.Default.RequestScanHistoryViewsRefresh();
+                                ServiceContainer.UiEvents.RequestScanHistoryViewsRefresh();
                             }
                         }
 
@@ -271,7 +274,7 @@ namespace optiSCAN.Services
             }
             finally
             {
-                ServiceContainer.Default.RealTimeProtection.Resume();
+                _realTimeProtection.Resume();
 
                 var phase = scanSucceeded ? RemovableDriveScanPhase.Completed : RemovableDriveScanPhase.Failed;
                 var threats = result?.Threats.Count ?? 0;

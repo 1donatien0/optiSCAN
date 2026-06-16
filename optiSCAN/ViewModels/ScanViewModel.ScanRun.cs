@@ -32,7 +32,7 @@ namespace optiSCAN.ViewModels
 
             if (type is ScanType.QuickScan or ScanType.FullScan or ScanType.File or ScanType.Folder)
             {
-                ServiceContainer.Default.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
+                _navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
                 DisplayScanProgressRequested?.Invoke(this, EventArgs.Empty);
             }
 
@@ -45,7 +45,7 @@ namespace optiSCAN.ViewModels
             var epoch = Interlocked.Increment(ref _scanEpoch);
             var progress = new Progress<ScanProgress>(p => SurChangementProgressionScan(p, epoch));
 
-            ServiceContainer.Default.RealTimeProtection.Suspend();
+            _realTimeProtection.Suspend();
             try
             {
                 ScanResult result = type switch
@@ -73,7 +73,7 @@ namespace optiSCAN.ViewModels
                 prefs.IncrementScanCount(type);
                 RefreshRecentTargets();
                 LoadHistory();
-                ServiceContainer.Default.RequestScanHistoryViewsRefresh();
+                _uiEvents.RequestScanHistoryViewsRefresh();
 
                 WpfApp.Current?.Dispatcher.Invoke(() =>
                 {
@@ -89,7 +89,7 @@ namespace optiSCAN.ViewModels
                 {
                     autoQuarantined = _quarantine.QuarantineAll(result.Threats, result.SessionId);
                     WpfApp.Current?.Dispatcher.Invoke(LoadQuarantine);
-                    ServiceContainer.Default.RequestScanHistoryViewsRefresh();
+                    _uiEvents.RequestScanHistoryViewsRefresh();
                 }
 
                 StatusMessage = autoQuarantined > 0
@@ -100,7 +100,7 @@ namespace optiSCAN.ViewModels
 
                 if (UserPreferences.Current.ActionNotificationsEnabled)
                 {
-                    ServiceContainer.Default.Notifications.ShowScanCompleted(
+                    _notifications.ShowScanCompleted(
                         result.Threats.Count,
                         result.FilesScanned);
                 }
@@ -124,7 +124,7 @@ namespace optiSCAN.ViewModels
                 ScanProgressDetail = string.Empty;
                 _cts?.Dispose();
                 _cts = null;
-                ServiceContainer.Default.RealTimeProtection.Resume();
+                _realTimeProtection.Resume();
             }
         }
 

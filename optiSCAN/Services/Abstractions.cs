@@ -59,6 +59,12 @@ namespace optiSCAN.Services
         void CancelUpdate();
     }
 
+    /// <summary>Annulation d'une mise à jour de signatures en cours (ClamAV, YARA).</summary>
+    public interface ISignatureUpdateCanceller
+    {
+        void CancelUpdate();
+    }
+
     /// <summary>
     /// Stockage des fichiers en quarantaine.
     /// </summary>

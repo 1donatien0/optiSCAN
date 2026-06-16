@@ -18,8 +18,9 @@ namespace optiSCAN.Views
     /// Vue principale de l'onglet Antivirus — scan, historique, signatures et quarantaine.
     /// Se connecte au <see cref="ScanViewModel"/> via DataContext.
     /// </summary>
-    public partial class AntivirusView : System.Windows.Controls.UserControl
+    public partial class AntivirusView : System.Windows.Controls.UserControl, IAntivirusSignaturesPanel
     {
+        private IViewServices? _services;
         private ScanViewModel? _vmScanTabSubscription;
 
         private readonly ConcurrentQueue<string> _signatureLogQueue = new();
@@ -33,6 +34,8 @@ namespace optiSCAN.Views
             Loaded += AntivirusView_Loaded;
             Unloaded += AntivirusView_Unloaded;
         }
+
+        public void Bind(IViewServices services) => _services = services;
 
         private void AntivirusView_Loaded(object sender, RoutedEventArgs e)
         {
@@ -92,7 +95,8 @@ namespace optiSCAN.Views
 
         private ScanViewModel? VM => DataContext as ScanViewModel;
         private MainWindow? Win => Window.GetWindow(this) as MainWindow;
-        private static AntivirusActions Actions => ServiceContainer.Default.Actions;
+        private AntivirusActions Actions => _services?.Actions
+            ?? throw new InvalidOperationException("AntivirusView.Bind() must be called before use.");
 
         public void UpdateLastScanDisplay(DateTime? lastScan)
         {
@@ -276,7 +280,7 @@ namespace optiSCAN.Views
             if (sender is System.Windows.Controls.Button btn && btn.Tag is string filePath)
             {
                 var sessionId = VM?.ActiveScanSessionId ?? Guid.Empty;
-                var known = ServiceContainer.Default.FindKnownThreat(filePath);
+                var known = _services!.FindKnownThreat(filePath);
                 var result = known != null
                     ? Actions.QuarantineThreat(known.Clone(), sessionId)
                     : Actions.QuarantineThreat(filePath, sessionId);
@@ -286,7 +290,7 @@ namespace optiSCAN.Views
                     VM?.NotifyThreatQuarantinedDuringScan(filePath);
                 }
                 VM?.LoadQuarantine(reset: true);
-                ServiceContainer.Default.RequestScanHistoryViewsRefresh();
+                ServiceContainer.UiEvents.RequestScanHistoryViewsRefresh();
             }
         }
 
@@ -309,7 +313,7 @@ namespace optiSCAN.Views
             btn.IsEnabled = false;
             try
             {
-                var result = await ServiceContainer.Default.ThreatReputation.LookupFileAsync(filePath);
+                var result = await _services!.ThreatReputation.LookupFileAsync(filePath);
                 var message = result.Summary;
                 if (!string.IsNullOrEmpty(result.Permalink))
                     message += Environment.NewLine + result.Permalink;
@@ -373,7 +377,7 @@ namespace optiSCAN.Views
 
         private void BtnManualUpdateSignatures_Click(object sender, RoutedEventArgs e)
         {
-            ServiceContainer.Default.TriggerSignatureUpdate();
+            ServiceContainer.UiEvents.TriggerSignatureUpdate();
         }
 
         private void BtnStopUpdateSignatures_Click(object sender, RoutedEventArgs e)

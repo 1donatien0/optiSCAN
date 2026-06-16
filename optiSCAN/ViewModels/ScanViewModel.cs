@@ -28,6 +28,10 @@ namespace optiSCAN.ViewModels
         private readonly ScanLogManager _logger;
         private readonly IUserConfirmService _confirm;
         private readonly YaraEngine _yara;
+        private readonly IUiEventBus _uiEvents;
+        private readonly INavigationService? _navigation;
+        private readonly RealTimeProtection _realTimeProtection;
+        private readonly NotificationService _notifications;
 
         private CancellationTokenSource? _cts;
         private long _scanEpoch;
@@ -335,6 +339,10 @@ namespace optiSCAN.ViewModels
             _quarantine = container.Quarantine;
             _logger = container.Logger;
             _confirm = new WpfUserConfirmService();
+            _uiEvents = container;
+            _navigation = container.Navigation;
+            _realTimeProtection = container.RealTimeProtection;
+            _notifications = container.Notifications;
             _dbVersion = VersionDisplayHelper.UnknownLabel;
 
             _updater.UpdateOutput += SurAjoutSortieMiseAJour;
@@ -359,7 +367,7 @@ namespace optiSCAN.ViewModels
             });
             StopScanCommand = new RelayCommand(_ => _cts?.Cancel(), _ => IsScanning);
             // Délègue au flux MainWindow → SignatureUpdateCoordinator (source unique de vérité).
-            UpdateDbCommand = new RelayCommand(_ => ServiceContainer.Default.TriggerSignatureUpdate(), _ => !IsUpdating);
+            UpdateDbCommand = new RelayCommand(_ => _uiEvents.TriggerSignatureUpdate(), _ => !IsUpdating);
             QuarantineAllCommand = new RelayCommand(_ => QuarantineAllThreats(), _ => Threats.Count > 0);
             RestoreFileCommand = new RelayCommand(p => RestoreFromQuarantine(p as string));
             DeleteFileCommand = new RelayCommand(p => DeleteFromQuarantine(p as string));
@@ -430,7 +438,7 @@ namespace optiSCAN.ViewModels
                     StatusMessage = ScanUserDisplay.Ready;
 
                 AppLogger.Info("ScanViewModel", "Initialisation terminée");
-                ServiceContainer.Default.RequestScanHistoryViewsRefresh();
+                _uiEvents.RequestScanHistoryViewsRefresh();
             }
             catch (Exception ex)
             {
@@ -450,13 +458,12 @@ namespace optiSCAN.ViewModels
         /// <summary>Recalcule le badge de protection (en-tête Antivirus).</summary>
         public void RefreshProtectionStatus()
         {
-            var c = ServiceContainer.Default;
             ProtectionBadgeLevel = ProtectionStatusEvaluator.Evaluate(
                 IsClamAvAvailable,
                 _yara.IsAvailable,
                 YaraRulesCount,
                 ExclusionSettings.Current.RealTimeEnabled,
-                c.RealTimeProtection.IsEnabled);
+                _realTimeProtection.IsEnabled);
         }
 
         private void SurDemandeRafraichissementProtection(object? sender, EventArgs e)

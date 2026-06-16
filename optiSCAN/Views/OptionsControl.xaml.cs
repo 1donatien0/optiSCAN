@@ -21,7 +21,7 @@ namespace optiSCAN.Views
     public partial class OptionsControl : System.Windows.Controls.UserControl
     {
         private readonly ObservableCollection<string> _exclusions = new();
-        private IScheduledScanService ScheduledScan => ServiceContainer.Default.ScheduledScan;
+        private ServiceContainer? _shell;
         private bool _suppressPreferenceEvents;
         private string? _languageTagBeforeDropDown;
         private int _favoriteScanIndexBeforeDropDown;
@@ -45,6 +45,11 @@ namespace optiSCAN.Views
                     SyncThemeControls();
             };
         }
+
+        public void Bind(ServiceContainer shell) => _shell = shell;
+
+        private IScheduledScanService ScheduledScan => _shell?.ScheduledScan
+            ?? ServiceContainer.Views.ScheduledScan;
 
         private void SurChangementTheme(object? sender, bool isDark) => SyncThemeControls();
 
@@ -146,7 +151,7 @@ namespace optiSCAN.Views
                 if (chkBackupBeforeQuarantine != null)
                     chkBackupBeforeQuarantine.IsChecked = prefs.BackupBeforeQuarantine;
 
-                var c = ServiceContainer.Default;
+                var c = _shell ?? ServiceContainer.Default;
                 if (chkAutoUpdate != null)
                     chkAutoUpdate.IsChecked = prefs.SignatureAutoUpdateEnabled;
                 if (chkAggressiveSignatures != null)
@@ -237,7 +242,7 @@ namespace optiSCAN.Views
             if (sender is not WpfCheckBox cb) return;
             bool isOn = cb.IsChecked == true;
             var prefs = UserPreferences.Current;
-            var c = ServiceContainer.Default;
+            var c = _shell ?? ServiceContainer.Default;
 
             switch (cb.Tag as string)
             {

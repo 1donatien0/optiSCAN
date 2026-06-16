@@ -13,28 +13,30 @@ namespace optiSCAN.Services
     public sealed class AntivirusActions
     {
         private readonly QuarantineManager _quarantine;
-        private readonly FreshclamUpdater _freshclam;
-        private readonly YaraForgeUpdater _rules;
+        private readonly ISignatureUpdateCanceller? _freshclam;
+        private readonly ISignatureUpdateCanceller? _rules;
+        private readonly Func<string, ThreatInfo?>? _threatLookup;
 
         public AntivirusActions(ServiceContainer container)
-            : this(container.Quarantine, container.FreshclamUpdater, container.RulesUpdater)
+            : this(
+                container.Quarantine,
+                container.FreshclamUpdater,
+                container.RulesUpdater,
+                container.FindKnownThreat)
         {
         }
 
         /// <summary>Constructeur de test (répertoire quarantaine isolé via <see cref="InternalsVisibleTo"/>).</summary>
-        internal AntivirusActions(QuarantineManager quarantine)
-            : this(quarantine, ServiceContainer.Default.FreshclamUpdater, ServiceContainer.Default.RulesUpdater)
-        {
-        }
-
-        private AntivirusActions(
+        internal AntivirusActions(
             QuarantineManager quarantine,
-            FreshclamUpdater freshclam,
-            YaraForgeUpdater rules)
+            ISignatureUpdateCanceller? freshclam = null,
+            ISignatureUpdateCanceller? rules = null,
+            Func<string, ThreatInfo?>? threatLookup = null)
         {
             _quarantine = quarantine;
             _freshclam = freshclam;
             _rules = rules;
+            _threatLookup = threatLookup;
         }
 
         public event EventHandler<ActionResult>? ActionCompleted;
@@ -81,9 +83,9 @@ namespace optiSCAN.Services
                    : LocalizationService.Format("Av_Action_QuarantineFail", Path.GetFileName(threat.FilePath)));
         }
 
-        private static ThreatInfo ResolveThreatForPath(string filePath)
+        private ThreatInfo ResolveThreatForPath(string filePath)
         {
-            var known = ServiceContainer.Default.FindKnownThreat(filePath);
+            var known = _threatLookup?.Invoke(filePath);
             if (known != null)
                 return known.Clone();
 
@@ -171,11 +173,17 @@ namespace optiSCAN.Services
 
         public void StopAllUpdates()
         {
-            try { _freshclam.CancelUpdate(); }
-            catch (Exception ex) { AppLogger.Warn("AntivirusActions", "Cancel freshclam", ex); }
+            if (_freshclam != null)
+            {
+                try { _freshclam.CancelUpdate(); }
+                catch (Exception ex) { AppLogger.Warn("AntivirusActions", "Cancel freshclam", ex); }
+            }
 
-            try { _rules.CancelUpdate(); }
-            catch (Exception ex) { AppLogger.Warn("AntivirusActions", "Cancel rules", ex); }
+            if (_rules != null)
+            {
+                try { _rules.CancelUpdate(); }
+                catch (Exception ex) { AppLogger.Warn("AntivirusActions", "Cancel rules", ex); }
+            }
 
             Complete(true, LocalizationService.GetString("Av_Action_UpdateStopped"));
         }

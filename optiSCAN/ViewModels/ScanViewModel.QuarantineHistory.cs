@@ -32,7 +32,7 @@ namespace optiSCAN.ViewModels
                     threat.Status = ThreatStatus.Quarantined;
             }
             StatusMessage = LocalizationService.Format("Vm_QuarantineBatch", count);
-            ServiceContainer.Default.RequestScanHistoryViewsRefresh();
+            _uiEvents.RequestScanHistoryViewsRefresh();
         }
 
         /// <summary>Appelé après une quarantaine réussie pendant un scan en cours.</summary>
@@ -41,7 +41,7 @@ namespace optiSCAN.ViewModels
             if (string.IsNullOrWhiteSpace(filePath)) return;
             _quarantinedDuringScanPaths.Add(filePath);
             LoadQuarantine();
-            ServiceContainer.Default.RequestScanHistoryViewsRefresh();
+            _uiEvents.RequestScanHistoryViewsRefresh();
         }
 
         private bool IsPathCurrentlyQuarantined(string filePath) =>

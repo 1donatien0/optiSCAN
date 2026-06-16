@@ -15,6 +15,10 @@ namespace optiSCAN.Views
     /// </summary>
     public partial class CleanControl : System.Windows.Controls.UserControl
     {
+        private ScanLogManager? _logger;
+
+        public void Bind(IViewServices services) => _logger = services.Logger;
+
         // Analyse doit être lancée avant de pouvoir nettoyer
         private bool _analysed = false;
 
@@ -219,7 +223,7 @@ namespace optiSCAN.Views
                         var targets = BuildCleanTargetsSummary(sel);
                         try
                         {
-                            ServiceContainer.Default.Logger.SaveCleanSession(new CleanSession
+                            _logger!.SaveCleanSession(new CleanSession
                             {
                                 StartedAt = cleanStarted,
                                 FinishedAt = cleanEnd,
@@ -227,7 +231,7 @@ namespace optiSCAN.Views
                                 BytesFreed = freed,
                                 OperationLog = CaptureCleanOperationLog()
                             });
-                            ServiceContainer.Default.RequestScanHistoryViewsRefresh();
+                            ServiceContainer.UiEvents.RequestScanHistoryViewsRefresh();
                         }
                         catch (Exception ex)
                         {

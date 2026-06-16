@@ -8,12 +8,18 @@ namespace optiSCAN.Services
     /// Construction via <see cref="Microsoft.Extensions.DependencyInjection"/> (v8).
     /// </summary>
     [SupportedOSPlatform("windows")]
-    public sealed class ServiceContainer
+    public sealed class ServiceContainer : IViewServices
     {
         private static readonly Lazy<ServiceContainer> _default =
             new(() => new ServiceContainer(), LazyThreadSafetyMode.ExecutionAndPublication);
 
         public static ServiceContainer Default => _default.Value;
+
+        /// <summary>Bus UI (événements inter-panneaux) — même instance que <see cref="Default"/>.</summary>
+        public static IUiEventBus UiEvents => Default;
+
+        /// <summary>Façade vues (bus + services) — même instance que <see cref="Default"/>.</summary>
+        public static IViewServices Views => Default;
 
         private readonly IServiceProvider _services;
         private bool _shutdownDone;
@@ -397,6 +403,8 @@ namespace optiSCAN.Services
                 }
             });
         }
+
+        IScheduledScanService IViewServices.ScheduledScan => ScheduledScan;
 
         /// <summary>
         /// Libère proprement tous les services disposables.

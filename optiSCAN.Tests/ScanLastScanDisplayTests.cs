@@ -4,6 +4,7 @@ using optiSCAN.Services;
 
 namespace optiSCAN.Tests;
 
+[Collection("Localization")]
 public sealed class ScanLastScanDisplayTests
 {
     public ScanLastScanDisplayTests()
