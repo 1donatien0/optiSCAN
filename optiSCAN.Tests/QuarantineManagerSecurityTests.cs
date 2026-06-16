@@ -8,6 +8,23 @@ namespace optiSCAN.Tests;
 public sealed class QuarantineManagerSecurityTests
 {
     [Theory]
+    [InlineData("ProgramData")]
+    public void IsSensitivePath_blocks_extended_folders(string folder)
+    {
+        var basePath = folder switch
+        {
+            "ProgramData" => Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+            _ => throw new ArgumentOutOfRangeException(nameof(folder)),
+        };
+
+        if (string.IsNullOrWhiteSpace(basePath))
+            return;
+
+        var target = Path.Combine(basePath, "optiscan_test_restore.exe");
+        Assert.True(QuarantineManager.IsSensitivePath(target));
+    }
+
+    [Theory]
     [InlineData("System32")]
     [InlineData("Windows")]
     public void IsSensitivePath_blocks_critical_folders(string folder)

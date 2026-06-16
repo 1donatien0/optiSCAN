@@ -399,6 +399,9 @@ namespace optiSCAN.Services
                 Environment.GetFolderPath(Environment.SpecialFolder.Windows),      // C:\Windows
                 Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
                 Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), // ProgramData
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonStartMenu),
+                Environment.GetFolderPath(Environment.SpecialFolder.Startup),
             };
 
             foreach (var f in forbidden)

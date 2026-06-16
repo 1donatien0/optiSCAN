@@ -21,7 +21,7 @@ namespace optiSCAN.Views
     public partial class OptionsControl : System.Windows.Controls.UserControl
     {
         private readonly ObservableCollection<string> _exclusions = new();
-        private ServiceContainer? _shell;
+        private IOptionsServices? _services;
         private bool _suppressPreferenceEvents;
         private string? _languageTagBeforeDropDown;
         private int _favoriteScanIndexBeforeDropDown;
@@ -45,12 +45,12 @@ namespace optiSCAN.Views
             };
         }
 
-        private ServiceContainer Shell => _shell ?? throw new InvalidOperationException("OptionsControl.Bind() must be called before use.");
-        private IScheduledScanService ScheduledScan => Shell.ScheduledScan;
+        private IOptionsServices Services => _services ?? throw new InvalidOperationException("OptionsControl.Bind() must be called before use.");
+        private IScheduledScanService ScheduledScan => Services.ScheduledScan;
 
-        public void Bind(ServiceContainer shell)
+        public void Bind(IOptionsServices services)
         {
-            _shell = shell;
+            _services = services;
             _ = LoadScheduledTaskStateAsync();
         }
 
@@ -244,7 +244,7 @@ namespace optiSCAN.Views
             if (sender is not WpfCheckBox cb) return;
             bool isOn = cb.IsChecked == true;
             var prefs = UserPreferences.Current;
-            var c = Shell;
+            var c = Services;
 
             switch (cb.Tag as string)
             {

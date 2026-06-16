@@ -50,7 +50,17 @@ public sealed class ProtectionPipeClient : IDisposable
 
     public async Task RequestShutdownAsync(CancellationToken ct = default)
     {
-        try { await SendAsync(new ProtectionPipeRequest { Operation = ProtectionPipeOperations.Shutdown }, ct).ConfigureAwait(false); }
+        if (!ProtectionPipeShutdownToken.TryRead(out var token))
+            return;
+
+        try
+        {
+            await SendAsync(new ProtectionPipeRequest
+            {
+                Operation = ProtectionPipeOperations.Shutdown,
+                AuthToken = token,
+            }, ct).ConfigureAwait(false);
+        }
         catch { /* service en cours d'arrêt */ }
     }
 

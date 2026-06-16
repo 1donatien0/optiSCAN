@@ -1,31 +1,42 @@
 using optiSCAN.Platform;
 using System.IO;
 using System.IO.Pipes;
+using System.Runtime.Versioning;
 using System.Text;
 using System.Text.Json;
 
 namespace optiSCAN.Services;
 
 /// <summary>Serveur IPC du moteur de protection (mode --service-host / AMSI / UI distante).</summary>
+[SupportedOSPlatform("windows")]
 public sealed class ProtectionPipeServer : IDisposable
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
     private readonly ScanOrchestrator _orchestrator;
     private readonly string _pipeName;
+    private readonly string? _shutdownTokenOverride;
+    private readonly Action? _onShutdown;
+    private string? _shutdownToken;
     private CancellationTokenSource? _cts;
     private Task? _listenTask;
 
-    public ProtectionPipeServer(ScanOrchestrator orchestrator, string? pipeName = null)
+    public ProtectionPipeServer(ScanOrchestrator orchestrator, string? pipeName = null, string? shutdownToken = null, Action? onShutdown = null)
     {
         _orchestrator = orchestrator;
         _pipeName = pipeName ?? ProtectionPipeNames.Protection;
+        _shutdownTokenOverride = shutdownToken;
+        _onShutdown = onShutdown;
     }
 
     public void Start()
     {
         if (_listenTask != null)
             return;
+
+        _shutdownToken = _shutdownTokenOverride ?? ProtectionPipeShutdownToken.Generate();
+        try { ProtectionPipeShutdownToken.Persist(_shutdownToken); }
+        catch (Exception ex) { AppLogger.Warn("ProtectionPipeServer", "Persist shutdown token", ex); }
 
         _cts = new CancellationTokenSource();
         _listenTask = Task.Run(() => ListenLoopAsync(_cts.Token));
@@ -60,7 +71,6 @@ public sealed class ProtectionPipeServer : IDisposable
                 NamedPipeServerStream.MaxAllowedServerInstances,
                 PipeTransmissionMode.Byte,
                 PipeOptions.Asynchronous);
-
             try
             {
                 await pipe.WaitForConnectionAsync(ct).ConfigureAwait(false);
@@ -98,7 +108,10 @@ public sealed class ProtectionPipeServer : IDisposable
         await pipe.FlushAsync(ct).ConfigureAwait(false);
     }
 
-    private async Task<ProtectionPipeResponse> DispatchAsync(ProtectionPipeRequest request, CancellationToken ct)
+    private Task<ProtectionPipeResponse> DispatchAsync(ProtectionPipeRequest request, CancellationToken ct) =>
+        Task.FromResult(Dispatch(request));
+
+    private ProtectionPipeResponse Dispatch(ProtectionPipeRequest request)
     {
         switch (request.Operation)
         {
@@ -114,27 +127,35 @@ public sealed class ProtectionPipeServer : IDisposable
                 };
 
             case ProtectionPipeOperations.Shutdown:
-                _ = Task.Run(() => Environment.Exit(0));
+                if (!ProtectionPipeShutdownToken.Validate(_shutdownToken, request.AuthToken))
+                    return ProtectionPipeResponse.Error("Non autorisé");
+                if (_onShutdown != null)
+                    _onShutdown();
+                else
+                    _ = Task.Run(() => Environment.Exit(0));
                 return ProtectionPipeResponse.SuccessClean();
 
             case ProtectionPipeOperations.ScanPath:
                 if (string.IsNullOrWhiteSpace(request.Path) || !File.Exists(request.Path))
                     return ProtectionPipeResponse.Error("Chemin invalide");
-                return await ScanPathAsync(request.Path, ct).ConfigureAwait(false);
+                var fullPath = Path.GetFullPath(request.Path);
+                if (QuarantineManager.IsSensitivePath(fullPath))
+                    return ProtectionPipeResponse.Error("Chemin refusé");
+                return ScanPath(fullPath);
 
             case ProtectionPipeOperations.ScanBuffer:
                 if (string.IsNullOrWhiteSpace(request.BufferBase64))
                     return ProtectionPipeResponse.Error("Buffer vide");
-                return await ScanBufferAsync(request.BufferBase64, request.ContentName ?? "amsi_buffer", ct).ConfigureAwait(false);
+                return ScanBuffer(request.BufferBase64, request.ContentName ?? "amsi_buffer");
 
             default:
                 return ProtectionPipeResponse.Error($"Opération inconnue : {request.Operation}");
         }
     }
 
-    private async Task<ProtectionPipeResponse> ScanPathAsync(string path, CancellationToken ct)
+    private ProtectionPipeResponse ScanPath(string path)
     {
-        var result = await _orchestrator.ScanFileAsync(path, ct: ct).ConfigureAwait(false);
+        var result = _orchestrator.ScanFileAsync(path).GetAwaiter().GetResult();
         if (result.Threats.Count == 0)
             return ProtectionPipeResponse.SuccessClean();
 
@@ -142,7 +163,7 @@ public sealed class ProtectionPipeServer : IDisposable
         return ProtectionPipeResponse.Threat(threat.VirusName, threat.DetectedBy);
     }
 
-    private async Task<ProtectionPipeResponse> ScanBufferAsync(string bufferBase64, string contentName, CancellationToken ct)
+    private ProtectionPipeResponse ScanBuffer(string bufferBase64, string contentName)
     {
         var bytes = Convert.FromBase64String(bufferBase64);
         var tempDir = Path.Combine(Path.GetTempPath(), "optiscan_ipc_" + Guid.NewGuid().ToString("N"));
@@ -153,8 +174,8 @@ public sealed class ProtectionPipeServer : IDisposable
 
         try
         {
-            await File.WriteAllBytesAsync(tempFile, bytes, ct).ConfigureAwait(false);
-            return await ScanPathAsync(tempFile, ct).ConfigureAwait(false);
+            File.WriteAllBytes(tempFile, bytes);
+            return ScanPath(tempFile);
         }
         finally
         {

@@ -45,6 +45,7 @@ namespace optiSCAN.Views
         private bool _bound;
         private bool _syncingFilterChips;
         private readonly HistoryDetailCoordinator _detailCoordinator = new();
+        private readonly HistoryThreatRemediationCoordinator _threatRemediation = new();
         private readonly HistoryDetailView _detailView;
 
         public HistoryViewModel VM { get; private set; } = null!;
@@ -490,90 +491,35 @@ namespace optiSCAN.Views
         private void BtnHistQuarantineAll_Click(object sender, RoutedEventArgs e)
         {
             if (SelectedScanSession is not ScanSession session || session.Threats.Count == 0) return;
-
-            int count = 0;
-            foreach (var t in session.Threats.ToList())
-            {
-                if (!VM.IsThreatFileAccessible(t.FilePath))
-                    continue;
-                if (History.Quarantine.Quarantine(t, session.SessionId))
-                {
-                    count++;
-                    Logger.TryRemoveThreatFromSession(session.SessionId, t.FilePath);
-                }
-            }
-
-            if (count > 0)
-                RefreshTimeline();
+            _threatRemediation.QuarantineAllThreats(History, VM, session, RefreshTimeline);
         }
-
-
 
         private void BtnHistQuarantine_Click(object sender, RoutedEventArgs e)
         {
             if (FilePathFromSender(sender) is not string filePath ||
                 SelectedScanSession is not ScanSession session) return;
-
-            if (VM.IsFileStillQuarantined(filePath))
-            {
-                Logger.TryRemoveThreatFromSession(session.SessionId, filePath);
-                RefreshTimeline();
-                return;
-            }
-
-            if (Actions.QuarantineThreat(filePath, session.SessionId).Success)
-            {
-                Logger.TryRemoveThreatFromSession(session.SessionId, filePath);
-                RefreshTimeline();
-            }
+            _threatRemediation.QuarantineThreat(History, VM, session, filePath, RefreshTimeline);
         }
 
         private void BtnHistDismiss_Click(object sender, RoutedEventArgs e)
         {
             if (FilePathFromSender(sender) is not string filePath ||
                 SelectedScanSession is not ScanSession session) return;
-            Logger.TryRemoveThreatFromSession(session.SessionId, filePath);
-            RefreshTimeline();
+            _threatRemediation.DismissThreat(History, session, filePath, RefreshTimeline);
         }
-
-
 
         private void BtnHistIgnore_Click(object sender, RoutedEventArgs e)
-
         {
-
             if (FilePathFromSender(sender) is not string filePath ||
-
                 SelectedScanSession is not ScanSession session) return;
-
-            Actions.IgnoreThreat(filePath);
-
-            Logger.TryRemoveThreatFromSession(session.SessionId, filePath);
-
-            RefreshTimeline();
-
+            _threatRemediation.IgnoreThreat(History, session, filePath, RefreshTimeline);
         }
 
-
-
         private void BtnHistDelete_Click(object sender, RoutedEventArgs e)
-
         {
-
             if (FilePathFromSender(sender) is not string filePath ||
-
                 SelectedScanSession is not ScanSession session) return;
-
-            if (Actions.DeleteThreatFile(filePath).Success)
-
-            {
-
-                Logger.TryRemoveThreatFromSession(session.SessionId, filePath);
-
-                RefreshTimeline();
-
-            }
-
+            _threatRemediation.DeleteThreat(History, session, filePath, RefreshTimeline);
         }
 
 

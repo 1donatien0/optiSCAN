@@ -23,6 +23,7 @@ packages/
 
 # Sorties de test / publish locales (racine)
 test-*.txt
+TestResults/
 artifacts/
 _build_verify/
 

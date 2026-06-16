@@ -46,13 +46,11 @@ namespace optiSCAN
         private readonly Services.NavigationService _navigationService = new();
         private Services.NavigationRefreshCoordinator? _navRefreshCoordinator;
         private readonly SignatureUpdateUiRunner _signatureUpdateRunner = new();
+        private readonly ToastActivationCoordinator _toastActivation = new();
+        private readonly StatusFooterCoordinator _statusFooter = new();
         private readonly RoutedCommand _quickScanShortcutCommand = new();
         private bool _isClosing = false;
         private bool _wasScanning;
-        private string? _lastStatusText;
-        private bool _lastStatusIsError;
-        private bool _lastStatusIsWarning;
-        private string? _lastStatusIconKind;
 
         private IUiEventBus UiBus => _container;
 
@@ -545,80 +543,22 @@ namespace optiSCAN
 
         private void SurActivationToast(object? sender, ToastActivationEventArgs e)
         {
-            Dispatcher.BeginInvoke(new Action(() => HandleToastActivation(e)), DispatcherPriority.Normal);
+            Dispatcher.BeginInvoke(() => _toastActivation.Handle(e, BuildToastHost()), DispatcherPriority.Normal);
         }
 
-        /// <summary>
-        /// Traite l'action reçue via un toast Windows (quarantaine, ignorer, navigation…).
-        /// </summary>
-        /// <remarks>
-        /// Le toast peut déclencher des changements d'UI et/ou de données. On route donc l'action
-        /// vers les services applicatifs, puis on rafraîchit l'état de la fenêtre (quarantaine,
-        /// vue Antivirus, synthèse d'onglet, etc.).
-        /// </remarks>
-        private void HandleToastActivation(ToastActivationEventArgs e)
+        private ToastActivationCoordinator.Host BuildToastHost() => new()
         {
-            var c = _container;
-            switch (e.Action.ToLowerInvariant())
-            {
-                case "quarantine":
-                    if (!string.IsNullOrEmpty(e.FilePath))
-                    {
-                        var result = c.Actions.QuarantineThreat(e.FilePath);
-                        SetStatus(result.Message, isError: result.IsError, isWarning: result.IsWarning);
-                        if (result.Success)
-                        {
-                            RefreshQuarantineList();
-                            (panelAntivirus as Views.AntivirusView)?.RefreshAllData();
-                        }
-                    }
-                    ShowWindow();
-                    _navigationService.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
-                    break;
-
-                case "ignore":
-                    if (!string.IsNullOrEmpty(e.FilePath))
-                    {
-                        var result = c.Actions.IgnoreThreat(e.FilePath);
-                        SetStatus(result.Message, isError: result.IsError, isWarning: result.IsWarning);
-                        (panelAntivirus as Views.AntivirusView)?.RefreshAllData();
-                    }
-                    break;
-
-                case "openav":
-                    ShowWindow();
-                    _navigationService.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
-                    (panelAntivirus as Views.AntivirusView)?.SelectScanTab();
-                    break;
-
-                case "open":
-                case "threat":
-                    ShowWindow();
-                    _navigationService.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
-                    (panelAntivirus as Views.AntivirusView)?.SelectScanTab();
-                    break;
-
-                case "showquarantine":
-                    ShowWindow();
-                    _navigationService.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
-                    (panelAntivirus as Views.AntivirusView)?.SelectQuarantineTab();
-                    RefreshQuarantineList();
-                    break;
-
-                case "history":
-                case "scanthreats":
-                    ShowWindow();
-                    _navigationService.NavigateTo(OptiscanStrings.PanelIds.History);
-                    break;
-
-                case "update":
-                    ShowWindow();
-                    _navigationService.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
-                    (panelAntivirus as Views.AntivirusView)?.SelectSignaturesTab();
-                    BtnManualUpdateSignatures_Click(this, new RoutedEventArgs());
-                    break;
-            }
-        }
+            Services = _container,
+            Navigation = _navigationService,
+            ShowWindow = ShowWindow,
+            SetStatus = (msg, err, warn) => SetStatus(msg, isError: err, isWarning: warn),
+            RefreshQuarantineList = RefreshQuarantineList,
+            RefreshAntivirusView = () => (panelAntivirus as Views.AntivirusView)?.RefreshAllData(),
+            SelectAntivirusScanTab = () => (panelAntivirus as Views.AntivirusView)?.SelectScanTab(),
+            SelectAntivirusQuarantineTab = () => (panelAntivirus as Views.AntivirusView)?.SelectQuarantineTab(),
+            SelectAntivirusSignaturesTab = () => (panelAntivirus as Views.AntivirusView)?.SelectSignaturesTab(),
+            TriggerManualSignatureUpdate = () => BtnManualUpdateSignatures_Click(this, new RoutedEventArgs()),
+        };
 
         /// <summary>Titre de protection, recommandations hygiène et activité (vue d’ensemble).</summary>
         private void RefreshOverviewProtectionAndRecommendations()
@@ -706,29 +646,33 @@ namespace optiSCAN
 
                 RefreshAntivirusStatus();
                 RefreshOverviewProtectionAndRecommendations();
-                if (_lastStatusText != null)
-                {
-                    if (!IsLiveFooterActive())
-                        ApplyPinnedFooter();
-                    else
-                        RefreshLiveFooter();
-                }
+                _statusFooter.OnThemeChanged(IsLiveFooterActive, RefreshFooterDisplay);
             });
         }
 
         private void SetStatus(string text, bool isError = false, bool isWarning = false, string? iconKindName = null)
         {
-            _lastStatusText = text;
-            _lastStatusIsError = isError;
-            _lastStatusIsWarning = isWarning;
-            _lastStatusIconKind = iconKindName;
-
             Dispatcher.InvokeAsync(() =>
             {
-                if (!IsLiveFooterActive())
-                    ApplyPinnedFooter();
+                _statusFooter.SetStatus(
+                    text,
+                    isError,
+                    isWarning,
+                    iconKindName,
+                    lblStatus,
+                    statusFooterIcon,
+                    IsLiveFooterActive,
+                    RefreshFooterDisplay);
                 AppLogger.Debug("MainWindow", $"Statut: {text}");
             });
+        }
+
+        private void RefreshFooterDisplay()
+        {
+            if (!IsLiveFooterActive())
+                _statusFooter.ApplyPinnedFooter(lblStatus, statusFooterIcon);
+            else
+                RefreshLiveFooter();
         }
 
         private bool IsLiveFooterActive()
@@ -743,110 +687,13 @@ namespace optiSCAN
         private bool IsSignatureUpdateRunning() =>
             _container.FreshclamUpdater.IsUpdating || _container.RulesUpdater.IsUpdating;
 
-        private void RefreshLiveFooter()
-        {
-            if (ViewModel == null) return;
-
-            if (ViewModel.IsScanning)
-            {
-                if (statusFooterSpinner != null)
-                    statusFooterSpinner.Visibility = Visibility.Visible;
-                if (statusFooterIcon != null)
-                    statusFooterIcon.Visibility = Visibility.Collapsed;
-                StopRefreshSpin();
-
-                var detail = ViewModel.ScanProgressDetail;
-                if (lblStatus != null)
-                {
-                    lblStatus.Text = string.IsNullOrWhiteSpace(detail)
-                        ? LocalizationService.GetString("Main_StatusScanning")
-                        : detail;
-                    var textBrush = ThemeUiBrushes.Get("TextMedium", lblStatus);
-                    if (textBrush != null)
-                        lblStatus.Foreground = textBrush;
-                }
-                return;
-            }
-
-            if (statusFooterSpinner != null)
-                statusFooterSpinner.Visibility = Visibility.Collapsed;
-            if (statusFooterIcon != null)
-                statusFooterIcon.Visibility = Visibility.Visible;
-
-            if (IsSignatureUpdateRunning() || ViewModel.IsUpdating)
-            {
-                if (lblStatus != null)
-                {
-                    lblStatus.Text = LocalizationService.GetString("Main_StatusUpdating");
-                    var textBrush = ThemeUiBrushes.Get("TextMedium", lblStatus);
-                    if (textBrush != null)
-                        lblStatus.Foreground = textBrush;
-                }
-
-                if (statusFooterIcon != null)
-                {
-                    if (Enum.TryParse<PackIconKind>(UiIconKinds.Refresh, ignoreCase: false, out var kind))
-                        statusFooterIcon.Kind = kind;
-                    var accent = ThemeUiBrushes.Get("AccentBlue", statusFooterIcon);
-                    if (accent != null)
-                        statusFooterIcon.Foreground = accent;
-                    StartRefreshSpin();
-                }
-                return;
-            }
-
-            StopRefreshSpin();
-            ApplyPinnedFooter();
-        }
-
-        private void ApplyPinnedFooter()
-        {
-            if (_lastStatusText == null) return;
-
-            var textKey = _lastStatusIsError ? "DangerRed" : _lastStatusIsWarning ? "AlertGold" : "TextMedium";
-            var iconKey = _lastStatusIsError ? "DangerRed" : _lastStatusIsWarning ? "WarningOrange" : "SuccessGreen";
-            var textBrush = ThemeUiBrushes.Get(textKey, lblStatus) ?? lblStatus?.Foreground;
-            var iconBrush = ThemeUiBrushes.Get(iconKey, statusFooterIcon) ?? statusFooterIcon?.Foreground;
-
-            if (lblStatus != null)
-            {
-                lblStatus.Text = _lastStatusText;
-                if (textBrush != null)
-                    lblStatus.Foreground = textBrush;
-            }
-
-            if (statusFooterIcon != null)
-            {
-                var kindName = _lastStatusIconKind ?? UiIconKinds.ForStatusFooter(_lastStatusIsError, _lastStatusIsWarning);
-                if (Enum.TryParse<PackIconKind>(kindName, ignoreCase: false, out var kind))
-                    statusFooterIcon.Kind = kind;
-                if (iconBrush != null)
-                    statusFooterIcon.Foreground = iconBrush;
-            }
-        }
-
-        private void StartRefreshSpin()
-        {
-            if (statusFooterIcon == null) return;
-
-            statusFooterIcon.RenderTransformOrigin = new System.Windows.Point(0.5, 0.5);
-            if (statusFooterIcon.RenderTransform is not RotateTransform rotate)
-            {
-                rotate = new RotateTransform();
-                statusFooterIcon.RenderTransform = rotate;
-            }
-
-            rotate.BeginAnimation(RotateTransform.AngleProperty, new DoubleAnimation(0, 360, TimeSpan.FromSeconds(1.1))
-            {
-                RepeatBehavior = RepeatBehavior.Forever
-            });
-        }
-
-        private void StopRefreshSpin()
-        {
-            if (statusFooterIcon?.RenderTransform is RotateTransform rotate)
-                rotate.BeginAnimation(RotateTransform.AngleProperty, null);
-        }
+        private void RefreshLiveFooter() =>
+            _statusFooter.RefreshLiveFooter(
+                ViewModel,
+                lblStatus,
+                statusFooterIcon,
+                statusFooterSpinner,
+                IsSignatureUpdateRunning);
 
         private void ApplyVersionLabels()
         {

@@ -35,6 +35,7 @@ jobs:
           dotnet test optiSCAN.Tests/optiSCAN.Tests.csproj
           --configuration Release
           --no-build
+          --settings optiSCAN.Tests/coverlet.runsettings
           --logger "trx;LogFileName=test-results.trx"
           --results-directory TestResults
           --collect:"XPlat Code Coverage"
@@ -58,12 +59,12 @@ jobs:
         if: always()
         shell: pwsh
         run: |
-          $floor = 0.30
+          $floor = 0.32
           $target = 0.50
           $file = Get-ChildItem -Path TestResults -Recurse -Filter coverage.cobertura.xml -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $file) {
-            Write-Host "No coverage file found — skipping threshold."
-            exit 0
+            Write-Error "No coverage file found."
+            exit 1
           }
           [xml]$xml = Get-Content $file.FullName
           $lineRate = [double]$xml.coverage.'line-rate'

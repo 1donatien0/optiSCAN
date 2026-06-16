@@ -257,7 +257,7 @@ namespace optiSCAN.Views
                 panelId = OptiscanStrings.PanelIds.Overview;
             }
 
-            (_services ?? ServiceContainer.Views).Navigation?.NavigateTo(panelId);
+            _services!.Navigation?.NavigateTo(panelId);
             return true;
         }
 
@@ -464,14 +464,13 @@ namespace optiSCAN.Views
 
             if (target == OptiscanStrings.ActionIds.Update)
             {
-                var ui = _services ?? ServiceContainer.Views;
-                ui.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
-                ui.RequestFocusAntivirusSignaturesTab();
-                ui.TriggerSignatureUpdate();
+                _services!.Navigation?.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
+                _services.RequestFocusAntivirusSignaturesTab();
+                _services.TriggerSignatureUpdate();
             }
             else
             {
-                (_services ?? ServiceContainer.Views).Navigation?.NavigateTo(target);
+                _services!.Navigation?.NavigateTo(target);
             }
         }
 

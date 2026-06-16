@@ -21,6 +21,10 @@ public sealed class ProtectionPipeRequest
 
     [JsonPropertyName("content_name")]
     public string? ContentName { get; set; }
+
+    /// <summary>Requis pour <see cref="ProtectionPipeOperations.Shutdown"/>.</summary>
+    [JsonPropertyName("auth")]
+    public string? AuthToken { get; set; }
 }
 
 public sealed class ProtectionPipeResponse

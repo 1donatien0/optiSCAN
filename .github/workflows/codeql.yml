@@ -14,7 +14,7 @@ permissions:
   security-events: write
 
 jobs:
-  analyze:
+  analyze-csharp:
     name: Analyze C#
     runs-on: windows-latest
     timeout-minutes: 30
@@ -35,6 +35,32 @@ jobs:
 
       - name: Build
         run: dotnet build optiSCAN.sln --configuration Release
+
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v3
+
+  analyze-cpp:
+    name: Analyze C++ (AMSI)
+    runs-on: windows-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v3
+        with:
+          languages: cpp
+          build-mode: manual
+
+      - name: Build AMSI provider
+        shell: pwsh
+        run: |
+          $msbuild = & "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe" `
+            -latest -requires Microsoft.Component.MSBuild -find MSBuild\**\Bin\MSBuild.exe | Select-Object -First 1
+          if (-not $msbuild) { throw "MSBuild not found" }
+          & $msbuild native/optiSCAN.AmsiProvider/optiSCAN.AmsiProvider.vcxproj /p:Configuration=Release /p:Platform=x64
 
       - name: Perform CodeQL Analysis
         uses: github/codeql-action/analyze@v3

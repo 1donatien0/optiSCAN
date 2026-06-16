@@ -6,13 +6,13 @@ namespace optiSCAN.Services
     /// <summary>
     /// Regroupe les services à longue durée de vie (singleton <see cref="Default"/>).
     /// Construction via <see cref="Microsoft.Extensions.DependencyInjection"/> (v8).
-    /// Points d'entrée légitimes pour <see cref="Default"/> / <see cref="UiEvents"/> / <see cref="Views"/> :
-    /// <see cref="App"/> (bootstrap), <see cref="ProtectionServiceHost"/>,
-    /// <see cref="ViewModels.ScanViewModel"/> sans paramètre, et repli avant <c>Bind</c> des vues.
+    /// Points d'entrée légitimes pour <see cref="Default"/> : <see cref="App"/> (bootstrap),
+    /// <see cref="ProtectionServiceHost"/>, et <see cref="ViewModels.ScanViewModel"/> sans paramètre (designer).
+    /// Les vues reçoivent <see cref="IViewServices"/> / <see cref="IOptionsServices"/> via <c>Bind()</c>.
     /// Le bus UI est implémenté par <see cref="UiEventBus"/> (singleton DI partagé).
     /// </summary>
     [SupportedOSPlatform("windows")]
-    public sealed class ServiceContainer : IViewServices, IHistoryServices, IProtectionServiceHostDependencies
+    public sealed class ServiceContainer : IViewServices, IHistoryServices, IOptionsServices, IProtectionServiceHostDependencies
     {
         private static readonly Lazy<ServiceContainer> _default =
             new(() => new ServiceContainer(), LazyThreadSafetyMode.ExecutionAndPublication);

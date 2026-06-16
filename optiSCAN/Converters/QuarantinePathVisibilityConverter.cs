@@ -8,7 +8,7 @@ namespace optiSCAN.Converters
     /// <summary>
     /// Visible si le chemin bindé correspond à un fichier encore en quarantaine.
     /// Paramètre <c>NotQuarantined</c> : visible quand le fichier n'est pas en quarantaine.
-    /// Assigner <see cref="Quarantine"/> depuis <c>Bind()</c> (sinon repli <see cref="ServiceContainer.Views"/>).
+    /// Assigner <see cref="Quarantine"/> depuis <c>Bind()</c>.
     /// </summary>
     public sealed class QuarantinePathVisibilityConverter : IValueConverter
     {
@@ -17,7 +17,8 @@ namespace optiSCAN.Converters
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             var path = value as string;
-            var quarantine = Quarantine ?? ServiceContainer.Views.Quarantine;
+            var quarantine = Quarantine
+                ?? throw new InvalidOperationException("QuarantinePathVisibilityConverter.Quarantine must be set via Bind().");
             var isQuarantined = !string.IsNullOrWhiteSpace(path)
                 && quarantine.GetEntries()
                     .Any(e => string.Equals(e.OriginalPath, path, StringComparison.OrdinalIgnoreCase));
