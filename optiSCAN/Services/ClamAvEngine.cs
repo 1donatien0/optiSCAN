@@ -335,7 +335,10 @@ namespace optiSCAN.Services
 
             // Ne pas parcourir le dossier d'optiSCAN lors d'un scan parent (ex. C:\).
             if (recursive && !AppInstallPaths.IsUnderInstallRoot(target))
-                args.Add($"--exclude={AppInstallPaths.GetClamScanExcludePattern()}");
+            {
+                foreach (var pattern in AppInstallPaths.GetClamScanExcludePatterns())
+                    args.Add($"--exclude={pattern}");
+            }
 
             args.Add("--stdout");
             // NB: --no-summary supprimé. Le résumé "Scanned files: N" en fin
