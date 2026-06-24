@@ -57,8 +57,8 @@ namespace optiSCAN.Services
                     try
                     {
                         StopProcessLocked();
-                        var exclude = AppInstallPaths.GetClamScanExcludePattern();
-                        ClamdConfSupport.EnsureConf(_databaseDir, exclude);
+                        var excludePatterns = AppInstallPaths.GetClamScanExcludePatterns().ToList();
+                        ClamdConfSupport.EnsureConf(_databaseDir, excludePatterns);
 
                         var psi = new ProcessStartInfo
                         {

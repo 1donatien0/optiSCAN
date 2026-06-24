@@ -29,6 +29,12 @@ namespace optiSCAN
         /// </summary>
         protected override async void OnStartup(StartupEventArgs e)
         {
+            // Avant TOUT : capter les exceptions non gérées. Sans cela, une exception
+            // au démarrage tue le process silencieusement (« l'app disparaît du
+            // gestionnaire des tâches sans message »). Désormais elles sont
+            // journalisées (%LOCALAPPDATA%\optiSCAN\Logs) et affichées à l'écran.
+            InstallGlobalCrashHandlers();
+
             LocalizationService.Initialize();
 
             if (ShellScanArguments.TryGetScanPath(e.Args, out var shellPath)
@@ -126,6 +132,107 @@ namespace optiSCAN
 
             base.OnStartup(e);
             // Thème : ThemeManager.Initialize() dans MainWindow (avant InitializeComponent).
+        }
+
+        // ── Gestion globale des exceptions non gérées ────────────────────────────
+
+        /// <summary>
+        /// Branche les trois sources d'exceptions non gérées d'une app WPF :
+        /// le thread UI (Dispatcher), les autres threads (AppDomain) et les
+        /// tâches non observées (TaskScheduler). Garantit qu'aucun crash ne
+        /// reste invisible : tout est journalisé et présenté à l'utilisateur.
+        /// </summary>
+        private void InstallGlobalCrashHandlers()
+        {
+            DispatcherUnhandledException += (_, args) =>
+            {
+                LogFatal("Dispatcher", args.Exception);
+                var recoverable = IsRecoverableDispatcherException(args.Exception);
+                ShowCrashDialog(args.Exception, CrashDialogKind.Dispatcher, terminating: !recoverable);
+                args.Handled = recoverable;
+            };
+
+            AppDomain.CurrentDomain.UnhandledException += (_, args) =>
+            {
+                if (args.ExceptionObject is Exception ex)
+                {
+                    LogFatal("AppDomain", ex);
+                    ShowCrashDialog(ex, CrashDialogKind.AppDomain, terminating: args.IsTerminating);
+                }
+            };
+
+            System.Threading.Tasks.TaskScheduler.UnobservedTaskException += (_, args) =>
+            {
+                LogFatal("UnobservedTask", args.Exception);
+                args.SetObserved();
+                ShowCrashDialog(
+                    args.Exception.GetBaseException(),
+                    CrashDialogKind.BackgroundTask);
+            };
+        }
+
+        private enum CrashDialogKind
+        {
+            Dispatcher,
+            AppDomain,
+            BackgroundTask,
+        }
+
+        /// <summary>
+        /// Exceptions UI récupérables : l'utilisateur peut lire le message et continuer.
+        /// Les autres provoquent un arrêt propre après fermeture du dialogue.
+        /// </summary>
+        private static bool IsRecoverableDispatcherException(Exception ex) =>
+            ex is not (StackOverflowException or OutOfMemoryException or AccessViolationException);
+
+        private static void LogFatal(string source, Exception ex)
+        {
+            try { Services.AppLogger.Fatal("UnhandledException", source, ex); }
+            catch { /* le logging ne doit jamais aggraver un crash */ }
+        }
+
+        private static void ShowCrashDialog(
+            Exception ex,
+            CrashDialogKind kind,
+            bool terminating = false)
+        {
+            try
+            {
+                var title = kind switch
+                {
+                    CrashDialogKind.BackgroundTask => "optiSCAN — Erreur en arrière-plan",
+                    _ when Current?.MainWindow == null => "optiSCAN — Erreur au démarrage",
+                    _ => "optiSCAN — Erreur inattendue",
+                };
+
+                var message =
+                    "optiSCAN a rencontré une erreur non gérée :\n\n" +
+                    ex.GetType().Name + " : " + ex.Message + "\n\n" +
+                    "Détails complets (stack trace) enregistrés dans :\n" +
+                    "%LOCALAPPDATA%\\optiSCAN\\Logs";
+
+                if (terminating)
+                    message += "\n\nL'application va se fermer.";
+
+                void Show()
+                {
+                    System.Windows.MessageBox.Show(
+                        message,
+                        title,
+                        System.Windows.MessageBoxButton.OK,
+                        System.Windows.MessageBoxImage.Error);
+
+                    if (terminating && Current != null)
+                        Current.Shutdown(-1);
+                }
+
+                var dispatcher = Current?.Dispatcher;
+                if (dispatcher != null && !dispatcher.CheckAccess())
+                    dispatcher.Invoke(Show);
+                else
+                    Show();
+            }
+            catch { /* pas d'UI disponible (mode headless) → log seul */ }
         }
 
         // ── Headless ────────────────────────────────────────────────────────────

@@ -110,7 +110,7 @@ namespace optiSCAN.Services
 
                 int count = 0;
                 foreach (var f in files)
-                    count += RuleStartRegex.Matches(File.ReadAllText(f)).Count;
+                    count += RuleStartRegex.Count(File.ReadAllText(f));
                 if (count <= 0)
                     count = files.Length;
 

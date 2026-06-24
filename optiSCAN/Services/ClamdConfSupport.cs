@@ -23,7 +23,7 @@ namespace optiSCAN.Services
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                 "optiSCAN", "clamd", "clamd.log");
 
-        public static void EnsureConf(string databaseDir, string? excludePattern = null)
+        public static void EnsureConf(string databaseDir, IEnumerable<string>? excludePatterns = null)
         {
             var confPath = GetConfPath();
             var dir = Path.GetDirectoryName(confPath)!;
@@ -43,8 +43,14 @@ namespace optiSCAN.Services
             sb.AppendLine("TCPAddr 127.0.0.1");
             sb.AppendLine("Foreground yes");
             sb.AppendLine("StreamMaxLength 100M");
-            if (!string.IsNullOrWhiteSpace(excludePattern))
-                sb.AppendLine("ExcludePath " + excludePattern);
+            if (excludePatterns != null)
+            {
+                foreach (var pattern in excludePatterns)
+                {
+                    if (!string.IsNullOrWhiteSpace(pattern))
+                        sb.AppendLine("ExcludePath " + pattern);
+                }
+            }
 
             File.WriteAllText(confPath, sb.ToString(), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
         }
