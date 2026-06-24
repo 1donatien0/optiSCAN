@@ -622,6 +622,9 @@ namespace optiSCAN.Views
         {
             if (sender is WpfButton btn && btn.Tag is string path)
             {
+                if (ExclusionSettings.IsMandatoryExcludedFolder(path))
+                    return;
+
                 _exclusions.Remove(path);
                 Excl.Current.RemoveFolder(path);
             }

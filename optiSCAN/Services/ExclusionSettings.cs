@@ -9,9 +9,9 @@ namespace optiSCAN.Services
     /// Paramètres d'exclusion persistants (dossiers + règles de détection ignorés).
     /// Stockés chiffrés DPAPI + intégrité HMAC dans %LOCALAPPDATA%\optiSCAN\exclusions.dat.
     ///
-    /// Exclusion implicite : tout chemin sous le répertoire d'installation du processus
-    /// (<see cref="AppInstallPaths"/>) est traité comme exclu (scans + RTP), sans entrée
-    /// dans ExcludedFolders — évite les auto-détections YARA/ClamAV sur rules/, yara/, etc.
+    /// Exclusion implicite : installation (Program Files ou répertoire du processus),
+    /// <c>%LOCALAPPDATA%\optiSCAN</c> (MAJ ClamAV/YARA, quarantaine, logs) — voir
+    /// <see cref="OptiscanProtectedPaths"/>.
     ///
     /// Pourquoi protégé : un attaquant local pourrait sinon ajouter des dossiers
     /// à ExcludedFolders (en éditant le JSON en clair) pour cacher du malware
@@ -64,7 +64,7 @@ namespace optiSCAN.Services
             var loaded = SecureStore.Load<ExclusionSettings>(SettingsPath);
             if (loaded != null)
             {
-                loaded.EnsureInstallFolderListed();
+                loaded.EnsureProtectedFoldersListed();
                 return loaded;
             }
 
@@ -72,33 +72,41 @@ namespace optiSCAN.Services
             var migrated = SecureStore.MigrateFromPlaintext<ExclusionSettings>(LegacyPath, SettingsPath);
             if (migrated != null)
             {
-                migrated.EnsureInstallFolderListed();
+                migrated.EnsureProtectedFoldersListed();
                 return migrated;
             }
 
             // 3. Premier lancement
             var fresh = new ExclusionSettings();
-            fresh.EnsureInstallFolderListed();
+            fresh.EnsureProtectedFoldersListed();
             return fresh;
         }
 
         /// <summary>
-        /// Ajoute le dossier d'installation aux exclusions persistées (visible dans Options),
-        /// en plus de l'exclusion implicite <see cref="IsFolderExcluded"/>.
+        /// Ajoute les dossiers protégés (install + données MAJ) aux exclusions persistées,
+        /// visibles dans Options et non supprimables.
         /// </summary>
-        internal void EnsureInstallFolderListed()
+        internal void EnsureProtectedFoldersListed()
         {
-            var root = AppInstallPaths.GetInstallRoot();
-            if (string.IsNullOrWhiteSpace(root)) return;
+            var changed = false;
+            foreach (var root in OptiscanProtectedPaths.GetProtectedRoots())
+            {
+                var norm = root.TrimEnd('\\', '/');
+                if (ExcludedFolders.Exists(f =>
+                        string.Equals(f.TrimEnd('\\', '/'), norm, StringComparison.OrdinalIgnoreCase)))
+                    continue;
 
-            var norm = root.TrimEnd('\\', '/');
-            if (ExcludedFolders.Exists(f =>
-                    string.Equals(f.TrimEnd('\\', '/'), norm, StringComparison.OrdinalIgnoreCase)))
-                return;
+                ExcludedFolders.Add(norm);
+                changed = true;
+            }
 
-            ExcludedFolders.Add(norm);
-            Save();
+            if (changed)
+                Save();
         }
+
+        /// <summary>Dossier d'exclusion imposé par optiSCAN (non retirable dans Options).</summary>
+        public static bool IsMandatoryExcludedFolder(string? folderPath)
+            => OptiscanProtectedPaths.IsMandatoryExcludedFolder(folderPath);
 
         public void Save()
         {
@@ -133,7 +141,7 @@ namespace optiSCAN.Services
         {
             if (string.IsNullOrEmpty(path)) return false;
 
-            if (AppInstallPaths.IsUnderInstallRoot(path))
+            if (OptiscanProtectedPaths.IsUnderProtectedPath(path))
                 return true;
 
             foreach (var folder in ExcludedFolders)
@@ -186,6 +194,9 @@ namespace optiSCAN.Services
 
         public bool RemoveFolder(string path)
         {
+            if (IsMandatoryExcludedFolder(path))
+                return false;
+
             var removed = ExcludedFolders.RemoveAll(f => string.Equals(f.TrimEnd('\\', '/'), path.TrimEnd('\\', '/'), StringComparison.OrdinalIgnoreCase)) > 0;
             if (removed) Save();
             return removed;

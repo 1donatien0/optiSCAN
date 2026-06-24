@@ -16,4 +16,15 @@ public sealed class InstallExclusionTests
         Assert.True(ExclusionSettings.Current.IsFileExcluded(exe));
         Assert.True(ExclusionSettings.Current.IsFileExcluded(rule));
     }
+
+    [Fact]
+    public void Files_under_local_app_data_optiSCAN_are_excluded_from_scans()
+    {
+        var root = OptiscanProtectedPaths.GetLocalAppDataRoot();
+        var clamDb = Path.Combine(root, "clamav", "database", "main.cvd");
+        var quarantine = Path.Combine(root, "Quarantine", "manifest.json");
+
+        Assert.True(ExclusionSettings.Current.IsFileExcluded(clamDb));
+        Assert.True(ExclusionSettings.Current.IsFileExcluded(quarantine));
+    }
 }
