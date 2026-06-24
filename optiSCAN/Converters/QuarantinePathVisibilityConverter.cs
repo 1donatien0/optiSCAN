@@ -8,20 +8,46 @@ namespace optiSCAN.Converters
     /// <summary>
     /// Visible si le chemin bindé correspond à un fichier encore en quarantaine.
     /// Paramètre <c>NotQuarantined</c> : visible quand le fichier n'est pas en quarantaine.
-    /// Assigner <see cref="Quarantine"/> depuis <c>Bind()</c>.
+    /// Assigner <see cref="Quarantine"/> depuis <c>Bind()</c> puis appeler <see cref="RefreshCache"/>
+    /// quand la quarantaine change.
     /// </summary>
     public sealed class QuarantinePathVisibilityConverter : IValueConverter
     {
-        public QuarantineManager? Quarantine { get; set; }
+        private QuarantineManager? _quarantine;
+        private HashSet<string>? _quarantinedPaths;
+
+        public QuarantineManager? Quarantine
+        {
+            get => _quarantine;
+            set
+            {
+                _quarantine = value;
+                RefreshCache();
+            }
+        }
+
+        /// <summary>Reconstruit le cache des chemins en quarantaine (O(n) une fois par refresh).</summary>
+        public void RefreshCache()
+        {
+            if (_quarantine == null)
+            {
+                _quarantinedPaths = null;
+                return;
+            }
+
+            _quarantinedPaths = new HashSet<string>(
+                _quarantine.GetEntries().Select(e => e.OriginalPath),
+                StringComparer.OrdinalIgnoreCase);
+        }
 
         public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
         {
             var path = value as string;
-            var quarantine = Quarantine
-                ?? throw new InvalidOperationException("QuarantinePathVisibilityConverter.Quarantine must be set via Bind().");
+            if (_quarantinedPaths == null)
+                return Visibility.Collapsed;
+
             var isQuarantined = !string.IsNullOrWhiteSpace(path)
-                && quarantine.GetEntries()
-                    .Any(e => string.Equals(e.OriginalPath, path, StringComparison.OrdinalIgnoreCase));
+                && _quarantinedPaths.Contains(path);
 
             var showWhenNotQuarantined = string.Equals(
                 parameter as string, "NotQuarantined", StringComparison.OrdinalIgnoreCase);
@@ -33,3 +59,4 @@ namespace optiSCAN.Converters
             => throw new NotSupportedException();
     }
 }
+

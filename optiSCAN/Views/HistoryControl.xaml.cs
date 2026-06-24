@@ -42,7 +42,9 @@ namespace optiSCAN.Views
     {
 
         private IHistoryServices? _history;
+        private Converters.QuarantinePathVisibilityConverter? _quarantineVis;
         private bool _bound;
+        private bool _loadedHandlersAttached;
         private bool _syncingFilterChips;
         private void HideDetailPanels() => HistoryDetailCoordinator.HideDetailPanels(_detailView);
         private readonly HistoryDetailView _detailView;
@@ -83,46 +85,49 @@ namespace optiSCAN.Views
             _bound = true;
             _history = services;
             if (Resources["QuarantinePathVis"] is Converters.QuarantinePathVisibilityConverter quarantineVis)
+            {
+                _quarantineVis = quarantineVis;
                 quarantineVis.Quarantine = services.Quarantine;
+            }
             VM = new HistoryViewModel(services);
             DataContext = VM;
             VM.PropertyChanged += OnViewModelPropertyChanged;
+
+            if (IsLoaded)
+                AttachLoadedHandlers();
         }
 
 
 
         public void RefreshTimeline()
-
         {
+            if (!_bound || VM == null) return;
 
+            _quarantineVis?.RefreshCache();
             VM.Refresh();
-
             SyncFilterChips();
-
             UpdateDetailPanels();
-
         }
-
-
 
         private void OnLoaded(object sender, RoutedEventArgs e)
-
         {
-
-            UiEvents.ScanHistoryViewsRefreshRequested += OnExternalRefreshRequested;
-
-            RefreshTimeline();
-
+            if (!_bound) return;
+            AttachLoadedHandlers();
         }
 
+        private void AttachLoadedHandlers()
+        {
+            if (_loadedHandlersAttached) return;
+            _loadedHandlersAttached = true;
 
+            UiEvents.ScanHistoryViewsRefreshRequested += OnExternalRefreshRequested;
+            RefreshTimeline();
+        }
 
         private void OnUnloaded(object sender, RoutedEventArgs e)
-
         {
-
             UiEvents.ScanHistoryViewsRefreshRequested -= OnExternalRefreshRequested;
-
+            _loadedHandlersAttached = false;
         }
 
 
@@ -172,10 +177,8 @@ namespace optiSCAN.Views
 
 
         private void SyncFilterChips()
-
         {
-
-            if (!IsLoaded) return;
+            if (!IsLoaded || !_bound || VM == null) return;
 
 
 
@@ -228,10 +231,8 @@ namespace optiSCAN.Views
 
 
         private void Chip_Checked(object sender, RoutedEventArgs e)
-
         {
-
-            if (_syncingFilterChips || sender is not RadioButton { Tag: string tag } || !IsLoaded) return;
+            if (!_bound || _syncingFilterChips || sender is not RadioButton { Tag: string tag } || !IsLoaded) return;
 
             VM.SelectedFilter = tag switch
 
