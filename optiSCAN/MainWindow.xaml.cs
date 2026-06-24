@@ -61,8 +61,9 @@ namespace optiSCAN
             // Avant OptionsControl (LoadPreferences) : thème Windows + prefs déjà appliqués.
             ThemeManager.Initialize();
             InitializeComponent();
-            // Avant toute navigation (ex. RadioButton coché), enregistrer les panneaux.
+            // Branche les vues avant tout IsChecked / handler XAML qui accède aux services.
             RegisterPanels();
+            BindAllViewPanels(_container);
             if (navOverview != null)
                 navOverview.IsChecked = true;
             else
@@ -106,10 +107,6 @@ namespace optiSCAN
 
                 // Les vues utilisent ServiceContainer.Navigation (INavigationService) sans référencer MainWindow.
                 c.Navigation = _navigationService;
-
-                if (panelHistory is HistoryControl historyPanel)
-                    historyPanel.Bind(c);
-                BindViewPanels(c);
 
                 _serviceEvents.Attach(
                     c,
@@ -227,6 +224,13 @@ namespace optiSCAN
             {
                 AppLogger.Warn("MainWindow", "WarmUpYaraRulesAsync", ex);
             }
+        }
+
+        private void BindAllViewPanels(ServiceContainer c)
+        {
+            if (panelHistory is HistoryControl historyPanel)
+                historyPanel.Bind(c);
+            BindViewPanels(c);
         }
 
         private void BindViewPanels(ServiceContainer c)

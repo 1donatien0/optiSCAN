@@ -25,15 +25,18 @@
     <CleanPublishArtifactsBeforePublish Condition="'$(CleanPublishArtifactsBeforePublish)' == ''">true</CleanPublishArtifactsBeforePublish>
   </PropertyGroup>
 
-  <!-- Inno Setup lit bin\...\publish\win-x64\ : sans ce nettoyage, des binaires
-       ClamAV/YARA ou une base freshclam obsolète dans bin\...\clamav\x64 peuvent
-       être recopiés (PreserveNewest) dans publish et finir dans l'installateur. -->
+  <!-- Inno Setup lit bin\...\publish\win-x64\. On supprime UNIQUEMENT le sous-dossier
+       publish\ (artefacts RID périmés) avant chaque publication. Supprimer le dossier
+       parent ($(TargetFramework)) effaçait l'optiSCAN.dll/exe que l'étape Publish doit
+       copier : comme le build est « up-to-date », rien n'était régénéré et Publish
+       échouait. Le ClamAV de l'installateur vient du dossier source et est exclu du
+       publish, donc le nettoyer ici est inutile. -->
   <Target Name="CleanStalePublishOutput" BeforeTargets="BeforePublish" Condition="'$(CleanPublishArtifactsBeforePublish)' == 'true'">
     <PropertyGroup>
-      <_PublishParent>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)</_PublishParent>
+      <_StalePublishDir>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\publish</_StalePublishDir>
     </PropertyGroup>
-    <Message Importance="high" Text="optiSCAN : nettoyage complet bin\Release (publish, clamav, exe) avant publication..." />
-    <RemoveDir Directories="$(_PublishParent)" ContinueOnError="true" />
+    <Message Importance="high" Text="optiSCAN : nettoyage du dossier publish\ périmé avant publication..." />
+    <RemoveDir Directories="$(_StalePublishDir)" ContinueOnError="true" />
   </Target>
 
   <ItemGroup>

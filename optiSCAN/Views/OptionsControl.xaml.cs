@@ -34,6 +34,10 @@ namespace optiSCAN.Views
 
         public OptionsControl()
         {
+            // XAML définit IsChecked sur plusieurs cases : sans ce garde-fou, Checked/Unchecked
+            // appellent CheckOption_Changed avant MainWindow.Bind() → Services lève une exception.
+            // Prevent preference event handlers from running while XAML/controls are initializing.
+            _suppressPreferenceEvents = true;
             InitializeComponent();
             lstExclusions.ItemsSource = _exclusions;
             InitScheduleTimeComboBoxes();
@@ -246,7 +250,7 @@ namespace optiSCAN.Views
 
         private void CheckOption_Changed(object sender, RoutedEventArgs e)
         {
-            if (_suppressPreferenceEvents) return;
+            if (_suppressPreferenceEvents || _services == null) return;
             if (sender is not WpfCheckBox cb) return;
             bool isOn = cb.IsChecked == true;
             var prefs = Prefs.Current;
