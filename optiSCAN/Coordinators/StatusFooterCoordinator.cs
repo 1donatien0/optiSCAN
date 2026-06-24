@@ -52,6 +52,18 @@ public sealed class StatusFooterCoordinator
         if (viewModel == null)
             return;
 
+        // Ces contrôles WPF n'appartiennent qu'au thread UI. Si l'appel vient d'un
+        // thread d'arrière-plan (fin de mise à jour signatures, warmup YARA, timers),
+        // on rebascule sur le Dispatcher — sinon WPF lève InvalidOperationException
+        // (« calling thread cannot access this object ») qui fait tomber le process.
+        var dispatcher = label?.Dispatcher ?? icon?.Dispatcher ?? spinner?.Dispatcher;
+        if (dispatcher != null && !dispatcher.CheckAccess())
+        {
+            dispatcher.Invoke(() =>
+                RefreshLiveFooter(viewModel, label, icon, spinner, isSignatureUpdateRunning));
+            return;
+        }
+
         if (viewModel.IsScanning)
         {
             if (spinner != null)

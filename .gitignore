@@ -2,10 +2,17 @@
 bin/
 obj/
 
-# Visual Studio
+# Visual Studio / MSBuild
 .vs/
 *.user
 *.suo
+*.userosscache
+*.sln.docstates
+*.rsuser
+*.DotSettings.user
+
+# JetBrains Rider
+.idea/
 
 # Logs
 *.log
@@ -17,19 +24,40 @@ packages/
 # Cache
 *.cache
 
-# Microsoft Word (audits / brouillons — doc : README.md §12)
+# Microsoft Word (audits / brouillons — synthèse officielle : README.md §12)
 *.docx
 audit_optiSCAN_v8.docx
 ~$*.docx
+
+# Audits Markdown (rapports de session / revues ponctuelles — ne pas versionner)
+# Doc produit versionnée : README.md, SECURITY.md, docs/*.md, native/**/README.md
+AUDIT_*.md
+audit_*.md
+RAPPORT_*.md
+rapport_*.md
 
 # Sorties de test / publish locales (racine)
 test-*.txt
 TestResults/
 artifacts/
 _build_verify/
+sbom/
+coverage/
+*.opencover.xml
 
 # Raccourcis Windows locaux (non versionnés)
 *.lnk
+Thumbs.db
+Desktop.ini
+
+# Secrets / signature (ne jamais committer)
+.env
+.env.*
+*.pfx
+*.p12
+*.snk
+secrets.json
+credentials.json
 
 # Binaires ClamAV / YARA (téléchargés via scripts/fetch-runtime-deps.ps1)
 optiSCAN/clamav/x64/*.exe
@@ -38,6 +66,8 @@ optiSCAN/clamav/x64/freshclam.conf
 optiSCAN/clamav/x64/certs/
 optiSCAN/clamav/x86/freshclam.conf
 optiSCAN/clamav/database/freshclam-ci.log
+optiSCAN/clamav/database/freshclam.log
+optiSCAN/clamav/database/*.log
 optiSCAN/clamav/x86/*.exe
 optiSCAN/clamav/x86/*.dll
 optiSCAN/clamav/database/*.cvd
@@ -46,9 +76,30 @@ optiSCAN/clamav/database/*.cud
 optiSCAN/yara/*.exe
 publish/
 
+# Cache YARA compilé (généré au runtime / warmup — les .yar sources restent versionnés)
+optiSCAN/rules/_compiled.yarc
+optiSCAN/rules/_compiled.stamp
+optiSCAN/rules/.rules_count.cache
+
+# Builds natifs MSVC / WDK (scripts/build-amsi.ps1, minifilter)
+native/**/x64/
+native/**/x86/
+native/**/ARM64/
+native/**/Debug/
+native/**/Release/
+native/**/*.obj
+native/**/*.pch
+native/**/*.pdb
+native/**/*.ilk
+native/**/*.exp
+native/**/*.lib
+native/**/*.tlog
+native/**/*.idb
+native/**/*.sys
+native/**/*.cat
+
 # Dossier output de l'installer
 installer/output/
 
 # Échantillons EICAR temporaires (tests d'intégration YARA)
 .eicar-test/
-

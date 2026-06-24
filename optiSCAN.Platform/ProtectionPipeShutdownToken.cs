@@ -1,4 +1,6 @@
 using System.Security.Cryptography;
+using System.Security.AccessControl;
+using System.Security.Principal;
 using System.Text;
 
 namespace optiSCAN.Platform;
@@ -29,6 +31,8 @@ public static class ProtectionPipeShutdownToken
         var dir = Path.GetDirectoryName(TokenFilePath)!;
         Directory.CreateDirectory(dir);
         File.WriteAllText(TokenFilePath, token, Encoding.UTF8);
+        TryRestrictToAdministrators(TokenFilePath);
+        TryRestrictToAdministrators(dir);
     }
 
     public static bool TryRead(out string? token)
@@ -44,6 +48,45 @@ public static class ProtectionPipeShutdownToken
         catch
         {
             return false;
+        }
+    }
+
+    /// <summary>Limite la lecture du jeton aux administrateurs (évite l'arrêt IPC par un utilisateur standard).</summary>
+    private static void TryRestrictToAdministrators(string path)
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        try
+        {
+            var system = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
+            var admins = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
+
+            if (Directory.Exists(path))
+            {
+                var dirSecurity = new DirectorySecurity();
+                dirSecurity.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+                dirSecurity.AddAccessRule(new FileSystemAccessRule(
+                    system, FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                    PropagationFlags.None, AccessControlType.Allow));
+                dirSecurity.AddAccessRule(new FileSystemAccessRule(
+                    admins, FileSystemRights.FullControl, InheritanceFlags.ContainerInherit | InheritanceFlags.ObjectInherit,
+                    PropagationFlags.None, AccessControlType.Allow));
+                new DirectoryInfo(path).SetAccessControl(dirSecurity);
+                return;
+            }
+
+            var fileSecurity = new FileSecurity();
+            fileSecurity.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+            fileSecurity.AddAccessRule(new FileSystemAccessRule(
+                system, FileSystemRights.FullControl, AccessControlType.Allow));
+            fileSecurity.AddAccessRule(new FileSystemAccessRule(
+                admins, FileSystemRights.FullControl, AccessControlType.Allow));
+            new FileInfo(path).SetAccessControl(fileSecurity);
+        }
+        catch
+        {
+            // Best effort : l'écriture du jeton ne doit pas faire échouer le démarrage IPC.
         }
     }
 }

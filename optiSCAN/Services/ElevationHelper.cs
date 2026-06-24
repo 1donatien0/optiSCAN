@@ -65,9 +65,16 @@ namespace optiSCAN.Services
                     Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),
                     Environment.GetFolderPath(Environment.SpecialFolder.ProgramFilesX86),
                 };
+                static string Normalize(string p) =>
+                    System.IO.Path.TrimEndingDirectorySeparator(System.IO.Path.GetFullPath(p));
+
+                var target = Normalize(full);
                 foreach (var r in roots)
                 {
-                    if (!string.IsNullOrEmpty(r) && full.StartsWith(r, StringComparison.OrdinalIgnoreCase))
+                    if (string.IsNullOrEmpty(r)) continue;
+                    var root = Normalize(r);
+                    if (target.Equals(root, StringComparison.OrdinalIgnoreCase)
+                        || target.StartsWith(root + System.IO.Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                         return true;
                 }
                 return false;

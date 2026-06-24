@@ -35,6 +35,12 @@ namespace optiSCAN
             // journalisées (%LOCALAPPDATA%\optiSCAN\Logs) et affichées à l'écran.
             InstallGlobalCrashHandlers();
 
+            // Rendu : sur certains environnements (session distante/RDP, VM, pilote GPU
+            // partiel), l'accélération matérielle WPF peint la fenêtre en NOIR alors que
+            // la barre de titre s'affiche. On bascule en rendu logiciel dans ces cas pour
+            // garantir l'affichage (app peu gourmande en graphismes — impact négligeable).
+            ConfigureSafeRendering();
+
             LocalizationService.Initialize();
 
             if (ShellScanArguments.TryGetScanPath(e.Args, out var shellPath)
@@ -58,6 +64,15 @@ namespace optiSCAN
                 ShutdownMode = ShutdownMode.OnExplicitShutdown;
                 base.OnStartup(e);
                 TamperProtectionService.RunWatchdogCheck();
+                Shutdown();
+                return;
+            }
+
+            if (headlessMode == HeadlessScanArguments.Mode.DefenderExclusions)
+            {
+                ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                base.OnStartup(e);
+                WindowsDefenderExclusionService.EnsureOptiscanExclusions();
                 Shutdown();
                 return;
             }
@@ -233,6 +248,25 @@ namespace optiSCAN
                     Show();
             }
             catch { /* pas d'UI disponible (mode headless) → log seul */ }
+        }
+
+        /// <summary>
+        /// Force le rendu logiciel WPF. Sur les environnements sans accélération
+        /// matérielle fiable (RDP/VM/pilote GPU partiel), le rendu matériel peint la
+        /// fenêtre en NOIR (barre de titre visible, contenu noir). Le rendu logiciel
+        /// rend exactement la même chose côté CPU ; impact négligeable pour cette UI.
+        /// </summary>
+        private static void ConfigureSafeRendering()
+        {
+            try
+            {
+                System.Windows.Media.RenderOptions.ProcessRenderMode =
+                    System.Windows.Interop.RenderMode.SoftwareOnly;
+            }
+            catch (Exception ex)
+            {
+                Services.AppLogger.Warn("App", "ConfigureSafeRendering", ex);
+            }
         }
 
         // ── Headless ────────────────────────────────────────────────────────────

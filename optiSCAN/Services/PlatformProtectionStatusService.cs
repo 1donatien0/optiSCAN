@@ -34,6 +34,22 @@ public static class PlatformProtectionStatusService
 
     public static PlatformProtectionStatusReport Evaluate(IUserPreferencesAccessor? preferences = null)
     {
+        if (!PlatformProtectionFeatureGate.IsUserActivatable)
+        {
+            return new PlatformProtectionStatusReport
+            {
+                Components =
+                [
+                    new PlatformComponentStatus
+                    {
+                        LabelKey = "Platform_PlannedUnavailable",
+                        State = PlatformComponentState.NotApplicable,
+                    },
+                ],
+                HasWarnings = false,
+            };
+        }
+
         var items = new List<PlatformComponentStatus>();
         var prefs = (preferences ?? new DefaultUserPreferencesAccessor()).Current;
 

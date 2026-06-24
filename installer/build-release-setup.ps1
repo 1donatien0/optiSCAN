@@ -6,7 +6,9 @@
 [CmdletBinding()]
 param(
     [switch] $SkipPublish,
-    [string] $PublishDir
+    [string] $PublishDir,
+    [switch] $AllowMissingSignatures,
+    [switch] $SkipVerify
 )
 
 $ErrorActionPreference = 'Stop'
@@ -61,9 +63,21 @@ if (-not (Test-Path -LiteralPath $publishExe)) {
     throw "Publication introuvable : $publishExe (faites dotnet publish avant Inno)."
 }
 
-if (Test-Path -LiteralPath $verifyScript) {
+$srcClamScan = Join-Path $root 'optiSCAN\clamav\x64\clamscan.exe'
+if (-not (Test-Path -LiteralPath $srcClamScan)) {
+    $fetchScript = Join-Path $root 'scripts\fetch-runtime-deps.ps1'
+    if (Test-Path -LiteralPath $fetchScript) {
+        Write-Host 'Dependances ClamAV/YARA absentes — fetch-runtime-deps...' -ForegroundColor Cyan
+        & $fetchScript
+        if ($LASTEXITCODE -ne 0) { throw "fetch-runtime-deps a echoue (code $LASTEXITCODE)." }
+    }
+}
+
+if (-not $SkipVerify -and (Test-Path -LiteralPath $verifyScript)) {
     Write-Host 'verify-runtime-deps...' -ForegroundColor Cyan
-    & $verifyScript -PublishDir $targetPublishDir
+    $verifyArgs = @{ PublishDir = $targetPublishDir }
+    if ($AllowMissingSignatures) { $verifyArgs['AllowMissingSignatures'] = $true }
+    & $verifyScript @verifyArgs
     if ($LASTEXITCODE -ne 0) { throw "verify-runtime-deps a echoue (code $LASTEXITCODE)." }
 }
 
@@ -85,8 +99,13 @@ $parts = $appVersion.Split('.')
 $appRelease = if ($parts.Length -ge 2) { "v$($parts[0]).$($parts[1])" } else { "v$appVersion" }
 
 Write-Host "Inno Setup : $iscc (AppVersion=$appVersion, AppRelease=$appRelease)" -ForegroundColor Cyan
-$relative = [System.IO.Path]::GetRelativePath($PSScriptRoot, $targetPublishDir)
-$publishGlob = ($relative -replace '/', '\') + '\*'
+$installerDir = $PSScriptRoot
+$publishUri = (Resolve-Path -LiteralPath $targetPublishDir).Path
+$installerUri = (Resolve-Path -LiteralPath $installerDir).Path
+$relative = [System.Uri]::UnescapeDataString(
+    (New-Object System.Uri($installerUri + '\')).MakeRelativeUri((New-Object System.Uri($publishUri + '\'))).ToString()
+).Replace('/', '\')
+$publishGlob = $relative.TrimEnd('\') + '\*'
 $isccArgs = @(
     "/DAppVersion=$appVersion",
     "/DAppRelease=$appRelease",

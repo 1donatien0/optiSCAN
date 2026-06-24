@@ -16,11 +16,14 @@ If you discover a security issue in optiSCAN, please report it privately:
 
 ## Security architecture (summary)
 
+> **Default protection is user-mode.** Real-time protection runs in-process via `FileSystemWatcher` and needs **no kernel driver and no Microsoft signing** (`UsePlatformProtectionService = false` by default). The platform layer below (Windows service, AMSI provider, kernel minifilter) is **present in the code but dormant**; it requires a **signed driver** (EV cert + Microsoft Partner Center) and is intended for a later phase.
+
 - **Self-scan exclusion**: install directory (Program Files / process base) and `%LocalAppData%\optiSCAN` (ClamAV DB, YARA rules, quarantine, update staging) are never scanned or auto-quarantined (`OptiscanProtectedPaths`); mandatory exclusion folders cannot be removed in Options.
+- **Windows Defender coexistence**: on install and at startup, optiSCAN registers the same protected paths and its processes (`optiSCAN.exe`, ClamAV/YARA binaries) in Defender exclusions via `WindowsDefenderExclusionService` and `scripts/add-defender-exclusions.ps1` (admin/UAC). Tamper Protection may block automatic registration — manual exclusions may be required.
 - **Quarantine**: AES-256-GCM encryption, HMAC-signed manifest, DPAPI-protected master key; path traversal checks on restore.
 - **Sensitive paths**: restore and IPC scan refuse System32, Windows, ProgramFiles, ProgramData, Startup.
-- **IPC pipe**: ACL (SYSTEM / Administrators / authenticated users); `shutdown` requires a token under `%ProgramData%\optiSCAN\`; scan refuses sensitive paths.
-- **AMSI (v8)**: native `optiSCAN.AmsiProvider.dll` forwards script buffers to `--service-host` via the protection pipe (admin registration).
+- **Platform layer (dormant)**: present in code but **not user-activatable** (`PlatformProtectionFeatureGate.IsUserActivatable = false`); Options UI and installer task are grayed with « planned in 3–5 years ». When enabled in a future phase: ACL on IPC pipe; `shutdown` requires a token under `%ProgramData%\optiSCAN\` (admin-only ACL).
+- **AMSI (v8, dormant)**: native `optiSCAN.AmsiProvider.dll` forwards script buffers to `--service-host` via the protection pipe (admin registration). Active only when the platform layer is enabled with a signed driver.
 - **Secrets**: user preferences (VirusTotal key) stored via DPAPI `SecureStore`; no credentials in the repository.
 - **CI**: Release builds treat warnings as errors; CodeQL (C# and native AMSI); Dependabot; dependency review on PRs (high severity fails); gitleaks; SBOM CycloneDX artifact on `main` publish.
 

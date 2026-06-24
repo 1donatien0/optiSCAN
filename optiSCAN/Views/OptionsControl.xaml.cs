@@ -150,8 +150,7 @@ namespace optiSCAN.Views
                     chkProcessMonitor.IsChecked = prefs.ProcessMonitorEnabled;
                 if (chkTamperProtection != null)
                     chkTamperProtection.IsChecked = prefs.TamperProtectionEnabled;
-                if (chkPlatformProtection != null)
-                    chkPlatformProtection.IsChecked = prefs.UsePlatformProtectionService;
+                ConfigurePlatformProtectionUi(prefs);
                 if (chkRemovableDriveScan != null)
                     chkRemovableDriveScan.IsChecked = prefs.RemovableDriveScanEnabled;
                 if (chkRemovableDriveDetailed != null)
@@ -248,6 +247,19 @@ namespace optiSCAN.Views
             catch { return false; }
         }
 
+        private void ConfigurePlatformProtectionUi(UserPreferences prefs)
+        {
+            if (chkPlatformProtection == null)
+                return;
+
+            var activatable = PlatformProtectionFeatureGate.IsUserActivatable;
+            chkPlatformProtection.IsEnabled = activatable;
+            chkPlatformProtection.IsChecked = activatable && prefs.UsePlatformProtectionService;
+
+            if (pnlPlatformProtection != null)
+                pnlPlatformProtection.Opacity = activatable ? 1.0 : 0.55;
+        }
+
         private void CheckOption_Changed(object sender, RoutedEventArgs e)
         {
             if (_suppressPreferenceEvents || _services == null) return;
@@ -307,6 +319,8 @@ namespace optiSCAN.Views
                     break;
 
                 case "PlatformProtection":
+                    if (!PlatformProtectionFeatureGate.IsUserActivatable)
+                        break;
                     c.ApplyPlatformProtectionService(isOn);
                     break;
 

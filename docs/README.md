@@ -13,8 +13,9 @@
 | Scan USB/SD | [§5](../README.md#5-services-avancés-modules-complémentaires) · `RemovableDriveScanService` |
 | Thème Windows | [§2.2](../README.md#22-thememanager) |
 | Exclusions / anti-autophagie (`OptiscanProtectedPaths`) | [§4.7](../README.md#47-système-dexclusions) |
-| Audit, tests (**287**) | [§12](../README.md#12-audit-et-qualité) |
+| Exclusions Windows Defender (auto) | [§4.7](../README.md#47-système-dexclusions) · [§7](../README.md#exclusion-windows-defender) · `scripts/add-defender-exclusions.ps1` |
+| Audit, tests (**289**) | [§12](../README.md#12-audit-et-qualité) |
 | Posture /100, AMSI | [§13](../README.md#13-sécurité-posture-et-menaces) |
 | Branches `main` / `dev` | [Branches Git](../README.md#branches-git) |
 
-**Version** : release **v8.0**, assembly **8.0.0**. Scripts : `scripts/` (dont `generate-sbom.ps1`), `installer/`, `.github/workflows/`.
+**Version** : release **v8.0**, assembly **8.0.0**. Scripts : `scripts/` (dont `add-defender-exclusions.ps1`, `generate-sbom.ps1`), `installer/`, `.github/workflows/`.

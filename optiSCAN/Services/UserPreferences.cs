@@ -117,8 +117,13 @@ namespace optiSCAN.Services
         /// <summary>MAJ signatures plus fréquentes (2 h ClamAV, 12 h YARA).</summary>
         public bool AggressiveSignatureUpdates { get; set; }
 
-        /// <summary>Utiliser le service Windows / --service-host pour la protection système.</summary>
-        public bool UsePlatformProtectionService { get; set; } = true;
+        /// <summary>
+        /// Utiliser le service Windows / minifiltre noyau pour la protection système (mode « plateforme v8 »).
+        /// Défaut : <c>false</c> — la protection temps réel user-mode (FileSystemWatcher) fonctionne SANS
+        /// pilote ni signature Microsoft. Le mode plateforme nécessite un pilote minifiltre SIGNÉ
+        /// (Partner Center / EV) : à n'activer que lorsque ce pilote est disponible et signé.
+        /// </summary>
+        public bool UsePlatformProtectionService { get; set; }
 
         /// <summary>
         /// Seuil (jours) au-delà duquel une suggestion de nettoyage est affichée sur l'accueil.
@@ -198,10 +203,18 @@ namespace optiSCAN.Services
         internal static UserPreferences LoadFromStorage(string securePath, string legacyPlaintextPath)
         {
             var loaded = SecureStore.Load<UserPreferences>(securePath);
-            if (loaded != null) return loaded;
+            if (loaded != null)
+            {
+                PlatformProtectionFeatureGate.NormalizePreferences(loaded);
+                return loaded;
+            }
 
             var migrated = SecureStore.MigrateFromPlaintext<UserPreferences>(legacyPlaintextPath, securePath);
-            if (migrated != null) return migrated;
+            if (migrated != null)
+            {
+                PlatformProtectionFeatureGate.NormalizePreferences(migrated);
+                return migrated;
+            }
 
             // Premier lancement : synchroniser avec les choix faits à l'installation (Inno Setup).
             // Inno écrit HKCU\Software\optiSCAN\AutoUpdateSignatures (dword 1/0) quand la tâche est

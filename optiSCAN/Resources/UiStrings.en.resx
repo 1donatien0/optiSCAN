@@ -349,7 +349,8 @@
   <data name="Opt_TamperProtection" xml:space="preserve"><value>Anti-tamper protection</value></data>
   <data name="Opt_TamperProtectionSub" xml:space="preserve"><value>Restarts optiSCAN in the background if real-time protection is expected but the app was closed.</value></data>
   <data name="Opt_PlatformProtection" xml:space="preserve"><value>Windows system protection service</value></data>
-  <data name="Opt_PlatformProtectionSub" xml:space="preserve"><value>RTP/AMSI/minifilter engine in optiSCAN.Service (v8 IPC). Requires administrator rights at install time.</value></data>
+  <data name="Opt_PlatformProtectionSub" xml:space="preserve"><value>RTP/AMSI/minifilter engine in optiSCAN.Service (v8 IPC). Advanced layer — awaiting a signed kernel driver.</value></data>
+  <data name="Opt_PlatformProtectionPlanned" xml:space="preserve"><value>Planned in 3–5 years (EV-signed driver + Microsoft Partner Center). Not available today — user-mode real-time protection remains active.</value></data>
   <data name="Repair_Quarantined" xml:space="preserve"><value>File quarantined.</value></data>
   <data name="Repair_QuarantineFailed" xml:space="preserve"><value>Quarantine failed.</value></data>
   <data name="Platform_StatusTitle" xml:space="preserve"><value>System protection v8</value></data>
@@ -363,6 +364,7 @@
   <data name="Platform_MinifilterLoaded" xml:space="preserve"><value>Kernel minifilter loaded</value></data>
   <data name="Platform_MinifilterNotLoaded" xml:space="preserve"><value>Minifilter present but not loaded (test signing / admin)</value></data>
   <data name="Platform_MinifilterAbsent" xml:space="preserve"><value>Kernel minifilter absent (stub — PE not intercepted)</value></data>
+  <data name="Platform_PlannedUnavailable" xml:space="preserve"><value>Platform layer v8 in development — activation planned in 3–5 years. Current protection: user-mode file monitoring.</value></data>
   <data name="Opt_BackupBeforeQuarantine" xml:space="preserve"><value>Safety backup before quarantine</value></data>
   <data name="Opt_BackupBeforeQuarantineSub" xml:space="preserve"><value>Keeps a local copy (32 MB max.) in %LocalAppData%\optiSCAN\SafetyBackups.</value></data>
   <data name="Opt_AggressiveSignatures" xml:space="preserve"><value>Aggressive signature updates</value></data>

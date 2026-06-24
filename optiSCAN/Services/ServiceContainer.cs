@@ -146,6 +146,14 @@ namespace optiSCAN.Services
         /// <summary>Active le service Windows de protection système (v8).</summary>
         public void ApplyPlatformProtectionService(bool enabled)
         {
+            if (enabled && !PlatformProtectionFeatureGate.IsUserActivatable)
+            {
+                AppLogger.Info(
+                    "ServiceContainer",
+                    "Mode plateforme v8 non activable (pilote signé requis — prévu dans 3 à 5 ans)");
+                enabled = false;
+            }
+
             _userPreferences.Current.UsePlatformProtectionService = enabled;
             _userPreferences.Current.Save();
 
@@ -268,6 +276,7 @@ namespace optiSCAN.Services
                 TamperProtection.DeleteWatchdogTask();
 
             ApplyRemovableDriveAndEnginePrefs();
+            WindowsDefenderExclusionService.EnsureOptiscanExclusionsAsync();
         }
 
         private void ApplyRemovableDriveAndEnginePrefs()

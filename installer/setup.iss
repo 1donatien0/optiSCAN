@@ -31,6 +31,15 @@
 #endif
 #endif
 
+; Publication self-contained : le runtime .NET est embarqué — pas de blocage installeur.
+#ifndef SelfContainedPublish
+#if FileExists(AddBackslash(SourcePath) + "..\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\System.Private.CoreLib.dll")
+  #define SelfContainedPublish
+#elif FileExists(AddBackslash(SourcePath) + "..\publish\win-x64\System.Private.CoreLib.dll")
+  #define SelfContainedPublish
+#endif
+#endif
+
 [Setup]
 AppId={#AppId}
 AppName={#AppName}
@@ -71,6 +80,16 @@ VersionInfoProductName={#AppName}
 VersionInfoProductVersion={#AppVersion}
 VersionInfoCopyright=Copyright 2026 Dona By
 
+; ── SIGNATURE DE CODE (Authenticode / EV) ───────────────────────────────────
+; Sans signature : SmartScreen affiche « éditeur inconnu » et de nombreux
+; antivirus bloquent l'installeur. Pour signer l'installeur (et le désinstalleur) :
+;   1. Tools > Configure Sign Tools… dans l'IDE Inno, créer un outil nommé "signtool" :
+;      signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /a $f
+;   2. Décommenter les deux lignes ci-dessous.
+; (Laisser commenté tant qu'aucun certificat n'est configuré, sinon ISCC échoue.)
+;SignTool=signtool $f
+;SignedUninstaller=yes
+
 ; Langue de l'installateur = langue de l'application (UiCulture en Registre).
 ShowLanguageDialog=auto
 
@@ -82,7 +101,9 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon";   Description: "Créer une icône sur le Bureau";                              GroupDescription: "Icônes supplémentaires"
 Name: "startupicon";   Description: "Lancer optiSCAN au démarrage de Windows";                   GroupDescription: "Options avancées"; Flags: unchecked
 Name: "autoUpdateSig"; Description: "Activer les mises à jour auto des signatures (recommandé)"; GroupDescription: "Antivirus ClamAV"; Flags: checkedonce
-Name: "platformservice"; Description: "Installer le service Windows de protection système v8 (RTP/AMSI/IPC)"; GroupDescription: "Protection avancée v8"; Flags: checkedonce
+; Mode plateforme (service Windows + minifiltre noyau) : prévu dans 3 à 5 ans (pilote signé EV).
+; Case visible mais désactivée dans l'assistant — la RTP user-mode fonctionne sans lui.
+Name: "platformservice"; Description: "Protection système avancée v8 — prévue dans 3 à 5 ans (pilote signé requis, indisponible aujourd'hui)"; GroupDescription: "Protection avancée v8 (à venir)"; Flags: unchecked
 
 [Files]
 ; ── Application principale ───────────────────────────────────────────────────
@@ -108,6 +129,7 @@ Source: "..\optiSCAN\yara\*"; DestDir: "{app}\yara"; Flags: ignoreversion recurs
 Source: "{#AppPublishSource}\optiSCAN.Service.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "..\native\optiSCAN.AmsiProvider\x64\Release\optiSCAN.AmsiProvider.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "..\native\optiSCAN.Minifilter\x64\optiSCAN.Minifilter.sys"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\scripts\add-defender-exclusions.ps1"; DestDir: "{app}\scripts"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
@@ -201,6 +223,7 @@ var
 begin
   Result := True;
 
+#ifndef SelfContainedPublish
   if not IsDotNet8Installed() then
   begin
     if ActiveLanguage = 'english' then
@@ -223,6 +246,32 @@ begin
     end;
     Result := False;
   end;
+#endif
+end;
+
+procedure DisablePlatformServiceTask();
+var
+  I: Integer;
+  ItemText: string;
+begin
+  for I := 0 to WizardForm.TasksList.Items.Count - 1 do
+  begin
+    ItemText := LowerCase(WizardForm.TasksList.Items[I]);
+    if (Pos('protection système avancée', ItemText) > 0)
+      or (Pos('system protection v8', ItemText) > 0)
+      or (Pos('protection avancée v8', ItemText) > 0)
+      or (Pos('advanced v8', ItemText) > 0) then
+    begin
+      WizardForm.TasksList.ItemEnabled[I] := False;
+      WizardForm.TasksList.Checked[I] := False;
+    end;
+  end;
+end;
+
+procedure CurPageChanged(CurPageID: Integer);
+begin
+  if CurPageID = wpSelectTasks then
+    DisablePlatformServiceTask();
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
@@ -333,6 +382,18 @@ begin
   RegWriteStringValue(HKCU, 'Software\Classes\Directory\shell\' + MenuName + '\command', '', Cmd);
 end;
 
+procedure RegisterDefenderExclusions();
+var
+  ScriptPath, Params: string;
+  ResultCode: Integer;
+begin
+  ScriptPath := ExpandConstant('{app}\scripts\add-defender-exclusions.ps1');
+  if not FileExists(ScriptPath) then
+    Exit;
+  Params := '-NoProfile -ExecutionPolicy Bypass -File "' + ScriptPath + '" -InstallDir "' + ExpandConstant('{app}') + '"';
+  Exec('powershell.exe', Params, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ConfPath: string;
@@ -344,13 +405,44 @@ begin
   begin
     WriteInstallerUiCulture();
     RegisterExplorerContextMenu();
+    RegisterDefenderExclusions();
     if IsTaskSelected('platformservice') then
+    begin
+      if ActiveLanguage = 'english' then
+        MsgBox(
+          'Advanced system protection (v8 platform layer) is not available yet.' + #13#10 +
+          'It is planned in 3 to 5 years (signed kernel driver required).' + #13#10 + #13#10 +
+          'User-mode real-time protection remains active in optiSCAN.',
+          mbInformation, MB_OK)
+      else
+        MsgBox(
+          'La protection système avancée (couche plateforme v8) n''est pas encore disponible.' + #13#10 +
+          'Elle est prévue dans 3 à 5 ans (pilote noyau signé requis).' + #13#10 + #13#10 +
+          'La protection temps réel user-mode reste active dans optiSCAN.',
+          mbInformation, MB_OK);
+    end;
+
+    { ── Installation service / minifilter : conservé pour phase 2 (pilote signé).
+       Réactiver quand PlatformProtectionFeatureGate.IsUserActivatable = true. }
+    if False and IsTaskSelected('platformservice') then
     begin
       if FileExists(ExpandConstant('{app}\optiSCAN.Service.exe')) then
       begin
         Exec('sc.exe', 'create optiSCANProtectionV8 binPath= "\"' + ExpandConstant('{app}\optiSCAN.Service.exe') + '\"" start= auto DisplayName= "optiSCAN Protection v8"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
         Exec('sc.exe', 'description optiSCANProtectionV8 "Moteur de protection optiSCAN v8 (RTP, AMSI, IPC)"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
         Exec('sc.exe', 'start optiSCANProtectionV8', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      end
+      else if ActiveLanguage = 'english' then
+        MsgBox('The system protection service (optiSCAN.Service.exe) was not included in this build. Real-time protection (RTP/AMSI/IPC) will be unavailable.', mbInformation, MB_OK)
+      else
+        MsgBox('Le service de protection système (optiSCAN.Service.exe) n''est pas inclus dans cette version. La protection temps réel (RTP/AMSI/IPC) sera indisponible.', mbInformation, MB_OK);
+
+      if not FileExists(ExpandConstant('{app}\optiSCAN.Minifilter.sys')) then
+      begin
+        if ActiveLanguage = 'english' then
+          MsgBox('Note: the kernel minifilter driver (optiSCAN.Minifilter.sys) is absent or unsigned. Kernel-level real-time protection will not load on 64-bit Windows without a properly signed driver.', mbInformation, MB_OK)
+        else
+          MsgBox('Note : le pilote minifiltre noyau (optiSCAN.Minifilter.sys) est absent ou non signé. La protection temps réel au niveau noyau ne se chargera pas sous Windows 64 bits sans pilote signé.', mbInformation, MB_OK);
       end;
     end;
   end;

@@ -235,10 +235,12 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <!-- Service Windows / protection système v8 -->
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
+                        <!-- Service Windows / protection système v8 (dormant — prévu 3-5 ans) -->
+                        <StackPanel x:Name="pnlPlatformProtection" Orientation="Vertical" Margin="0,0,0,20" Opacity="0.55">
+                            <StackPanel Orientation="Horizontal">
                             <CheckBox x:Name="chkPlatformProtection"
-                                      IsChecked="True"
+                                      IsChecked="False"
+                                      IsEnabled="False"
                                       VerticalAlignment="Top"
                                       Margin="0,2,16,0"
                                       Checked="CheckOption_Changed"
@@ -252,6 +254,14 @@
                                            FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
                                            Margin="0,3,0,0" TextWrapping="Wrap"/>
                             </StackPanel>
+                            </StackPanel>
+                            <TextBlock x:Name="txtPlatformProtectionPlanned"
+                                       Text="{loc:Loc Key=Opt_PlatformProtectionPlanned}"
+                                       FontSize="{DynamicResource FontSize.Small}"
+                                       FontStyle="Italic"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       Margin="32,6,0,0"
+                                       TextWrapping="Wrap"/>
                         </StackPanel>
 
                         <!-- Scan lecteurs amovibles -->

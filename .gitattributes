@@ -14,6 +14,10 @@
 *.json   text
 *.ps1    text
 *.sh     text eol=lf
+*.iss      text
+*.inf      text
+*.manifest text
+*.config   text
 
 *.png    binary
 *.ico    binary
@@ -21,3 +25,6 @@
 *.exe    binary
 *.zip    binary
 *.crt    binary
+*.sys    binary
+*.cat    binary
+*.docx   binary

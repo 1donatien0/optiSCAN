@@ -11,6 +11,12 @@ public sealed class PlatformProtectionStatusServiceTests
 
     Assert.NotEmpty(report.Components);
     Assert.Contains(report.Components, c => c.LabelKey.StartsWith("Platform_", StringComparison.Ordinal));
+    if (!PlatformProtectionFeatureGate.IsUserActivatable)
+    {
+      Assert.Single(report.Components);
+      Assert.Equal("Platform_PlannedUnavailable", report.Components[0].LabelKey);
+      Assert.False(report.HasWarnings);
+    }
   }
 
   [Fact]

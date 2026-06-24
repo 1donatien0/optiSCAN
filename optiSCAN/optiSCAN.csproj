@@ -131,6 +131,16 @@
     <InternalsVisibleTo Include="optiSCAN.Tests" />
   </ItemGroup>
 
+  <!-- Profils Publish visibles dans l'Explorateur de solutions (VS : clic droit projet → Publier). -->
+  <ItemGroup>
+    <None Update="Properties\PublishProfiles\FolderProfile.pubxml">
+      <Visible>true</Visible>
+    </None>
+    <None Update="Properties\PublishProfiles\FolderProfile-SelfContained.pubxml">
+      <Visible>true</Visible>
+    </None>
+  </ItemGroup>
+
   <ItemGroup>
     <PackageReference Include="MaterialDesignThemes" Version="5.3.1" />
     <!-- Phase 2 — services avancés (PDF, notifications) -->
