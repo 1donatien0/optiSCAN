@@ -12,7 +12,8 @@
 | Accueil stats / recommandations | [§4.11](../README.md#411-vue-densemble-dashboard) |
 | Scan USB/SD | [§5](../README.md#5-services-avancés-modules-complémentaires) · `RemovableDriveScanService` |
 | Thème Windows | [§2.2](../README.md#22-thememanager) |
-| Audit, tests (**279**) | [§12](../README.md#12-audit-et-qualité) |
+| Exclusions / anti-autophagie (`OptiscanProtectedPaths`) | [§4.7](../README.md#47-système-dexclusions) |
+| Audit, tests (**287**) | [§12](../README.md#12-audit-et-qualité) |
 | Posture /100, AMSI | [§13](../README.md#13-sécurité-posture-et-menaces) |
 | Branches `main` / `dev` | [Branches Git](../README.md#branches-git) |
 

@@ -15,6 +15,9 @@ namespace optiSCAN.Services
         /// <summary>Racine normalisée sans slash final (Path.GetFullPath).</summary>
         public static string GetInstallRoot() => CachedRoot.Value;
 
+        /// <summary>Résolution directe sans cache (découverte des autres racines protégées).</summary>
+        internal static string GetInstallRootUncached() => ResolveRoot();
+
         private static string ResolveRoot()
         {
             var baseDir = AppContext.BaseDirectory;
@@ -31,38 +34,12 @@ namespace optiSCAN.Services
             }
         }
 
-        /// <summary>Vrai si <paramref name="path"/> désigne un fichier ou dossier sous la racine d’installation.</summary>
+        /// <summary>Vrai si <paramref name="path"/> est sous l'installation ou les données optiSCAN (MAJ, quarantaine).</summary>
         public static bool IsUnderInstallRoot(string? path)
-        {
-            if (string.IsNullOrWhiteSpace(path))
-                return false;
+            => OptiscanProtectedPaths.IsUnderProtectedPath(path);
 
-            string root;
-            string fullPath;
-            try
-            {
-                root = GetInstallRoot();
-                fullPath = Path.GetFullPath(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
-            }
-            catch
-            {
-                return false;
-            }
-
-            if (fullPath.Equals(root, StringComparison.OrdinalIgnoreCase))
-                return true;
-
-            return fullPath.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
-                || fullPath.StartsWith(root + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
-        }
-
-        /// <summary>
-        /// Motif PCRE pour <c>clamscan --exclude</c> : tout chemin sous la racine d'installation.
-        /// </summary>
-        public static string GetClamScanExcludePattern()
-        {
-            var root = GetInstallRoot().TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
-            return "^" + Regex.Escape(root) + @"([\\/]|$)";
-        }
+        /// <summary>Motifs PCRE pour <c>clamscan --exclude</c> et <c>clamd.conf ExcludePath</c>.</summary>
+        public static IEnumerable<string> GetClamScanExcludePatterns()
+            => OptiscanProtectedPaths.GetClamScanExcludePatterns();
     }
 }
