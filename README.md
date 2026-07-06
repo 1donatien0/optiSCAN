@@ -80,6 +80,7 @@ optiSCAN.Service.exe  →  optiSCAN.exe --service-host
 | `optiSCAN.Service` | Service Windows qui supervise `optiSCAN.exe --service-host` |
 | `--service-host` | Moteur sans UI : RTP, IPC, enregistrement AMSI/minifilter |
 | `ThreatRepairService` | Quarantaine + recours Defender (`MpCmdRun`) |
+| `WindowsDefenderExclusionService` | Exclusions Defender auto (chemins + processus optiSCAN) — install, démarrage, `--defender-exclusions` |
 | `CloudThreatIntelService` | Enrichissement VirusTotal (cache local) |
 | `native/optiSCAN.AmsiProvider` | DLL C++ fournisseur AMSI (build VS 2022 x64) |
 | `native/optiSCAN.Minifilter` | Driver noyau stub (WDK + certificat EV en production) |
@@ -100,7 +101,7 @@ optiSCAN.Service.exe  →  optiSCAN.exe --service-host
 ├── .editorconfig                      ← Sévérités analyse Roslyn (alignement IDE / MSBuild)
 ├── Directory.Build.props              ← Version 8.0.0, NetAnalyzers, TreatWarningsAsErrors (Release)
 ├── .github/workflows/
-│   ├── ci.yml                         ← Build, tests (287), publish + SBOM (main)
+│   ├── ci.yml                         ← Build, tests (289), publish + SBOM (main)
 │   ├── codeql.yml                     ← Analyse CodeQL (C# + natif)
 │   ├── dependency-review.yml          ← Revue dépendances (PR)
 │   └── gitleaks.yml                   ← Détection fuites secrets
@@ -108,6 +109,7 @@ optiSCAN.Service.exe  →  optiSCAN.exe --service-host
 │   ├── fetch-runtime-deps.ps1         ← Télécharge ClamAV + YARA (CI / dev)
 │   ├── prepare-release-v8.ps1         ← Chaîne complète release v8
 │   ├── clean-before-publish.ps1       ← Nettoyage bin/obj avant release
+│   ├── add-defender-exclusions.ps1    ← Exclusions Windows Defender (install / manuel)
 │   ├── generate-sbom.ps1              ← SBOM CycloneDX (CI publish)
 │   ├── build-amsi.ps1 / stage-amsi.ps1← DLL AMSI native (publish)
 │   ├── verify-runtime-deps.ps1        ← Vérifie clamav + clamd + yara + rules
@@ -163,6 +165,7 @@ optiSCAN.Service.exe  →  optiSCAN.exe --service-host
     │   ├── ThemeManager.cs            ← Bascule Donaby + MaterialDesign (UserPreferences)
     │   ├── ExclusionSettings.cs       ← Exclusions DPAPI (exclusions.dat) + dossiers protégés
     │   ├── OptiscanProtectedPaths.cs  ← Install + %LocalAppData%\optiSCAN : anti-autophagie scan/RTP
+    │   ├── WindowsDefenderExclusionService.cs ← Exclusions Defender (chemins + processus)
     │   ├── AppInstallPaths.cs         ← Façade racine install + motifs clamscan --exclude
     │   ├── YaraEngine.cs              ← YARA + cache _compiled.yarc / _compiled.stamp
     │   ├── YaraForgeUpdater.cs        ← Mise à jour automatique règles de détection
@@ -178,7 +181,7 @@ optiSCAN.Service.exe  →  optiSCAN.exe --service-host
     │   ├── HistoryExportService.cs    ← Export HTML/PDF (`IHistoryExportService`)
     │   ├── SystemTrayHost.cs          ← Icône zone de notification (bas niveau)
     │   ├── OnboardingService.cs       ← Message premier lancement
-    │   ├── HeadlessScanArguments.cs   ← --fullscan / --quickscan / --quiet
+    │   ├── HeadlessScanArguments.cs   ← --fullscan / --quickscan / --defender-exclusions / --quiet
     │   ├── ScheduledScanApply.cs      ← Logique enable/disable tâche (testable)
     │   ├── ElevationHelper.cs         ← Relance UAC (--scan, analyse complète)
     │   ├── QuarantineManager.cs       ← Quarantaine AES-GCM, manifeste signé
@@ -437,7 +440,17 @@ ScanViewModel → ScanOrchestrator
 - **ClamAV / clamd** : plusieurs `--exclude` / lignes `ExcludePath` (une par racine protégée)
 - **RTP** et **scan USB/SD** : mêmes exclusions ; lecteur entier exclu si son chemin racine est listé
 
-Configurable depuis **Options → EXCLUSIONS**.
+**Exclusions Windows Defender** (`WindowsDefenderExclusionService`) — évite que Defender bloque optiSCAN, ClamAV ou YARA :
+
+| Moment | Comportement |
+|--------|----------------|
+| **Installation** | Inno exécute `{app}\scripts\add-defender-exclusions.ps1` (admin) |
+| **Démarrage** | Vérification asynchrone ; relance UAC via `--defender-exclusions` si besoin (max 1× / 24 h) |
+| **Manuel** | `.\scripts\add-defender-exclusions.ps1` (élévation auto) |
+
+Chemins : mêmes racines que `OptiscanProtectedPaths`. Processus : `optiSCAN.exe`, `optiSCAN.Service.exe`, `clamscan.exe`, `freshclam.exe`, `clamd.exe`, `yara64.exe`. Si la **protection contre la falsification** Defender est active, ajout manuel dans *Sécurité Windows → Exclusions* — voir [§7](#exclusion-windows-defender).
+
+Configurable depuis **Options → EXCLUSIONS** (exclusions internes optiSCAN uniquement).
 
 ### 4.8 QuarantineManager — sécurité des fichiers infectés
 
@@ -626,12 +639,18 @@ L’application est publiée en **`asInvoker`** (`app.manifest`) : exécution av
 
 ### Exclusion Windows Defender
 
-Recommandé sur une machine de développement ou après installation (évite les conflits avec freshclam et les faux positifs sur les signatures) :
+Voir aussi [§4.7](#47-système-dexclusions) (détail technique). Résumé :
+
+- **À l’installation** (installateur Inno, droits admin) : chemins `Program Files\optiSCAN` et `%LOCALAPPDATA%\optiSCAN`, plus les processus `optiSCAN.exe`, `clamscan.exe`, `freshclam.exe`, `clamd.exe`, `yara64.exe`, etc.
+- **Au démarrage** de l’application : même logique si une exclusion manque encore.
+
+Commande manuelle (console **administrateur**) :
 
 ```powershell
-Add-MpPreference -ExclusionPath "C:\Program Files\optiSCAN"
-Add-MpPreference -ExclusionPath "$env:LOCALAPPDATA\optiSCAN"
+.\scripts\add-defender-exclusions.ps1
 ```
+
+Si la **protection contre la falsification** de Defender est active, l’ajout peut échouer — ajoutez les chemins dans *Sécurité Windows → Protection contre les virus et menaces → Exclusions*.
 
 ---
 
@@ -660,7 +679,7 @@ Sortie publish : `optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x6
 
 ### Ordre recommandé (équipe)
 
-1. Gel fonctionnel : `.\scripts\validate-release-readiness.ps1` (ou `dotnet test` Release — **287** tests).
+1. Gel fonctionnel : `.\scripts\validate-release-readiness.ps1` (ou `dotnet test` Release — **289** tests).
 2. Dépendances : `.\scripts\fetch-runtime-deps.ps1` (+ `-RunFreshclam` pour l’installateur).
 3. Publish local : `.\scripts\prepare-release-v8.ps1` (ou étapes manuelles ci-dessous).
 4. VM propre : installer `optiSCAN_Setup_v8.0.0.exe` ; scan, RTP, clamd, posture, FR/EN.
@@ -706,17 +725,18 @@ optiSCAN_Setup_v8.0.0.exe
     ├── *.dll (runtime .NET 8)
     ├── clamav/x64/          ← Binaires x86-64 (clamscan + clamd) + base de signatures
     ├── yara/                ← Binaires du moteur de détection
-    └── rules/               ← Règles de détection initiales
+    ├── rules/               ← Règles de détection initiales
+    └── scripts/             ← add-defender-exclusions.ps1 (exclusions Defender post-install)
 ```
 
 ### Checklist binaire (bloquant)
 
-- [ ] `dotnet test` Release — **287** tests OK
+- [ ] `dotnet test` Release — **289** tests OK
 - [ ] `.\scripts\verify-runtime-deps.ps1` — vert sur dossier publish
 - [ ] `clamscan.exe`, `freshclam.exe`, **`clamd.exe`**, `yara64.exe`, règles `.yar`
 - [ ] `clamav\database\` — au moins un `main.cvd` / `daily.cvd` (via freshclam)
 - [ ] Installateur FR/EN, sidebar **v8.0**, options clamd / VT / mode jeu, accueil posture /100
-- [ ] Test post-install : scan fichier, quarantaine, **historique → traiter une menace**, exports PDF/HTML ; **clé USB** (scan auto si option activée)
+- [ ] Test post-install : scan fichier, quarantaine, **historique → traiter une menace**, exports PDF/HTML ; **clé USB** (scan auto si option activée) ; exclusions Defender (script ou démarrage app)
 - [ ] Après upgrade depuis v7 : `scan_history.dat` présent (éventuellement `scan_history.json.legacy`)
 
 ### CI GitHub
@@ -732,7 +752,7 @@ Pipelines : [`.github/workflows/ci.yml`](.github/workflows/ci.yml), [`codeql.yml
 
 **Freshclam en CI** : génère un `freshclam.conf` minimal dans `clamav\x64\` (non versionné dans Git, comme en production via `FreshclamUpdater`). **Erreur connue (corrigée)** : `Can't open/parse freshclam.conf` si freshclam est lancé sans `--config-file`.
 
-**Repères de couverture tests (release, 287 au total — voir checklist)** :
+**Repères de couverture tests (release, 289 au total — voir checklist)** :
 
 | Module | Fichier de tests |
 |--------|------------------|
@@ -745,7 +765,7 @@ Pipelines : [`.github/workflows/ci.yml`](.github/workflows/ci.yml), [`codeql.yml
 | Intégration EICAR (YARA) | `EicarIntegrationTests` — règle `EICAR_Test` dans `test_rules.yar` (no-op si `yara64.exe` absent) |
 | Signatures (cache TTL) | `SignatureStatusServiceTests` |
 | Thème Windows | `ThemeManagerPreferenceTests` |
-| Persistance | `SecureStoreTests`, `UserPreferencesStorageTests`, `ExclusionSettingsTests`, `OptiscanProtectedPathsTests` |
+| Persistance | `SecureStoreTests`, `UserPreferencesStorageTests`, `ExclusionSettingsTests`, `OptiscanProtectedPathsTests`, `WindowsDefenderExclusionServiceTests` |
 
 ### Après publication
 
@@ -809,11 +829,12 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 ### v8.0 — Clamd, posture, historique unifié, scan USB, coordinateurs
 
 - **Anti-autophagie** — `OptiscanProtectedPaths` : installation (Program Files + processus) et `%LOCALAPPDATA%\optiSCAN` (MAJ signatures, quarantaine, logs) exclus des scans / RTP / quarantaine auto ; dossiers obligatoires dans Options
+- **Exclusions Defender** — `WindowsDefenderExclusionService` + `scripts/add-defender-exclusions.ps1` : chemins et processus optiSCAN enregistrés à l’install et au démarrage (`--defender-exclusions` si UAC)
 - **Démarrage UI** — handlers globaux d’exceptions (`InstallGlobalCrashHandlers`) ; `BindAllViewPanels` avant navigation sidebar (course XAML / services)
 - **Publish** — cible MSBuild `CleanStalePublishOutput` : nettoyage de `publish\` uniquement (évite publish cassé)
 - **Refactor UI** — ~22 coordinateurs (`optiSCAN/Coordinators/`) : startup/shutdown, systray, exports, historique, RTP/USB/toasts ; `MainWindow` allégé (~730 L)
 - **DI préférences** — `IUserPreferencesAccessor`, `IExclusionSettingsAccessor` ; vues via `IViewServices` / `IHistoryServices` / `IHistoryExportService`
-- **Qualité** — `.editorconfig` ; NetAnalyzers `latest-recommended` ; **287** tests ; SBOM CycloneDX en publish CI
+- **Qualité** — `.editorconfig` ; NetAnalyzers `latest-recommended` ; **289** tests ; SBOM CycloneDX en publish CI
 - **Historique** — `ActivityLogService` + `activity_log.dat` (150 événements, migration unique) ; `HistoryViewModel` (5 filtres, `SelectionKey`) ; menaces traitables (**Traiter dans Analyse**) ; `scan_history.dat` / `clean_history.dat` (rotation 100→50) ; compat v7 sans chemins
 - **Accueil** — `OverviewRecommendationsBuilder` + `OverviewProtectionStatsFormatter` (stats 30 j. sans doublon dans les recommandations)
 - **Scan USB/SD** — rapide = extensions à risque (4 000 max), moteurs **en série**, timeouts 10/45 min, repli récursif ; complet = `ScanFolderBackgroundAsync` ; statut barre + toasts début/fin
@@ -821,7 +842,7 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 - **Thème Windows** — `SyncWindowsTheme` par défaut ; case Options (thème opposé à Windows) ; `ThemeManager.Initialize()` dans `MainWindow` avant `InitializeComponent`
 - **clamd** — `CompositeClamAvBackend`, TCP `127.0.0.1:3310`, repli `clamscan.exe`
 - **Posture /100**, **VirusTotal**, **mode jeu** — voir [§13](#13-sécurité-posture-et-menaces) et Options
-- **Tests** — **287** tests Release — [§12](#12-audit-et-qualité) ; i18n **621** clés FR/EN ; coordinateurs + exports couverts par tests dédiés
+- **Tests** — **289** tests Release — [§12](#12-audit-et-qualité) ; i18n **621** clés FR/EN ; coordinateurs + exports couverts par tests dédiés
 
 ### v7.0 — Lifting UI Donaby + identité visuelle
 
@@ -917,7 +938,7 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 | Architecture | 8/10 | `CompositeClamAvBackend`, posture injectable ; recommandations accueil extraites |
 | Sécurité locale | 8/10 | Quarantaine AES-GCM ; historique `.dat` DPAPI ; `optiSCAN.log` diagnostic (chemins redacted, pas de secret critique) |
 | UI / Donaby | 8/10 | Accueil posture ; VT optionnel |
-| Tests & CI | 9/10 | **287** tests (posture, coordinateurs, historique/timeline, USB, quarantaine, périmètres protégés) ; couverture ligne **≥ 40 %** (cible 50 %) |
+| Tests & CI | 9/10 | **289** tests (posture, coordinateurs, historique/timeline, USB, quarantaine, périmètres protégés, exclusions Defender) ; couverture ligne **≥ 40 %** (cible 50 %) |
 | Release Inno | 7/10 | Pipeline CI OK |
 
 **Dettes ouvertes (résumé)** : tests intégration clamd/schtasks réels ; signature Authenticode optionnelle. Voir §12.1 pour le reste (maintenabilité, choix volontaires).
@@ -958,7 +979,7 @@ Liens **Corriger** (accueil) : `optiscan://panel/{id}` (antivirus, options, hist
 
 **Actifs** : fichiers analysés, quarantaine, prefs/exclusions (`%LocalAppData%\optiSCAN`), clé VT optionnelle.
 
-**Contrôles** : quarantaine AES-GCM + HMAC ; exclusions avec frontière `\` ; périmètres protégés optiSCAN (`OptiscanProtectedPaths`) ; UAC pour scan complet ; RTP ; clamd sur `127.0.0.1`.
+**Contrôles** : quarantaine AES-GCM + HMAC ; exclusions avec frontière `\` ; périmètres protégés optiSCAN (`OptiscanProtectedPaths`) ; exclusions Defender automatiques (`WindowsDefenderExclusionService`) ; UAC pour scan complet ; RTP ; clamd sur `127.0.0.1`.
 
 **Limites** : malware admin peut neutraliser l’AV local ; AMSI v8 via `optiSCAN.AmsiProvider.dll` (nécessite service + droits admin) ; minifilter encore stub ; VT envoie le hash ; `optiSCAN.log` non chiffré mais sans chemins complets (`PathRedaction` sur les lignes de scan).
 

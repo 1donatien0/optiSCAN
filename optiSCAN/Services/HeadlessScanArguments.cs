@@ -9,8 +9,9 @@ namespace optiSCAN.Services
         public const string Guard = "--guard";
         public const string Watchdog = "--watchdog";
         public const string ServiceHost = "--service-host";
+        public const string DefenderExclusions = "--defender-exclusions";
 
-        public enum Mode { None, FullScan, QuickScan, Guard, Watchdog, ServiceHost }
+        public enum Mode { None, FullScan, QuickScan, Guard, Watchdog, ServiceHost, DefenderExclusions }
 
         public static Mode ParseMode(IReadOnlyList<string> args)
         {
@@ -22,6 +23,8 @@ namespace optiSCAN.Services
                     return Mode.Guard;
                 if (string.Equals(a, ServiceHost, StringComparison.OrdinalIgnoreCase))
                     return Mode.ServiceHost;
+                if (string.Equals(a, DefenderExclusions, StringComparison.OrdinalIgnoreCase))
+                    return Mode.DefenderExclusions;
                 if (string.Equals(a, FullScan, StringComparison.OrdinalIgnoreCase))
                     return Mode.FullScan;
                 if (string.Equals(a, QuickScan, StringComparison.OrdinalIgnoreCase))
