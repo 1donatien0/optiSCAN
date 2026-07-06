@@ -71,6 +71,16 @@ VersionInfoProductName={#AppName}
 VersionInfoProductVersion={#AppVersion}
 VersionInfoCopyright=Copyright 2026 Dona By
 
+; ── SIGNATURE DE CODE (Authenticode / EV) ───────────────────────────────────
+; Sans signature : SmartScreen affiche « éditeur inconnu » et de nombreux
+; antivirus bloquent l'installeur. Pour signer l'installeur (et le désinstalleur) :
+;   1. Tools > Configure Sign Tools… dans l'IDE Inno, créer un outil nommé "signtool" :
+;      signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /a $f
+;   2. Décommenter les deux lignes ci-dessous.
+; (Laisser commenté tant qu'aucun certificat n'est configuré, sinon ISCC échoue.)
+;SignTool=signtool $f
+;SignedUninstaller=yes
+
 ; Langue de l'installateur = langue de l'application (UiCulture en Registre).
 ShowLanguageDialog=auto
 
@@ -108,6 +118,7 @@ Source: "..\optiSCAN\yara\*"; DestDir: "{app}\yara"; Flags: ignoreversion recurs
 Source: "{#AppPublishSource}\optiSCAN.Service.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "..\native\optiSCAN.AmsiProvider\x64\Release\optiSCAN.AmsiProvider.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "..\native\optiSCAN.Minifilter\x64\optiSCAN.Minifilter.sys"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\scripts\add-defender-exclusions.ps1"; DestDir: "{app}\scripts"; Flags: ignoreversion
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
@@ -333,6 +344,18 @@ begin
   RegWriteStringValue(HKCU, 'Software\Classes\Directory\shell\' + MenuName + '\command', '', Cmd);
 end;
 
+procedure RegisterDefenderExclusions();
+var
+  ScriptPath, Params: string;
+  ResultCode: Integer;
+begin
+  ScriptPath := ExpandConstant('{app}\scripts\add-defender-exclusions.ps1');
+  if not FileExists(ScriptPath) then
+    Exit;
+  Params := '-NoProfile -ExecutionPolicy Bypass -File "' + ScriptPath + '" -InstallDir "' + ExpandConstant('{app}') + '"';
+  Exec('powershell.exe', Params, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ConfPath: string;
@@ -344,6 +367,7 @@ begin
   begin
     WriteInstallerUiCulture();
     RegisterExplorerContextMenu();
+    RegisterDefenderExclusions();
     if IsTaskSelected('platformservice') then
     begin
       if FileExists(ExpandConstant('{app}\optiSCAN.Service.exe')) then
@@ -351,6 +375,25 @@ begin
         Exec('sc.exe', 'create optiSCANProtectionV8 binPath= "\"' + ExpandConstant('{app}\optiSCAN.Service.exe') + '\"" start= auto DisplayName= "optiSCAN Protection v8"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
         Exec('sc.exe', 'description optiSCANProtectionV8 "Moteur de protection optiSCAN v8 (RTP, AMSI, IPC)"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
         Exec('sc.exe', 'start optiSCANProtectionV8', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+      end
+      else
+      begin
+        // Le service natif n'a pas été inclus dans ce build : on prévient au lieu
+        // d'échouer silencieusement (l'utilisateur a coché « protection avancée »).
+        if ActiveLanguage = 'english' then
+          MsgBox('The system protection service (optiSCAN.Service.exe) was not included in this build. Real-time protection (RTP/AMSI/IPC) will be unavailable.', mbInformation, MB_OK)
+        else
+          MsgBox('Le service de protection système (optiSCAN.Service.exe) n''est pas inclus dans cette version. La protection temps réel (RTP/AMSI/IPC) sera indisponible.', mbInformation, MB_OK);
+      end;
+
+      // Pilote minifiltre noyau : sans .sys signé, la protection temps réel
+      // au niveau noyau ne se chargera pas (Driver Signature Enforcement x64).
+      if not FileExists(ExpandConstant('{app}\optiSCAN.Minifilter.sys')) then
+      begin
+        if ActiveLanguage = 'english' then
+          MsgBox('Note: the kernel minifilter driver (optiSCAN.Minifilter.sys) is absent or unsigned. Kernel-level real-time protection will not load on 64-bit Windows without a properly signed driver.', mbInformation, MB_OK)
+        else
+          MsgBox('Note : le pilote minifiltre noyau (optiSCAN.Minifilter.sys) est absent ou non signé. La protection temps réel au niveau noyau ne se chargera pas sous Windows 64 bits sans pilote signé.', mbInformation, MB_OK);
       end;
     end;
   end;

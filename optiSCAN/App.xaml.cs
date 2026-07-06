@@ -62,6 +62,15 @@ namespace optiSCAN
                 return;
             }
 
+            if (headlessMode == HeadlessScanArguments.Mode.DefenderExclusions)
+            {
+                ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                base.OnStartup(e);
+                WindowsDefenderExclusionService.EnsureOptiscanExclusions();
+                Shutdown();
+                return;
+            }
+
             if (headlessMode == HeadlessScanArguments.Mode.ServiceHost)
             {
                 bool createdService;
