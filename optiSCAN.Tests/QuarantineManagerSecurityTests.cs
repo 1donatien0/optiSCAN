@@ -52,6 +52,39 @@ public sealed class QuarantineManagerSecurityTests
     }
 
     [Fact]
+    public void IsSensitivePath_does_not_block_sibling_with_shared_prefix()
+    {
+        // Régression : « C:\WindowsApps\… » ne doit PAS être considéré comme
+        // étant sous « C:\Windows » (comparaison par segment de chemin, pas par préfixe brut).
+        var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+        if (string.IsNullOrWhiteSpace(windows))
+            return;
+
+        var sibling = Path.Combine(Path.TrimEndingDirectorySeparator(windows) + "Apps", "sample.exe");
+        Assert.False(QuarantineManager.IsSensitivePath(sibling));
+    }
+
+    [Fact]
+    public void IsSensitivePath_blocks_exact_system_root()
+    {
+        var system = Environment.GetFolderPath(Environment.SpecialFolder.System);
+        if (string.IsNullOrWhiteSpace(system))
+            return;
+
+        // L'égalité exacte avec un dossier interdit doit être bloquée.
+        Assert.True(QuarantineManager.IsSensitivePath(system));
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("   ")]
+    public void IsSensitivePath_returns_false_for_blank(string path)
+    {
+        // La garde évite que Path.GetFullPath ne lève sur une chaîne vide.
+        Assert.False(QuarantineManager.IsSensitivePath(path));
+    }
+
+    [Fact]
     public void LoadManifest_rejects_tampered_hmac()
     {
         var root = Path.Combine(Path.GetTempPath(), "optiscan_ut_hmac_" + Guid.NewGuid().ToString("N"));

@@ -394,6 +394,11 @@ namespace optiSCAN.Services
         /// <summary>Refuse la restauration vers les emplacements système critiques (tests via InternalsVisibleTo).</summary>
         internal static bool IsSensitivePath(string fullPath)
         {
+            // Chemin vide/blanc : non sensible (conserve le comportement d'origine
+            // et évite que Path.GetFullPath ne lève sur une chaîne vide).
+            if (string.IsNullOrWhiteSpace(fullPath))
+                return false;
+
             string[] forbidden =
             {
                 Environment.GetFolderPath(Environment.SpecialFolder.System),       // System32
@@ -406,10 +411,19 @@ namespace optiSCAN.Services
                 Environment.GetFolderPath(Environment.SpecialFolder.Startup),
             };
 
+            // Comparaison par segment de chemin : « C:\WindowsApps » ne doit PAS être
+            // considéré comme étant sous « C:\Windows ». On normalise et on exige soit
+            // l'égalité exacte, soit un séparateur de répertoire après le préfixe.
+            static string Normalize(string p) =>
+                Path.TrimEndingDirectorySeparator(Path.GetFullPath(p));
+
+            var target = Normalize(fullPath);
             foreach (var f in forbidden)
             {
                 if (string.IsNullOrEmpty(f)) continue;
-                if (fullPath.StartsWith(f, StringComparison.OrdinalIgnoreCase))
+                var root = Normalize(f);
+                if (target.Equals(root, StringComparison.OrdinalIgnoreCase)
+                    || target.StartsWith(root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                     return true;
             }
             return false;

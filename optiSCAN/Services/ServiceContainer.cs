@@ -268,6 +268,7 @@ namespace optiSCAN.Services
                 TamperProtection.DeleteWatchdogTask();
 
             ApplyRemovableDriveAndEnginePrefs();
+            WindowsDefenderExclusionService.EnsureOptiscanExclusionsAsync();
         }
 
         private void ApplyRemovableDriveAndEnginePrefs()
