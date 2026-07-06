@@ -13,6 +13,11 @@ public sealed class ProtectionPipeServer : IDisposable
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { PropertyNameCaseInsensitive = true };
 
+    // Borne anti-DoS : le pipe est accessible aux utilisateurs authentifiés (cf. ProtectionPipeAcl),
+    // donc on plafonne la taille d'un buffer AMSI/IPC pour éviter qu'un client local n'épuise
+    // la mémoire ou le disque. ~96 Mo de base64 ≈ ~72 Mo décodés, large pour un scan AMSI légitime.
+    private const int MaxScanBufferBase64Length = 96 * 1024 * 1024;
+
     private readonly ScanOrchestrator _orchestrator;
     private readonly string _pipeName;
     private readonly string? _shutdownTokenOverride;
@@ -151,6 +156,8 @@ public sealed class ProtectionPipeServer : IDisposable
             case ProtectionPipeOperations.ScanBuffer:
                 if (string.IsNullOrWhiteSpace(request.BufferBase64))
                     return ProtectionPipeResponse.Error("Buffer vide");
+                if (request.BufferBase64.Length > MaxScanBufferBase64Length)
+                    return ProtectionPipeResponse.Error("Buffer trop volumineux");
                 return ScanBuffer(request.BufferBase64, request.ContentName ?? "amsi_buffer");
 
             default:
