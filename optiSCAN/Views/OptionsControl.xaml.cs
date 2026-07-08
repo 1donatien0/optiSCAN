@@ -51,7 +51,10 @@ namespace optiSCAN.Views
             IsVisibleChanged += (_, _) =>
             {
                 if (IsVisible)
+                {
                     SyncThemeControls();
+                    RefreshDefenderStatus();
+                }
             };
         }
 
@@ -61,8 +64,13 @@ namespace optiSCAN.Views
         public void Bind(IOptionsServices services)
         {
             _services = services;
+            services.ProtectionStateRefreshRequested += SurDemandeRafraichissementProtection;
             _ = LoadScheduledTaskStateAsync();
+            RefreshDefenderStatus();
         }
+
+        private void SurDemandeRafraichissementProtection(object? sender, EventArgs e) =>
+            RefreshDefenderStatus();
 
         private void SurChangementTheme(object? sender, bool isDark) => SyncThemeControls();
 
@@ -190,6 +198,8 @@ namespace optiSCAN.Views
 
                 if (txtScheduledNextRun != null)
                     txtScheduledNextRun.Text = LocalizationService.GetString("Opt_SchedLoading");
+
+                RefreshDefenderStatus();
             }
             finally
             {
@@ -670,6 +680,35 @@ namespace optiSCAN.Views
                     break;
             }
             prefs.Save();
+        }
+
+        private void RefreshDefenderStatus()
+        {
+            if (panelDefenderStatus == null || _services == null)
+                return;
+
+            var status = Services.GetDefenderCoexistenceStatus();
+            if (!status.IsDefenderActive)
+            {
+                panelDefenderStatus.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            panelDefenderStatus.Visibility = Visibility.Visible;
+            if (txtDefenderStatusMode != null)
+                txtDefenderStatusMode.Text = LocalizationService.GetString(status.StatusMessageKey);
+            if (txtDefenderStatusExclusions != null)
+                txtDefenderStatusExclusions.Text = LocalizationService.GetString(status.ExclusionMessageKey);
+        }
+
+        private void BtnRefreshDefenderExclusions_Click(object sender, RoutedEventArgs e)
+        {
+            Services.RefreshDefenderExclusions();
+            _ = Dispatcher.InvokeAsync(async () =>
+            {
+                await Task.Delay(2500).ConfigureAwait(true);
+                RefreshDefenderStatus();
+            });
         }
     }
 }

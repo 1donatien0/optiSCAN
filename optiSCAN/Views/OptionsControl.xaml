@@ -178,6 +178,47 @@
                                    Foreground="{DynamicResource AlertGoldLight}"
                                    Margin="0,0,0,16"/>
 
+                        <Border x:Name="panelDefenderStatus"
+                                Background="{DynamicResource AlertBg}"
+                                BorderBrush="{DynamicResource AlertGold}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="14,12"
+                                Margin="0,0,0,16"
+                                Visibility="Collapsed">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <md:PackIcon Kind="ShieldCheck"
+                                                             Width="18" Height="18"
+                                                             VerticalAlignment="Top"
+                                                             Margin="0,2,8,0"
+                                                             Foreground="{DynamicResource AccentBlue}"/>
+                                    <TextBlock x:Name="txtDefenderStatusTitle"
+                                               Text="{loc:Loc Key=Defender_Opt_Title}"
+                                               FontSize="{DynamicResource FontSize.Title}"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextDark}"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <TextBlock x:Name="txtDefenderStatusMode"
+                                           FontSize="{DynamicResource FontSize.Small}"
+                                           Foreground="{DynamicResource TextMedium}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,0,0,4"/>
+                                <TextBlock x:Name="txtDefenderStatusExclusions"
+                                           FontSize="{DynamicResource FontSize.Small}"
+                                           Foreground="{DynamicResource TextMuted}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,0,0,10"/>
+                                <Button x:Name="btnRefreshDefenderExclusions"
+                                        Content="{loc:Loc Key=Defender_Opt_RefreshExclusions}"
+                                        Style="{StaticResource SecondaryButton}"
+                                        HorizontalAlignment="Left"
+                                        Padding="12,6"
+                                        Click="BtnRefreshDefenderExclusions_Click"/>
+                            </StackPanel>
+                        </Border>
+
                         <!-- Protection temps réel -->
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
                             <CheckBox x:Name="chkRealtimeProtection"
@@ -235,7 +276,7 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <!-- Service Windows / protection système v8 -->
+                        <!-- Service Windows / protection système v9 -->
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
                             <CheckBox x:Name="chkPlatformProtection"
                                       IsChecked="True"

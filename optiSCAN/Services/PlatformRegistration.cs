@@ -10,7 +10,7 @@ namespace optiSCAN.Services;
 public static class PlatformRegistration
 {
     private const string AmsiProviderGuid = "{A8F4E2B1-9C3D-4E5F-8A7B-1C2D3E4F5A6B}";
-    private const string AmsiProviderName = "optiSCAN AMSI Provider v8";
+    private const string AmsiProviderName = "optiSCAN AMSI Provider v9";
 
     public static void TryRegisterAmsiProvider()
     {
@@ -31,6 +31,27 @@ public static class PlatformRegistration
         catch (Exception ex)
         {
             AppLogger.Warn("PlatformRegistration", "TryRegisterAmsiProvider", ex);
+        }
+    }
+
+    /// <summary>
+    /// Retire l'enregistrement AMSI (mode complément / protection plateforme désactivée).
+    /// La DLL peut rester dans le dossier d'installation sans être chargée par Windows.
+    /// </summary>
+    public static void TryUnregisterAmsiProvider()
+    {
+        try
+        {
+            using var parent = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\Microsoft\AMSI\Providers", writable: true);
+            if (parent == null)
+                return;
+
+            parent.DeleteSubKey(AmsiProviderGuid, throwOnMissingSubKey: false);
+            AppLogger.Info("PlatformRegistration", "Fournisseur AMSI désenregistré");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("PlatformRegistration", "TryUnregisterAmsiProvider", ex);
         }
     }
 
