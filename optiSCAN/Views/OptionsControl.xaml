@@ -54,7 +54,8 @@
                                       Margin="0,2,16,0"
                                       Checked="CheckOption_Changed"
                                       Unchecked="CheckOption_Changed"
-                                      Tag="AutoStart"/>
+                                      Tag="AutoStart"
+                                      AutomationProperties.Name="{loc:Loc Key=Opt_Startup}"/>
                             <StackPanel>
                                 <TextBlock Text="{loc:Loc Key=Opt_Startup}"
                                            FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
@@ -132,7 +133,8 @@
                                       DropDownOpened="ComboBox_DropDownOpened"
                                       DropDownClosed="CmbUiLanguage_DropDownClosed"
                                       PreviewMouseLeftButtonDown="ComboBox_PreviewMouseLeftButtonDown"
-                                      Height="36" Width="240" HorizontalAlignment="Left">
+                                      Height="36" Width="240" HorizontalAlignment="Left"
+                                      AutomationProperties.Name="{loc:Loc Key=Opt_Language}">
                                 <ComboBoxItem Tag="fr-FR" Content="{loc:Loc Key=Opt_LangFrench}"/>
                                 <ComboBoxItem Tag="en-US" Content="{loc:Loc Key=Opt_LangEnglish}"/>
                             </ComboBox>
@@ -177,6 +179,47 @@
                                    FontSize="{DynamicResource FontSize.Small}" FontWeight="Bold"
                                    Foreground="{DynamicResource AlertGoldLight}"
                                    Margin="0,0,0,16"/>
+
+                        <Border x:Name="panelDefenderStatus"
+                                Background="{DynamicResource AlertBg}"
+                                BorderBrush="{DynamicResource AlertGold}"
+                                BorderThickness="1"
+                                CornerRadius="8"
+                                Padding="14,12"
+                                Margin="0,0,0,16"
+                                Visibility="Collapsed">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <md:PackIcon Kind="ShieldCheck"
+                                                             Width="18" Height="18"
+                                                             VerticalAlignment="Top"
+                                                             Margin="0,2,8,0"
+                                                             Foreground="{DynamicResource AccentBlue}"/>
+                                    <TextBlock x:Name="txtDefenderStatusTitle"
+                                               Text="{loc:Loc Key=Defender_Opt_Title}"
+                                               FontSize="{DynamicResource FontSize.Title}"
+                                               FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextDark}"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                                <TextBlock x:Name="txtDefenderStatusMode"
+                                           FontSize="{DynamicResource FontSize.Small}"
+                                           Foreground="{DynamicResource TextMedium}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,0,0,4"/>
+                                <TextBlock x:Name="txtDefenderStatusExclusions"
+                                           FontSize="{DynamicResource FontSize.Small}"
+                                           Foreground="{DynamicResource TextMuted}"
+                                           TextWrapping="Wrap"
+                                           Margin="0,0,0,10"/>
+                                <Button x:Name="btnRefreshDefenderExclusions"
+                                        Content="{loc:Loc Key=Defender_Opt_RefreshExclusions}"
+                                        Style="{StaticResource SecondaryButton}"
+                                        HorizontalAlignment="Left"
+                                        Padding="12,6"
+                                        Click="BtnRefreshDefenderExclusions_Click"/>
+                            </StackPanel>
+                        </Border>
 
                         <!-- Protection temps réel -->
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
@@ -235,7 +278,7 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <!-- Service Windows / protection système v8 -->
+                        <!-- Service Windows / protection système v9 -->
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
                             <CheckBox x:Name="chkPlatformProtection"
                                       IsChecked="True"
@@ -545,12 +588,27 @@
                             <Button Content="{loc:Loc Key=Opt_AboutUpdates}"
                                     Click="BtnCheckAppUpdate_Click"
                                     Style="{StaticResource SecondaryButton}"
-                                    Height="34" Padding="14,6" Margin="0,0,10,0"/>
+                                    Height="34" Padding="14,6" Margin="0,0,10,0"
+                                    AutomationProperties.Name="{loc:Loc Key=Opt_AboutUpdates}"/>
                             <Button Content="{loc:Loc Key=Opt_SourceForge}"
                                     Click="BtnOpenSourceForge_Click"
                                     Style="{StaticResource SecondaryButton}"
-                                    Height="34" Padding="14,6"/>
+                                    Height="34" Padding="14,6" Margin="0,0,10,0"
+                                    AutomationProperties.Name="{loc:Loc Key=Opt_SourceForge}"/>
+                            <Button Content="{loc:Loc Key=Opt_PrivacyPolicy}"
+                                    Click="BtnOpenPrivacyPolicy_Click"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Height="34" Padding="14,6" Margin="0,0,10,0"
+                                    AutomationProperties.Name="{loc:Loc Key=Opt_PrivacyPolicy}"/>
+                            <Button Content="{loc:Loc Key=Opt_License}"
+                                    Click="BtnOpenLicense_Click"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Height="34" Padding="14,6"
+                                    AutomationProperties.Name="{loc:Loc Key=Opt_License}"/>
                         </StackPanel>
+                        <TextBlock Text="{loc:Loc Key=Opt_LegalHint}"
+                                   FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"
+                                   Margin="0,10,0,0"/>
                     </StackPanel>
                 </Border>
 

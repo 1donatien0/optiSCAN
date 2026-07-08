@@ -1,7 +1,7 @@
 ; =============================================================================
 ; optiSCAN — Installateur Windows (Inno Setup)
 ; =============================================================================
-; AppRelease = nom vM.m (v8.0) · AppVersion = semver / Directory.Build.props
+; AppRelease = nom vM.m (v9.0) · AppVersion = semver / Directory.Build.props
 
 #define AppName        "optiSCAN"
 #ifndef AppVersion
@@ -92,7 +92,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon";   Description: "Créer une icône sur le Bureau";                              GroupDescription: "Icônes supplémentaires"
 Name: "startupicon";   Description: "Lancer optiSCAN au démarrage de Windows";                   GroupDescription: "Options avancées"; Flags: unchecked
 Name: "autoUpdateSig"; Description: "Activer les mises à jour auto des signatures (recommandé)"; GroupDescription: "Antivirus ClamAV"; Flags: checkedonce
-Name: "platformservice"; Description: "Installer le service Windows de protection système v8 (RTP/AMSI/IPC)"; GroupDescription: "Protection avancée v8"; Flags: checkedonce
+Name: "platformservice"; Description: "Installer le service Windows de protection système v9 (RTP/AMSI/IPC)"; GroupDescription: "Protection avancée v9"; Flags: checkedonce
 
 [Files]
 ; ── Application principale ───────────────────────────────────────────────────
@@ -236,6 +236,80 @@ begin
   end;
 end;
 
+procedure RemoveExplorerShellMenu(const Root: Integer; const ParentKey, MenuKey: string);
+begin
+  if RegKeyExists(Root, ParentKey + '\' + MenuKey) then
+    RegDeleteKeyIncludingSubkeys(Root, ParentKey + '\' + MenuKey);
+end;
+
+procedure UnregisterExplorerContextMenus();
+begin
+  RemoveExplorerShellMenu(HKCU, 'Software\Classes\*\shell', 'optiSCAN.Scan');
+  RemoveExplorerShellMenu(HKCU, 'Software\Classes\*\shell', 'Scanner avec optiSCAN');
+  RemoveExplorerShellMenu(HKCU, 'Software\Classes\*\shell', 'Scan with optiSCAN');
+  RemoveExplorerShellMenu(HKCU, 'Software\Classes\*\shell', 'Scanner avec optiCombat');
+  RemoveExplorerShellMenu(HKCU, 'Software\Classes\*\shell', 'Scan with optiCombat');
+  RemoveExplorerShellMenu(HKCU, 'Software\Classes\*\shell', 'ScanWithOptiSCAN');
+  RemoveExplorerShellMenu(HKCU, 'Software\Classes\*\shell', 'ScanWithOptiCombat');
+  RemoveExplorerShellMenu(HKCU, 'Software\Classes\*\shell', 'Shell_ScanWith');
+
+  RemoveExplorerShellMenu(HKCU, 'Software\Classes\Directory\shell', 'optiSCAN.Scan');
+  RemoveExplorerShellMenu(HKCU, 'Software\Classes\Directory\shell', 'Scanner avec optiSCAN');
+  RemoveExplorerShellMenu(HKCU, 'Software\Classes\Directory\shell', 'Scan with optiSCAN');
+  RemoveExplorerShellMenu(HKCU, 'Software\Classes\Directory\shell', 'Scanner avec optiCombat');
+  RemoveExplorerShellMenu(HKCU, 'Software\Classes\Directory\shell', 'Scan with optiCombat');
+  RemoveExplorerShellMenu(HKCU, 'Software\Classes\Directory\shell', 'ScanWithOptiSCAN');
+  RemoveExplorerShellMenu(HKCU, 'Software\Classes\Directory\shell', 'ScanWithOptiCombat');
+  RemoveExplorerShellMenu(HKCU, 'Software\Classes\Directory\shell', 'Shell_ScanWith');
+
+  RemoveExplorerShellMenu(HKCR, '*\shell', 'optiSCAN.Scan');
+  RemoveExplorerShellMenu(HKCR, '*\shell', 'Scanner avec optiSCAN');
+  RemoveExplorerShellMenu(HKCR, '*\shell', 'Scan with optiSCAN');
+  RemoveExplorerShellMenu(HKCR, '*\shell', 'Scanner avec optiCombat');
+  RemoveExplorerShellMenu(HKCR, '*\shell', 'Scan with optiCombat');
+  RemoveExplorerShellMenu(HKCR, '*\shell', 'ScanWithOptiSCAN');
+  RemoveExplorerShellMenu(HKCR, '*\shell', 'ScanWithOptiCombat');
+  RemoveExplorerShellMenu(HKCR, '*\shell', 'Shell_ScanWith');
+
+  RemoveExplorerShellMenu(HKCR, 'Directory\shell', 'optiSCAN.Scan');
+  RemoveExplorerShellMenu(HKCR, 'Directory\shell', 'Scanner avec optiSCAN');
+  RemoveExplorerShellMenu(HKCR, 'Directory\shell', 'Scan with optiSCAN');
+  RemoveExplorerShellMenu(HKCR, 'Directory\shell', 'Scanner avec optiCombat');
+  RemoveExplorerShellMenu(HKCR, 'Directory\shell', 'Scan with optiCombat');
+  RemoveExplorerShellMenu(HKCR, 'Directory\shell', 'ScanWithOptiSCAN');
+  RemoveExplorerShellMenu(HKCR, 'Directory\shell', 'ScanWithOptiCombat');
+  RemoveExplorerShellMenu(HKCR, 'Directory\shell', 'Shell_ScanWith');
+end;
+
+procedure UnregisterOptiScanSystemArtifacts();
+var
+  ResultCode: Integer;
+begin
+  UnregisterExplorerContextMenus();
+  RegDeleteKeyIncludingSubkeys(HKCU, 'Software\optiSCAN');
+
+  Exec('schtasks.exe', '/Delete /TN "optiSCAN_DailyScan" /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec('schtasks.exe', '/Delete /TN "optiSCAN_Watchdog" /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
+  Exec('fltmc.exe', 'unload optiSCANMinifilter', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec('sc.exe', 'stop optiSCANProtectionV9', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec('sc.exe', 'delete optiSCANProtectionV9', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec('sc.exe', 'stop optiSCANProtectionV8', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec('sc.exe', 'delete optiSCANProtectionV8', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
+  if RegKeyExists(HKLM, 'SOFTWARE\Microsoft\AMSI\Providers\{A8F4E2B1-9C3D-4E5F-8A7B-1C2D3E4F5A6B}') then
+    RegDeleteKeyIncludingSubkeys(HKLM, 'SOFTWARE\Microsoft\AMSI\Providers\{A8F4E2B1-9C3D-4E5F-8A7B-1C2D3E4F5A6B}');
+
+  if DirExists(ExpandConstant('{commonappdata}\optiSCAN')) then
+    DelTree(ExpandConstant('{commonappdata}\optiSCAN'), True, True, True);
+end;
+
+function InitializeUninstall(): Boolean;
+begin
+  UnregisterOptiScanSystemArtifacts();
+  Result := True;
+end;
+
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
   UserDataLocal: string;
@@ -243,27 +317,13 @@ var
   Response: Integer;
   ResultCode: Integer;
 begin
+  if CurUninstallStep = usUninstall then
+    UnregisterOptiScanSystemArtifacts();
+
   if CurUninstallStep = usPostUninstall then
   begin
-    // 1. Toujours : suppression de la branche Registre HKCU\Software\optiSCAN
-    RegDeleteKeyIncludingSubkeys(HKCU, 'Software\optiSCAN');
-    RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\*\shell\Scanner avec optiSCAN');
-    RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\*\shell\Scan with optiSCAN');
-    RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\Directory\shell\Scanner avec optiSCAN');
-    RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\Directory\shell\Scan with optiSCAN');
-    RegDeleteKeyIncludingSubkeys(HKCR, '*\shell\Scanner avec optiSCAN');
-    RegDeleteKeyIncludingSubkeys(HKCR, '*\shell\Scan with optiSCAN');
-    RegDeleteKeyIncludingSubkeys(HKCR, 'Directory\shell\Scanner avec optiSCAN');
-    RegDeleteKeyIncludingSubkeys(HKCR, 'Directory\shell\Scan with optiSCAN');
-
-    Exec('fltmc.exe', 'unload optiSCANMinifilter', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    Exec('sc.exe', 'stop optiSCANProtectionV8', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    Exec('sc.exe', 'delete optiSCANProtectionV8', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-
-    // 2. Proposition : suppression des données utilisateur (quarantaine,
-    //    historique, préférences, logs). On demande explicitement car
-    //    l'utilisateur peut vouloir réinstaller plus tard et conserver son
-    //    historique de scans.
+    UnregisterOptiScanSystemArtifacts();
+    // Proposition : suppression des données utilisateur (quarantaine, historique, préférences, logs).
     UserDataLocal := ExpandConstant('{localappdata}\optiSCAN');
     UserDataRoaming := ExpandConstant('{userappdata}\optiSCAN');
 
@@ -316,32 +376,26 @@ end;
 
 procedure RegisterExplorerContextMenu();
 var
-  MenuName, ExePath, Cmd: string;
+  MenuKey, MenuLabel, ExePath, Cmd: string;
 begin
   if ActiveLanguage = 'english' then
-    MenuName := 'Scan with optiSCAN'
+    MenuLabel := 'Scan with optiSCAN'
   else
-    MenuName := 'Scanner avec optiSCAN';
+    MenuLabel := 'Scanner avec optiSCAN';
 
+  MenuKey := 'optiSCAN.Scan';
   ExePath := ExpandConstant('{app}\{#AppExeName}');
   Cmd := '"' + ExePath + '" --scan "%1"';
 
-  RegDeleteKeyIncludingSubkeys(HKCR, '*\shell\Scanner avec optiSCAN');
-  RegDeleteKeyIncludingSubkeys(HKCR, '*\shell\Scan with optiSCAN');
-  RegDeleteKeyIncludingSubkeys(HKCR, 'Directory\shell\Scanner avec optiSCAN');
-  RegDeleteKeyIncludingSubkeys(HKCR, 'Directory\shell\Scan with optiSCAN');
-  RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\*\shell\Scanner avec optiSCAN');
-  RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\*\shell\Scan with optiSCAN');
-  RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\Directory\shell\Scanner avec optiSCAN');
-  RegDeleteKeyIncludingSubkeys(HKCU, 'Software\Classes\Directory\shell\Scan with optiSCAN');
+  UnregisterExplorerContextMenus();
 
-  RegWriteStringValue(HKCU, 'Software\Classes\*\shell\' + MenuName, '', MenuName);
-  RegWriteStringValue(HKCU, 'Software\Classes\*\shell\' + MenuName, 'Icon', ExePath + ',0');
-  RegWriteStringValue(HKCU, 'Software\Classes\*\shell\' + MenuName + '\command', '', Cmd);
+  RegWriteStringValue(HKCU, 'Software\Classes\*\shell\' + MenuKey, '', MenuLabel);
+  RegWriteStringValue(HKCU, 'Software\Classes\*\shell\' + MenuKey, 'Icon', ExePath + ',0');
+  RegWriteStringValue(HKCU, 'Software\Classes\*\shell\' + MenuKey + '\command', '', Cmd);
 
-  RegWriteStringValue(HKCU, 'Software\Classes\Directory\shell\' + MenuName, '', MenuName);
-  RegWriteStringValue(HKCU, 'Software\Classes\Directory\shell\' + MenuName, 'Icon', ExePath + ',0');
-  RegWriteStringValue(HKCU, 'Software\Classes\Directory\shell\' + MenuName + '\command', '', Cmd);
+  RegWriteStringValue(HKCU, 'Software\Classes\Directory\shell\' + MenuKey, '', MenuLabel);
+  RegWriteStringValue(HKCU, 'Software\Classes\Directory\shell\' + MenuKey, 'Icon', ExePath + ',0');
+  RegWriteStringValue(HKCU, 'Software\Classes\Directory\shell\' + MenuKey + '\command', '', Cmd);
 end;
 
 procedure RegisterDefenderExclusions();
@@ -372,9 +426,9 @@ begin
     begin
       if FileExists(ExpandConstant('{app}\optiSCAN.Service.exe')) then
       begin
-        Exec('sc.exe', 'create optiSCANProtectionV8 binPath= "\"' + ExpandConstant('{app}\optiSCAN.Service.exe') + '\"" start= auto DisplayName= "optiSCAN Protection v8"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-        Exec('sc.exe', 'description optiSCANProtectionV8 "Moteur de protection optiSCAN v8 (RTP, AMSI, IPC)"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-        Exec('sc.exe', 'start optiSCANProtectionV8', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+        Exec('sc.exe', 'create optiSCANProtectionV9 binPath= "\"' + ExpandConstant('{app}\optiSCAN.Service.exe') + '\"" start= auto DisplayName= "optiSCAN Protection v9"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+        Exec('sc.exe', 'description optiSCANProtectionV9 "Moteur de protection optiSCAN v9 (RTP, AMSI, IPC)"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+        Exec('sc.exe', 'start optiSCANProtectionV9', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
       end
       else
       begin

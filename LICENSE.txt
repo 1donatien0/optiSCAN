@@ -1,6 +1,6 @@
 ==============================================================================
   optiSCAN — Contrat de licence utilisateur final (CLUF / EULA)
-  v8.0 — 2026
+  v9.0 — 2026
   Auteur : Dona By
   Site   : https://sourceforge.net/u/donaby
 ==============================================================================
@@ -14,9 +14,9 @@ pas le logiciel et supprimez toute copie en votre possession.
 ARTICLE 1 — DÉFINITIONS
 ------------------------------------------------------------------------------
 
-« Logiciel » désigne le programme optiSCAN v8.0 (édition ClamAV ; build 8.0.0), ses
+« Logiciel » désigne le programme optiSCAN v9.0 (édition ClamAV ; build 9.0.0), ses
 composants, ressources, fichiers de configuration et toute mise à jour fournie
-par l'auteur au titre de la branche v8.x du produit.
+par l'auteur au titre de la branche v9.x du produit.
 
 « Auteur » désigne Dona By, titulaire exclusif des droits
 sur le Logiciel.
@@ -139,8 +139,12 @@ de ses fonctions d'analyse et de nettoyage, à votre demande explicite.
 Les seules connexions réseau établies par le Logiciel sont :
   • Téléchargement de mises à jour de signatures ClamAV
   • Téléchargement de règles YARA depuis GitHub
+  • (Optionnel) Envoi du hash SHA-256 d'un fichier à VirusTotal si vous avez
+    configuré votre propre clé API — jamais le fichier lui-même
 
 Aucune télémétrie, publicité ou compte utilisateur n'est requis.
+Pour le détail des traitements de données, consultez la politique de
+confidentialité fournie avec le Logiciel (docs/POLITIQUE_CONFIDENTIALITE.md).
 
 ------------------------------------------------------------------------------
 ARTICLE 8 — RÉSILIATION
@@ -169,5 +173,5 @@ Pour toute question relative à ce contrat ou au Logiciel :
 
 ------------------------------------------------------------------------------
   Copyright © 2026 Dona By. Tous droits réservés.
-  optiSCAN v8.0 — logiciel gratuit — Vanier, Canada.
+  optiSCAN v9.0 — logiciel gratuit — Vanier, Canada.
 ------------------------------------------------------------------------------

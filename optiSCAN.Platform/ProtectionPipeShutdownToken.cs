@@ -1,9 +1,12 @@
+using System.Runtime.Versioning;
+using System.Security.AccessControl;
 using System.Security.Cryptography;
+using System.Security.Principal;
 using System.Text;
 
 namespace optiSCAN.Platform;
 
-/// <summary>Jeton d'authentification pour l'opération IPC <c>shutdown</c> (fichier ProgramData).</summary>
+/// <summary>Jeton d'authentification pour l'opération IPC <c>shutdown</c> (fichier ProgramData, ACL restreinte).</summary>
 public static class ProtectionPipeShutdownToken
 {
     public static string TokenFilePath { get; } = Path.Combine(
@@ -29,6 +32,8 @@ public static class ProtectionPipeShutdownToken
         var dir = Path.GetDirectoryName(TokenFilePath)!;
         Directory.CreateDirectory(dir);
         File.WriteAllText(TokenFilePath, token, Encoding.UTF8);
+        if (OperatingSystem.IsWindows())
+            TryRestrictTokenFileAcl(TokenFilePath);
     }
 
     public static bool TryRead(out string? token)
@@ -44,6 +49,37 @@ public static class ProtectionPipeShutdownToken
         catch
         {
             return false;
+        }
+    }
+
+    [SupportedOSPlatform("windows")]
+    internal static void TryRestrictTokenFileAcl(string path)
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        try
+        {
+            var security = new FileSecurity();
+            security.SetAccessRuleProtection(isProtected: true, preserveInheritance: false);
+
+            var system = new SecurityIdentifier(WellKnownSidType.LocalSystemSid, null);
+            var admins = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
+
+            security.AddAccessRule(new FileSystemAccessRule(
+                system,
+                FileSystemRights.FullControl,
+                AccessControlType.Allow));
+            security.AddAccessRule(new FileSystemAccessRule(
+                admins,
+                FileSystemRights.FullControl,
+                AccessControlType.Allow));
+
+            new FileInfo(path).SetAccessControl(security);
+        }
+        catch
+        {
+            /* ACL best effort — le jeton reste fonctionnel pour SYSTEM */
         }
     }
 }

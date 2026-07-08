@@ -36,7 +36,11 @@ public sealed class SignatureRefreshCoordinator
         _refreshSignaturesAsync = refreshSignaturesAsync;
         _refreshFooter = refreshFooter;
         _scheduleUiAsync = scheduleUiAsync;
-        _footerOnOutput = (_, _) => _refreshFooter();
+        _footerOnOutput = (_, _) => _scheduleUiAsync(() =>
+        {
+            _refreshFooter();
+            return Task.CompletedTask;
+        });
     }
 
     public void Attach()
