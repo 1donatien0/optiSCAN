@@ -1,4 +1,4 @@
-# Audit technique 360° — optiSCAN v8.0
+# Audit technique 360° — optiSCAN v9.0
 
 **Date :** 23 juin 2026
 **Périmètre :** architecture, qualité de code, sécurité, robustesse, build & distribution, conformité (signature/RGPD), tests/CI.

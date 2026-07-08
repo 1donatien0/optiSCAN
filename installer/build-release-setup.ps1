@@ -80,7 +80,7 @@ New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 $propsPath = Join-Path $root 'Directory.Build.props'
 [xml]$propsXml = Get-Content -LiteralPath $propsPath
 $appVersion = ($propsXml.Project.PropertyGroup.Version | Select-Object -First 1).'#text'
-if ([string]::IsNullOrWhiteSpace($appVersion)) { $appVersion = '8.0.0' }
+if ([string]::IsNullOrWhiteSpace($appVersion)) { $appVersion = '9.0.0' }
 $parts = $appVersion.Split('.')
 $appRelease = if ($parts.Length -ge 2) { "v$($parts[0]).$($parts[1])" } else { "v$appVersion" }
 

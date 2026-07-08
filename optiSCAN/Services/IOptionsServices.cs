@@ -19,4 +19,8 @@ public interface IOptionsServices : IViewServices
     void ApplyRemovableDriveScan(bool enabled);
 
     void ApplyAutoQuarantine(bool enabled);
+
+    DefenderCoexistenceStatus GetDefenderCoexistenceStatus();
+
+    void RefreshDefenderExclusions();
 }

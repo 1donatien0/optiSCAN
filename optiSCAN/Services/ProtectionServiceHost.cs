@@ -55,6 +55,7 @@ public sealed class ProtectionServiceHost : IDisposable
         }
 
         MinifilterUserBridge.Stop();
+        PlatformRegistration.TryUnregisterAmsiProvider();
         if (_pipeServer != null)
             await _pipeServer.StopAsync().ConfigureAwait(false);
 

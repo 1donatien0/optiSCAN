@@ -57,40 +57,52 @@ public static class PlatformProtectionStatusService
 
         var dllPath = Path.Combine(AppContext.BaseDirectory, "optiSCAN.AmsiProvider.dll");
         var dllPresent = File.Exists(dllPath);
-        var amsiRegistered = IsAmsiProviderRegistered(dllPath);
 
-        if (!dllPresent)
+        if (!prefs.UsePlatformProtectionService)
         {
             items.Add(new PlatformComponentStatus
             {
-                LabelKey = "Platform_AmsiDllMissing",
-                State = PlatformComponentState.Warning,
-            });
-        }
-        else if (!amsiRegistered)
-        {
-            items.Add(new PlatformComponentStatus
-            {
-                LabelKey = "Platform_AmsiNotRegistered",
-                State = PlatformComponentState.Warning,
+                LabelKey = dllPresent ? "Platform_AmsiPresentInactive" : "Platform_AmsiDllMissing",
+                State = PlatformComponentState.NotApplicable,
             });
         }
         else
         {
-            items.Add(new PlatformComponentStatus
-            {
-                LabelKey = "Platform_AmsiRegistered",
-                State = PlatformComponentState.Active,
-            });
-        }
+            var amsiRegistered = IsAmsiProviderRegistered(dllPath);
 
-        if (IsDefenderServiceRunning() && amsiRegistered)
-        {
-            items.Add(new PlatformComponentStatus
+            if (!dllPresent)
             {
-                LabelKey = "Platform_DefenderMayOverride",
-                State = PlatformComponentState.Warning,
-            });
+                items.Add(new PlatformComponentStatus
+                {
+                    LabelKey = "Platform_AmsiDllMissing",
+                    State = PlatformComponentState.Warning,
+                });
+            }
+            else if (!amsiRegistered)
+            {
+                items.Add(new PlatformComponentStatus
+                {
+                    LabelKey = "Platform_AmsiNotRegistered",
+                    State = PlatformComponentState.Warning,
+                });
+            }
+            else
+            {
+                items.Add(new PlatformComponentStatus
+                {
+                    LabelKey = "Platform_AmsiRegistered",
+                    State = PlatformComponentState.Active,
+                });
+            }
+
+            if (IsDefenderServiceRunning() && amsiRegistered)
+            {
+                items.Add(new PlatformComponentStatus
+                {
+                    LabelKey = "Platform_DefenderMayOverride",
+                    State = PlatformComponentState.Warning,
+                });
+            }
         }
 
         var sysPresent = File.Exists(Path.Combine(AppContext.BaseDirectory, "optiSCAN.Minifilter.sys"));

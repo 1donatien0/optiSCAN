@@ -25,6 +25,9 @@ namespace optiSCAN.Services
 
         private static int _ensureInFlight;
 
+        /// <summary>Dernier résultat connu (Options / onboarding).</summary>
+        internal static DefenderExclusionResult? LastExclusionResult { get; private set; }
+
         /// <summary>Idempotent — appelé au démarrage (arrière-plan).</summary>
         public static void EnsureOptiscanExclusionsAsync()
         {
@@ -36,6 +39,7 @@ namespace optiSCAN.Services
                 try
                 {
                     var result = EnsureOptiscanExclusions();
+                    LastExclusionResult = result;
                     if (result.Status == DefenderExclusionStatus.Added)
                         AppLogger.Info("DefenderExclusion", $"Exclusions ajoutées ({result.AddedCount})");
                     else if (result.Status is DefenderExclusionStatus.PartialFailure or DefenderExclusionStatus.AccessDenied)
@@ -130,7 +134,9 @@ namespace optiSCAN.Services
                 """;
 
             var run = RunPowerShell(script.Replace("__PAYLOAD__", payload, StringComparison.Ordinal));
-            return ParseResult(run.ExitCode, run.Output);
+            var result = ParseResult(run.ExitCode, run.Output);
+            LastExclusionResult = result;
+            return result;
         }
 
         internal static IReadOnlyList<string> CollectExclusionPaths()
@@ -280,7 +286,7 @@ namespace optiSCAN.Services
         }
     }
 
-    internal enum DefenderExclusionStatus
+    public enum DefenderExclusionStatus
     {
         NotApplicable,
         DefenderUnavailable,
@@ -290,7 +296,7 @@ namespace optiSCAN.Services
         AccessDenied,
     }
 
-    internal readonly struct DefenderExclusionResult
+    public readonly struct DefenderExclusionResult
     {
         public DefenderExclusionStatus Status { get; }
         public int AddedCount { get; }

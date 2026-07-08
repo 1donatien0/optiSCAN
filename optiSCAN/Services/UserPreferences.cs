@@ -120,6 +120,15 @@ namespace optiSCAN.Services
         /// <summary>Utiliser le service Windows / --service-host pour la protection système.</summary>
         public bool UsePlatformProtectionService { get; set; } = true;
 
+        /// <summary>Windows Defender actif : optiSCAN en complément (scans manuels, pas de RTP concurrent).</summary>
+        public bool DefenderComplementModeEnabled { get; set; }
+
+        /// <summary>Choix de cohabitation Defender présenté (onboarding ou migration).</summary>
+        public bool DefenderCoexistenceConfigured { get; set; } = true;
+
+        /// <summary>Premier lancement sur poste Defender : RTP optiSCAN tenu désactivé jusqu'à l'onboarding.</summary>
+        public bool FirstLaunchDefenderPending { get; set; }
+
         /// <summary>
         /// Seuil (jours) au-delà duquel une suggestion de nettoyage est affichée sur l'accueil.
         /// Valeur par défaut : <see cref="RecommendationThresholds.CleanSuggestThresholdDays"/>.
@@ -208,6 +217,7 @@ namespace optiSCAN.Services
             // cochée/décochée. Sans cette lecture, UserPreferences ignore le choix de l'installateur.
             var prefs = new UserPreferences();
             ApplyInnoSetupDefaults(prefs);
+            DefenderCoexistenceService.ApplyNewInstallDefaults(prefs);
             return prefs;
         }
 

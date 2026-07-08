@@ -3,21 +3,44 @@ using optiSCAN.Services;
 
 namespace optiSCAN.Localization
 {
-    /// <summary>Menu contextuel Explorateur « Scanner avec optiSCAN » / « Scan with optiSCAN » (fichiers et dossiers).</summary>
+    /// <summary>
+    /// Menu contextuel Explorateur optiSCAN (fichiers et dossiers).
+    /// Utilise une clé registre stable (<see cref="StableMenuKey"/>) et un libellé localisé.
+    /// </summary>
     internal static class ShellContextMenuSupport
     {
+        /// <summary>Clé registre stable — le libellé affiché est la valeur (default) localisée.</summary>
+        public const string StableMenuKey = "optiSCAN.Scan";
+
         private static readonly string[] ShellKeys =
         {
             @"Software\Classes\*\shell",
             @"Software\Classes\Directory\shell",
         };
 
-        private const string LegacyFrenchName = "Scanner avec optiSCAN";
-        private const string LegacyEnglishName = "Scan with optiSCAN";
+        /// <summary>Toutes les clés shell historiques (y compris optiCombat et noms localisés).</summary>
+        internal static readonly string[] LegacyMenuKeys =
+        {
+            StableMenuKey,
+            "Scanner avec optiSCAN",
+            "Scan with optiSCAN",
+            "Scanner avec optiCombat",
+            "Scan with optiCombat",
+            "ScanWithOptiSCAN",
+            "ScanWithOptiCombat",
+            "Shell_ScanWith",
+        };
 
         public static void ApplyForCurrentCulture()
         {
-            var menuName = LocalizationService.GetString("Shell_ScanWith");
+            var displayName = LocalizationService.GetString("Shell_ScanWith");
+            if (string.IsNullOrWhiteSpace(displayName) || displayName == "Shell_ScanWith")
+            {
+                displayName = LocalizationService.IsEnglish
+                    ? "Scan with optiSCAN"
+                    : "Scanner avec optiSCAN";
+            }
+
             var exe = Environment.ProcessPath;
             if (string.IsNullOrWhiteSpace(exe))
                 exe = System.Diagnostics.Process.GetCurrentProcess().MainModule?.FileName;
@@ -26,25 +49,40 @@ namespace optiSCAN.Localization
 
             try
             {
+                RemoveAllMenus();
                 foreach (var shellKey in ShellKeys)
-                {
-                    RemoveMenu(shellKey, LegacyFrenchName);
-                    RemoveMenu(shellKey, LegacyEnglishName);
-
-                    using var shell = Registry.CurrentUser.CreateSubKey(shellKey);
-                    if (shell == null)
-                        continue;
-
-                    using var menu = shell.CreateSubKey(menuName);
-                    menu?.SetValue("Icon", $"{exe},0");
-                    using var command = menu?.CreateSubKey("command");
-                    command?.SetValue("", $"\"{exe}\" --scan \"%1\"");
-                }
+                    RegisterMenu(shellKey, StableMenuKey, displayName, exe);
             }
             catch (Exception ex)
             {
                 AppLogger.Warn("ShellContextMenu", "ApplyForCurrentCulture", ex);
             }
+        }
+
+        /// <summary>Supprime toutes les entrées shell optiSCAN connues (HKCU).</summary>
+        public static void RemoveAllMenus()
+        {
+            foreach (var shellKey in ShellKeys)
+            {
+                foreach (var menuKey in LegacyMenuKeys)
+                    RemoveMenu(shellKey, menuKey);
+            }
+        }
+
+        private static void RegisterMenu(string shellKey, string menuKey, string displayName, string exe)
+        {
+            using var shell = Registry.CurrentUser.CreateSubKey(shellKey);
+            if (shell == null)
+                return;
+
+            using var menu = shell.CreateSubKey(menuKey);
+            if (menu == null)
+                return;
+
+            menu.SetValue(string.Empty, displayName);
+            menu.SetValue("Icon", $"{exe},0");
+            using var command = menu.CreateSubKey("command");
+            command?.SetValue(string.Empty, $"\"{exe}\" --scan \"%1\"");
         }
 
         private static void RemoveMenu(string shellKey, string name)

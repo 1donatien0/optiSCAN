@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -13,7 +13,7 @@
     <AssemblyName>optiSCAN</AssemblyName>
     <RootNamespace>optiSCAN</RootNamespace>
     <Company>optiSCAN</Company>
-    <Product>optiSCAN v8.0 — ClamAV Edition</Product>
+    <Product>optiSCAN v9.0 — ClamAV Edition</Product>
     <Copyright>Copyright 2026 Dona By</Copyright>
     <!-- Icône embarquée dans l'exécutable (barre des tâches, Explorateur, installateur) -->
     <ApplicationIcon>optiSCAN.ico</ApplicationIcon>
@@ -79,7 +79,17 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Binaires YARA -->
+    <Content Include="..\LICENSE.txt">
+      <Link>LICENSE.txt</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\docs\POLITIQUE_CONFIDENTIALITE.md">
+      <Link>docs\POLITIQUE_CONFIDENTIALITE.md</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup>
     <Content Include="yara\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
