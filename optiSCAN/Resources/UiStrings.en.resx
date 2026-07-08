@@ -397,6 +397,10 @@
   <data name="Opt_UpdateHint" xml:space="preserve"><value>optiSCAN does not automatically download a new program version. ClamAV signatures and YARA rules are managed under Antivirus → Signatures.</value></data>
   <data name="Opt_AboutUpdates" xml:space="preserve"><value>Version information…</value></data>
   <data name="Opt_SourceForge" xml:space="preserve"><value>SourceForge page</value></data>
+  <data name="Opt_PrivacyPolicy" xml:space="preserve"><value>Privacy policy</value></data>
+  <data name="Opt_License" xml:space="preserve"><value>License agreement (EULA)</value></data>
+  <data name="Opt_LegalHint" xml:space="preserve"><value>Legal documents shipped with optiSCAN.</value></data>
+  <data name="Opt_OpenDocError" xml:space="preserve"><value>Could not open document: {0}</value></data>
   <data name="Opt_Exclusions" xml:space="preserve"><value>Exclusions</value></data>
   <data name="Opt_ExclHint" xml:space="preserve"><value>Folders skipped during scans</value></data>
   <data name="Opt_Add" xml:space="preserve"><value>Add</value></data>
@@ -588,6 +592,7 @@
   <data name="YaraForge_Cancelled" xml:space="preserve"><value>Rules update cancelled.</value></data>
   <data name="YaraForge_Error" xml:space="preserve"><value>Unexpected error during rules update: {0}</value></data>
   <data name="YaraForge_VersionAvailable" xml:space="preserve"><value>Available version: {0}</value></data>
+  <data name="YaraForge_IntegrityError" xml:space="preserve"><value>Downloaded package failed integrity verification (size or digest). Update cancelled.</value></data>
   <data name="Vm_QuarantineEmpty" xml:space="preserve"><value>No files in quarantine.</value></data>
   <data name="Vm_QuarantineAllShown" xml:space="preserve"><value>All entries shown ({0:N0}).</value></data>
   <data name="Vm_QuarantinePartial" xml:space="preserve"><value>{0:N0} of {1:N0} shown — click Load more for the rest.</value></data>

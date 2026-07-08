@@ -397,6 +397,10 @@
   <data name="Opt_UpdateHint" xml:space="preserve"><value>optiSCAN ne télécharge pas automatiquement une nouvelle version du programme. Les signatures ClamAV et YARA se gèrent dans Antivirus → Signatures.</value></data>
   <data name="Opt_AboutUpdates" xml:space="preserve"><value>Informations de version…</value></data>
   <data name="Opt_SourceForge" xml:space="preserve"><value>Page SourceForge</value></data>
+  <data name="Opt_PrivacyPolicy" xml:space="preserve"><value>Politique de confidentialité</value></data>
+  <data name="Opt_License" xml:space="preserve"><value>Contrat de licence (EULA)</value></data>
+  <data name="Opt_LegalHint" xml:space="preserve"><value>Documents légaux fournis avec optiSCAN.</value></data>
+  <data name="Opt_OpenDocError" xml:space="preserve"><value>Impossible d'ouvrir le document : {0}</value></data>
   <data name="Opt_Exclusions" xml:space="preserve"><value>Exclusions</value></data>
   <data name="Opt_ExclHint" xml:space="preserve"><value>Dossiers ignorés lors de l'analyse</value></data>
   <data name="Opt_Add" xml:space="preserve"><value>Ajouter</value></data>
@@ -588,6 +592,7 @@
   <data name="YaraForge_Cancelled" xml:space="preserve"><value>Mise à jour des règles annulée.</value></data>
   <data name="YaraForge_Error" xml:space="preserve"><value>Erreur inattendue lors de la mise à jour des règles : {0}</value></data>
   <data name="YaraForge_VersionAvailable" xml:space="preserve"><value>Version disponible : {0}</value></data>
+  <data name="YaraForge_IntegrityError" xml:space="preserve"><value>Le paquet téléchargé n'a pas passé la vérification d'intégrité (taille ou empreinte). Mise à jour annulée.</value></data>
   <data name="Vm_QuarantineEmpty" xml:space="preserve"><value>Aucun fichier en quarantaine.</value></data>
   <data name="Vm_QuarantineAllShown" xml:space="preserve"><value>Toutes les entrées sont affichées ({0:N0}).</value></data>
   <data name="Vm_QuarantinePartial" xml:space="preserve"><value>{0:N0} sur {1:N0} affiché(s) — « Charger plus » pour la suite.</value></data>

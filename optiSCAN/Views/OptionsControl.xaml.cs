@@ -610,6 +610,44 @@ namespace optiSCAN.Views
             await Task.CompletedTask;
         }
 
+        private void BtnOpenPrivacyPolicy_Click(object sender, RoutedEventArgs e) =>
+            OpenBundledDocument("docs\\POLITIQUE_CONFIDENTIALITE.md");
+
+        private void BtnOpenLicense_Click(object sender, RoutedEventArgs e) =>
+            OpenBundledDocument("LICENSE.txt");
+
+        private static void OpenBundledDocument(string relativePath)
+        {
+            var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, relativePath);
+            if (!File.Exists(path))
+            {
+                System.Windows.MessageBox.Show(
+                    LocalizationService.Format("Opt_OpenDocError", path),
+                    LocalizationService.GetString("Opt_Title"),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = path,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("OptionsControl", $"Open document {relativePath}", ex);
+                System.Windows.MessageBox.Show(
+                    LocalizationService.Format("Opt_OpenDocError", ex.Message),
+                    LocalizationService.GetString("Opt_Title"),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+        }
+
         private void BtnAddExclusion_Click(object sender, RoutedEventArgs e)
         {
             using var dlg = new WinForms.FolderBrowserDialog

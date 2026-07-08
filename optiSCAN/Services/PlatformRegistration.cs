@@ -81,7 +81,8 @@ public static class PlatformRegistration
 
     public static void TryUnloadMinifilter()
     {
-        try { RunProcess("fltmc.exe", "unload optiSCANMinifilter"); } catch { }
+        try { RunProcess("fltmc.exe", "unload optiSCANMinifilter"); }
+        catch (Exception ex) { AppLogger.Debug("PlatformRegistration", $"TryUnloadMinifilter: {ex.Message}"); }
     }
 
     private static void RunProcess(string file, string args)
