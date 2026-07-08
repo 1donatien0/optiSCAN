@@ -349,16 +349,17 @@
   <data name="Opt_TamperProtection" xml:space="preserve"><value>Protection anti-manipulation</value></data>
   <data name="Opt_TamperProtectionSub" xml:space="preserve"><value>Relance optiSCAN en arrière-plan si la protection temps réel est attendue mais l'application est arrêtée.</value></data>
   <data name="Opt_PlatformProtection" xml:space="preserve"><value>Service Windows de protection système</value></data>
-  <data name="Opt_PlatformProtectionSub" xml:space="preserve"><value>Moteur RTP/AMSI/minifilter dans optiSCAN.Service (IPC v8). Nécessite des droits administrateur à l'installation.</value></data>
+  <data name="Opt_PlatformProtectionSub" xml:space="preserve"><value>Moteur RTP/AMSI/minifilter dans optiSCAN.Service (IPC v9). Nécessite des droits administrateur à l'installation.</value></data>
   <data name="Repair_Quarantined" xml:space="preserve"><value>Fichier mis en quarantaine.</value></data>
   <data name="Repair_QuarantineFailed" xml:space="preserve"><value>Échec de la quarantaine.</value></data>
-  <data name="Platform_StatusTitle" xml:space="preserve"><value>Protection système v8</value></data>
+  <data name="Platform_StatusTitle" xml:space="preserve"><value>Protection système v9</value></data>
   <data name="Platform_IpcActive" xml:space="preserve"><value>Service IPC / moteur distant actif</value></data>
   <data name="Platform_IpcInactive" xml:space="preserve"><value>Service IPC injoignable (repli RTP locale possible)</value></data>
   <data name="Platform_IpcDisabled" xml:space="preserve"><value>Service Windows désactivé (RTP dans l'application)</value></data>
   <data name="Platform_AmsiDllMissing" xml:space="preserve"><value>AMSI : DLL optiSCAN.AmsiProvider.dll absente</value></data>
   <data name="Platform_AmsiNotRegistered" xml:space="preserve"><value>AMSI : fournisseur non enregistré (admin requis)</value></data>
   <data name="Platform_AmsiRegistered" xml:space="preserve"><value>AMSI : fournisseur enregistré</value></data>
+  <data name="Platform_AmsiPresentInactive" xml:space="preserve"><value>AMSI : DLL présente, désactivée (protection plateforme off)</value></data>
   <data name="Platform_DefenderMayOverride" xml:space="preserve"><value>Defender actif — peut prendre la priorité AMSI sur les scripts</value></data>
   <data name="Platform_MinifilterLoaded" xml:space="preserve"><value>Minifilter noyau chargé</value></data>
   <data name="Platform_MinifilterNotLoaded" xml:space="preserve"><value>Minifilter présent mais non chargé (test signing / admin)</value></data>
@@ -396,6 +397,10 @@
   <data name="Opt_UpdateHint" xml:space="preserve"><value>optiSCAN ne télécharge pas automatiquement une nouvelle version du programme. Les signatures ClamAV et YARA se gèrent dans Antivirus → Signatures.</value></data>
   <data name="Opt_AboutUpdates" xml:space="preserve"><value>Informations de version…</value></data>
   <data name="Opt_SourceForge" xml:space="preserve"><value>Page SourceForge</value></data>
+  <data name="Opt_PrivacyPolicy" xml:space="preserve"><value>Politique de confidentialité</value></data>
+  <data name="Opt_License" xml:space="preserve"><value>Contrat de licence (EULA)</value></data>
+  <data name="Opt_LegalHint" xml:space="preserve"><value>Documents légaux fournis avec optiSCAN.</value></data>
+  <data name="Opt_OpenDocError" xml:space="preserve"><value>Impossible d'ouvrir le document : {0}</value></data>
   <data name="Opt_Exclusions" xml:space="preserve"><value>Exclusions</value></data>
   <data name="Opt_ExclHint" xml:space="preserve"><value>Dossiers ignorés lors de l'analyse</value></data>
   <data name="Opt_Add" xml:space="preserve"><value>Ajouter</value></data>
@@ -501,7 +506,7 @@
   <data name="Hist_SearchScan" xml:space="preserve"><value>Rechercher (cible, type, menace)…</value></data>
   <data name="Hist_SearchClean" xml:space="preserve"><value>Rechercher (cibles)…</value></data>
   <data name="Hist_DetailSelectClean" xml:space="preserve"><value>Sélectionnez un nettoyage pour afficher le journal d'opérations.</value></data>
-  <data name="Hist_DetailThreatsLegacy" xml:space="preserve"><value>(Session enregistrée sous v7 : chemins des menaces non conservés. Les analyses v8 enregistrent le détail.)</value></data>
+  <data name="Hist_DetailThreatsLegacy" xml:space="preserve"><value>(Session enregistrée sous v7 : chemins des menaces non conservés. Les analyses v9 enregistrent le détail.)</value></data>
   <data name="Hist_ThreatsTitle" xml:space="preserve"><value>Détections de la session</value></data>
   <data name="Hist_TreatInAv" xml:space="preserve"><value>Traiter dans Analyse</value></data>
   <data name="Hist_TooltipTreatInAv" xml:space="preserve"><value>Ouvre l'onglet Analyse avec les menaces de cette session pour les traiter comme après un scan.</value></data>
@@ -587,6 +592,7 @@
   <data name="YaraForge_Cancelled" xml:space="preserve"><value>Mise à jour des règles annulée.</value></data>
   <data name="YaraForge_Error" xml:space="preserve"><value>Erreur inattendue lors de la mise à jour des règles : {0}</value></data>
   <data name="YaraForge_VersionAvailable" xml:space="preserve"><value>Version disponible : {0}</value></data>
+  <data name="YaraForge_IntegrityError" xml:space="preserve"><value>Le paquet téléchargé n'a pas passé la vérification d'intégrité (taille ou empreinte). Mise à jour annulée.</value></data>
   <data name="Vm_QuarantineEmpty" xml:space="preserve"><value>Aucun fichier en quarantaine.</value></data>
   <data name="Vm_QuarantineAllShown" xml:space="preserve"><value>Toutes les entrées sont affichées ({0:N0}).</value></data>
   <data name="Vm_QuarantinePartial" xml:space="preserve"><value>{0:N0} sur {1:N0} affiché(s) — « Charger plus » pour la suite.</value></data>
@@ -659,6 +665,17 @@
   <data name="Onboarding_Step1" xml:space="preserve"><value>optiSCAN protège et nettoie votre PC localement (ClamAV + YARA).&#10;&#10;Ce guide rapide vous indique les trois gestes utiles au premier lancement.</value></data>
   <data name="Onboarding_Step2" xml:space="preserve"><value>Mettre à jour les signatures antivirus maintenant ?&#10;(Antivirus → Signatures)</value></data>
   <data name="Onboarding_Step3" xml:space="preserve"><value>Étape suivante : lancez une analyse rapide avec F5 depuis l'onglet Antivirus.&#10;&#10;Sans droits administrateur, l'analyse complète et le scan planifié restent partiels.</value></data>
+  <data name="Onboarding_DefenderTitle" xml:space="preserve"><value>Windows Defender détecté</value></data>
+  <data name="Onboarding_DefenderStep" xml:space="preserve"><value>Windows Defender protège déjà votre PC en temps réel.&#10;&#10;Recommandé : laisser Defender actif et utiliser optiSCAN en complément (analyses manuelles et planifiées avec ClamAV + YARA).&#10;&#10;Oui = mode complément (plus fluide, moins de conflits)&#10;Non = activer aussi la protection temps réel optiSCAN</value></data>
+  <data name="Defender_Opt_Title" xml:space="preserve"><value>Cohabitation avec Windows Defender</value></data>
+  <data name="Defender_Opt_StatusInactive" xml:space="preserve"><value>Windows Defender n'est pas le service antivirus actif sur ce poste.</value></data>
+  <data name="Defender_Opt_StatusComplement" xml:space="preserve"><value>Mode complément : Defender garde le temps réel ; optiSCAN analyse à la demande (recommandé).</value></data>
+  <data name="Defender_Opt_StatusParallel" xml:space="preserve"><value>Protection optiSCAN active en parallèle de Defender (charge disque plus élevée).</value></data>
+  <data name="Defender_Opt_ExclusionsOk" xml:space="preserve"><value>Exclusions Defender : configurées pour optiSCAN et les moteurs ClamAV/YARA.</value></data>
+  <data name="Defender_Opt_ExclusionsPending" xml:space="preserve"><value>Exclusions Defender : en attente ou non vérifiées. Utilisez le bouton ci-dessous si besoin.</value></data>
+  <data name="Defender_Opt_ExclusionsPartial" xml:space="preserve"><value>Exclusions Defender : partiellement appliquées. Relancez ou ajoutez-les manuellement dans Sécurité Windows.</value></data>
+  <data name="Defender_Opt_ExclusionsTamper" xml:space="preserve"><value>Exclusions Defender : accès refusé (protection contre la falsification ?). Ajoutez-les manuellement dans Sécurité Windows → Exclusions.</value></data>
+  <data name="Defender_Opt_RefreshExclusions" xml:space="preserve"><value>Réappliquer les exclusions Defender</value></data>
   <data name="SigUpd_HeaderStart" xml:space="preserve"><value>=== Mise à jour des signatures ===</value></data>
   <data name="SigUpd_StepClam" xml:space="preserve"><value>1. Signatures ClamAV…</value></data>
   <data name="SigUpd_StepRules" xml:space="preserve"><value>2. Règles de détection…</value></data>

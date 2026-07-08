@@ -349,16 +349,17 @@
   <data name="Opt_TamperProtection" xml:space="preserve"><value>Anti-tamper protection</value></data>
   <data name="Opt_TamperProtectionSub" xml:space="preserve"><value>Restarts optiSCAN in the background if real-time protection is expected but the app was closed.</value></data>
   <data name="Opt_PlatformProtection" xml:space="preserve"><value>Windows system protection service</value></data>
-  <data name="Opt_PlatformProtectionSub" xml:space="preserve"><value>RTP/AMSI/minifilter engine in optiSCAN.Service (v8 IPC). Requires administrator rights at install time.</value></data>
+  <data name="Opt_PlatformProtectionSub" xml:space="preserve"><value>RTP/AMSI/minifilter engine in optiSCAN.Service (v9 IPC). Requires administrator rights at install time.</value></data>
   <data name="Repair_Quarantined" xml:space="preserve"><value>File quarantined.</value></data>
   <data name="Repair_QuarantineFailed" xml:space="preserve"><value>Quarantine failed.</value></data>
-  <data name="Platform_StatusTitle" xml:space="preserve"><value>System protection v8</value></data>
+  <data name="Platform_StatusTitle" xml:space="preserve"><value>System protection v9</value></data>
   <data name="Platform_IpcActive" xml:space="preserve"><value>IPC service / remote engine active</value></data>
   <data name="Platform_IpcInactive" xml:space="preserve"><value>IPC service unreachable (local RTP fallback possible)</value></data>
   <data name="Platform_IpcDisabled" xml:space="preserve"><value>Windows service disabled (RTP in application)</value></data>
   <data name="Platform_AmsiDllMissing" xml:space="preserve"><value>AMSI: optiSCAN.AmsiProvider.dll missing</value></data>
   <data name="Platform_AmsiNotRegistered" xml:space="preserve"><value>AMSI: provider not registered (admin required)</value></data>
   <data name="Platform_AmsiRegistered" xml:space="preserve"><value>AMSI: provider registered</value></data>
+  <data name="Platform_AmsiPresentInactive" xml:space="preserve"><value>AMSI: DLL present, inactive (platform protection off)</value></data>
   <data name="Platform_DefenderMayOverride" xml:space="preserve"><value>Defender active — may take AMSI priority on scripts</value></data>
   <data name="Platform_MinifilterLoaded" xml:space="preserve"><value>Kernel minifilter loaded</value></data>
   <data name="Platform_MinifilterNotLoaded" xml:space="preserve"><value>Minifilter present but not loaded (test signing / admin)</value></data>
@@ -396,6 +397,10 @@
   <data name="Opt_UpdateHint" xml:space="preserve"><value>optiSCAN does not automatically download a new program version. ClamAV signatures and YARA rules are managed under Antivirus → Signatures.</value></data>
   <data name="Opt_AboutUpdates" xml:space="preserve"><value>Version information…</value></data>
   <data name="Opt_SourceForge" xml:space="preserve"><value>SourceForge page</value></data>
+  <data name="Opt_PrivacyPolicy" xml:space="preserve"><value>Privacy policy</value></data>
+  <data name="Opt_License" xml:space="preserve"><value>License agreement (EULA)</value></data>
+  <data name="Opt_LegalHint" xml:space="preserve"><value>Legal documents shipped with optiSCAN.</value></data>
+  <data name="Opt_OpenDocError" xml:space="preserve"><value>Could not open document: {0}</value></data>
   <data name="Opt_Exclusions" xml:space="preserve"><value>Exclusions</value></data>
   <data name="Opt_ExclHint" xml:space="preserve"><value>Folders skipped during scans</value></data>
   <data name="Opt_Add" xml:space="preserve"><value>Add</value></data>
@@ -501,7 +506,7 @@
   <data name="Hist_SearchScan" xml:space="preserve"><value>Search (target, type, threat)…</value></data>
   <data name="Hist_SearchClean" xml:space="preserve"><value>Search (targets)…</value></data>
   <data name="Hist_DetailSelectClean" xml:space="preserve"><value>Select a cleanup to view the operation log.</value></data>
-  <data name="Hist_DetailThreatsLegacy" xml:space="preserve"><value>(Session saved under v7: threat paths were not stored. v8 scans keep full details.)</value></data>
+  <data name="Hist_DetailThreatsLegacy" xml:space="preserve"><value>(Session saved under v7: threat paths were not stored. v9 scans keep full details.)</value></data>
   <data name="Hist_ThreatsTitle" xml:space="preserve"><value>Session detections</value></data>
   <data name="Hist_TreatInAv" xml:space="preserve"><value>Treat in Scan</value></data>
   <data name="Hist_TooltipTreatInAv" xml:space="preserve"><value>Opens the Scan tab with this session's threats so you can quarantine, ignore, or delete them.</value></data>
@@ -587,6 +592,7 @@
   <data name="YaraForge_Cancelled" xml:space="preserve"><value>Rules update cancelled.</value></data>
   <data name="YaraForge_Error" xml:space="preserve"><value>Unexpected error during rules update: {0}</value></data>
   <data name="YaraForge_VersionAvailable" xml:space="preserve"><value>Available version: {0}</value></data>
+  <data name="YaraForge_IntegrityError" xml:space="preserve"><value>Downloaded package failed integrity verification (size or digest). Update cancelled.</value></data>
   <data name="Vm_QuarantineEmpty" xml:space="preserve"><value>No files in quarantine.</value></data>
   <data name="Vm_QuarantineAllShown" xml:space="preserve"><value>All entries shown ({0:N0}).</value></data>
   <data name="Vm_QuarantinePartial" xml:space="preserve"><value>{0:N0} of {1:N0} shown — click Load more for the rest.</value></data>
@@ -659,6 +665,17 @@
   <data name="Onboarding_Step1" xml:space="preserve"><value>optiSCAN protects and cleans your PC locally (ClamAV + YARA).&#10;&#10;This quick guide covers three useful first steps.</value></data>
   <data name="Onboarding_Step2" xml:space="preserve"><value>Update antivirus signatures now?&#10;(Antivirus → Signatures)</value></data>
   <data name="Onboarding_Step3" xml:space="preserve"><value>Next: run a quick scan with F5 from the Antivirus tab.&#10;&#10;Without administrator rights, full and scheduled scans remain partial.</value></data>
+  <data name="Onboarding_DefenderTitle" xml:space="preserve"><value>Windows Defender detected</value></data>
+  <data name="Onboarding_DefenderStep" xml:space="preserve"><value>Windows Defender already protects this PC in real time.&#10;&#10;Recommended: keep Defender active and use optiSCAN as a supplement (manual and scheduled scans with ClamAV + YARA).&#10;&#10;Yes = complement mode (smoother, fewer conflicts)&#10;No = also enable optiSCAN real-time protection</value></data>
+  <data name="Defender_Opt_Title" xml:space="preserve"><value>Coexistence with Windows Defender</value></data>
+  <data name="Defender_Opt_StatusInactive" xml:space="preserve"><value>Windows Defender is not the active antivirus service on this PC.</value></data>
+  <data name="Defender_Opt_StatusComplement" xml:space="preserve"><value>Complement mode: Defender keeps real-time protection; optiSCAN scans on demand (recommended).</value></data>
+  <data name="Defender_Opt_StatusParallel" xml:space="preserve"><value>optiSCAN protection runs alongside Defender (higher disk load).</value></data>
+  <data name="Defender_Opt_ExclusionsOk" xml:space="preserve"><value>Defender exclusions: configured for optiSCAN and ClamAV/YARA engines.</value></data>
+  <data name="Defender_Opt_ExclusionsPending" xml:space="preserve"><value>Defender exclusions: pending or not verified. Use the button below if needed.</value></data>
+  <data name="Defender_Opt_ExclusionsPartial" xml:space="preserve"><value>Defender exclusions: partially applied. Retry or add them manually in Windows Security.</value></data>
+  <data name="Defender_Opt_ExclusionsTamper" xml:space="preserve"><value>Defender exclusions: access denied (tamper protection?). Add them manually in Windows Security → Exclusions.</value></data>
+  <data name="Defender_Opt_RefreshExclusions" xml:space="preserve"><value>Re-apply Defender exclusions</value></data>
   <data name="SigUpd_HeaderStart" xml:space="preserve"><value>=== Signature update ===</value></data>
   <data name="SigUpd_StepClam" xml:space="preserve"><value>1. ClamAV signatures…</value></data>
   <data name="SigUpd_StepRules" xml:space="preserve"><value>2. Detection rules…</value></data>

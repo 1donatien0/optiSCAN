@@ -98,7 +98,7 @@ public:
 
         const std::string request = std::string(R"({"op":"scan_buffer","buffer_b64":")") + b64data + R"(","content_name":"amsi_buffer"})";
         std::string response;
-        if (!optiscan::ipc::ScanBufferViaPipe(L"\\\\.\\pipe\\optiSCAN_Protection_v8", request, response))
+        if (!optiscan::ipc::ScanBufferViaPipe(L"\\\\.\\pipe\\optiSCAN_Protection_v9", request, response))
             return S_OK;
 
         if (response.find("\"clean\":false") != std::string::npos)

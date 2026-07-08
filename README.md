@@ -1,7 +1,7 @@
-# Guide Complet — optiSCAN v8.0
+# Guide Complet — optiSCAN v9.0
 
 > **Version de référence.** Architecture mono-fenêtre, services avancés + Donaby Design System.  
-> **Nomenclature** — **v8.0** : nom de release (documentation, CLUF). **8.0.0** : assembly et installateur (`Directory.Build.props`, Inno Setup).
+> **Nomenclature** — **v9.0** : nom de release (documentation, CLUF). **9.0.0** : assembly et installateur (`Directory.Build.props`, Inno Setup).
 >
 > **Design system : Donaby Design** — thème sombre/clair dynamique, tokens DynamicResource WPF.
 > Développé par **© 2026 Donatien Byakombe (Dona By)**.
@@ -60,13 +60,13 @@ Branche par défaut GitHub : **`main`**. CI : uniquement `main` et `dev` (voir [
 | MVVM + Binding UI | Oui — excellent | Partiel — différent | Non — manuel |
 | **Verdict** | **Retenu** | Non nécessaire | Non nécessaire |
 
-### Architecture plateforme v8 (protection système)
+### Architecture plateforme v9 (protection système)
 
-optiSCAN v8 rapproche un antivirus « classique » via une couche plateforme Windows :
+optiSCAN v9 rapproche un antivirus « classique » via une couche plateforme Windows :
 
 ```
 optiSCAN.exe (UI WPF)
-    ↔ IPC (optiSCAN.Platform — pipe optiSCAN_Protection_v8)
+    ↔ IPC (optiSCAN.Platform — pipe optiSCAN_Protection_v9)
 optiSCAN.Service.exe  →  optiSCAN.exe --service-host
     ├── RTP + ProcessStartMonitor + scan USB
     ├── ProtectionPipeServer (scan path/buffer pour AMSI)
@@ -99,7 +99,7 @@ optiSCAN.Service.exe  →  optiSCAN.exe --service-host
 ├── docs/
 │   └── README.md                      ← Index doc (renvoie vers ce README)
 ├── .editorconfig                      ← Sévérités analyse Roslyn (alignement IDE / MSBuild)
-├── Directory.Build.props              ← Version 8.0.0, NetAnalyzers, TreatWarningsAsErrors (Release)
+├── Directory.Build.props              ← Version 9.0.0, NetAnalyzers, TreatWarningsAsErrors (Release)
 ├── .github/workflows/
 │   ├── ci.yml                         ← Build, tests (289), publish + SBOM (main)
 │   ├── codeql.yml                     ← Analyse CodeQL (C# + natif)
@@ -107,7 +107,7 @@ optiSCAN.Service.exe  →  optiSCAN.exe --service-host
 │   └── gitleaks.yml                   ← Détection fuites secrets
 ├── scripts/
 │   ├── fetch-runtime-deps.ps1         ← Télécharge ClamAV + YARA (CI / dev)
-│   ├── prepare-release-v8.ps1         ← Chaîne complète release v8
+│   ├── prepare-release-v9.ps1         ← Chaîne complète release v9
 │   ├── clean-before-publish.ps1       ← Nettoyage bin/obj avant release
 │   ├── add-defender-exclusions.ps1    ← Exclusions Windows Defender (install / manuel)
 │   ├── generate-sbom.ps1              ← SBOM CycloneDX (CI publish)
@@ -116,7 +116,7 @@ optiSCAN.Service.exe  →  optiSCAN.exe --service-host
 │   ├── validate-release-readiness.ps1 ← Tests Release (+ verify publish optionnel)
 │   └── runtime-versions.json          ← Versions URL ClamAV / YARA
 ├── optiSCAN.sln                       ← Solution Visual Studio
-├── optiSCAN.Platform/                 ← IPC protection système v8
+├── optiSCAN.Platform/                 ← IPC protection système v9
 ├── optiSCAN.Service/                  ← Service Windows (supervise --service-host)
 ├── optiSCAN.Tests/                    ← Tests unitaires (xUnit)
 ├── native/
@@ -344,7 +344,7 @@ après la date textuelle (le premier champ est une date lisible, pas un entier).
 
 ---
 
-## 4. Architecture mono-fenêtre (v8.0)
+## 4. Architecture mono-fenêtre (v9.0)
 
 Les sous-sections **4.1** à **4.11** suivent une lecture « produit » : navigation et panneaux, détail du panneau Antivirus, menaces et pipeline, options techniques (MAJ, exclusions, quarantaine, logs), exports, puis contenu de la vue d’ensemble.
 
@@ -579,7 +579,7 @@ Instance unique : **`ServiceContainer.Default.ScheduledScan`** (partagée avec *
 
 ---
 
-## 6. Workflow utilisateur optiSCAN v8.0
+## 6. Workflow utilisateur optiSCAN v9.0
 
 ```
 DÉMARRAGE (UI)
@@ -654,9 +654,9 @@ Si la **protection contre la falsification** de Defender est active, l’ajout p
 
 ---
 
-## 8. Publication, installateur et checklist release (v8.0)
+## 8. Publication, installateur et checklist release (v9.0)
 
-> **Publication** : assembly **8.0.0** (`Directory.Build.props`, Inno Setup). **Branche** : `dev` → merge → `main` → artefacts CI / installateur — voir [Branches Git](#branches-git).
+> **Publication** : assembly **9.0.0** (`Directory.Build.props`, Inno Setup). **Branche** : `dev` → merge → `main` → artefacts CI / installateur — voir [Branches Git](#branches-git).
 
 ### Prérequis machine de build
 
@@ -668,12 +668,12 @@ Si la **protection contre la falsification** de Defender est active, l’ajout p
 
 ```powershell
 # Depuis la racine du dépôt (dossier contenant optiSCAN.sln)
-.\scripts\prepare-release-v8.ps1
+.\scripts\prepare-release-v9.ps1
 ```
 
 Équivalent manuel : `clean-before-publish` → `fetch-runtime-deps -RunFreshclam` → `dotnet test` → `dotnet publish` → `verify-runtime-deps` → `build-release-setup.ps1`.
 
-Sortie publish : `optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\` (chemin attendu par `installer\setup.iss`). Installateur typique : `installer\output\optiSCAN_Setup_v8.0.0.exe`.
+Sortie publish : `optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\` (chemin attendu par `installer\setup.iss`). Installateur typique : `installer\output\optiSCAN_Setup_v9.0.0.exe`.
 
 **Chaîne locale alternative** : `.\installer\build-release-setup.ps1` (nettoie, publie, lance ISCC).
 
@@ -681,11 +681,11 @@ Sortie publish : `optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x6
 
 1. Gel fonctionnel : `.\scripts\validate-release-readiness.ps1` (ou `dotnet test` Release — **289** tests).
 2. Dépendances : `.\scripts\fetch-runtime-deps.ps1` (+ `-RunFreshclam` pour l’installateur).
-3. Publish local : `.\scripts\prepare-release-v8.ps1` (ou étapes manuelles ci-dessous).
-4. VM propre : installer `optiSCAN_Setup_v8.0.0.exe` ; scan, RTP, clamd, posture, FR/EN.
+3. Publish local : `.\scripts\prepare-release-v9.ps1` (ou étapes manuelles ci-dessous).
+4. VM propre : installer `optiSCAN_Setup_v9.0.0.exe` ; scan, RTP, clamd, posture, FR/EN.
 5. CI : push `main` → job **Publish win-x64** ; artefact `optiSCAN-setup-<sha>.exe`.
 6. Signature (opt.) : Authenticode — `installer/setup.iss.signing.example`.
-7. Tag / distribution : `git tag v8.0.0`, release GitHub, SourceForge ou site.
+7. Tag / distribution : `git tag v9.0.0`, release GitHub, SourceForge ou site.
 
 ### Étapes manuelles détaillées
 
@@ -719,7 +719,7 @@ $pub = ".\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64"
 **Contenu de l'installateur (~260 Mo avec signatures initiales) :**
 
 ```
-optiSCAN_Setup_v8.0.0.exe
+optiSCAN_Setup_v9.0.0.exe
     ├── optiSCAN.exe
     ├── optiSCAN.ico
     ├── *.dll (runtime .NET 8)
@@ -735,7 +735,7 @@ optiSCAN_Setup_v8.0.0.exe
 - [ ] `.\scripts\verify-runtime-deps.ps1` — vert sur dossier publish
 - [ ] `clamscan.exe`, `freshclam.exe`, **`clamd.exe`**, `yara64.exe`, règles `.yar`
 - [ ] `clamav\database\` — au moins un `main.cvd` / `daily.cvd` (via freshclam)
-- [ ] Installateur FR/EN, sidebar **v8.0**, options clamd / VT / mode jeu, accueil posture /100
+- [ ] Installateur FR/EN, sidebar **v9.0**, options clamd / VT / mode jeu, accueil posture /100
 - [ ] Test post-install : scan fichier, quarantaine, **historique → traiter une menace**, exports PDF/HTML ; **clé USB** (scan auto si option activée) ; exclusions Defender (script ou démarrage app)
 - [ ] Après upgrade depuis v7 : `scan_history.dat` présent (éventuellement `scan_history.json.legacy`)
 
@@ -745,7 +745,7 @@ Pipelines : [`.github/workflows/ci.yml`](.github/workflows/ci.yml), [`codeql.yml
 
 | Branche | Comportement |
 |---------|----------------|
-| **`main`** | `fetch-runtime-deps.ps1` → `fetch-runtime-deps.ps1 -RunFreshclam` (timeout 45 min) → build AMSI (optionnel) → `dotnet publish` → SBOM CycloneDX → Inno → `optiSCAN_Setup_v8.0.0.exe` |
+| **`main`** | `fetch-runtime-deps.ps1` → `fetch-runtime-deps.ps1 -RunFreshclam` (timeout 45 min) → build AMSI (optionnel) → `dotnet publish` → SBOM CycloneDX → Inno → `optiSCAN_Setup_v9.0.0.exe` |
 | **`dev`** | Build + tests + artefact binaire Release (sans installateur complet) |
 
 **Couverture** : seuil minimal **40 %** lignes (échec CI si en dessous) ; avertissement si &lt; **50 %** (cible progressive).
@@ -775,7 +775,7 @@ Pipelines : [`.github/workflows/ci.yml`](.github/workflows/ci.yml), [`codeql.yml
 
 ### Signature Authenticode (optionnelle)
 
-Windows affiche « Éditeur inconnu » sans certificat. Utile pour release publique ; nécessite un `.pfx` et des secrets CI (`CODESIGN_PFX`). Exemple : [`installer/setup.iss.signing.example`](installer/setup.iss.signing.example). Signer `optiSCAN.exe` + `optiSCAN_Setup_v8.0.0.exe` (`signtool`).
+Windows affiche « Éditeur inconnu » sans certificat. Utile pour release publique ; nécessite un `.pfx` et des secrets CI (`CODESIGN_PFX`). Exemple : [`installer/setup.iss.signing.example`](installer/setup.iss.signing.example). Signer `optiSCAN.exe` + `optiSCAN_Setup_v9.0.0.exe` (`signtool`).
 
 ---
 
@@ -825,6 +825,14 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 ---
 
 ## 11. Historique des versions produit
+
+### v9.0 — Defender complément, ClamAV 1.4.5, IPC v9
+
+- **Version produit** — assembly **9.0.0** ; service Windows `optiSCANProtectionV9` ; pipes `optiSCAN_Protection_v9` / `optiSCAN_Amsi_v9`
+- **Mode complément Defender** — coexistence recommandée : Defender garde le RTP ; optiSCAN scans manuels/planifiés ; exclusions automatiques
+- **ClamAV 1.4.5** — binaires x64/x86 ; correction `freshclam.conf` (retrait `CVDCertsDirectory`, certificats via `CVD_CERTS_DIR`)
+- **AMSI** — DLL présente mais inactive si protection plateforme désactivée ; désenregistrement AMSI à la coupure
+- **Upgrade v8** — l’installateur retire l’ancien service `optiSCANProtectionV8` si présent
 
 ### v8.0 — Clamd, posture, historique unifié, scan USB, coordinateurs
 
@@ -931,7 +939,7 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 
 ## 12. Audit et qualité
 
-**Verdict (v8.0)** : produit stable ; valider l’installateur sur une machine propre avant diffusion large.
+**Verdict (v9.0)** : produit stable ; valider l’installateur sur une machine propre avant diffusion large.
 
 | Domaine | Note | Commentaire |
 |---------|:----:|-------------|
@@ -947,7 +955,7 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 dotnet test optiSCAN.Tests\optiSCAN.Tests.csproj -c Release
 ```
 
-### 12.1 Maintenabilité et choix volontaires (non bloquants v8)
+### 12.1 Maintenabilité et choix volontaires (non bloquants v9)
 
 **`MainWindow` allégé (v8.1 refactor)** — la logique événementielle est dans `optiSCAN/Coordinators/` (classes `static` + hôtes typés). Il reste dans la fenêtre : enregistrement des panneaux, branchement `ServiceContainer`, et raccourcis navigation.
 
@@ -981,7 +989,7 @@ Liens **Corriger** (accueil) : `optiscan://panel/{id}` (antivirus, options, hist
 
 **Contrôles** : quarantaine AES-GCM + HMAC ; exclusions avec frontière `\` ; périmètres protégés optiSCAN (`OptiscanProtectedPaths`) ; exclusions Defender automatiques (`WindowsDefenderExclusionService`) ; UAC pour scan complet ; RTP ; clamd sur `127.0.0.1`.
 
-**Limites** : malware admin peut neutraliser l’AV local ; AMSI v8 via `optiSCAN.AmsiProvider.dll` (nécessite service + droits admin) ; minifilter encore stub ; VT envoie le hash ; `optiSCAN.log` non chiffré mais sans chemins complets (`PathRedaction` sur les lignes de scan).
+**Limites** : malware admin peut neutraliser l’AV local ; AMSI v9 via `optiSCAN.AmsiProvider.dll` (nécessite service + droits admin) ; minifilter encore stub ; VT envoie le hash ; `optiSCAN.log` non chiffré mais sans chemins complets (`PathRedaction` sur les lignes de scan).
 
 ---
 

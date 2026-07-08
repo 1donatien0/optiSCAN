@@ -9,13 +9,13 @@ namespace optiSCAN.Services
     /// <summary>
     /// Gère l'historique des scans et des nettoyages système et le journal texte.
     ///
-    /// Persistance sécurisée (v8) :
+    /// Persistance sécurisée (v9) :
     ///   - <c>scan_history.dat</c>  / <c>clean_history.dat</c> — chiffrés DPAPI + HMAC-SHA256
     ///     (même format que UserPreferences et ExclusionSettings).
     ///   - Migration transparente depuis les anciens <c>.json</c> en clair au premier chargement ;
     ///     le fichier clair est renommé en <c>.legacy</c> après migration réussie.
     ///
-    /// Sessions scan v8 : liste <see cref="Models.ThreatInfo"/> (chemin + nom) ;
+    /// Sessions scan v9 : liste <see cref="Models.ThreatInfo"/> (chemin + nom) ;
     /// entrées v7 : compteur de menaces sans chemins persistés.
     ///
     /// Rétention implicite (scans et nettoyages) : la liste regrosse jusqu'à 100 entrées,

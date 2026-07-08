@@ -51,7 +51,10 @@ namespace optiSCAN.Views
             IsVisibleChanged += (_, _) =>
             {
                 if (IsVisible)
+                {
                     SyncThemeControls();
+                    RefreshDefenderStatus();
+                }
             };
         }
 
@@ -61,8 +64,13 @@ namespace optiSCAN.Views
         public void Bind(IOptionsServices services)
         {
             _services = services;
+            services.ProtectionStateRefreshRequested += SurDemandeRafraichissementProtection;
             _ = LoadScheduledTaskStateAsync();
+            RefreshDefenderStatus();
         }
+
+        private void SurDemandeRafraichissementProtection(object? sender, EventArgs e) =>
+            RefreshDefenderStatus();
 
         private void SurChangementTheme(object? sender, bool isDark) => SyncThemeControls();
 
@@ -190,6 +198,8 @@ namespace optiSCAN.Views
 
                 if (txtScheduledNextRun != null)
                     txtScheduledNextRun.Text = LocalizationService.GetString("Opt_SchedLoading");
+
+                RefreshDefenderStatus();
             }
             finally
             {
@@ -600,6 +610,44 @@ namespace optiSCAN.Views
             await Task.CompletedTask;
         }
 
+        private void BtnOpenPrivacyPolicy_Click(object sender, RoutedEventArgs e) =>
+            OpenBundledDocument("docs\\POLITIQUE_CONFIDENTIALITE.md");
+
+        private void BtnOpenLicense_Click(object sender, RoutedEventArgs e) =>
+            OpenBundledDocument("LICENSE.txt");
+
+        private static void OpenBundledDocument(string relativePath)
+        {
+            var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, relativePath);
+            if (!File.Exists(path))
+            {
+                System.Windows.MessageBox.Show(
+                    LocalizationService.Format("Opt_OpenDocError", path),
+                    LocalizationService.GetString("Opt_Title"),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+                return;
+            }
+
+            try
+            {
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = path,
+                    UseShellExecute = true
+                });
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("OptionsControl", $"Open document {relativePath}", ex);
+                System.Windows.MessageBox.Show(
+                    LocalizationService.Format("Opt_OpenDocError", ex.Message),
+                    LocalizationService.GetString("Opt_Title"),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+        }
+
         private void BtnAddExclusion_Click(object sender, RoutedEventArgs e)
         {
             using var dlg = new WinForms.FolderBrowserDialog
@@ -670,6 +718,35 @@ namespace optiSCAN.Views
                     break;
             }
             prefs.Save();
+        }
+
+        private void RefreshDefenderStatus()
+        {
+            if (panelDefenderStatus == null || _services == null)
+                return;
+
+            var status = Services.GetDefenderCoexistenceStatus();
+            if (!status.IsDefenderActive)
+            {
+                panelDefenderStatus.Visibility = Visibility.Collapsed;
+                return;
+            }
+
+            panelDefenderStatus.Visibility = Visibility.Visible;
+            if (txtDefenderStatusMode != null)
+                txtDefenderStatusMode.Text = LocalizationService.GetString(status.StatusMessageKey);
+            if (txtDefenderStatusExclusions != null)
+                txtDefenderStatusExclusions.Text = LocalizationService.GetString(status.ExclusionMessageKey);
+        }
+
+        private void BtnRefreshDefenderExclusions_Click(object sender, RoutedEventArgs e)
+        {
+            Services.RefreshDefenderExclusions();
+            _ = Dispatcher.InvokeAsync(async () =>
+            {
+                await Task.Delay(2500).ConfigureAwait(true);
+                RefreshDefenderStatus();
+            });
         }
     }
 }

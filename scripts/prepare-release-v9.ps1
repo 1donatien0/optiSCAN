@@ -1,11 +1,11 @@
 <#
 .SYNOPSIS
-    Chaîne complète de publication v8.0 (dépôt -> installateur testé).
+    Chaîne complète de publication v9.0 (dépôt -> installateur testé).
 
 .EXAMPLE
-    .\scripts\prepare-release-v8.ps1
-    .\scripts\prepare-release-v8.ps1 -SkipFreshclam
-    .\scripts\prepare-release-v8.ps1 -SkipInstaller -RunFreshclam
+    .\scripts\prepare-release-v9.ps1
+    .\scripts\prepare-release-v9.ps1 -SkipFreshclam
+    .\scripts\prepare-release-v9.ps1 -SkipInstaller -RunFreshclam
 #>
 [CmdletBinding()]
 param(
@@ -91,6 +91,6 @@ if (-not $SkipInstaller) {
     }
 }
 
-Write-Host "`n=== Publication v8 prete ===" -ForegroundColor Green
+Write-Host "`n=== Publication v9 prete ===" -ForegroundColor Green
 Write-Host "  Publish : $pubDir"
-Write-Host "  Setup   : installer\output\optiSCAN_Setup_v8.0.0.exe"
+Write-Host "  Setup   : installer\output\optiSCAN_Setup_v9.0.0.exe"

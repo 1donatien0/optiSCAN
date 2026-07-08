@@ -165,6 +165,9 @@ namespace optiSCAN.Services
 
                 await EnsureCodeSigningCertificatesPresentAsync(token).ConfigureAwait(false);
 
+                // Régénère freshclam.conf si une ancienne version contenait CVDCertsDirectory (ClamAV 1.4.5+).
+                _ = EnsureConfExists();
+
                 // ArgumentList : pas de concaténation de chaîne ; conf et datadir (chemins avec espaces) sont échappés token par token.
                 var psi = new ProcessStartInfo
                 {
@@ -500,17 +503,11 @@ namespace optiSCAN.Services
                 Directory.CreateDirectory(_databaseDir);
                 var dbDirForConf = FreshclamConfSupport.NormalizePathForConf(_databaseDir);
                 var logForConf = FreshclamConfSupport.NormalizePathForConf(ResolveWritableLogPath());
-                var includeCerts = HasUsableRootCert();
-                var certsDir = includeCerts
-                    ? FreshclamConfSupport.NormalizePathForConf(_effectiveCvdCertsDir)
-                    : null;
 
                 return FreshclamConfSupport.BuildConfBytes(
                     ProductVersionInfo.ConfMarkerMajor,
                     dbDirForConf,
-                    logForConf,
-                    includeCerts,
-                    certsDir);
+                    logForConf);
             }
             catch (Exception ex)
             {
