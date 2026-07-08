@@ -46,7 +46,7 @@ Check "optiSCAN.exe" "Executable principal"
 Write-Host "`n[ ClamAV x64 ]"
 Check "clamav\x64\clamscan.exe"  "Scanner ClamAV"
 Check "clamav\x64\freshclam.exe" "Mise a jour signatures"
-Check "clamav\x64\clamd.exe"     "Daemon ClamAV (v8)"
+Check "clamav\x64\clamd.exe"     "Daemon ClamAV (v9)"
 $clambc = Join-Path $PublishDir "clamav\x64\clambc.exe"
 if (Test-Path $clambc) {
     Write-Host "  OK        clamav\x64\clambc.exe" -ForegroundColor Green
@@ -64,7 +64,7 @@ if ($sigFiles.Count -eq 0) {
     if ($AllowMissingSignatures) {
         Write-Host "  SKIP      clamav\database (AllowMissingSignatures)" -ForegroundColor Yellow
     } else {
-        Write-Host "  MANQUANT  clamav\database\*.cvd / *.cld  (lancer freshclam ou prepare-release-v8 -RunFreshclam)" -ForegroundColor Red
+        Write-Host "  MANQUANT  clamav\database\*.cvd / *.cld  (lancer freshclam ou prepare-release-v9 -RunFreshclam)" -ForegroundColor Red
         $failed += "clamav\database\*.cvd"
     }
 } else {

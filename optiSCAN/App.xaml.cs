@@ -360,7 +360,8 @@ namespace optiSCAN
                 {
                     Services.AppLogger.Warn("App", "ReleaseMutex", ex);
                 }
-                try { _instanceMutex.Dispose(); } catch { }
+                try { _instanceMutex.Dispose(); }
+                catch (Exception ex) { Services.AppLogger.Debug("App", $"Dispose instance mutex: {ex.Message}"); }
                 _instanceMutex = null;
             }
             base.OnExit(e);

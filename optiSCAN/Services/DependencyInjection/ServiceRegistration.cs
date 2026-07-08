@@ -2,7 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace optiSCAN.Services.DependencyInjection;
 
-/// <summary>Enregistrement DI Microsoft.Extensions pour optiSCAN (v8).</summary>
+/// <summary>Enregistrement DI Microsoft.Extensions pour optiSCAN (v9).</summary>
 public static class ServiceRegistration
 {
     public static IServiceCollection AddOptiscanCoreServices(this IServiceCollection services)

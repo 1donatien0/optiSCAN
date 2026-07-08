@@ -4,8 +4,8 @@
 
 | Sujet | Section README |
 |-------|----------------|
-| Build, publish, Inno, CI, SBOM, checklist | [§8](../README.md#8-publication-installateur-et-checklist-release-v80) |
-| Coordinateurs UI (`optiSCAN/Coordinators/`) | [§1](../README.md#structure-des-modules) · [§12.1](../README.md#121-maintenabilité-et-choix-volontaires-non-bloquants-v8) |
+| Build, publish, Inno, CI, SBOM, checklist | [§8](../README.md#8-publication-installateur-et-checklist-release-v90) |
+| Coordinateurs UI (`optiSCAN/Coordinators/`) | [§1](../README.md#structure-des-modules) · [§12.1](../README.md#121-maintenabilité-et-choix-volontaires-non-bloquants-v9) |
 | DI préférences (`IUserPreferencesAccessor`, …) | [§1](../README.md#structure-des-modules) |
 | FR / EN (621 clés) | [§9](../README.md#9-langues-de-linterface-fr-fr--en-us) |
 | Historique (`ActivityLogService`, 5 filtres) | [§4.9](../README.md#49-journaux-et-historique) |
@@ -18,4 +18,4 @@
 | Posture /100, AMSI | [§13](../README.md#13-sécurité-posture-et-menaces) |
 | Branches `main` / `dev` | [Branches Git](../README.md#branches-git) |
 
-**Version** : release **v8.0**, assembly **8.0.0**. Scripts : `scripts/` (dont `add-defender-exclusions.ps1`, `generate-sbom.ps1`), `installer/`, `.github/workflows/`.
+**Version** : release **v9.0**, assembly **9.0.0**. Scripts : `scripts/` (dont `add-defender-exclusions.ps1`, `generate-sbom.ps1`), `installer/`, `.github/workflows/`.

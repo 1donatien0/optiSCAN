@@ -514,8 +514,10 @@ namespace optiSCAN.ViewModels
         public void Dispose()
         {
             if (_disposed) return;
-            try { _cts?.Cancel(); } catch { }
-            try { _cts?.Dispose(); } catch { }
+            try { _cts?.Cancel(); }
+            catch (Exception ex) { AppLogger.Debug("ScanViewModel", $"Cancel on dispose: {ex.Message}"); }
+            try { _cts?.Dispose(); }
+            catch (Exception ex) { AppLogger.Debug("ScanViewModel", $"Dispose CTS: {ex.Message}"); }
             _cts = null;
 
             try

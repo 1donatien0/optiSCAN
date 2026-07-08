@@ -99,7 +99,7 @@ if (-not $SkipInstaller) {
         }
     }
     if ($iscc) {
-        & $iscc (Join-Path $repo 'installer\setup.iss') /DAppVersion=8.0.0
+        & $iscc (Join-Path $repo 'installer\setup.iss') /DAppVersion=9.0.0
         if ($LASTEXITCODE -ne 0) { throw "ISCC a échoué (code $LASTEXITCODE)." }
         Write-Host "Installeur généré dans installer\output\" -ForegroundColor Green
     }
