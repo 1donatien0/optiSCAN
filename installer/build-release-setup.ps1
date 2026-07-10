@@ -85,8 +85,10 @@ $parts = $appVersion.Split('.')
 $appRelease = if ($parts.Length -ge 2) { "v$($parts[0]).$($parts[1])" } else { "v$appVersion" }
 
 Write-Host "Inno Setup : $iscc (AppVersion=$appVersion, AppRelease=$appRelease)" -ForegroundColor Cyan
-$relative = [System.IO.Path]::GetRelativePath($PSScriptRoot, $targetPublishDir)
-$publishGlob = ($relative -replace '/', '\') + '\*'
+$fromUri = New-Object System.Uri(($PSScriptRoot.TrimEnd('\') + '\'))
+$toUri = New-Object System.Uri(($targetPublishDir.TrimEnd('\') + '\'))
+$relative = [Uri]::UnescapeDataString($fromUri.MakeRelativeUri($toUri).ToString()).TrimEnd('/').Replace('/', '\')
+$publishGlob = $relative + '\*'
 $isccArgs = @(
     "/DAppVersion=$appVersion",
     "/DAppRelease=$appRelease",
