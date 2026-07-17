@@ -68,7 +68,7 @@ namespace optiSCAN.Services
                 }
 
                 DefenderCoexistenceService.MarkConfigured(container.UserPreferencesAccessor);
-                WindowsDefenderExclusionService.EnsureOptiscanExclusionsAsync();
+                // Exclusions Defender : opt-in via Options (pas d'Add-MpPreference silencieux ici).
             }
 
             var step2 = MessageBox.Show(
