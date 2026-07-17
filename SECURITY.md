@@ -17,7 +17,7 @@ If you discover a security issue in optiSCAN, please report it privately:
 ## Security architecture (summary)
 
 - **Self-scan exclusion**: install directory (Program Files / process base) and `%LocalAppData%\optiSCAN` (ClamAV DB, YARA rules, quarantine, update staging) are never scanned or auto-quarantined (`OptiscanProtectedPaths`); mandatory exclusion folders cannot be removed in Options.
-- **Windows Defender coexistence (recommended on consumer PCs)**: Defender keeps real-time protection; optiSCAN runs as a **complement** (manual/scheduled ClamAV + YARA scans). `WindowsDefenderExclusionService` registers install paths and engine processes in Defender exclusions at install and startup. Tamper Protection may block automatic registration — add exclusions manually in Windows Security if needed.
+- **Windows Defender coexistence (recommended on consumer PCs)**: Defender keeps real-time protection; optiSCAN runs as a **complement** (manual/scheduled ClamAV + YARA scans). `WindowsDefenderExclusionService` can register install paths and engine processes in Defender exclusions **on demand** (Options → refresh exclusions). Tamper Protection may block registration — add exclusions manually in Windows Security if needed.
 - **Quarantine**: AES-256-GCM encryption, HMAC-signed manifest, DPAPI-protected master key; path traversal checks on restore.
 - **Sensitive paths**: restore and IPC scan refuse System32, Windows, ProgramFiles, ProgramData, Startup.
 - **IPC pipe**: ACL (SYSTEM / Administrators / authenticated users); `shutdown` requires a token under `%ProgramData%\optiSCAN\`; scan refuses sensitive paths; buffer size capped for AMSI/IPC.

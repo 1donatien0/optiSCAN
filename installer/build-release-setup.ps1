@@ -6,7 +6,13 @@
 [CmdletBinding()]
 param(
     [switch] $SkipPublish,
-    [string] $PublishDir
+    [string] $PublishDir,
+    # Embarquer les bases ClamAV (~105 Mo). Défaut: non (téléchargement post-install).
+    [switch] $EmbedClamAvDatabase,
+    # Embarquer les règles YARA. Défaut: non (YARA-Forge post-install).
+    [switch] $EmbedYaraRules,
+    # Embarquer ClamAV DB + règles YARA (offline).
+    [switch] $EmbedOfflineSignatures
 )
 
 $ErrorActionPreference = 'Stop'
@@ -94,8 +100,24 @@ $isccArgs = @(
     "/DAppRelease=$appRelease",
     "/DAppPublishSource=$publishGlob"
 )
+if ($EmbedOfflineSignatures) {
+    $isccArgs += '/DEmbedOfflineSignatures'
+} else {
+    if ($EmbedClamAvDatabase) { $isccArgs += '/DEmbedClamAvDatabase' }
+    if ($EmbedYaraRules) { $isccArgs += '/DEmbedYaraRules' }
+}
 Write-Host "Publish source (force) : $publishGlob" -ForegroundColor DarkGray
 Write-Host "  optiSCAN.exe : $((Get-Item -LiteralPath $publishExe).LastWriteTime.ToString('u'))" -ForegroundColor DarkGray
+if ($EmbedOfflineSignatures -or $EmbedClamAvDatabase) {
+    Write-Host '  Bases ClamAV : embarquees' -ForegroundColor DarkGray
+} else {
+    Write-Host '  Bases ClamAV : telechargement post-install (freshclam / MAJ)' -ForegroundColor DarkGray
+}
+if ($EmbedOfflineSignatures -or $EmbedYaraRules) {
+    Write-Host '  Regles YARA : embarquees' -ForegroundColor DarkGray
+} else {
+    Write-Host '  Regles YARA : telechargement post-install (YARA-Forge / MAJ)' -ForegroundColor DarkGray
+}
 & $iscc @isccArgs $iss
 if ($LASTEXITCODE -ne 0) { throw "ISCC a echoue (code $LASTEXITCODE)." }
 
