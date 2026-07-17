@@ -37,13 +37,31 @@ namespace optiSCAN.Services
                 try
                 {
                     var fresh = container.FreshclamUpdater;
-                    var last = fresh.LastUpdateTime;
-                    if (last.HasValue && DateTime.UtcNow - last.Value.ToUniversalTime() < threshold)
+                    var rules = container.RulesUpdater;
+                    var lastClam = fresh.GetLastSignatureUpdateTime();
+                    var missingClam = lastClam == null;
+                    var missingYara = !rules.HasLocalRulesFiles();
+                    var clamStale = !missingClam
+                        && DateTime.UtcNow - lastClam!.Value.ToUniversalTime() >= threshold;
+
+                    if (!missingClam && !missingYara && !clamStale)
                         return;
 
-                    AppLogger.Info("SignatureUpdatePolicy", "Signatures potentiellement obsolètes — MAJ au démarrage");
-                    await fresh.UpdateAsync().ConfigureAwait(false);
-                    await container.RulesUpdater.UpdateAsync().ConfigureAwait(false);
+                    string reason;
+                    if (missingClam && missingYara)
+                        reason = "Bases ClamAV et règles YARA absentes — téléchargement au démarrage";
+                    else if (missingClam)
+                        reason = "Bases ClamAV absentes — téléchargement freshclam au démarrage";
+                    else if (missingYara)
+                        reason = "Règles YARA absentes — téléchargement YARA-Forge au démarrage";
+                    else
+                        reason = "Signatures potentiellement obsolètes — MAJ au démarrage";
+
+                    AppLogger.Info("SignatureUpdatePolicy", reason);
+                    if (missingClam || clamStale)
+                        await fresh.UpdateAsync().ConfigureAwait(false);
+                    if (missingYara || clamStale || missingClam)
+                        await rules.UpdateAsync().ConfigureAwait(false);
                 }
                 catch (Exception ex)
                 {

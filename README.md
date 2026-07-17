@@ -80,7 +80,7 @@ optiSCAN.Service.exe  →  optiSCAN.exe --service-host
 | `optiSCAN.Service` | Service Windows qui supervise `optiSCAN.exe --service-host` |
 | `--service-host` | Moteur sans UI : RTP, IPC, enregistrement AMSI/minifilter |
 | `ThreatRepairService` | Quarantaine + recours Defender (`MpCmdRun`) |
-| `WindowsDefenderExclusionService` | Exclusions Defender auto (chemins + processus optiSCAN) — install, démarrage, `--defender-exclusions` |
+| `WindowsDefenderExclusionService` | Exclusions Defender **opt-in** (Options → réappliquer ; script ; `--defender-exclusions` si UAC) — plus d’auto install/démarrage |
 | `CloudThreatIntelService` | Enrichissement VirusTotal (cache local) |
 | `native/optiSCAN.AmsiProvider` | DLL C++ fournisseur AMSI (build VS 2022 x64) |
 | `native/optiSCAN.Minifilter` | Driver noyau stub (WDK + certificat EV en production) |
@@ -97,7 +97,14 @@ optiSCAN.Service.exe  →  optiSCAN.exe --service-host
 (racine du dépôt optiSCAN)
 ├── README.md                          ← Ce fichier (guide complet)
 ├── docs/
-│   └── README.md                      ← Index doc (renvoie vers ce README)
+│   ├── README.md                      ← Index doc (guides + renvois vers ce README)
+│   ├── GUIDE_DISTRIBUTION.md          ← Signature, .NET, publish / Inno, checklist
+│   ├── DIAGNOSTIC_INTEGRATION_WINDOWS.md ← Profil install allégé façon v8 (2 moteurs)
+│   ├── POLITIQUE_CONFIDENTIALITE.md   ← Politique utilisateur v9.0
+│   └── CONFORMITE_RGPD.md             ← Note traitements / RGPD
+├── Audit.md                           ← Audit statique v9.0
+├── SECURITY.md                        ← Signalement + architecture sécurité
+├── LICENSE.txt                        ← CLUF v9.0
 ├── .editorconfig                      ← Sévérités analyse Roslyn (alignement IDE / MSBuild)
 ├── Directory.Build.props              ← Version 9.0.0, NetAnalyzers, TreatWarningsAsErrors (Release)
 ├── .github/workflows/
@@ -109,10 +116,11 @@ optiSCAN.Service.exe  →  optiSCAN.exe --service-host
 │   ├── fetch-runtime-deps.ps1         ← Télécharge ClamAV + YARA (CI / dev)
 │   ├── prepare-release-v9.ps1         ← Chaîne complète release v9
 │   ├── clean-before-publish.ps1       ← Nettoyage bin/obj avant release
-│   ├── add-defender-exclusions.ps1    ← Exclusions Windows Defender (install / manuel)
+│   ├── add-defender-exclusions.ps1    ← Exclusions Defender (manuel / Options ; pas auto à l’install)
 │   ├── generate-sbom.ps1              ← SBOM CycloneDX (CI publish)
 │   ├── build-amsi.ps1 / stage-amsi.ps1← DLL AMSI native (publish)
-│   ├── verify-runtime-deps.ps1        ← Vérifie clamav + clamd + yara + rules
+│   ├── verify-runtime-deps.ps1        ← Vérifie clamav + clamd + yara (+ rules optionnelles)
+│   ├── publish-release.ps1            ← Publish + Inno (défaut sans CVD/.yar embarqués)
 │   ├── validate-release-readiness.ps1 ← Tests Release (+ verify publish optionnel)
 │   └── runtime-versions.json          ← Versions URL ClamAV / YARA
 ├── optiSCAN.sln                       ← Solution Visual Studio
@@ -123,7 +131,8 @@ optiSCAN.Service.exe  →  optiSCAN.exe --service-host
 │   ├── optiSCAN.AmsiProvider/         ← DLL AMSI (C++, build MSVC)
 │   └── optiSCAN.Minifilter/           ← Driver noyau stub (WDK)
 ├── installer/
-│   ├── setup.iss                      ← Script Inno Setup (FR + EN)
+│   ├── setup.iss                      ← Inno Setup FR/EN (x64 ; signatures post-install par défaut)
+│   ├── redist/LISEZMOI.md             ← Runtime .NET 8 embarqué (optionnel)
 │   └── build-release-setup.ps1        ← clean + publish + ISCC
 └── optiSCAN/                          ← Projet C# WPF
     ├── Models/
@@ -165,7 +174,7 @@ optiSCAN.Service.exe  →  optiSCAN.exe --service-host
     │   ├── ThemeManager.cs            ← Bascule Donaby + MaterialDesign (UserPreferences)
     │   ├── ExclusionSettings.cs       ← Exclusions DPAPI (exclusions.dat) + dossiers protégés
     │   ├── OptiscanProtectedPaths.cs  ← Install + %LocalAppData%\optiSCAN : anti-autophagie scan/RTP
-    │   ├── WindowsDefenderExclusionService.cs ← Exclusions Defender (chemins + processus)
+    │   ├── WindowsDefenderExclusionService.cs ← Exclusions Defender (opt-in Options / script)
     │   ├── AppInstallPaths.cs         ← Façade racine install + motifs clamscan --exclude
     │   ├── YaraEngine.cs              ← YARA + cache _compiled.yarc / _compiled.stamp
     │   ├── YaraForgeUpdater.cs        ← Mise à jour automatique règles de détection
@@ -312,7 +321,7 @@ Dossiers attendus à côté de `optiSCAN.exe` (publish ou debug) :
 |---|---|
 | `clamav/x64/` (ou `x86/`) | `clamscan.exe`, `freshclam.exe` recommandé |
 | `yara/` | `yara64.exe`, `yarac64.exe` (ou `32` en processus x86) |
-| `rules/` | Au moins un fichier `.yar` (paquet initial ou MAJ YARA-Forge) |
+| `rules/` | Fichiers `.yar` (optionnels au publish ; téléchargés via YARA-Forge / MAJ signatures) |
 
 ### 3.3 Première mise à jour des signatures
 
@@ -440,13 +449,14 @@ ScanViewModel → ScanOrchestrator
 - **ClamAV / clamd** : plusieurs `--exclude` / lignes `ExcludePath` (une par racine protégée)
 - **RTP** et **scan USB/SD** : mêmes exclusions ; lecteur entier exclu si son chemin racine est listé
 
-**Exclusions Windows Defender** (`WindowsDefenderExclusionService`) — évite que Defender bloque optiSCAN, ClamAV ou YARA :
+**Exclusions Windows Defender** (`WindowsDefenderExclusionService`) — **opt-in** (évite le marqueur heuristique « tamper » d’un ajout silencieux) :
 
 | Moment | Comportement |
 |--------|----------------|
-| **Installation** | Inno exécute `{app}\scripts\add-defender-exclusions.ps1` (admin) |
-| **Démarrage** | Vérification asynchrone ; relance UAC via `--defender-exclusions` si besoin (max 1× / 24 h) |
-| **Manuel** | `.\scripts\add-defender-exclusions.ps1` (élévation auto) |
+| **Installation** | Script copié dans `{app}\scripts\` — **non exécuté** par Inno |
+| **Démarrage / onboarding** | **Pas** d’appel automatique |
+| **Options** | Bouton « Réappliquer les exclusions Defender » |
+| **Manuel** | `.\scripts\add-defender-exclusions.ps1` (élévation) ou `optiSCAN.exe --defender-exclusions` |
 
 Chemins : mêmes racines que `OptiscanProtectedPaths`. Processus : `optiSCAN.exe`, `optiSCAN.Service.exe`, `clamscan.exe`, `freshclam.exe`, `clamd.exe`, `yara64.exe`. Si la **protection contre la falsification** Defender est active, ajout manuel dans *Sécurité Windows → Exclusions* — voir [§7](#exclusion-windows-defender).
 
@@ -641,14 +651,9 @@ L’application est publiée en **`asInvoker`** (`app.manifest`) : exécution av
 
 Voir aussi [§4.7](#47-système-dexclusions) (détail technique). Résumé :
 
-- **À l’installation** (installateur Inno, droits admin) : chemins `Program Files\optiSCAN` et `%LOCALAPPDATA%\optiSCAN`, plus les processus `optiSCAN.exe`, `clamscan.exe`, `freshclam.exe`, `clamd.exe`, `yara64.exe`, etc.
-- **Au démarrage** de l’application : même logique si une exclusion manque encore.
-
-Commande manuelle (console **administrateur**) :
-
-```powershell
-.\scripts\add-defender-exclusions.ps1
-```
+- **Opt-in** : Options → « Réappliquer les exclusions Defender », ou script admin `.\scripts\add-defender-exclusions.ps1`.
+- Chemins typiques : `Program Files\optiSCAN`, `%LOCALAPPDATA%\optiSCAN` ; processus `optiSCAN.exe`, `clamscan.exe`, `freshclam.exe`, `clamd.exe`, `yara64.exe`, etc.
+- L’installeur **ne lance plus** le script automatiquement (profil allégé façon v8).
 
 Si la **protection contre la falsification** de Defender est active, l’ajout peut échouer — ajoutez les chemins dans *Sécurité Windows → Protection contre les virus et menaces → Exclusions*.
 
@@ -671,18 +676,20 @@ Si la **protection contre la falsification** de Defender est active, l’ajout p
 .\scripts\prepare-release-v9.ps1
 ```
 
-Équivalent manuel : `clean-before-publish` → `fetch-runtime-deps -RunFreshclam` → `dotnet test` → `dotnet publish` → `verify-runtime-deps` → `build-release-setup.ps1`.
+Équivalent manuel : `clean-before-publish` → `dotnet publish` → `verify-runtime-deps` → `build-release-setup.ps1 -SkipPublish`.  
+Détails distribution (.NET auto, Embed signatures) : [`docs/GUIDE_DISTRIBUTION.md`](docs/GUIDE_DISTRIBUTION.md).
 
-Sortie publish : `optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\` (chemin attendu par `installer\setup.iss`). Installateur typique : `installer\output\optiSCAN_Setup_v9.0.0.exe`.
+Sortie publish : `optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\` (chemin attendu par `installer\setup.iss`). Installateur typique : `installer\output\optiSCAN_Setup_v9.0.0.exe` (**~26 Mo** sans CVD/.yar embarqués).
 
-**Chaîne locale alternative** : `.\installer\build-release-setup.ps1` (nettoie, publie, lance ISCC).
+**Chaîne locale alternative** : `.\installer\build-release-setup.ps1` (nettoie, publie, lance ISCC).  
+Offline avec bases + règles : `.\scripts\publish-release.ps1 -EmbedOfflineSignatures`.
 
 ### Ordre recommandé (équipe)
 
 1. Gel fonctionnel : `.\scripts\validate-release-readiness.ps1` (ou `dotnet test` Release — **289** tests).
-2. Dépendances : `.\scripts\fetch-runtime-deps.ps1` (+ `-RunFreshclam` pour l’installateur).
-3. Publish local : `.\scripts\prepare-release-v9.ps1` (ou étapes manuelles ci-dessous).
-4. VM propre : installer `optiSCAN_Setup_v9.0.0.exe` ; scan, RTP, clamd, posture, FR/EN.
+2. Dépendances : `.\scripts\fetch-runtime-deps.ps1` (binaires ClamAV/YARA ; freshclam optionnel — les CVD/`.yar` se téléchargent aussi **après install** via MAJ signatures).
+3. Publish local : `.\scripts\prepare-release-v9.ps1` ou `clean` → `dotnet publish` → `build-release-setup.ps1 -SkipPublish`.
+4. VM propre : installer `optiSCAN_Setup_v9.0.0.exe` ; **MAJ signatures** (freshclam + YARA-Forge) ; scan, RTP optionnelle, FR/EN.
 5. CI : push `main` → job **Publish win-x64** ; artefact `optiSCAN-setup-<sha>.exe`.
 6. Signature (opt.) : Authenticode — `installer/setup.iss.signing.example`.
 7. Tag / distribution : `git tag v9.0.0`, release GitHub, SourceForge ou site.
@@ -701,7 +708,7 @@ Sortie publish : `optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x6
 dotnet publish .\optiSCAN\optiSCAN.csproj -c Release /p:PublishProfile=FolderProfile
 ```
 
-**Étape B — première base ClamAV** (adapter `$pub` si vous publiez ailleurs)
+**Étape B — (optionnel) bases ClamAV dans le publish** — non requise pour l’installeur **par défaut** (téléchargement post-install). Utile pour tests locaux ou `-EmbedClamAvDatabase` :
 
 ```powershell
 $pub = ".\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64"
@@ -711,32 +718,36 @@ $pub = ".\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64"
 **Étape C — compilateur Inno Setup**
 
 ```powershell
-& "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" .\installer\setup.iss
+.\installer\build-release-setup.ps1 -SkipPublish
+# ou : & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" .\installer\setup.iss
 ```
 
-**Installateur** : assistant **bilingue** (français / English) ; langue choisie → `UiCulture` en registre pour le premier lancement de l’app.
+**Installateur** : assistant **bilingue** (français / English) ; langue choisie → `UiCulture` en registre pour le premier lancement de l’app.  
+**Profil défaut** : x64 only ; .NET 8 auto-install si manquant ; service plateforme **décoché** ; AMSI/`.sys` **s’ils existent** (comme v8) ; **pas** d’exclusions Defender auto ; bases ClamAV et règles YARA via **MAJ signatures** après install.
 
-**Contenu de l'installateur (~260 Mo avec signatures initiales) :**
+**Contenu de l'installateur (~26 Mo par défaut, hors CVD/.yar) :**
 
 ```
 optiSCAN_Setup_v9.0.0.exe
-    ├── optiSCAN.exe
-    ├── optiSCAN.ico
-    ├── *.dll (runtime .NET 8)
-    ├── clamav/x64/          ← Binaires x86-64 (clamscan + clamd) + base de signatures
-    ├── yara/                ← Binaires du moteur de détection
-    ├── rules/               ← Règles de détection initiales
-    └── scripts/             ← add-defender-exclusions.ps1 (exclusions Defender post-install)
+    ├── optiSCAN.exe (+ DLL framework-dependent)
+    ├── optiSCAN.ico / hero / shield
+    ├── clamav/x64/          ← Binaires (clamscan, clamd, freshclam) — sans database/
+    ├── yara/                ← yara64 / yarac (moteur)
+    ├── rules/               ← absent par défaut (YARA-Forge au 1er lancement)
+    ├── scripts/             ← add-defender-exclusions.ps1 (opt-in manuel / Options)
+    └── AMSI / .sys          ← si présents sur la machine de build (skipifsourcedoesntexist)
 ```
+
+Offline complet : `publish-release.ps1 -EmbedOfflineSignatures` (CVD + `.yar` dans le setup).
 
 ### Checklist binaire (bloquant)
 
 - [ ] `dotnet test` Release — **289** tests OK
 - [ ] `.\scripts\verify-runtime-deps.ps1` — vert sur dossier publish
-- [ ] `clamscan.exe`, `freshclam.exe`, **`clamd.exe`**, `yara64.exe`, règles `.yar`
-- [ ] `clamav\database\` — au moins un `main.cvd` / `daily.cvd` (via freshclam)
-- [ ] Installateur FR/EN, sidebar **v9.0**, options clamd / VT / mode jeu, accueil posture /100
-- [ ] Test post-install : scan fichier, quarantaine, **historique → traiter une menace**, exports PDF/HTML ; **clé USB** (scan auto si option activée) ; exclusions Defender (script ou démarrage app)
+- [ ] `clamscan.exe`, `freshclam.exe`, **`clamd.exe`**, `yara64.exe` (rules `.yar` : OK si absentes — MAJ post-install)
+- [ ] `clamav\database\` — optionnel dans le setup défaut ; après install : freshclam / MAJ signatures
+- [ ] Installateur FR/EN, sidebar **v9.0**, service plateforme décoché par défaut, .NET auto si besoin
+- [ ] Test post-install : **MAJ signatures** → scan fichier, quarantaine, historique ; exclusions Defender via Options si souhaité
 - [ ] Après upgrade depuis v7 : `scan_history.dat` présent (éventuellement `scan_history.json.legacy`)
 
 ### CI GitHub
@@ -826,11 +837,13 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 
 ## 11. Historique des versions produit
 
-### v9.0 — Defender complément, ClamAV 1.4.5, IPC v9
+### v9.0 — Defender complément, install allégé, IPC v9
 
-- **Version produit** — assembly **9.0.0** ; service Windows `optiSCANProtectionV9` ; pipes `optiSCAN_Protection_v9` / `optiSCAN_Amsi_v9`
-- **Mode complément Defender** — coexistence recommandée : Defender garde le RTP ; optiSCAN scans manuels/planifiés ; exclusions automatiques
-- **ClamAV 1.4.5** — binaires x64/x86 ; correction `freshclam.conf` (retrait `CVDCertsDirectory`, certificats via `CVD_CERTS_DIR`)
+- **Version produit** — assembly **9.0.0** ; service Windows `optiSCANProtectionV9` ; pipe `optiSCAN_Protection_v9`
+- **Mode complément Defender** — coexistence recommandée : Defender garde le RTP ; optiSCAN scans manuels/planifiés
+- **Exclusions Defender** — **opt-in** (Options / script) ; plus d’exécution silencieuse à l’install ni au démarrage
+- **Installateur** — x64 only ; .NET 8 auto-download ; service plateforme décoché ; CVD ClamAV + règles YARA **post-install** (freshclam / YARA-Forge) ; AMSI/`.sys` livrés s’ils existent (comme v8)
+- **ClamAV 1.4.x** — binaires x64 ; correction `freshclam.conf` (retrait `CVDCertsDirectory`, certificats via `CVD_CERTS_DIR`)
 - **AMSI** — DLL présente mais inactive si protection plateforme désactivée ; désenregistrement AMSI à la coupure
 - **Upgrade v8** — l’installateur retire l’ancien service `optiSCANProtectionV8` si présent
 
@@ -987,7 +1000,7 @@ Liens **Corriger** (accueil) : `optiscan://panel/{id}` (antivirus, options, hist
 
 **Actifs** : fichiers analysés, quarantaine, prefs/exclusions (`%LocalAppData%\optiSCAN`), clé VT optionnelle.
 
-**Contrôles** : quarantaine AES-GCM + HMAC ; exclusions avec frontière `\` ; périmètres protégés optiSCAN (`OptiscanProtectedPaths`) ; exclusions Defender automatiques (`WindowsDefenderExclusionService`) ; UAC pour scan complet ; RTP ; clamd sur `127.0.0.1`.
+**Contrôles** : quarantaine AES-GCM + HMAC ; exclusions avec frontière `\` ; périmètres protégés optiSCAN (`OptiscanProtectedPaths`) ; exclusions Defender **opt-in** (`WindowsDefenderExclusionService`) ; UAC pour scan complet ; RTP ; clamd sur `127.0.0.1`.
 
 **Limites** : malware admin peut neutraliser l’AV local ; AMSI v9 via `optiSCAN.AmsiProvider.dll` (nécessite service + droits admin) ; minifilter encore stub ; VT envoie le hash ; `optiSCAN.log` non chiffré mais sans chemins complets (`PathRedaction` sur les lignes de scan).
 

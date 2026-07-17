@@ -1,6 +1,6 @@
 # Guide de distribution — optiSCAN
 
-Ce guide couvre la mise en production d'optiSCAN chez des utilisateurs tiers : **signature de code**, **cohabitation avec d'autres antivirus** et **chaîne de publication**. Il complète l'audit (`AUDIT_optiSCAN_360.md`).
+Ce guide couvre la mise en production d'optiSCAN chez des utilisateurs tiers : **signature de code**, **cohabitation avec d'autres antivirus** et **chaîne de publication**. Il complète l'[audit v9.0](../Audit.md) et le [diagnostic d'intégration](DIAGNOSTIC_INTEGRATION_WINDOWS.md) (profil install **allégé façon v8**, deux moteurs ClamAV + YARA — pas un clone ClamWin).
 
 ---
 
@@ -10,7 +10,7 @@ Ce guide couvre la mise en production d'optiSCAN chez des utilisateurs tiers : *
 
 Sans signature, SmartScreen affiche « éditeur inconnu » et beaucoup de produits de sécurité bloquent l'installeur.
 
-- **Certificat** : un certificat **Code Signing OV** suffit techniquement ; un **EV** (sur token matériel) supprime l'écran SmartScreen plus vite (réputation immédiate). Fournisseurs : DigiCert, Sectigo, GlobalSign.
+- **Certificat** : un certificat **Code Signing OV** suffit techniquement ; un **EV** (sur token matériel) supprime l'écran SmartScreen plus vite (réputation immédiate). Fournisseurs : DigiCert, Sectigo, GlobalSign. Piste gratuite OSS : SignPath Foundation (voir le diagnostic d'intégration).
 - **Signer l'exe publié** (intégré au script `scripts/publish-release.ps1` via `-CertSubject`) :
 
   ```powershell
@@ -31,7 +31,7 @@ Sur **Windows 10/11 x64**, un pilote non signé **ne se charge pas** (Driver Sig
 - Le pilote doit être signé via le **portail Microsoft Hardware Dev Center** (compte développeur matériel + certificat EV) :
   - soit **Attestation signing** (plus simple, pas de tests HLK) — suffisant pour un minifiltre,
   - soit **WHQL** (tests HLK complets) si certification complète souhaitée.
-- Sans cela, `optiSCAN.Minifilter.sys` est rejeté au chargement → pas de protection temps réel au niveau noyau. L'installeur avertit désormais l'utilisateur si le `.sys` est absent/non signé.
+- L'installeur n'avertit plus systématiquement si le `.sys` est absent (profil allégé) ; sans signature, le pilote ne se charge pas sous Windows x64.
 
 ### 1.3 Fournisseur AMSI
 
@@ -48,45 +48,65 @@ optiSCAN (hooks de processus, RTP, minifiltre, quarantaine) a le profil comporte
   1. **Signer** tous les binaires (réduit fortement les faux positifs).
   2. Documenter pour l'utilisateur comment **ajouter une exclusion** dans son AV existant (dossier d'installation + `optiSCAN.exe`, `optiSCAN.Service.exe`).
   3. Tester optiSCAN sur des postes équipés de Kaspersky/Bitdefender/Defender **avant** diffusion.
-  4. Côté Defender, le projet gère déjà l'ajout d'exclusions (`add-defender-exclusions.ps1`).
-- **Avertissement** : faire tourner **deux moteurs temps réel** simultanément peut dégrader les performances et provoquer des conflits de verrous. Le recommander uniquement en complément (scan à la demande), pas comme second RTP permanent.
+  4. Côté Defender, le projet gère déjà l'ajout d'exclusions (`scripts/add-defender-exclusions.ps1`).
+- **Avertissement** : faire tourner **deux moteurs temps réel** simultanément peut dégrader les performances et provoquer des conflits de verrous. Le recommander uniquement en complément (scan à la demande), pas comme second RTP permanent. Voir aussi [SECURITY.md](../SECURITY.md).
 
 ---
 
 ## 3. Dépendance au runtime .NET
 
-Publication en **framework-dependent** : l'utilisateur doit avoir le **.NET 8 Desktop Runtime x64**. L'installeur le **vérifie déjà** (`IsDotNet8Installed`) et redirige vers la page de téléchargement si absent.
+Publication en **framework-dependent** **win-x64 uniquement** (`ArchitecturesAllowed=x64compatible` dans `setup.iss`). L'utilisateur doit avoir le **.NET 8 Desktop Runtime x64**.
 
-Pour une expérience « zéro dépendance » sur poste vierge, deux options :
+Comportement de l'installeur (`installer/setup.iss`) si le runtime manque :
 
-- publier en **self-contained** : `scripts\publish-release.ps1 -SelfContained` (installeur plus lourd, ~150 Mo) ;
-- ou **bundler** le runtime dans l'installeur (téléchargement via Inno Download Plugin déjà présent sur la machine de build).
+1. **Runtime embarqué** (optionnel) : si `installer/redist/windowsdesktop-runtime-win-x64.exe` est présent au build, il est extrait et installé en local (`/quiet /norestart`) — fonctionne hors-ligne. Voir [installer/redist/LISEZMOI.md](../installer/redist/LISEZMOI.md).
+2. **Sinon** : téléchargement automatique depuis le lien officiel Microsoft `aka.ms/dotnet/8.0/windowsdesktop-runtime-win-x64.exe`, puis installation silencieuse.
+3. **Secours** (hors-ligne / échec téléchargement) : proposition d'ouvrir la page de téléchargement manuelle.
+
+Pour une expérience « zéro dépendance » ou un package plus léger :
+
+| Option | Commande / mécanisme | Effet |
+|--------|----------------------|--------|
+| Self-contained | `scripts\publish-release.ps1 -SelfContained` | Runtime dans le publish (installeur plus lourd) |
+| Redist Inno | Placer l'exe dans `installer/redist/` | Hors-ligne sans self-contained |
+| Installeur léger (défaut) | `scripts\publish-release.ps1` | Sans bases ClamAV ni règles YARA ; MAJ au 1er lancement |
+| Offline (tout) | `-EmbedOfflineSignatures` | CVD ClamAV + règles YARA embarqués |
+| Offline ClamAV seul | `-EmbedClamAvDatabase` | ~105 Mo CVD |
+| Offline YARA seul | `-EmbedYaraRules` | fichiers `.yar` |
 
 ---
 
 ## 4. Chaîne de publication fiable
 
-L'UI de publication de Visual Studio s'est révélée peu fiable ici. Utiliser le script :
+L'UI de publication de Visual Studio s'est révélée peu fiable ici. Préférer les scripts :
 
 ```powershell
-# Publication simple
-pwsh -File scripts\publish-release.ps1
+# Chaîne complète v9 (recommandé)
+.\scripts\prepare-release-v9.ps1
 
-# Publication + signature + installeur
-pwsh -File scripts\publish-release.ps1 -CertSubject "Dona By"
+# Ou : publish + signature + Inno
+.\scripts\publish-release.ps1
+.\scripts\publish-release.ps1 -CertSubject "Dona By"
+.\scripts\publish-release.ps1 -EmbedOfflineSignatures   # bases ClamAV + règles YARA dans le setup
+
+# Publish déjà fait → Inno seul
+.\installer\build-release-setup.ps1 -SkipPublish
 ```
 
-Le script : désactive le watchdog, ferme les instances qui verrouillent les fichiers, nettoie `publish\`, publie, signe (si certificat), puis compile l'installeur Inno.
+Le script `publish-release.ps1` : désactive le watchdog, ferme les instances qui verrouillent les fichiers, nettoie `publish\`, publie, signe (si certificat), puis compile l'installeur Inno. Sortie typique : `installer\output\optiSCAN_Setup_v9.0.0.exe`.
+
+Le publish WPF recopie aussi les assets disque (`optiSCAN.ico`, hero, shield) via la cible MSBuild `CopyEmbeddedAssetsToPublish` — nécessaires au systray, à `verify-runtime-deps` et à Inno.
 
 ---
 
 ## 5. Checklist avant release
 
 - [ ] Code committé et build CI vert (tests + CodeQL + gitleaks).
-- [ ] Pilote minifiltre **signé** (attestation/WHQL) et présent.
-- [ ] `optiSCAN.AmsiProvider.dll` **signé** et présent.
+- [ ] Pilote minifiltre **signé** (attestation/WHQL) et présent — ou absent du setup si non signé (voir diagnostic).
+- [ ] `optiSCAN.AmsiProvider.dll` **signé** et présent — ou absent du setup si non signé.
 - [ ] `optiSCAN.exe` et installeur **signés** Authenticode.
-- [ ] Runtime .NET 8 géré (vérif installeur ou self-contained).
+- [ ] Runtime .NET 8 géré (auto-download, redist, ou self-contained).
+- [ ] Assets publish présents (`optiSCAN.ico`, hero, shield) — `verify-runtime-deps.ps1`.
 - [ ] Testé sur poste vierge + poste avec Kaspersky/Defender.
-- [ ] Politique de confidentialité publiée (voir `CONFORMITE_RGPD.md`).
-- [ ] Numéro de version cohérent (`Directory.Build.props`, Inno, README).
+- [ ] Politique de confidentialité accessible ([POLITIQUE_CONFIDENTIALITE.md](POLITIQUE_CONFIDENTIALITE.md) ; à exposer aussi dans l'app / site).
+- [ ] Numéro de version cohérent (`Directory.Build.props`, `LICENSE.txt`, Inno, README) — **v9.0 / 9.0.0**.
