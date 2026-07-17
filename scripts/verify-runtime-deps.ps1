@@ -84,8 +84,7 @@ if (Test-Path $yara32) {
 
 $yaraRules = Get-ChildItem -Path (Join-Path $PublishDir "rules") -Filter "*.yar" -Recurse -ErrorAction SilentlyContinue
 if ($yaraRules.Count -eq 0) {
-    Write-Host "  MANQUANT  rules\*.yar  (regles YARA)" -ForegroundColor Red
-    $failed += "rules\*.yar"
+    Write-Host "  SKIP      rules\*.yar  (telechargees apres install via YARA-Forge / MAJ)" -ForegroundColor Yellow
 } else {
     Write-Host "  OK        rules\ - $($yaraRules.Count) regle(s) .yar" -ForegroundColor Green
 }

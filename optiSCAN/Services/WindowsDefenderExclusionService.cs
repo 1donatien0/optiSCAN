@@ -28,7 +28,7 @@ namespace optiSCAN.Services
         /// <summary>Dernier résultat connu (Options / onboarding).</summary>
         internal static DefenderExclusionResult? LastExclusionResult { get; private set; }
 
-        /// <summary>Idempotent — appelé au démarrage (arrière-plan).</summary>
+        /// <summary>Opt-in — Options / bouton « Réappliquer les exclusions » (pas au démarrage).</summary>
         public static void EnsureOptiscanExclusionsAsync()
         {
             if (Interlocked.CompareExchange(ref _ensureInFlight, 1, 0) != 0)

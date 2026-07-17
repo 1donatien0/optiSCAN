@@ -33,13 +33,13 @@ Aucune de ces données ne quitte le poste.
 
 ## 3. Points à formaliser pour le RGPD
 
-1. **Politique de confidentialité** publiée et accessible (dans l'app + site).
+1. **Politique de confidentialité** : texte rédigé dans [POLITIQUE_CONFIDENTIALITE.md](POLITIQUE_CONFIDENTIALITE.md) — reste à **exposer** dans l'app et sur le site / page de téléchargement.
 2. **Base légale** : intérêt légitime (sécurité) pour le fonctionnement local ; **consentement** explicite pour l'envoi de hash à VirusTotal (déjà opt-in via saisie de clé).
 3. **Minimisation** : confirmée (hash seul, pas de fichier ; logs caviardés ; rétention 30 j).
 4. **Droits** : l'utilisateur peut supprimer toutes ses données (la désinstallation propose explicitement la purge ; suppression manuelle possible dans `%LOCALAPPDATA%\optiSCAN`).
-5. **Transferts hors UE** : VirusTotal (États‑Unis) — à mentionner si la fonction est utilisée.
-6. **Pas de télémétrie** tierce intrusive détectée — à confirmer et à déclarer (« optiSCAN ne collecte pas de télémétrie d'usage »).
+5. **Transferts hors UE** : VirusTotal (États‑Unis) — déjà mentionné dans la politique ; à rappeler dans l'UI Options près du champ clé API.
+6. **Pas de télémétrie** tierce intrusive — déclaré dans la politique (« pas de télémétrie d'usage vers l'éditeur »).
 
 ## 4. Verdict
 
-Le design est **respectueux de la vie privée** : traitement local par défaut, chiffrement de la quarantaine, caviardage des logs, rétention bornée, et le seul envoi externe (hash VirusTotal) est **opt-in**. Le principal travail restant est **documentaire** (politique de confidentialité + mention du traitement VirusTotal), pas technique.
+Le design est **respectueux de la vie privée** : traitement local par défaut, chiffrement de la quarantaine, caviardage des logs, rétention bornée, et le seul envoi externe (hash VirusTotal) est **opt-in**. La politique est **rédigée** ; le travail restant est surtout **d'exposition** (lien dans l'app / site), pas de conception technique.

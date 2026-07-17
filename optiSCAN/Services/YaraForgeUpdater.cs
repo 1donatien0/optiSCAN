@@ -70,6 +70,20 @@ namespace optiSCAN.Services
             LoadPersistedMeta();
         }
 
+        /// <summary>True si au moins un fichier .yar est présent localement.</summary>
+        public bool HasLocalRulesFiles()
+        {
+            try
+            {
+                return Directory.Exists(_rulesDirectory)
+                    && Directory.GetFiles(_rulesDirectory, "*.yar").Length > 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         /// <summary>Version du paquet YARA-Forge affichable (persistée sur disque).</summary>
         public string GetRulesPackVersionDisplay()
             => string.IsNullOrWhiteSpace(LastVersion) ? "—" : LastVersion!.Trim();
