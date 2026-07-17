@@ -52,18 +52,11 @@
     <Resource Include="ico.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Resource>
-    <Resource Include="optiSCAN.ico">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Resource>
     <Resource Include="optiSCAN.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Resource>
-    <Resource Include="optiSCAN_shield.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Resource>
-    <Resource Include="optiSCAN_hero.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Resource>
+    <Resource Include="optiSCAN_hero.png" />
+    <Resource Include="optiSCAN_shield.png" />
     <Resource Include="icons8-historique-des-commandes-50.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Resource>
@@ -79,6 +72,11 @@
   </ItemGroup>
 
   <ItemGroup>
+    <!-- Sur disque : systray + verify-runtime-deps + Inno (Resource WPF n'est pas recopié au publish RID) -->
+    <Content Include="optiSCAN.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
     <Content Include="..\LICENSE.txt">
       <Link>LICENSE.txt</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
@@ -88,6 +86,17 @@
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>
+
+  <!-- Images pack URI (Resource) aussi en fichiers pour verify / installateur -->
+  <Target Name="CopyEmbeddedAssetsToPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <_PublishLooseAssets Include="$(MSBuildProjectDirectory)\optiSCAN_hero.png" />
+      <_PublishLooseAssets Include="$(MSBuildProjectDirectory)\optiSCAN_shield.png" />
+      <_PublishLooseAssets Include="$(MSBuildProjectDirectory)\optiSCAN.ico" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_PublishLooseAssets)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true"
+          Condition="'$(PublishDir)' != '' And Exists('%(_PublishLooseAssets.Identity)')" />
+  </Target>
 
   <ItemGroup>
     <Content Include="yara\**\*">

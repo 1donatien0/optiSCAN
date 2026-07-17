@@ -51,6 +51,7 @@ DefaultDirName={autopf}\{#AppName}
 DefaultGroupName={#AppName}
 AllowNoIcons=yes
 OutputDir=.\output
+; Même nom de fichier avec ou sans bases ClamAV embarquées.
 OutputBaseFilename=optiSCAN_Setup_v{#AppVersion}
 Compression=lzma2/ultra64
 SolidCompression=yes
@@ -59,7 +60,9 @@ LZMAUseSeparateProcess=no
 WizardStyle=modern
 PrivilegesRequired=admin
 MinVersion=10.0.17763
-ArchitecturesAllowed=x86 x64compatible
+; x86 retiré : l'application est publiée en win-x64 uniquement (les binaires
+; .NET copiés seraient inexécutables sur un Windows 32 bits).
+ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 CloseApplications=yes
 CloseApplicationsFilter=*.exe;*.dll
@@ -89,10 +92,12 @@ Name: "french"; MessagesFile: "compiler:Languages\French.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
+; Profil d'install allégé façon v8 : défaut = UI + ClamAV + YARA (+ MAJ signatures).
+; Service plateforme / RTP avancé = opt-in explicite (Flags: unchecked).
 Name: "desktopicon";   Description: "Créer une icône sur le Bureau";                              GroupDescription: "Icônes supplémentaires"
 Name: "startupicon";   Description: "Lancer optiSCAN au démarrage de Windows";                   GroupDescription: "Options avancées"; Flags: unchecked
-Name: "autoUpdateSig"; Description: "Activer les mises à jour auto des signatures (recommandé)"; GroupDescription: "Antivirus ClamAV"; Flags: checkedonce
-Name: "platformservice"; Description: "Installer le service Windows de protection système v9 (RTP/AMSI/IPC)"; GroupDescription: "Protection avancée v9"; Flags: checkedonce
+Name: "autoUpdateSig"; Description: "Activer les mises à jour auto des signatures (recommandé)"; GroupDescription: "Moteurs ClamAV + YARA"; Flags: checkedonce
+Name: "platformservice"; Description: "Installer le service Windows de protection système v9 (RTP/AMSI/IPC — avancé)"; GroupDescription: "Protection avancée (optionnel)"; Flags: unchecked
 
 [Files]
 ; ── Application principale ───────────────────────────────────────────────────
@@ -100,25 +105,53 @@ Name: "platformservice"; Description: "Installer le service Windows de protectio
 ; Le chemin exact est résolu par le préprocesseur (AppPublishSource).
 ; clamav\*, rules\* et yara\* sont exclus ici — gérés séparément ci-dessous.
 Source: "{#AppPublishSource}"; DestDir: "{app}"; Excludes: "clamav\*,rules\*,yara\*"; Flags: ignoreversion recursesubdirs createallsubdirs
-; ── ClamAV (architecture-specific) — ignoré si le dossier n'existe pas (clone partiel) ──
+; ── ClamAV x64 — outils développeur exclus (sigtool/clambc & co : ~47 Mo
+; inutiles au scan et à la mise à jour ; le code n'y fait jamais appel) ──────
 #if DirExists(AddBackslash(SourcePath) + "..\optiSCAN\clamav\x64")
-Source: "..\optiSCAN\clamav\x64\*"; DestDir: "{app}\clamav\x64"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: IsWin64
-#endif
-#if DirExists(AddBackslash(SourcePath) + "..\optiSCAN\clamav\x86")
-Source: "..\optiSCAN\clamav\x86\*"; DestDir: "{app}\clamav\x86"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: not IsWin64
+Source: "..\optiSCAN\clamav\x64\*"; DestDir: "{app}\clamav\x64"; Excludes: "sigtool.exe,clambc.exe,clamdtop.exe,clamsubmit.exe,clamconf.exe"; Flags: ignoreversion recursesubdirs createallsubdirs
 #endif
 ; Certificat CVD (freshclam ≥ 1.5) — skip si absent (évite l'échec de compilation ISCC)
-Source: "..\optiSCAN\clamav\certs\clamav.crt"; DestDir: "{app}\clamav\x64\certs"; Flags: ignoreversion skipifsourcedoesntexist; Check: IsWin64
-Source: "..\optiSCAN\clamav\certs\clamav.crt"; DestDir: "{app}\clamav\x86\certs"; Flags: ignoreversion skipifsourcedoesntexist; Check: not IsWin64
-Source: "..\optiSCAN\clamav\database\*"; DestDir: "{app}\clamav\database"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
-; ── YARA ─────────────────────────────────────────────────────────────────────
+Source: "..\optiSCAN\clamav\certs\clamav.crt"; DestDir: "{app}\clamav\x64\certs"; Flags: ignoreversion skipifsourcedoesntexist
+; Offline complet (DB ClamAV + règles YARA) : iscc /DEmbedOfflineSignatures
+#ifdef EmbedOfflineSignatures
+  #define EmbedClamAvDatabase
+  #define EmbedYaraRules
+#endif
+; ── Base de signatures ClamAV (~105 Mo incompressibles) ─────────────────────
+; Par défaut : NON embarquée — freshclam / bouton MAJ signatures les télécharge
+; après installation (réseau requis au 1er lancement). Aligné setup v8 léger.
+; Offline : /DEmbedClamAvDatabase ou /DEmbedOfflineSignatures
+#ifdef EmbedClamAvDatabase
+Source: "..\optiSCAN\clamav\database\*"; DestDir: "{app}\clamav\database"; Excludes: "*.log"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+#endif
+; ── YARA : binaire toujours embarqué ; règles .yar optionnelles ───────────────
+; Par défaut : règles NON embarquées — YARA-Forge / MAJ signatures au 1er lancement.
+; Offline : /DEmbedYaraRules ou /DEmbedOfflineSignatures
+#ifdef EmbedYaraRules
 Source: "..\optiSCAN\rules\*"; DestDir: "{app}\rules"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+#endif
 Source: "..\optiSCAN\yara\*"; DestDir: "{app}\yara"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
-; ── Service Windows + composants natifs (optionnels si non compilés) ───────────
-Source: "{#AppPublishSource}\optiSCAN.Service.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+; ── Service Windows (pour tâche platformservice opt-in) ───────────────────────
+; Chemin dédié : AppPublishSource finit par \* et ne peut pas servir de préfixe fichier.
+Source: "..\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\optiSCAN.Service.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\optiSCAN.Service\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\optiSCAN.Service.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+; Script exclusions Defender : copié pour usage manuel / depuis l'app — PAS exécuté
+; automatiquement à l'install (évite le marqueur heuristique « tamper » post-v8).
+Source: "..\scripts\add-defender-exclusions.ps1"; DestDir: "{app}\scripts"; Flags: ignoreversion
+; AMSI / minifiltre — comme v8 : livrés s'ils existent sur la machine de build
+; (skipifsourcedoesntexist). Sans signature Authenticode/EV ils restent inopérants
+; sous Windows x64, mais disponibles pour tests / builds signés ultérieurs.
 Source: "..\native\optiSCAN.AmsiProvider\x64\Release\optiSCAN.AmsiProvider.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "..\native\optiSCAN.Minifilter\x64\optiSCAN.Minifilter.sys"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
-Source: "..\scripts\add-defender-exclusions.ps1"; DestDir: "{app}\scripts"; Flags: ignoreversion
+; ── Runtime .NET 8 Desktop embarqué (OPTIONNEL, ~56 Mo) ──────────────────────
+; Placer windowsdesktop-runtime-8.0.x-win-x64.exe renommé en
+; installer\redist\windowsdesktop-runtime-win-x64.exe pour un installeur
+; autonome (hors-ligne). Absent → l'installeur télécharge le runtime si besoin.
+#define DotNetRedist "redist\windowsdesktop-runtime-win-x64.exe"
+#if FileExists(AddBackslash(SourcePath) + DotNetRedist)
+  #define HasDotNetRedist
+Source: "{#DotNetRedist}"; DestDir: "{tmp}"; DestName: "windowsdesktop-runtime-8.0.exe"; Flags: dontcopy
+#endif
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
@@ -206,33 +239,110 @@ begin
     Result := DirExists(ExpandConstant('{pf}\dotnet\shared\Microsoft.WindowsDesktop.App'));
 end;
 
-function InitializeSetup(): Boolean;
+// ── .NET 8 Desktop Runtime : auto-installation (plus de blocage) ─────────────
+// Si le runtime manque, il est téléchargé (lien « latest » officiel Microsoft)
+// puis installé silencieusement avant la copie des fichiers. L'ancien
+// comportement (blocage + redirection navigateur) ne reste qu'en secours
+// si le téléchargement échoue (machine hors-ligne).
+var
+  DotNetDownloadPage: TDownloadWizardPage;
+
+function DotNetRuntimeUrl(): string;
+begin
+  if IsWin64 then
+    Result := 'https://aka.ms/dotnet/8.0/windowsdesktop-runtime-win-x64.exe'
+  else
+    Result := 'https://aka.ms/dotnet/8.0/windowsdesktop-runtime-win-x86.exe';
+end;
+
+function OnDotNetDownloadProgress(const Url, FileName: string; const Progress, ProgressMax: Int64): Boolean;
+begin
+  Result := True; // ne pas annuler
+end;
+
+procedure InitializeWizard();
+begin
+  if ActiveLanguage = 'english' then
+    DotNetDownloadPage := CreateDownloadPage(
+      'Installing .NET 8 Desktop Runtime',
+      'optiSCAN requires the .NET 8 Desktop Runtime. It is being downloaded and installed automatically — no action needed.',
+      @OnDotNetDownloadProgress)
+  else
+    DotNetDownloadPage := CreateDownloadPage(
+      'Installation de .NET 8 Desktop Runtime',
+      'optiSCAN nécessite .NET 8 Desktop Runtime. Téléchargement et installation automatiques en cours — aucune action requise.',
+      @OnDotNetDownloadProgress);
+end;
+
+function RunDotNetRuntimeInstaller(): Boolean;
 var
   ResultCode: Integer;
 begin
-  Result := True;
+  Result := False;
+  if not Exec(ExpandConstant('{tmp}\windowsdesktop-runtime-8.0.exe'),
+              '/install /quiet /norestart', '', SW_SHOW,
+              ewWaitUntilTerminated, ResultCode) then
+    Exit;
+  // 0 = OK · 3010 = OK, redémarrage requis · 1638 = version déjà présente
+  Result := (ResultCode = 0) or (ResultCode = 3010) or (ResultCode = 1638);
+end;
 
-  if not IsDotNet8Installed() then
+procedure OfferDotNetDownloadPage();
+var
+  ResultCode: Integer;
+begin
+  if ActiveLanguage = 'english' then
   begin
-    if ActiveLanguage = 'english' then
-    begin
-      if MsgBox(
-        '.NET 8 Desktop Runtime is not installed on this computer.' + #13#10 + #13#10 +
-        'optiSCAN requires it to run.' + #13#10 +
-        'Would you like to open the download page?',
-        mbConfirmation, MB_YESNO) = IDYES then
-        ShellExec('open', 'https://dotnet.microsoft.com/en-us/download/dotnet/8.0', '', '', SW_SHOW, ewNoWait, ResultCode);
-    end
-    else
     if MsgBox(
-      '.NET 8 Desktop Runtime n''est pas installé sur cet ordinateur.' + #13#10 + #13#10 +
-      'optiSCAN en a besoin pour fonctionner.' + #13#10 +
-      'Voulez-vous être redirigé vers la page de téléchargement ?',
+      'The .NET 8 Desktop Runtime could not be installed automatically' + #13#10 +
+      '(no Internet connection or download error).' + #13#10 + #13#10 +
+      'Would you like to open the download page to install it manually?',
       mbConfirmation, MB_YESNO) = IDYES then
-    begin
       ShellExec('open', 'https://dotnet.microsoft.com/en-us/download/dotnet/8.0', '', '', SW_SHOW, ewNoWait, ResultCode);
+  end
+  else
+  if MsgBox(
+    'Le runtime .NET 8 Desktop n''a pas pu être installé automatiquement' + #13#10 +
+    '(pas de connexion Internet ou erreur de téléchargement).' + #13#10 + #13#10 +
+    'Voulez-vous ouvrir la page de téléchargement pour l''installer manuellement ?',
+    mbConfirmation, MB_YESNO) = IDYES then
+    ShellExec('open', 'https://dotnet.microsoft.com/en-us/download/dotnet/8.0', '', '', SW_SHOW, ewNoWait, ResultCode);
+end;
+
+function NextButtonClick(CurPageID: Integer): Boolean;
+begin
+  Result := True;
+  if (CurPageID = wpReady) and (not IsDotNet8Installed()) then
+  begin
+#ifdef HasDotNetRedist
+    // Runtime embarqué dans l'installeur : extraction + installation locale,
+    // aucun téléchargement (fonctionne hors-ligne).
+    ExtractTemporaryFile('windowsdesktop-runtime-8.0.exe');
+    if not RunDotNetRuntimeInstaller() then
+    begin
+      OfferDotNetDownloadPage();
+      Result := False; // rester sur la page « Prêt à installer »
     end;
-    Result := False;
+#else
+    DotNetDownloadPage.Clear;
+    DotNetDownloadPage.Add(DotNetRuntimeUrl(), 'windowsdesktop-runtime-8.0.exe', '');
+    DotNetDownloadPage.Show;
+    try
+      try
+        DotNetDownloadPage.Download;
+        if not RunDotNetRuntimeInstaller() then
+        begin
+          OfferDotNetDownloadPage();
+          Result := False; // rester sur la page « Prêt à installer »
+        end;
+      except
+        OfferDotNetDownloadPage();
+        Result := False;
+      end;
+    finally
+      DotNetDownloadPage.Hide;
+    end;
+#endif
   end;
 end;
 
@@ -398,17 +508,8 @@ begin
   RegWriteStringValue(HKCU, 'Software\Classes\Directory\shell\' + MenuKey + '\command', '', Cmd);
 end;
 
-procedure RegisterDefenderExclusions();
-var
-  ScriptPath, Params: string;
-  ResultCode: Integer;
-begin
-  ScriptPath := ExpandConstant('{app}\scripts\add-defender-exclusions.ps1');
-  if not FileExists(ScriptPath) then
-    Exit;
-  Params := '-NoProfile -ExecutionPolicy Bypass -File "' + ScriptPath + '" -InstallDir "' + ExpandConstant('{app}') + '"';
-  Exec('powershell.exe', Params, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-end;
+// Exclusions Defender : volontairement NON appelées ici (profil allégé v8).
+// Le script reste dans {app}\scripts pour un opt-in depuis l'application.
 
 procedure CurStepChanged(CurStep: TSetupStep);
 var
@@ -421,7 +522,6 @@ begin
   begin
     WriteInstallerUiCulture();
     RegisterExplorerContextMenu();
-    RegisterDefenderExclusions();
     if IsTaskSelected('platformservice') then
     begin
       if FileExists(ExpandConstant('{app}\optiSCAN.Service.exe')) then
@@ -432,22 +532,10 @@ begin
       end
       else
       begin
-        // Le service natif n'a pas été inclus dans ce build : on prévient au lieu
-        // d'échouer silencieusement (l'utilisateur a coché « protection avancée »).
         if ActiveLanguage = 'english' then
           MsgBox('The system protection service (optiSCAN.Service.exe) was not included in this build. Real-time protection (RTP/AMSI/IPC) will be unavailable.', mbInformation, MB_OK)
         else
           MsgBox('Le service de protection système (optiSCAN.Service.exe) n''est pas inclus dans cette version. La protection temps réel (RTP/AMSI/IPC) sera indisponible.', mbInformation, MB_OK);
-      end;
-
-      // Pilote minifiltre noyau : sans .sys signé, la protection temps réel
-      // au niveau noyau ne se chargera pas (Driver Signature Enforcement x64).
-      if not FileExists(ExpandConstant('{app}\optiSCAN.Minifilter.sys')) then
-      begin
-        if ActiveLanguage = 'english' then
-          MsgBox('Note: the kernel minifilter driver (optiSCAN.Minifilter.sys) is absent or unsigned. Kernel-level real-time protection will not load on 64-bit Windows without a properly signed driver.', mbInformation, MB_OK)
-        else
-          MsgBox('Note : le pilote minifiltre noyau (optiSCAN.Minifilter.sys) est absent ou non signé. La protection temps réel au niveau noyau ne se chargera pas sous Windows 64 bits sans pilote signé.', mbInformation, MB_OK);
       end;
     end;
   end;
