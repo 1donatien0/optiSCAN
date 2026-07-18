@@ -33,6 +33,8 @@ namespace optiSCAN.Views
             public bool TempUser { get; init; }
             public bool Recycle { get; init; }
             public bool Logs { get; init; }
+            public bool WUCache { get; init; }
+            public bool Dns { get; init; }
             public bool Edge { get; init; }
             public bool Chrome { get; init; }
             public bool Firefox { get; init; }
@@ -40,8 +42,9 @@ namespace optiSCAN.Views
             public bool Opera { get; init; }
             public bool Vivaldi { get; init; }
             public bool Arc { get; init; }
+            public bool History { get; init; }
 
-            public bool AnySystem => TempWin || TempUser || Recycle || Logs;
+            public bool AnySystem => TempWin || TempUser || Recycle || Logs || WUCache || Dns;
             public bool AnyBrowser => Edge || Chrome || Firefox || Brave || Opera || Vivaldi || Arc;
         }
 
@@ -77,6 +80,7 @@ namespace optiSCAN.Views
                     : 0;
                 long tempUser = sel.TempUser ? MeasureDir(Path.GetTempPath()) : 0;
                 long logsSize = sel.Logs ? MeasureDir(WindowsLogsPath()) : 0;
+                long wuSize = sel.WUCache ? MeasureDir(WindowsUpdateCachePath()) : 0;
                 long edgeCache = sel.Edge ? MeasureDir(EdgeCachePath()) : 0;
                 long chromeCache = sel.Chrome ? MeasureDir(ChromeCachePath()) : 0;
                 long ffCache = sel.Firefox ? MeasureDir(FirefoxCachePath()) : 0;
@@ -84,9 +88,10 @@ namespace optiSCAN.Views
                 long operaCache = sel.Opera ? MeasureDir(OperaCachePath()) : 0;
                 long vivaldiCache = sel.Vivaldi ? MeasureDir(VivaldiCachePath()) : 0;
                 long arcCache = sel.Arc ? MeasureDir(ArcCachePath()) : 0;
+                long historySize = sel.History ? MeasureFiles(HistoryTargets(sel)) : 0;
 
-                long sysTotal = tempWin + tempUser + logsSize;
-                long browserTotal = edgeCache + chromeCache + ffCache + braveCache + operaCache + vivaldiCache + arcCache;
+                long sysTotal = tempWin + tempUser + logsSize + wuSize;
+                long browserTotal = edgeCache + chromeCache + ffCache + braveCache + operaCache + vivaldiCache + arcCache + historySize;
                 long total = sysTotal + browserTotal;
 
                 Dispatcher.Invoke(() =>
@@ -101,6 +106,8 @@ namespace optiSCAN.Views
                         AppendLog(LocalizationService.Format("Clean_LogLineTempUser", FormatSize(tempUser)));
                     if (sel.Logs)
                         AppendLog(LocalizationService.Format("Clean_LogLineLogs", FormatSize(logsSize)));
+                    if (sel.WUCache)
+                        AppendLog(LocalizationService.Format("Clean_LogLineWU", FormatSize(wuSize)));
                     if (sel.Edge)
                         AppendLog(LocalizationService.Format("Clean_LogLineEdge", FormatSize(edgeCache)));
                     if (sel.Chrome)
@@ -115,13 +122,19 @@ namespace optiSCAN.Views
                         AppendLog(LocalizationService.Format("Clean_LogLineVivaldi", FormatSize(vivaldiCache)));
                     if (sel.Arc)
                         AppendLog(LocalizationService.Format("Clean_LogLineArc", FormatSize(arcCache)));
+                    if (sel.History)
+                    {
+                        AppendLog(LocalizationService.Format("Clean_LogLineHistory", FormatSize(historySize)));
+                        if (sel.Firefox)
+                            AppendLog(LocalizationService.GetString("Clean_LogHistoryFirefox"));
+                    }
                     AppendLog($"─────────────────────────");
                     AppendLog(LocalizationService.Format("Clean_LogTotal", FormatSize(total)));
                     AppendLog(LocalizationService.GetString("Clean_LogAnalyzeEnd"));
 
                     _analysed = true;
-                    btnCleanNow.IsEnabled = total > 0;
-                    SetEmptyResultState(total == 0);
+                    btnCleanNow.IsEnabled = total > 0 || sel.Dns || sel.Recycle;
+                    SetEmptyResultState(total == 0 && !sel.Dns && !sel.Recycle);
                 });
             });
 
@@ -211,6 +224,44 @@ namespace optiSCAN.Views
                         long f = CleanDir(WindowsLogsPath());
                         freed += f;
                         Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedLogs", FormatSize(f))));
+                    }
+                    if (sel.WUCache)
+                    {
+                        // Nécessite l'arrêt du service Windows Update → script
+                        // administrateur (une invite UAC), taille mesurée avant.
+                        long before = MeasureDir(WindowsUpdateCachePath());
+                        bool ok = SystemTweaksService.RunElevatedBatch(
+                            SystemTweaksService.ElevatedWindowsUpdateCacheCommands(),
+                            waitForExit: true);
+                        if (ok)
+                        {
+                            long after = MeasureDir(WindowsUpdateCachePath());
+                            long f = Math.Max(0, before - after);
+                            freed += f;
+                            Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedWU", FormatSize(f))));
+                        }
+                        else
+                        {
+                            Dispatcher.Invoke(() => AppendLog(LocalizationService.GetString("Clean_LogWUDenied")));
+                        }
+                    }
+                    if (sel.Dns)
+                    {
+                        if (SystemTweaksService.FlushDnsCache())
+                            Dispatcher.Invoke(() => AppendLog(LocalizationService.GetString("Clean_LogDnsFlushed")));
+                    }
+                    if (sel.History)
+                    {
+                        var (f, locked) = CleanFiles(HistoryTargets(sel));
+                        freed += f;
+                        Dispatcher.Invoke(() =>
+                        {
+                            AppendLog(LocalizationService.Format("Clean_LogFreedHistory", FormatSize(f)));
+                            if (locked > 0)
+                                AppendLog(LocalizationService.Format("Clean_LogHistoryLocked", locked));
+                            if (sel.Firefox)
+                                AppendLog(LocalizationService.GetString("Clean_LogHistoryFirefox"));
+                        });
                     }
 
                     Dispatcher.Invoke(() =>
@@ -306,6 +357,82 @@ namespace optiSCAN.Views
         private static string ArcCachePath() => Path.Combine(LocalApp, @"Arc\User Data\Default\Cache");
         private static string WindowsLogsPath() => Path.Combine(
             Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows", @"Logs");
+        private static string WindowsUpdateCachePath() => Path.Combine(
+            Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows",
+            @"SoftwareDistribution\Download");
+
+        // ── Historique de navigation (navigateurs Chromium uniquement) ───────
+        // Fichiers SQLite « History » dans le dossier profil (parent du Cache).
+        // Firefox est exclu : places.sqlite contient aussi les favoris.
+        private static readonly string[] ChromiumHistoryFileNames =
+        {
+            "History", "History-journal", "Visited Links",
+        };
+
+        private static IEnumerable<string> ChromiumHistoryFiles(string cachePath)
+        {
+            if (string.IsNullOrEmpty(cachePath))
+                yield break;
+            var profileDir = Path.GetDirectoryName(cachePath);
+            if (string.IsNullOrEmpty(profileDir))
+                yield break;
+            foreach (var name in ChromiumHistoryFileNames)
+                yield return Path.Combine(profileDir, name);
+        }
+
+        private static List<string> HistoryTargets(CleanSelection sel)
+        {
+            var files = new List<string>();
+            if (sel.Edge) files.AddRange(ChromiumHistoryFiles(EdgeCachePath()));
+            if (sel.Chrome) files.AddRange(ChromiumHistoryFiles(ChromeCachePath()));
+            if (sel.Brave) files.AddRange(ChromiumHistoryFiles(BraveCachePath()));
+            if (sel.Opera) files.AddRange(ChromiumHistoryFiles(OperaCachePath()));
+            if (sel.Vivaldi) files.AddRange(ChromiumHistoryFiles(VivaldiCachePath()));
+            if (sel.Arc) files.AddRange(ChromiumHistoryFiles(ArcCachePath()));
+            return files;
+        }
+
+        private static long MeasureFiles(IEnumerable<string> paths)
+        {
+            long total = 0;
+            foreach (var p in paths)
+            {
+                try
+                {
+                    if (File.Exists(p))
+                        total += new FileInfo(p).Length;
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn("CleanControl", $"Mesure ignorée : {p}", ex);
+                }
+            }
+            return total;
+        }
+
+        /// <summary>Supprime les fichiers donnés. Renvoie (octets libérés, nb verrouillés/échoués).</summary>
+        private static (long Freed, int Locked) CleanFiles(IEnumerable<string> paths)
+        {
+            long freed = 0;
+            int locked = 0;
+            foreach (var p in paths)
+            {
+                try
+                {
+                    if (!File.Exists(p))
+                        continue;
+                    long s = new FileInfo(p).Length;
+                    File.Delete(p);
+                    freed += s;
+                }
+                catch (Exception ex)
+                {
+                    locked++;
+                    AppLogger.Warn("CleanControl", $"Fichier non supprimé : {p}", ex);
+                }
+            }
+            return (freed, locked);
+        }
         private static string FirefoxCachePath()
         {
             var localProfilesBase = Path.Combine(LocalApp, @"Mozilla\Firefox\Profiles");
@@ -416,13 +543,16 @@ namespace optiSCAN.Views
             TempUser = chkTempUser?.IsChecked == true,
             Recycle = chkRecycleBin?.IsChecked == true,
             Logs = chkLogs?.IsChecked == true,
+            WUCache = chkWUCache?.IsChecked == true,
+            Dns = chkDns?.IsChecked == true,
             Edge = chkEdge?.IsChecked == true,
             Chrome = chkChrome?.IsChecked == true,
             Firefox = chkFirefox?.IsChecked == true,
             Brave = chkBrave?.IsChecked == true,
             Opera = chkOpera?.IsChecked == true,
             Vivaldi = chkVivaldi?.IsChecked == true,
-            Arc = chkArc?.IsChecked == true
+            Arc = chkArc?.IsChecked == true,
+            History = chkBrowserHistory?.IsChecked == true
         };
 
         private static string BuildCleanTargetsSummary(CleanSelection sel)
@@ -432,6 +562,8 @@ namespace optiSCAN.Views
             if (sel.TempUser) parts.Add(LocalizationService.GetString("Clean_TempUserCb"));
             if (sel.Recycle) parts.Add(LocalizationService.GetString("Clean_RecycleCb"));
             if (sel.Logs) parts.Add(LocalizationService.GetString("Clean_LogsCb"));
+            if (sel.WUCache) parts.Add(LocalizationService.GetString("Clean_WUCacheCb"));
+            if (sel.Dns) parts.Add(LocalizationService.GetString("Clean_DnsCb"));
             if (sel.Edge) parts.Add(LocalizationService.GetString("Clean_Edge"));
             if (sel.Chrome) parts.Add(LocalizationService.GetString("Clean_Chrome"));
             if (sel.Firefox) parts.Add(LocalizationService.GetString("Clean_Firefox"));
@@ -439,6 +571,7 @@ namespace optiSCAN.Views
             if (sel.Opera) parts.Add(LocalizationService.GetString("Clean_Opera"));
             if (sel.Vivaldi) parts.Add(LocalizationService.GetString("Clean_Vivaldi"));
             if (sel.Arc) parts.Add(LocalizationService.GetString("Clean_Arc"));
+            if (sel.History) parts.Add(LocalizationService.GetString("Clean_HistoryCb"));
             return parts.Count == 0 ? "—" : string.Join(", ", parts);
         }
 

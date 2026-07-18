@@ -59,7 +59,7 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="Nav_TooltipHome" xml:space="preserve"><value>Tableau de bord (Ctrl+1)</value></data>
-  <data name="Nav_TooltipClean" xml:space="preserve"><value>Nettoyer le système (Ctrl+2)</value></data>
+  <data name="Nav_TooltipClean" xml:space="preserve"><value>Optimiser le système (Ctrl+2)</value></data>
   <data name="Nav_TooltipAntivirus" xml:space="preserve"><value>Antivirus — ClamAV + YARA (Ctrl+3)</value></data>
   <data name="Nav_TooltipHistory" xml:space="preserve"><value>Historique des analyses (Ctrl+4)</value></data>
   <data name="Nav_TooltipOptions" xml:space="preserve"><value>Paramètres (Ctrl+5)</value></data>
@@ -67,7 +67,7 @@
   <data name="Nav_TooltipThemeLight" xml:space="preserve"><value>Passer en mode clair</value></data>
   <data name="Nav_TooltipThemeDark" xml:space="preserve"><value>Passer en mode sombre</value></data>
   <data name="Nav_Home" xml:space="preserve"><value>Accueil</value></data>
-  <data name="Nav_Clean" xml:space="preserve"><value>Nettoyer</value></data>
+  <data name="Nav_Clean" xml:space="preserve"><value>Optimiser</value></data>
   <data name="Nav_Antivirus" xml:space="preserve"><value>Antivirus</value></data>
   <data name="Nav_History" xml:space="preserve"><value>Historique</value></data>
   <data name="Nav_Options" xml:space="preserve"><value>Options</value></data>
@@ -163,8 +163,8 @@
   <data name="Notif_UpdateBtn" xml:space="preserve"><value>Mettre à jour</value></data>
   <data name="Overview_Protected" xml:space="preserve"><value>Votre ordinateur est protégé</value></data>
   <data name="Overview_ProtectionIncomplete" xml:space="preserve"><value>Protection incomplète</value></data>
-  <data name="Overview_CleanTitle" xml:space="preserve"><value>Nettoyer</value></data>
-  <data name="Overview_CleanSub" xml:space="preserve"><value>Fichiers temporaires</value></data>
+  <data name="Overview_CleanTitle" xml:space="preserve"><value>Optimiser</value></data>
+  <data name="Overview_CleanSub" xml:space="preserve"><value>Nettoyage, mises à jour, tweaks</value></data>
   <data name="Overview_ScanTitle" xml:space="preserve"><value>Antivirus</value></data>
   <data name="Overview_ScanSub" xml:space="preserve"><value>Lancer une analyse</value></data>
   <data name="Overview_HistoryTitle" xml:space="preserve"><value>Historique</value></data>
@@ -250,12 +250,12 @@
   <data name="Av_StopUpdate" xml:space="preserve"><value>Arrêter</value></data>
   <data name="Av_NoThreats" xml:space="preserve"><value>Aucune menace détectée</value></data>
   <data name="Av_SystemClean" xml:space="preserve"><value>Votre système est propre.</value></data>
-  <data name="Clean_Title" xml:space="preserve"><value>Nettoyage du système</value></data>
-  <data name="Clean_Sub" xml:space="preserve"><value>Libérez de l'espace en supprimant les fichiers inutiles.</value></data>
-  <data name="Clean_TempWin" xml:space="preserve"><value>Temp Windows</value></data>
+  <data name="Clean_Title" xml:space="preserve"><value>Optimisation du système</value></data>
+  <data name="Clean_Sub" xml:space="preserve"><value>Nettoyage, mises à jour et réglages pour une machine plus rapide.</value></data>
+  <data name="Clean_TempWin" xml:space="preserve"><value>Système</value></data>
   <data name="Clean_Browsers" xml:space="preserve"><value>Navigateurs</value></data>
   <data name="Clean_Total" xml:space="preserve"><value>Total libérable</value></data>
-  <data name="Clean_TempSub" xml:space="preserve"><value>Windows Temp + utilisateur</value></data>
+  <data name="Clean_TempSub" xml:space="preserve"><value>Temp Windows + utilisateur, journaux, cache Windows Update</value></data>
   <data name="Clean_BrowserSub" xml:space="preserve"><value>Caches des profils par défaut (Firefox : profil principal)</value></data>
   <data name="Clean_TotalSub" xml:space="preserve"><value>Cibles cochées</value></data>
   <data name="Clean_Analyze" xml:space="preserve"><value>Analyser</value></data>
@@ -304,9 +304,82 @@
   <data name="Clean_LogCleanEnd" xml:space="preserve"><value>=== NETTOYAGE TERMINÉ ===</value></data>
   <data name="Clean_ErrCleaning" xml:space="preserve"><value>Erreur pendant le nettoyage : {0}</value></data>
   <data name="Clean_LogTitle" xml:space="preserve"><value>Journal d'opérations</value></data>
-  <data name="Clean_LogHint" xml:space="preserve"><value>Cliquez sur Analyser pour estimer l'espace récupérable&#x0a;(fichiers temporaires et caches des navigateurs cochés).</value></data>
+  <data name="Clean_LogHint" xml:space="preserve"><value>Cliquez sur Analyser pour estimer l'espace récupérable&#x0a;(éléments système et caches des navigateurs cochés).</value></data>
   <data name="Clean_EmptyTitle" xml:space="preserve"><value>Rien à libérer</value></data>
   <data name="Clean_EmptySub" xml:space="preserve"><value>Aucun fichier récupérable détecté lors de l'analyse.</value></data>
+  <data name="Opti_TabClean" xml:space="preserve"><value>Nettoyage</value></data>
+  <data name="Opti_TabUpdates" xml:space="preserve"><value>Mises à jour</value></data>
+  <data name="Opti_TabTweaks" xml:space="preserve"><value>Tweaks</value></data>
+  <data name="Clean_WUCacheCb" xml:space="preserve"><value>Cache Windows Update (admin)</value></data>
+  <data name="Clean_DnsCb" xml:space="preserve"><value>Cache DNS</value></data>
+  <data name="Clean_LogLineWU" xml:space="preserve"><value>Cache Windows Update : {0}</value></data>
+  <data name="Clean_LogFreedWU" xml:space="preserve"><value>Cache Windows Update vidé : {0}</value></data>
+  <data name="Clean_LogWUDenied" xml:space="preserve"><value>Cache Windows Update ignoré (élévation refusée).</value></data>
+  <data name="Clean_LogDnsFlushed" xml:space="preserve"><value>Cache DNS vidé.</value></data>
+  <data name="Clean_HistoryCb" xml:space="preserve"><value>Historique de navigation</value></data>
+  <data name="Clean_HistoryTooltip" xml:space="preserve"><value>Supprime l'historique des navigateurs cochés (fermez-les d'abord). Firefox non pris en charge : son historique partage le fichier des favoris.</value></data>
+  <data name="Clean_LogLineHistory" xml:space="preserve"><value>Historique navig.  : {0}</value></data>
+  <data name="Clean_LogFreedHistory" xml:space="preserve"><value>Historique de navigation supprimé : {0}</value></data>
+  <data name="Clean_LogHistoryFirefox" xml:space="preserve"><value>Firefox : historique non pris en charge (places.sqlite contient aussi les favoris).</value></data>
+  <data name="Clean_LogHistoryLocked" xml:space="preserve"><value>{0} fichier(s) d'historique verrouillé(s) — fermez le navigateur puis relancez.</value></data>
+  <data name="Upd_Hint" xml:space="preserve"><value>Recherchez les mises à jour d'applications (winget), cochez celles à installer, puis lancez la mise à jour. Le bouton Windows Update ouvre les paramètres système.</value></data>
+  <data name="Upd_Scan" xml:space="preserve"><value>Rechercher</value></data>
+  <data name="Upd_InstallSelected" xml:space="preserve"><value>Mettre à jour la sélection</value></data>
+  <data name="Upd_InstallAll" xml:space="preserve"><value>Tout mettre à jour</value></data>
+  <data name="Upd_Windows" xml:space="preserve"><value>Windows Update</value></data>
+  <data name="Upd_ListTitle" xml:space="preserve"><value>Applications</value></data>
+  <data name="Upd_LogTitle" xml:space="preserve"><value>Journal des mises à jour</value></data>
+  <data name="Upd_LogHint" xml:space="preserve"><value>Cliquez sur Rechercher pour lister les applications&#x0a;à mettre à jour (via winget).</value></data>
+  <data name="Upd_LogScanStart" xml:space="preserve"><value>=== RECHERCHE DES MISES À JOUR ===</value></data>
+  <data name="Upd_LogWinget" xml:space="preserve"><value>winget : {0}</value></data>
+  <data name="Upd_LogWingetMissing" xml:space="preserve"><value>winget introuvable. Installez « App Installer » depuis le Microsoft Store.</value></data>
+  <data name="Upd_LogNone" xml:space="preserve"><value>Aucune mise à jour trouvée.</value></data>
+  <data name="Upd_LogFound" xml:space="preserve"><value>{0} mise(s) à jour disponible(s). Décochez celles à ignorer.</value></data>
+  <data name="Upd_LogNoneChecked" xml:space="preserve"><value>Aucune application cochée. Lancez d'abord une recherche.</value></data>
+  <data name="Upd_LogUpgradeStart" xml:space="preserve"><value>Mise à jour de {0} application(s)...</value></data>
+  <data name="Upd_LogUpgradeAllStart" xml:space="preserve"><value>Mise à jour de toutes les applications...</value></data>
+  <data name="Upd_LogUpgradeDone" xml:space="preserve"><value>Mises à jour terminées ({0} réussie(s)).</value></data>
+  <data name="Upd_LogUpgradeAllDone" xml:space="preserve"><value>Mise à jour globale terminée.</value></data>
+  <data name="Upd_LogWindowsSettings" xml:space="preserve"><value>Paramètres Windows Update ouverts.</value></data>
+  <data name="Upd_LogError" xml:space="preserve"><value>Erreur : {0}</value></data>
+  <data name="Upd_ConfirmBody" xml:space="preserve"><value>Les applications suivantes seront mises à jour :&#x0a;&#x0a;{0}</value></data>
+  <data name="Upd_ConfirmAllBody" xml:space="preserve"><value>Toutes les applications disposant d'une mise à jour seront mises à niveau (winget upgrade --all).</value></data>
+  <data name="Upd_EmptyTitle" xml:space="preserve"><value>Système à jour</value></data>
+  <data name="Upd_EmptySub" xml:space="preserve"><value>Aucune mise à jour d'application détectée.</value></data>
+  <data name="Twk_SectionPerf" xml:space="preserve"><value>Performance</value></data>
+  <data name="Twk_SectionPrivacy" xml:space="preserve"><value>Confidentialité</value></data>
+  <data name="Twk_SectionUi" xml:space="preserve"><value>Interface</value></data>
+  <data name="Twk_SectionMaint" xml:space="preserve"><value>Maintenance</value></data>
+  <data name="Twk_PowerPlan" xml:space="preserve"><value>Plan d'alimentation « Performances élevées »</value></data>
+  <data name="Twk_VisualFx" xml:space="preserve"><value>Effets visuels : meilleures performances (effet à la reconnexion)</value></data>
+  <data name="Twk_Startup" xml:space="preserve"><value>Applications au démarrage...</value></data>
+  <data name="Twk_Telemetry" xml:space="preserve"><value>Télémétrie au minimum + service DiagTrack désactivé (admin)</value></data>
+  <data name="Twk_Ads" xml:space="preserve"><value>Désactiver l'identifiant publicitaire</value></data>
+  <data name="Twk_Suggestions" xml:space="preserve"><value>Désactiver suggestions et publicités (Démarrer, verrouillage)</value></data>
+  <data name="Twk_Tailored" xml:space="preserve"><value>Désactiver les expériences personnalisées</value></data>
+  <data name="Twk_ShowExt" xml:space="preserve"><value>Afficher les extensions de fichiers</value></data>
+  <data name="Twk_ShowHidden" xml:space="preserve"><value>Afficher les fichiers cachés</value></data>
+  <data name="Twk_TaskbarLeft" xml:space="preserve"><value>Barre des tâches à gauche (Windows 11)</value></data>
+  <data name="Twk_HideWidgets" xml:space="preserve"><value>Masquer les widgets de la barre des tâches</value></data>
+  <data name="Twk_SearchIcon" xml:space="preserve"><value>Recherche réduite à une icône</value></data>
+  <data name="Twk_ThisPC" xml:space="preserve"><value>Explorateur ouvre « Ce PC »</value></data>
+  <data name="Twk_Dism" xml:space="preserve"><value>Nettoyage des composants Windows — DISM, lent (admin)</value></data>
+  <data name="Twk_Apply" xml:space="preserve"><value>Appliquer les tweaks</value></data>
+  <data name="Twk_ElevNote" xml:space="preserve"><value>Les actions marquées (admin) sont regroupées dans une seule invite UAC.</value></data>
+  <data name="Twk_LogTitle" xml:space="preserve"><value>Journal des tweaks</value></data>
+  <data name="Twk_LogHint" xml:space="preserve"><value>Cochez des réglages puis cliquez sur Appliquer.&#x0a;Un récapitulatif est affiché avant toute modification.</value></data>
+  <data name="Twk_LogNone" xml:space="preserve"><value>Aucune option cochée.</value></data>
+  <data name="Twk_ConfirmBody" xml:space="preserve"><value>Les actions suivantes seront appliquées :&#x0a;&#x0a;{0}</value></data>
+  <data name="Twk_Cancelled" xml:space="preserve"><value>Opération annulée.</value></data>
+  <data name="Twk_LogStart" xml:space="preserve"><value>=== APPLICATION DES TWEAKS ===</value></data>
+  <data name="Twk_LogEnd" xml:space="preserve"><value>=== TWEAKS APPLIQUÉS ===</value></data>
+  <data name="Twk_LogOk" xml:space="preserve"><value>{0} — OK</value></data>
+  <data name="Twk_LogFail" xml:space="preserve"><value>{0} — échec</value></data>
+  <data name="Twk_LogError" xml:space="preserve"><value>Erreur : {0}</value></data>
+  <data name="Twk_LogElevStart" xml:space="preserve"><value>Actions administrateur : validez l'invite UAC (console minimisée).</value></data>
+  <data name="Twk_LogElevDenied" xml:space="preserve"><value>Actions administrateur ignorées (élévation refusée).</value></data>
+  <data name="Twk_LogExplorerRestart" xml:space="preserve"><value>Explorateur redémarré.</value></data>
+  <data name="Twk_LogStartupOpened" xml:space="preserve"><value>Gestionnaire des tâches ouvert (onglet Démarrage).</value></data>
   <data name="Hist_Title" xml:space="preserve"><value>Historique</value></data>
   <data name="Hist_Sub" xml:space="preserve"><value>Journal de vos analyses, nettoyages et actions de sécurité.</value></data>
   <data name="Hist_ExportHtml" xml:space="preserve"><value>Exporter HTML</value></data>
@@ -447,7 +520,7 @@
   <data name="Main_ClamOperational" xml:space="preserve"><value>ClamAV est opérationnel.</value></data>
   <data name="Main_ClamNotFound" xml:space="preserve"><value>ClamAV est introuvable sur cette machine.</value></data>
   <data name="Main_RuntimeHint" xml:space="preserve"><value> — voir README § 3 ou scripts\verify-runtime-deps.ps1</value></data>
-  <data name="Rec_CleanSuggest" xml:space="preserve"><value>Envisagez un nettoyage des fichiers temporaires et caches (menu Nettoyer) si ce n'est pas fait récemment.</value></data>
+  <data name="Rec_CleanSuggest" xml:space="preserve"><value>Envisagez un nettoyage des fichiers temporaires et caches (menu Optimiser) si ce n'est pas fait récemment.</value></data>
   <data name="Rec_CleanRecent" xml:space="preserve"><value>Dernier nettoyage enregistré le {0} — priorité basse.</value></data>
   <data name="Rec_ActNone" xml:space="preserve"><value>Aucune analyse dans l'historique — lancez une analyse rapide (Antivirus).</value></data>
   <data name="Rec_ActThreats" xml:space="preserve"><value>30 derniers jours : {0} menace(s) signalée(s) — consultez Historique / onglet Analyse.</value></data>

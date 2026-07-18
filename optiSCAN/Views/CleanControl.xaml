@@ -24,234 +24,573 @@
                 </StackPanel>
 
                 <Border Grid.Column="1" Style="{StaticResource PageHeaderIcon}">
-                    <md:PackIcon Kind="Broom" Width="26" Height="26"
+                    <md:PackIcon Kind="Speedometer" Width="26" Height="26"
                                  Foreground="{DynamicResource TextAccent}"
                                  HorizontalAlignment="Center" VerticalAlignment="Center"/>
                 </Border>
             </Grid>
         </Border>
 
-        <Grid Margin="16,12,16,14">
-            <Grid.RowDefinitions>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="Auto"/>
-                <RowDefinition Height="*"/>
-            </Grid.RowDefinitions>
+        <TabControl x:Name="optimizeTabs" Margin="16,4,16,14"
+                    BorderThickness="0" Background="Transparent"
+                    Padding="0">
+            <TabControl.ItemContainerStyle>
+                <Style TargetType="TabItem" BasedOn="{StaticResource DonabyTabItemUnderline}"/>
+            </TabControl.ItemContainerStyle>
 
-            <Grid Grid.Row="0" Margin="0,0,0,10">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="10"/>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="10"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <Border Grid.Column="0" Style="{StaticResource MetricCard}">
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                            <Border Width="32" Height="32" CornerRadius="8"
-                                    Background="{DynamicResource AlertBg}">
-                                <md:PackIcon Kind="Folder" Width="18" Height="18"
-                                             Foreground="{DynamicResource AlertGoldLight}"
-                                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
-                            <TextBlock Text="{loc:Loc Key=Clean_TempWin}"
-                                       FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource TextDark}"
-                                       VerticalAlignment="Center" Margin="10,0,0,0"/>
-                        </StackPanel>
-                        <TextBlock x:Name="txtTempSize" Text="0 Mo"
-                                   FontSize="{DynamicResource FontSize.Metric}" FontWeight="Bold"
-                                   Foreground="{DynamicResource AlertGoldLight}"/>
-                        <TextBlock Text="{loc:Loc Key=Clean_TempSub}"
-                                   FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextMuted}"
-                                   Margin="0,2,0,0"/>
+            <!-- ═════════════════ Onglet 1 : Nettoyage ═════════════════ -->
+            <TabItem>
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <md:PackIcon Kind="Broom" Width="14" Height="14"
+                                     Style="{StaticResource TabHeaderPackIcon}"
+                                     Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="{loc:Loc Key=Opti_TabClean}" VerticalAlignment="Center"/>
                     </StackPanel>
-                </Border>
+                </TabItem.Header>
 
-                <Border Grid.Column="2" Style="{StaticResource MetricCard}">
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                            <Border Width="32" Height="32" CornerRadius="8"
-                                    Background="{DynamicResource AlertBg}">
-                                <md:PackIcon Kind="Web" Width="18" Height="18"
-                                             Foreground="{DynamicResource AlertGoldLight}"
-                                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
-                            <TextBlock Text="{loc:Loc Key=Clean_Browsers}"
-                                       FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource TextDark}"
-                                       VerticalAlignment="Center" Margin="10,0,0,0"/>
-                        </StackPanel>
-                        <TextBlock x:Name="txtBrowserSize" Text="0 Mo"
-                                   FontSize="{DynamicResource FontSize.Metric}" FontWeight="Bold"
-                                   Foreground="{DynamicResource AlertGoldLight}"/>
-                        <TextBlock Text="{loc:Loc Key=Clean_BrowserSub}"
-                                   FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextMuted}"
-                                   Margin="0,2,0,0"/>
-                    </StackPanel>
-                </Border>
+                <Grid Margin="0,10,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
 
-                <Border Grid.Column="4" Style="{StaticResource HeroMetricCard}">
-                    <StackPanel>
-                        <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
-                            <Border Width="32" Height="32" CornerRadius="8"
-                                    Background="{DynamicResource AccentIconRing}">
-                                <md:PackIcon Kind="ChartBar" Width="18" Height="18"
-                                             Foreground="{DynamicResource TextOnPrimary}"
-                                             HorizontalAlignment="Center" VerticalAlignment="Center"/>
-                            </Border>
-                            <TextBlock Text="{loc:Loc Key=Clean_Total}"
-                                       FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource TextOnPrimary}"
-                                       VerticalAlignment="Center" Margin="10,0,0,0"/>
-                        </StackPanel>
-                        <TextBlock x:Name="txtTotalSize" Text="0 Mo"
-                                   FontSize="{DynamicResource FontSize.Metric}" FontWeight="Bold"
-                                   Foreground="{DynamicResource TextOnPrimary}"/>
-                        <TextBlock Text="{loc:Loc Key=Clean_TotalSub}"
-                                   FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextOnPrimaryMuted}"
-                                   Margin="0,2,0,0"/>
-                    </StackPanel>
-                </Border>
-            </Grid>
+                    <Grid Grid.Row="0" Margin="0,0,0,10">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
 
-            <Border Grid.Row="1" Style="{StaticResource GlassCard}" Margin="0,0,0,10" Padding="14,10">
-                <StackPanel Orientation="Horizontal">
-                    <Button x:Name="btnAnalyze"
-                            Click="btnAnalyze_Click"
-                            Style="{StaticResource SecondaryButton}"
-                            Height="36" Width="140" Margin="0,0,10,0"
-                            AutomationProperties.Name="{loc:Loc Key=Clean_Analyze}">
-                        <StackPanel Orientation="Horizontal">
-                            <md:PackIcon Kind="Magnify" Width="15" Height="15"
-                                         VerticalAlignment="Center"/>
-                            <TextBlock Text="{loc:Loc Key=Clean_Analyze}" FontSize="{DynamicResource FontSize.Body}"
-                                       VerticalAlignment="Center" Margin="6,0,0,0"/>
-                        </StackPanel>
-                    </Button>
-                    <Button x:Name="btnCleanNow"
-                            Click="btnCleanNow_Click"
-                            Style="{StaticResource GradientPrimaryButton}"
-                            IsEnabled="False"
-                            Height="36" Width="190"
-                            AutomationProperties.Name="{loc:Loc Key=Clean_Run}">
-                        <StackPanel Orientation="Horizontal">
-                            <md:PackIcon Kind="AutoFix" Width="15" Height="15"
-                                         VerticalAlignment="Center"/>
-                            <TextBlock Text="{loc:Loc Key=Clean_Run}" FontSize="{DynamicResource FontSize.Body}"
-                                       VerticalAlignment="Center" Margin="6,0,0,0"/>
-                        </StackPanel>
-                    </Button>
-                </StackPanel>
-            </Border>
-
-            <Grid Grid.Row="2">
-                <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="*"/>
-                    <ColumnDefinition Width="10"/>
-                    <ColumnDefinition Width="*"/>
-                </Grid.ColumnDefinitions>
-
-                <Border Grid.Column="0" Style="{StaticResource GlassCard}">
-                    <StackPanel>
-                        <TextBlock Text="{loc:Loc Key=Clean_ItemsTitle}"
-                                   FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextDark}"
-                                   Margin="0,0,0,8"/>
-
-                        <TextBlock Text="{loc:Loc Key=Clean_System}" Style="{StaticResource SectionLabel}"
-                                   Margin="0,0,0,4"/>
-                        <Border Background="{DynamicResource SurfaceBg}"
-                                CornerRadius="8" Padding="10,6" Margin="0,0,0,8"
-                                BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1">
-                            <UniformGrid Columns="2">
-                                <CheckBox x:Name="chkTempWin"
-                                          Content="{loc:Loc Key=Clean_TempWinCb}" IsChecked="True"
-                                          Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
-                                <CheckBox x:Name="chkTempUser"
-                                          Content="{loc:Loc Key=Clean_TempUserCb}" IsChecked="True"
-                                          Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
-                                <CheckBox x:Name="chkRecycleBin"
-                                          Content="{loc:Loc Key=Clean_RecycleCb}" IsChecked="True"
-                                          Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
-                                <CheckBox x:Name="chkLogs"
-                                          Content="{loc:Loc Key=Clean_LogsCb}" IsChecked="False"
-                                          Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
-                            </UniformGrid>
+                        <Border Grid.Column="0" Style="{StaticResource MetricCard}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <Border Width="32" Height="32" CornerRadius="8"
+                                            Background="{DynamicResource AlertBg}">
+                                        <md:PackIcon Kind="Folder" Width="18" Height="18"
+                                                     Foreground="{DynamicResource AlertGoldLight}"
+                                                     HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <TextBlock Text="{loc:Loc Key=Clean_TempWin}"
+                                               FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextDark}"
+                                               VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                </StackPanel>
+                                <TextBlock x:Name="txtTempSize" Text="0 Mo"
+                                           FontSize="{DynamicResource FontSize.Metric}" FontWeight="Bold"
+                                           Foreground="{DynamicResource AlertGoldLight}"/>
+                                <TextBlock Text="{loc:Loc Key=Clean_TempSub}"
+                                           FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextMuted}"
+                                           Margin="0,2,0,0"/>
+                            </StackPanel>
                         </Border>
 
-                        <TextBlock Text="{loc:Loc Key=Clean_BrowsersSection}" Style="{StaticResource SectionLabel}"
-                                   Margin="0,0,0,4"/>
-                        <Border Background="{DynamicResource SurfaceBg}"
-                                CornerRadius="8" Padding="10,6"
-                                BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1">
-                            <UniformGrid Columns="2">
-                                <CheckBox x:Name="chkEdge"
-                                          Content="{loc:Loc Key=Clean_Edge}" IsChecked="True"
-                                          Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
-                                <CheckBox x:Name="chkChrome"
-                                          Content="{loc:Loc Key=Clean_Chrome}" IsChecked="True"
-                                          Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
-                                <CheckBox x:Name="chkFirefox"
-                                          Content="{loc:Loc Key=Clean_Firefox}" IsChecked="True"
-                                          Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
-                                <CheckBox x:Name="chkBrave"
-                                          Content="{loc:Loc Key=Clean_Brave}" IsChecked="False"
-                                          Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
-                                <CheckBox x:Name="chkOpera"
-                                          Content="{loc:Loc Key=Clean_Opera}" IsChecked="False"
-                                          Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
-                                <CheckBox x:Name="chkVivaldi"
-                                          Content="{loc:Loc Key=Clean_Vivaldi}" IsChecked="False"
-                                          Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
-                                <CheckBox x:Name="chkArc"
-                                          Content="{loc:Loc Key=Clean_Arc}" IsChecked="False"
-                                          Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
-                            </UniformGrid>
+                        <Border Grid.Column="2" Style="{StaticResource MetricCard}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <Border Width="32" Height="32" CornerRadius="8"
+                                            Background="{DynamicResource AlertBg}">
+                                        <md:PackIcon Kind="Web" Width="18" Height="18"
+                                                     Foreground="{DynamicResource AlertGoldLight}"
+                                                     HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <TextBlock Text="{loc:Loc Key=Clean_Browsers}"
+                                               FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextDark}"
+                                               VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                </StackPanel>
+                                <TextBlock x:Name="txtBrowserSize" Text="0 Mo"
+                                           FontSize="{DynamicResource FontSize.Metric}" FontWeight="Bold"
+                                           Foreground="{DynamicResource AlertGoldLight}"/>
+                                <TextBlock Text="{loc:Loc Key=Clean_BrowserSub}"
+                                           FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextMuted}"
+                                           Margin="0,2,0,0"/>
+                            </StackPanel>
                         </Border>
-                    </StackPanel>
-                </Border>
 
-                <Border Grid.Column="2" Style="{StaticResource LogConsolePanel}">
-                    <Grid>
-                        <Grid.RowDefinitions>
-                            <RowDefinition Height="Auto"/>
-                            <RowDefinition Height="*"/>
-                        </Grid.RowDefinitions>
-                        <TextBlock Grid.Row="0"
-                                   Text="{loc:Loc Key=Clean_LogTitle}"
-                                   FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextDark}"
-                                   Margin="0,0,0,6"/>
-                        <TextBox Grid.Row="1"
-                                 x:Name="txtCleanLog"
-                                 Style="{StaticResource LogConsoleTextBox}"
-                                 VerticalScrollBarVisibility="Hidden"
-                                 HorizontalScrollBarVisibility="Disabled"
-                                 VerticalAlignment="Stretch"
-                                 Text="{loc:Loc Key=Clean_LogHint}"/>
-
-                        <StackPanel x:Name="emptyCleanResultState" Visibility="Collapsed"
-                                    Grid.Row="1"
-                                    Style="{StaticResource EmptyStatePlaceholder}">
-                            <md:PackIcon Kind="CheckCircleOutline" Width="48" Height="48"
-                                         Foreground="{DynamicResource SuccessGreen}"
-                                         HorizontalAlignment="Center"/>
-                            <TextBlock Text="{loc:Loc Key=Clean_EmptyTitle}"
-                                       FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
-                                       Foreground="{DynamicResource TextMedium}"
-                                       HorizontalAlignment="Center" Margin="0,10,0,4"/>
-                            <TextBlock Text="{loc:Loc Key=Clean_EmptySub}"
-                                       FontSize="{DynamicResource FontSize.Body}"
-                                       Foreground="{DynamicResource TextMuted}"
-                                       HorizontalAlignment="Center"/>
-                        </StackPanel>
+                        <Border Grid.Column="4" Style="{StaticResource HeroMetricCard}">
+                            <StackPanel>
+                                <StackPanel Orientation="Horizontal" Margin="0,0,0,6">
+                                    <Border Width="32" Height="32" CornerRadius="8"
+                                            Background="{DynamicResource AccentIconRing}">
+                                        <md:PackIcon Kind="ChartBar" Width="18" Height="18"
+                                                     Foreground="{DynamicResource TextOnPrimary}"
+                                                     HorizontalAlignment="Center" VerticalAlignment="Center"/>
+                                    </Border>
+                                    <TextBlock Text="{loc:Loc Key=Clean_Total}"
+                                               FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextOnPrimary}"
+                                               VerticalAlignment="Center" Margin="10,0,0,0"/>
+                                </StackPanel>
+                                <TextBlock x:Name="txtTotalSize" Text="0 Mo"
+                                           FontSize="{DynamicResource FontSize.Metric}" FontWeight="Bold"
+                                           Foreground="{DynamicResource TextOnPrimary}"/>
+                                <TextBlock Text="{loc:Loc Key=Clean_TotalSub}"
+                                           FontSize="{DynamicResource FontSize.Caption}" Foreground="{DynamicResource TextOnPrimaryMuted}"
+                                           Margin="0,2,0,0"/>
+                            </StackPanel>
+                        </Border>
                     </Grid>
-                </Border>
-            </Grid>
-        </Grid>
+
+                    <Border Grid.Row="1" Style="{StaticResource GlassCard}" Margin="0,0,0,10" Padding="14,10">
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="btnAnalyze"
+                                    Click="btnAnalyze_Click"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Height="36" Width="140" Margin="0,0,10,0"
+                                    AutomationProperties.Name="{loc:Loc Key=Clean_Analyze}">
+                                <StackPanel Orientation="Horizontal">
+                                    <md:PackIcon Kind="Magnify" Width="15" Height="15"
+                                                 VerticalAlignment="Center"/>
+                                    <TextBlock Text="{loc:Loc Key=Clean_Analyze}" FontSize="{DynamicResource FontSize.Body}"
+                                               VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="btnCleanNow"
+                                    Click="btnCleanNow_Click"
+                                    Style="{StaticResource GradientPrimaryButton}"
+                                    IsEnabled="False"
+                                    Height="36" Width="190"
+                                    AutomationProperties.Name="{loc:Loc Key=Clean_Run}">
+                                <StackPanel Orientation="Horizontal">
+                                    <md:PackIcon Kind="AutoFix" Width="15" Height="15"
+                                                 VerticalAlignment="Center"/>
+                                    <TextBlock Text="{loc:Loc Key=Clean_Run}" FontSize="{DynamicResource FontSize.Body}"
+                                               VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                </StackPanel>
+                            </Button>
+                        </StackPanel>
+                    </Border>
+
+                    <Grid Grid.Row="2">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0" Style="{StaticResource GlassCard}" Padding="12,8">
+                            <StackPanel>
+                                <TextBlock Text="{loc:Loc Key=Clean_ItemsTitle}"
+                                           FontSize="{DynamicResource FontSize.Body}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextDark}"
+                                           Margin="0,0,0,4"/>
+
+                                <TextBlock Text="{loc:Loc Key=Clean_System}" Style="{StaticResource SectionLabel}"
+                                           Margin="0,0,0,2"/>
+                                <Border Background="{DynamicResource SurfaceBg}"
+                                        CornerRadius="8" Padding="8,3" Margin="0,0,0,4"
+                                        BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1">
+                                    <UniformGrid Columns="2">
+                                        <CheckBox x:Name="chkTempWin"
+                                                  Content="{loc:Loc Key=Clean_TempWinCb}" IsChecked="True"
+                                                  Margin="1,0" FontSize="{DynamicResource FontSize.Caption}"/>
+                                        <CheckBox x:Name="chkTempUser"
+                                                  Content="{loc:Loc Key=Clean_TempUserCb}" IsChecked="True"
+                                                  Margin="1,0" FontSize="{DynamicResource FontSize.Caption}"/>
+                                        <CheckBox x:Name="chkRecycleBin"
+                                                  Content="{loc:Loc Key=Clean_RecycleCb}" IsChecked="True"
+                                                  Margin="1,0" FontSize="{DynamicResource FontSize.Caption}"/>
+                                        <CheckBox x:Name="chkLogs"
+                                                  Content="{loc:Loc Key=Clean_LogsCb}" IsChecked="False"
+                                                  Margin="1,0" FontSize="{DynamicResource FontSize.Caption}"/>
+                                        <CheckBox x:Name="chkWUCache"
+                                                  Content="{loc:Loc Key=Clean_WUCacheCb}" IsChecked="False"
+                                                  Margin="1,0" FontSize="{DynamicResource FontSize.Caption}"/>
+                                        <CheckBox x:Name="chkDns"
+                                                  Content="{loc:Loc Key=Clean_DnsCb}" IsChecked="False"
+                                                  Margin="1,0" FontSize="{DynamicResource FontSize.Caption}"/>
+                                    </UniformGrid>
+                                </Border>
+
+                                <TextBlock Text="{loc:Loc Key=Clean_BrowsersSection}" Style="{StaticResource SectionLabel}"
+                                           Margin="0,0,0,2"/>
+                                <Border Background="{DynamicResource SurfaceBg}"
+                                        CornerRadius="8" Padding="8,3"
+                                        BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1">
+                                    <UniformGrid Columns="2">
+                                        <CheckBox x:Name="chkEdge"
+                                                  Content="{loc:Loc Key=Clean_Edge}" IsChecked="True"
+                                                  Margin="1,0" FontSize="{DynamicResource FontSize.Caption}"/>
+                                        <CheckBox x:Name="chkChrome"
+                                                  Content="{loc:Loc Key=Clean_Chrome}" IsChecked="True"
+                                                  Margin="1,0" FontSize="{DynamicResource FontSize.Caption}"/>
+                                        <CheckBox x:Name="chkFirefox"
+                                                  Content="{loc:Loc Key=Clean_Firefox}" IsChecked="True"
+                                                  Margin="1,0" FontSize="{DynamicResource FontSize.Caption}"/>
+                                        <CheckBox x:Name="chkBrave"
+                                                  Content="{loc:Loc Key=Clean_Brave}" IsChecked="False"
+                                                  Margin="1,0" FontSize="{DynamicResource FontSize.Caption}"/>
+                                        <CheckBox x:Name="chkOpera"
+                                                  Content="{loc:Loc Key=Clean_Opera}" IsChecked="False"
+                                                  Margin="1,0" FontSize="{DynamicResource FontSize.Caption}"/>
+                                        <CheckBox x:Name="chkVivaldi"
+                                                  Content="{loc:Loc Key=Clean_Vivaldi}" IsChecked="False"
+                                                  Margin="1,0" FontSize="{DynamicResource FontSize.Caption}"/>
+                                        <CheckBox x:Name="chkArc"
+                                                  Content="{loc:Loc Key=Clean_Arc}" IsChecked="False"
+                                                  Margin="1,0" FontSize="{DynamicResource FontSize.Caption}"/>
+                                        <CheckBox x:Name="chkBrowserHistory"
+                                                  Content="{loc:Loc Key=Clean_HistoryCb}" IsChecked="False"
+                                                  Margin="1,0" FontSize="{DynamicResource FontSize.Caption}"
+                                                  ToolTip="{loc:Loc Key=Clean_HistoryTooltip}"/>
+                                    </UniformGrid>
+                                </Border>
+                            </StackPanel>
+                        </Border>
+
+                        <Border Grid.Column="2" Style="{StaticResource LogConsolePanel}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0"
+                                           Text="{loc:Loc Key=Clean_LogTitle}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextDark}"
+                                           Margin="0,0,0,6"/>
+                                <TextBox Grid.Row="1"
+                                         x:Name="txtCleanLog"
+                                         Style="{StaticResource LogConsoleTextBox}"
+                                         VerticalScrollBarVisibility="Hidden"
+                                         HorizontalScrollBarVisibility="Disabled"
+                                         VerticalAlignment="Stretch"
+                                         Text="{loc:Loc Key=Clean_LogHint}"/>
+
+                                <StackPanel x:Name="emptyCleanResultState" Visibility="Collapsed"
+                                            Grid.Row="1"
+                                            Style="{StaticResource EmptyStatePlaceholder}">
+                                    <md:PackIcon Kind="CheckCircleOutline" Width="48" Height="48"
+                                                 Foreground="{DynamicResource SuccessGreen}"
+                                                 HorizontalAlignment="Center"/>
+                                    <TextBlock Text="{loc:Loc Key=Clean_EmptyTitle}"
+                                               FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource TextMedium}"
+                                               HorizontalAlignment="Center" Margin="0,10,0,4"/>
+                                    <TextBlock Text="{loc:Loc Key=Clean_EmptySub}"
+                                               FontSize="{DynamicResource FontSize.Body}"
+                                               Foreground="{DynamicResource TextMuted}"
+                                               HorizontalAlignment="Center"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </TabItem>
+
+            <!-- ═════════════════ Onglet 2 : Mises à jour ═════════════════ -->
+            <TabItem>
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <md:PackIcon Kind="Update" Width="14" Height="14"
+                                     Style="{StaticResource TabHeaderPackIcon}"
+                                     Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="{loc:Loc Key=Opti_TabUpdates}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </TabItem.Header>
+
+                <Grid Margin="0,10,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" Style="{StaticResource GlassCard}" Margin="0,0,0,10" Padding="14,10">
+                        <StackPanel>
+                            <TextBlock Text="{loc:Loc Key=Upd_Hint}"
+                                       FontSize="{DynamicResource FontSize.Small}"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       TextWrapping="Wrap" Margin="0,0,0,8"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Button x:Name="btnUpdScan"
+                                        Click="btnUpdScan_Click"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Height="36" Width="150" Margin="0,0,10,0"
+                                        AutomationProperties.Name="{loc:Loc Key=Upd_Scan}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <md:PackIcon Kind="Magnify" Width="15" Height="15"
+                                                     VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Key=Upd_Scan}" FontSize="{DynamicResource FontSize.Body}"
+                                                   VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="btnUpdSelected"
+                                        Click="btnUpdSelected_Click"
+                                        Style="{StaticResource GradientPrimaryButton}"
+                                        IsEnabled="False"
+                                        Height="36" Width="210" Margin="0,0,10,0"
+                                        AutomationProperties.Name="{loc:Loc Key=Upd_InstallSelected}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <md:PackIcon Kind="DownloadOutline" Width="15" Height="15"
+                                                     VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Key=Upd_InstallSelected}" FontSize="{DynamicResource FontSize.Body}"
+                                                   VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="btnUpdAll"
+                                        Click="btnUpdAll_Click"
+                                        Style="{StaticResource SecondaryButton}"
+                                        IsEnabled="False"
+                                        Height="36" Width="170" Margin="0,0,10,0"
+                                        AutomationProperties.Name="{loc:Loc Key=Upd_InstallAll}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <md:PackIcon Kind="DownloadMultiple" Width="15" Height="15"
+                                                     VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Key=Upd_InstallAll}" FontSize="{DynamicResource FontSize.Body}"
+                                                   VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                    </StackPanel>
+                                </Button>
+                                <Button x:Name="btnUpdWindows"
+                                        Click="btnUpdWindows_Click"
+                                        Style="{StaticResource SecondaryButton}"
+                                        Height="36" Width="170"
+                                        AutomationProperties.Name="{loc:Loc Key=Upd_Windows}">
+                                    <StackPanel Orientation="Horizontal">
+                                        <md:PackIcon Kind="MicrosoftWindows" Width="15" Height="15"
+                                                     VerticalAlignment="Center"/>
+                                        <TextBlock Text="{loc:Loc Key=Upd_Windows}" FontSize="{DynamicResource FontSize.Body}"
+                                                   VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                    </StackPanel>
+                                </Button>
+                            </StackPanel>
+                        </StackPanel>
+                    </Border>
+
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0" Style="{StaticResource GlassCard}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0"
+                                           Text="{loc:Loc Key=Upd_ListTitle}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextDark}"
+                                           Margin="0,0,0,8"/>
+                                <Border Grid.Row="1" Background="{DynamicResource SurfaceBg}"
+                                        CornerRadius="8" Padding="10,6"
+                                        BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1">
+                                    <Grid>
+                                        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                                      HorizontalScrollBarVisibility="Disabled">
+                                            <StackPanel x:Name="pnlUpdateList"/>
+                                        </ScrollViewer>
+                                        <StackPanel x:Name="emptyUpdateState" Visibility="Collapsed"
+                                                    Style="{StaticResource EmptyStatePlaceholder}">
+                                            <md:PackIcon Kind="CheckCircleOutline" Width="48" Height="48"
+                                                         Foreground="{DynamicResource SuccessGreen}"
+                                                         HorizontalAlignment="Center"/>
+                                            <TextBlock Text="{loc:Loc Key=Upd_EmptyTitle}"
+                                                       FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                                       Foreground="{DynamicResource TextMedium}"
+                                                       HorizontalAlignment="Center" Margin="0,10,0,4"/>
+                                            <TextBlock Text="{loc:Loc Key=Upd_EmptySub}"
+                                                       FontSize="{DynamicResource FontSize.Body}"
+                                                       Foreground="{DynamicResource TextMuted}"
+                                                       HorizontalAlignment="Center"/>
+                                        </StackPanel>
+                                    </Grid>
+                                </Border>
+                            </Grid>
+                        </Border>
+
+                        <Border Grid.Column="2" Style="{StaticResource LogConsolePanel}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0"
+                                           Text="{loc:Loc Key=Upd_LogTitle}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextDark}"
+                                           Margin="0,0,0,6"/>
+                                <TextBox Grid.Row="1"
+                                         x:Name="txtUpdateLog"
+                                         Style="{StaticResource LogConsoleTextBox}"
+                                         VerticalScrollBarVisibility="Hidden"
+                                         HorizontalScrollBarVisibility="Disabled"
+                                         VerticalAlignment="Stretch"
+                                         Text="{loc:Loc Key=Upd_LogHint}"/>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </TabItem>
+
+            <!-- ═════════════════ Onglet 3 : Tweaks ═════════════════ -->
+            <TabItem>
+                <TabItem.Header>
+                    <StackPanel Orientation="Horizontal">
+                        <md:PackIcon Kind="Tune" Width="14" Height="14"
+                                     Style="{StaticResource TabHeaderPackIcon}"
+                                     Margin="0,0,6,0" VerticalAlignment="Center"/>
+                        <TextBlock Text="{loc:Loc Key=Opti_TabTweaks}" VerticalAlignment="Center"/>
+                    </StackPanel>
+                </TabItem.Header>
+
+                <Grid Margin="0,10,0,0">
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto"/>
+                        <RowDefinition Height="*"/>
+                    </Grid.RowDefinitions>
+
+                    <Border Grid.Row="0" Style="{StaticResource GlassCard}" Margin="0,0,0,10" Padding="14,10">
+                        <StackPanel Orientation="Horizontal">
+                            <Button x:Name="btnTwkApply"
+                                    Click="btnTwkApply_Click"
+                                    Style="{StaticResource GradientPrimaryButton}"
+                                    Height="36" Width="190" Margin="0,0,10,0"
+                                    AutomationProperties.Name="{loc:Loc Key=Twk_Apply}">
+                                <StackPanel Orientation="Horizontal">
+                                    <md:PackIcon Kind="AutoFix" Width="15" Height="15"
+                                                 VerticalAlignment="Center"/>
+                                    <TextBlock Text="{loc:Loc Key=Twk_Apply}" FontSize="{DynamicResource FontSize.Body}"
+                                               VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="btnTwkStartup"
+                                    Click="btnTwkStartup_Click"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Height="36" Width="230" Margin="0,0,14,0"
+                                    AutomationProperties.Name="{loc:Loc Key=Twk_Startup}">
+                                <StackPanel Orientation="Horizontal">
+                                    <md:PackIcon Kind="RocketLaunch" Width="15" Height="15"
+                                                 VerticalAlignment="Center"/>
+                                    <TextBlock Text="{loc:Loc Key=Twk_Startup}" FontSize="{DynamicResource FontSize.Body}"
+                                               VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                </StackPanel>
+                            </Button>
+                            <TextBlock Text="{loc:Loc Key=Twk_ElevNote}"
+                                       FontSize="{DynamicResource FontSize.Caption}"
+                                       Foreground="{DynamicResource TextMuted}"
+                                       VerticalAlignment="Center" TextWrapping="Wrap"
+                                       MaxWidth="320"/>
+                        </StackPanel>
+                    </Border>
+
+                    <Grid Grid.Row="1">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*"/>
+                            <ColumnDefinition Width="10"/>
+                            <ColumnDefinition Width="*"/>
+                        </Grid.ColumnDefinitions>
+
+                        <Border Grid.Column="0" Style="{StaticResource GlassCard}">
+                            <ScrollViewer VerticalScrollBarVisibility="Auto"
+                                          HorizontalScrollBarVisibility="Disabled">
+                                <StackPanel>
+                                    <TextBlock Text="{loc:Loc Key=Twk_SectionPerf}" Style="{StaticResource SectionLabel}"
+                                               Margin="0,0,0,4"/>
+                                    <Border Background="{DynamicResource SurfaceBg}"
+                                            CornerRadius="8" Padding="10,6" Margin="0,0,0,8"
+                                            BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1">
+                                        <StackPanel>
+                                            <CheckBox x:Name="chkTwkPowerPlan"
+                                                      Content="{loc:Loc Key=Twk_PowerPlan}" IsChecked="False"
+                                                      Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
+                                            <CheckBox x:Name="chkTwkVisualFx"
+                                                      Content="{loc:Loc Key=Twk_VisualFx}" IsChecked="False"
+                                                      Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <TextBlock Text="{loc:Loc Key=Twk_SectionPrivacy}" Style="{StaticResource SectionLabel}"
+                                               Margin="0,0,0,4"/>
+                                    <Border Background="{DynamicResource SurfaceBg}"
+                                            CornerRadius="8" Padding="10,6" Margin="0,0,0,8"
+                                            BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1">
+                                        <StackPanel>
+                                            <CheckBox x:Name="chkTwkTelemetry"
+                                                      Content="{loc:Loc Key=Twk_Telemetry}" IsChecked="False"
+                                                      Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
+                                            <CheckBox x:Name="chkTwkAds"
+                                                      Content="{loc:Loc Key=Twk_Ads}" IsChecked="False"
+                                                      Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
+                                            <CheckBox x:Name="chkTwkSuggestions"
+                                                      Content="{loc:Loc Key=Twk_Suggestions}" IsChecked="False"
+                                                      Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
+                                            <CheckBox x:Name="chkTwkTailored"
+                                                      Content="{loc:Loc Key=Twk_Tailored}" IsChecked="False"
+                                                      Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
+                                        </StackPanel>
+                                    </Border>
+
+                                    <TextBlock Text="{loc:Loc Key=Twk_SectionUi}" Style="{StaticResource SectionLabel}"
+                                               Margin="0,0,0,4"/>
+                                    <Border Background="{DynamicResource SurfaceBg}"
+                                            CornerRadius="8" Padding="10,6" Margin="0,0,0,8"
+                                            BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1">
+                                        <UniformGrid Columns="2">
+                                            <CheckBox x:Name="chkTwkExt"
+                                                      Content="{loc:Loc Key=Twk_ShowExt}" IsChecked="False"
+                                                      Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
+                                            <CheckBox x:Name="chkTwkHidden"
+                                                      Content="{loc:Loc Key=Twk_ShowHidden}" IsChecked="False"
+                                                      Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
+                                            <CheckBox x:Name="chkTwkTaskbarLeft"
+                                                      Content="{loc:Loc Key=Twk_TaskbarLeft}" IsChecked="False"
+                                                      Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
+                                            <CheckBox x:Name="chkTwkWidgets"
+                                                      Content="{loc:Loc Key=Twk_HideWidgets}" IsChecked="False"
+                                                      Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
+                                            <CheckBox x:Name="chkTwkSearchIcon"
+                                                      Content="{loc:Loc Key=Twk_SearchIcon}" IsChecked="False"
+                                                      Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
+                                            <CheckBox x:Name="chkTwkThisPC"
+                                                      Content="{loc:Loc Key=Twk_ThisPC}" IsChecked="False"
+                                                      Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
+                                        </UniformGrid>
+                                    </Border>
+
+                                    <TextBlock Text="{loc:Loc Key=Twk_SectionMaint}" Style="{StaticResource SectionLabel}"
+                                               Margin="0,0,0,4"/>
+                                    <Border Background="{DynamicResource SurfaceBg}"
+                                            CornerRadius="8" Padding="10,6"
+                                            BorderBrush="{DynamicResource BorderSubtle}" BorderThickness="1">
+                                        <CheckBox x:Name="chkTwkDism"
+                                                  Content="{loc:Loc Key=Twk_Dism}" IsChecked="False"
+                                                  Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
+                                    </Border>
+                                </StackPanel>
+                            </ScrollViewer>
+                        </Border>
+
+                        <Border Grid.Column="2" Style="{StaticResource LogConsolePanel}">
+                            <Grid>
+                                <Grid.RowDefinitions>
+                                    <RowDefinition Height="Auto"/>
+                                    <RowDefinition Height="*"/>
+                                </Grid.RowDefinitions>
+                                <TextBlock Grid.Row="0"
+                                           Text="{loc:Loc Key=Twk_LogTitle}"
+                                           FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                                           Foreground="{DynamicResource TextDark}"
+                                           Margin="0,0,0,6"/>
+                                <TextBox Grid.Row="1"
+                                         x:Name="txtTweaksLog"
+                                         Style="{StaticResource LogConsoleTextBox}"
+                                         VerticalScrollBarVisibility="Hidden"
+                                         HorizontalScrollBarVisibility="Disabled"
+                                         VerticalAlignment="Stretch"
+                                         Text="{loc:Loc Key=Twk_LogHint}"/>
+                            </Grid>
+                        </Border>
+                    </Grid>
+                </Grid>
+            </TabItem>
+        </TabControl>
 
     </DockPanel>
 </UserControl>
