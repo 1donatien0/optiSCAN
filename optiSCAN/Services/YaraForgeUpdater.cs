@@ -70,6 +70,20 @@ namespace optiSCAN.Services
             LoadPersistedMeta();
         }
 
+        /// <summary>True si au moins un fichier .yar est présent localement.</summary>
+        public bool HasLocalRulesFiles()
+        {
+            try
+            {
+                return Directory.Exists(_rulesDirectory)
+                    && Directory.GetFiles(_rulesDirectory, "*.yar").Length > 0;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
         /// <summary>Version du paquet YARA-Forge affichable (persistée sur disque).</summary>
         public string GetRulesPackVersionDisplay()
             => string.IsNullOrWhiteSpace(LastVersion) ? "—" : LastVersion!.Trim();
@@ -221,6 +235,7 @@ namespace optiSCAN.Services
                 // ── 2. Localisation de l'asset ────────────────────────────────
                 var assets = release?["assets"]?.AsArray();
                 string? downloadUrl = null;
+                JsonNode? packageAsset = null;
 
                 if (assets != null)
                 {
@@ -230,6 +245,7 @@ namespace optiSCAN.Services
                         if (name.Equals(PackageName, StringComparison.OrdinalIgnoreCase))
                         {
                             downloadUrl = asset?["browser_download_url"]?.GetValue<string>();
+                            packageAsset = asset;
                             break;
                         }
                     }
@@ -254,6 +270,15 @@ namespace optiSCAN.Services
                 {
                     result.Success = false;
                     result.Message = LocalizationService.Format("YaraForge_DownloadError", ex.Message);
+                    return result;
+                }
+
+                YaraForgePackageIntegrity.TryGetExpectedDigest(packageAsset, out var expectedSize, out var expectedSha256);
+                if (!YaraForgePackageIntegrity.Validate(zipBytes, expectedSize, expectedSha256))
+                {
+                    result.Success = false;
+                    result.Message = LocalizationService.GetString("YaraForge_IntegrityError");
+                    AppLogger.Warn("YaraForgeUpdater", "Intégrité du paquet YARA-Forge refusée");
                     return result;
                 }
 

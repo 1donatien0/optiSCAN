@@ -6,7 +6,13 @@
 [CmdletBinding()]
 param(
     [switch] $SkipPublish,
-    [string] $PublishDir
+    [string] $PublishDir,
+    # Embarquer les bases ClamAV (~105 Mo). Défaut: non (téléchargement post-install).
+    [switch] $EmbedClamAvDatabase,
+    # Embarquer les règles YARA. Défaut: non (YARA-Forge post-install).
+    [switch] $EmbedYaraRules,
+    # Embarquer ClamAV DB + règles YARA (offline).
+    [switch] $EmbedOfflineSignatures
 )
 
 $ErrorActionPreference = 'Stop'
@@ -40,7 +46,9 @@ $staleFlatPublish = Join-Path (Split-Path $targetPublishDir -Parent) 'optiSCAN.e
 if (-not $SkipPublish) {
     if (-not (Test-Path -LiteralPath $cleanScript)) { throw "Introuvable : $cleanScript" }
     & $cleanScript -Configuration Release -IncludeObj -IncludeCiPublish
-    if ($LASTEXITCODE -ne 0) { throw "clean-before-publish a echoue (code $LASTEXITCODE)." }
+    if ($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0) {
+        throw "clean-before-publish a echoue (code $LASTEXITCODE)."
+    }
     Write-Host 'dotnet publish (Release, FolderProfile -> publish\win-x64)...' -ForegroundColor Cyan
     dotnet publish $csproj -c Release /p:PublishProfile=FolderProfile
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish a echoue (code $LASTEXITCODE)." }
@@ -64,7 +72,9 @@ if (-not (Test-Path -LiteralPath $publishExe)) {
 if (Test-Path -LiteralPath $verifyScript) {
     Write-Host 'verify-runtime-deps...' -ForegroundColor Cyan
     & $verifyScript -PublishDir $targetPublishDir
-    if ($LASTEXITCODE -ne 0) { throw "verify-runtime-deps a echoue (code $LASTEXITCODE)." }
+    if ($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0) {
+        throw "verify-runtime-deps a echoue (code $LASTEXITCODE)."
+    }
 }
 
 $iscc = @(
@@ -80,20 +90,38 @@ New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 $propsPath = Join-Path $root 'Directory.Build.props'
 [xml]$propsXml = Get-Content -LiteralPath $propsPath
 $appVersion = ($propsXml.Project.PropertyGroup.Version | Select-Object -First 1).'#text'
-if ([string]::IsNullOrWhiteSpace($appVersion)) { $appVersion = '8.0.0' }
+if ([string]::IsNullOrWhiteSpace($appVersion)) { $appVersion = '9.0.0' }
 $parts = $appVersion.Split('.')
 $appRelease = if ($parts.Length -ge 2) { "v$($parts[0]).$($parts[1])" } else { "v$appVersion" }
 
 Write-Host "Inno Setup : $iscc (AppVersion=$appVersion, AppRelease=$appRelease)" -ForegroundColor Cyan
-$relative = [System.IO.Path]::GetRelativePath($PSScriptRoot, $targetPublishDir)
-$publishGlob = ($relative -replace '/', '\') + '\*'
+$fromUri = New-Object System.Uri(($PSScriptRoot.TrimEnd('\') + '\'))
+$toUri = New-Object System.Uri(($targetPublishDir.TrimEnd('\') + '\'))
+$relative = [Uri]::UnescapeDataString($fromUri.MakeRelativeUri($toUri).ToString()).TrimEnd('/').Replace('/', '\')
+$publishGlob = $relative + '\*'
 $isccArgs = @(
     "/DAppVersion=$appVersion",
     "/DAppRelease=$appRelease",
     "/DAppPublishSource=$publishGlob"
 )
+if ($EmbedOfflineSignatures) {
+    $isccArgs += '/DEmbedOfflineSignatures'
+} else {
+    if ($EmbedClamAvDatabase) { $isccArgs += '/DEmbedClamAvDatabase' }
+    if ($EmbedYaraRules) { $isccArgs += '/DEmbedYaraRules' }
+}
 Write-Host "Publish source (force) : $publishGlob" -ForegroundColor DarkGray
 Write-Host "  optiSCAN.exe : $((Get-Item -LiteralPath $publishExe).LastWriteTime.ToString('u'))" -ForegroundColor DarkGray
+if ($EmbedOfflineSignatures -or $EmbedClamAvDatabase) {
+    Write-Host '  Bases ClamAV : embarquees' -ForegroundColor DarkGray
+} else {
+    Write-Host '  Bases ClamAV : telechargement post-install (freshclam / MAJ)' -ForegroundColor DarkGray
+}
+if ($EmbedOfflineSignatures -or $EmbedYaraRules) {
+    Write-Host '  Regles YARA : embarquees' -ForegroundColor DarkGray
+} else {
+    Write-Host '  Regles YARA : telechargement post-install (YARA-Forge / MAJ)' -ForegroundColor DarkGray
+}
 & $iscc @isccArgs $iss
 if ($LASTEXITCODE -ne 0) { throw "ISCC a echoue (code $LASTEXITCODE)." }
 

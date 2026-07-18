@@ -4,8 +4,8 @@ namespace optiSCAN.Platform;
 
 public static class ProtectionPipeNames
 {
-    public const string Protection = "optiSCAN_Protection_v8";
-    public const string Amsi = "optiSCAN_Amsi_v8";
+    public const string Protection = "optiSCAN_Protection_v9";
+    public const string Amsi = "optiSCAN_Amsi_v9";
 }
 
 public sealed class ProtectionPipeRequest

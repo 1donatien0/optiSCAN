@@ -59,7 +59,7 @@
     <value>System.Resources.ResXResourceWriter, System.Windows.Forms, Version=4.0.0.0, Culture=neutral, PublicKeyToken=b77a5c561934e089</value>
   </resheader>
   <data name="Nav_TooltipHome" xml:space="preserve"><value>Dashboard (Ctrl+1)</value></data>
-  <data name="Nav_TooltipClean" xml:space="preserve"><value>System cleanup (Ctrl+2)</value></data>
+  <data name="Nav_TooltipClean" xml:space="preserve"><value>System optimization (Ctrl+2)</value></data>
   <data name="Nav_TooltipAntivirus" xml:space="preserve"><value>Antivirus — ClamAV + YARA (Ctrl+3)</value></data>
   <data name="Nav_TooltipHistory" xml:space="preserve"><value>Scan history (Ctrl+4)</value></data>
   <data name="Nav_TooltipOptions" xml:space="preserve"><value>Settings (Ctrl+5)</value></data>
@@ -67,7 +67,7 @@
   <data name="Nav_TooltipThemeLight" xml:space="preserve"><value>Switch to light mode</value></data>
   <data name="Nav_TooltipThemeDark" xml:space="preserve"><value>Switch to dark mode</value></data>
   <data name="Nav_Home" xml:space="preserve"><value>Home</value></data>
-  <data name="Nav_Clean" xml:space="preserve"><value>Clean</value></data>
+  <data name="Nav_Clean" xml:space="preserve"><value>Optimize</value></data>
   <data name="Nav_Antivirus" xml:space="preserve"><value>Antivirus</value></data>
   <data name="Nav_History" xml:space="preserve"><value>History</value></data>
   <data name="Nav_Options" xml:space="preserve"><value>Options</value></data>
@@ -163,8 +163,8 @@
   <data name="Notif_UpdateBtn" xml:space="preserve"><value>Update</value></data>
   <data name="Overview_Protected" xml:space="preserve"><value>Your PC is protected</value></data>
   <data name="Overview_ProtectionIncomplete" xml:space="preserve"><value>Protection incomplete</value></data>
-  <data name="Overview_CleanTitle" xml:space="preserve"><value>Clean</value></data>
-  <data name="Overview_CleanSub" xml:space="preserve"><value>Temporary files</value></data>
+  <data name="Overview_CleanTitle" xml:space="preserve"><value>Optimize</value></data>
+  <data name="Overview_CleanSub" xml:space="preserve"><value>Cleanup, updates, tweaks</value></data>
   <data name="Overview_ScanTitle" xml:space="preserve"><value>Antivirus</value></data>
   <data name="Overview_ScanSub" xml:space="preserve"><value>Run a scan</value></data>
   <data name="Overview_HistoryTitle" xml:space="preserve"><value>History</value></data>
@@ -250,12 +250,12 @@
   <data name="Av_StopUpdate" xml:space="preserve"><value>Stop</value></data>
   <data name="Av_NoThreats" xml:space="preserve"><value>No threats detected</value></data>
   <data name="Av_SystemClean" xml:space="preserve"><value>Your system is clean.</value></data>
-  <data name="Clean_Title" xml:space="preserve"><value>System cleanup</value></data>
-  <data name="Clean_Sub" xml:space="preserve"><value>Free up space by removing unnecessary files.</value></data>
-  <data name="Clean_TempWin" xml:space="preserve"><value>Windows temp</value></data>
+  <data name="Clean_Title" xml:space="preserve"><value>System optimization</value></data>
+  <data name="Clean_Sub" xml:space="preserve"><value>Cleanup, updates and tweaks for a faster machine.</value></data>
+  <data name="Clean_TempWin" xml:space="preserve"><value>System</value></data>
   <data name="Clean_Browsers" xml:space="preserve"><value>Browsers</value></data>
   <data name="Clean_Total" xml:space="preserve"><value>Total recoverable</value></data>
-  <data name="Clean_TempSub" xml:space="preserve"><value>Windows + user temp folders</value></data>
+  <data name="Clean_TempSub" xml:space="preserve"><value>Windows + user temp, logs, Windows Update cache</value></data>
   <data name="Clean_BrowserSub" xml:space="preserve"><value>Default browser profiles only (Firefox: primary profile)</value></data>
   <data name="Clean_TotalSub" xml:space="preserve"><value>Selected targets</value></data>
   <data name="Clean_Analyze" xml:space="preserve"><value>Analyze</value></data>
@@ -304,9 +304,82 @@
   <data name="Clean_LogCleanEnd" xml:space="preserve"><value>=== CLEANUP COMPLETE ===</value></data>
   <data name="Clean_ErrCleaning" xml:space="preserve"><value>Error during cleanup: {0}</value></data>
   <data name="Clean_LogTitle" xml:space="preserve"><value>Operation log</value></data>
-  <data name="Clean_LogHint" xml:space="preserve"><value>Click Analyze to estimate recoverable space&#x0a;(temporary files and selected browser caches).</value></data>
+  <data name="Clean_LogHint" xml:space="preserve"><value>Click Analyze to estimate recoverable space&#x0a;(selected system items and browser caches).</value></data>
   <data name="Clean_EmptyTitle" xml:space="preserve"><value>Nothing to free</value></data>
   <data name="Clean_EmptySub" xml:space="preserve"><value>No recoverable files were found during analysis.</value></data>
+  <data name="Opti_TabClean" xml:space="preserve"><value>Cleanup</value></data>
+  <data name="Opti_TabUpdates" xml:space="preserve"><value>Updates</value></data>
+  <data name="Opti_TabTweaks" xml:space="preserve"><value>Tweaks</value></data>
+  <data name="Clean_WUCacheCb" xml:space="preserve"><value>Windows Update cache (admin)</value></data>
+  <data name="Clean_DnsCb" xml:space="preserve"><value>DNS cache</value></data>
+  <data name="Clean_LogLineWU" xml:space="preserve"><value>Windows Update cache: {0}</value></data>
+  <data name="Clean_LogFreedWU" xml:space="preserve"><value>Windows Update cache cleared: {0}</value></data>
+  <data name="Clean_LogWUDenied" xml:space="preserve"><value>Windows Update cache skipped (elevation declined).</value></data>
+  <data name="Clean_LogDnsFlushed" xml:space="preserve"><value>DNS cache flushed.</value></data>
+  <data name="Clean_HistoryCb" xml:space="preserve"><value>Browsing history</value></data>
+  <data name="Clean_HistoryTooltip" xml:space="preserve"><value>Removes the history of the checked browsers (close them first). Firefox not supported: its history shares the bookmarks file.</value></data>
+  <data name="Clean_LogLineHistory" xml:space="preserve"><value>Browsing history : {0}</value></data>
+  <data name="Clean_LogFreedHistory" xml:space="preserve"><value>Browsing history removed: {0}</value></data>
+  <data name="Clean_LogHistoryFirefox" xml:space="preserve"><value>Firefox: history not supported (places.sqlite also stores bookmarks).</value></data>
+  <data name="Clean_LogHistoryLocked" xml:space="preserve"><value>{0} history file(s) locked — close the browser and try again.</value></data>
+  <data name="Upd_Hint" xml:space="preserve"><value>Search for application updates (winget), check the ones to install, then run the update. The Windows Update button opens system settings.</value></data>
+  <data name="Upd_Scan" xml:space="preserve"><value>Search</value></data>
+  <data name="Upd_InstallSelected" xml:space="preserve"><value>Update selection</value></data>
+  <data name="Upd_InstallAll" xml:space="preserve"><value>Update all</value></data>
+  <data name="Upd_Windows" xml:space="preserve"><value>Windows Update</value></data>
+  <data name="Upd_ListTitle" xml:space="preserve"><value>Applications</value></data>
+  <data name="Upd_LogTitle" xml:space="preserve"><value>Update log</value></data>
+  <data name="Upd_LogHint" xml:space="preserve"><value>Click Search to list applications&#x0a;with available updates (via winget).</value></data>
+  <data name="Upd_LogScanStart" xml:space="preserve"><value>=== CHECKING FOR UPDATES ===</value></data>
+  <data name="Upd_LogWinget" xml:space="preserve"><value>winget: {0}</value></data>
+  <data name="Upd_LogWingetMissing" xml:space="preserve"><value>winget not found. Install "App Installer" from the Microsoft Store.</value></data>
+  <data name="Upd_LogNone" xml:space="preserve"><value>No updates found.</value></data>
+  <data name="Upd_LogFound" xml:space="preserve"><value>{0} update(s) available. Uncheck the ones to skip.</value></data>
+  <data name="Upd_LogNoneChecked" xml:space="preserve"><value>No application checked. Run a search first.</value></data>
+  <data name="Upd_LogUpgradeStart" xml:space="preserve"><value>Updating {0} application(s)...</value></data>
+  <data name="Upd_LogUpgradeAllStart" xml:space="preserve"><value>Updating all applications...</value></data>
+  <data name="Upd_LogUpgradeDone" xml:space="preserve"><value>Updates finished ({0} succeeded).</value></data>
+  <data name="Upd_LogUpgradeAllDone" xml:space="preserve"><value>Global update finished.</value></data>
+  <data name="Upd_LogWindowsSettings" xml:space="preserve"><value>Windows Update settings opened.</value></data>
+  <data name="Upd_LogError" xml:space="preserve"><value>Error: {0}</value></data>
+  <data name="Upd_ConfirmBody" xml:space="preserve"><value>The following applications will be updated:&#x0a;&#x0a;{0}</value></data>
+  <data name="Upd_ConfirmAllBody" xml:space="preserve"><value>All applications with an available update will be upgraded (winget upgrade --all).</value></data>
+  <data name="Upd_EmptyTitle" xml:space="preserve"><value>System up to date</value></data>
+  <data name="Upd_EmptySub" xml:space="preserve"><value>No application updates detected.</value></data>
+  <data name="Twk_SectionPerf" xml:space="preserve"><value>Performance</value></data>
+  <data name="Twk_SectionPrivacy" xml:space="preserve"><value>Privacy</value></data>
+  <data name="Twk_SectionUi" xml:space="preserve"><value>Interface</value></data>
+  <data name="Twk_SectionMaint" xml:space="preserve"><value>Maintenance</value></data>
+  <data name="Twk_PowerPlan" xml:space="preserve"><value>"High performance" power plan</value></data>
+  <data name="Twk_VisualFx" xml:space="preserve"><value>Visual effects: best performance (takes effect after sign-in)</value></data>
+  <data name="Twk_Startup" xml:space="preserve"><value>Startup apps...</value></data>
+  <data name="Twk_Telemetry" xml:space="preserve"><value>Minimal telemetry + DiagTrack service disabled (admin)</value></data>
+  <data name="Twk_Ads" xml:space="preserve"><value>Disable advertising ID</value></data>
+  <data name="Twk_Suggestions" xml:space="preserve"><value>Disable suggestions and ads (Start, lock screen)</value></data>
+  <data name="Twk_Tailored" xml:space="preserve"><value>Disable tailored experiences</value></data>
+  <data name="Twk_ShowExt" xml:space="preserve"><value>Show file extensions</value></data>
+  <data name="Twk_ShowHidden" xml:space="preserve"><value>Show hidden files</value></data>
+  <data name="Twk_TaskbarLeft" xml:space="preserve"><value>Left-aligned taskbar (Windows 11)</value></data>
+  <data name="Twk_HideWidgets" xml:space="preserve"><value>Hide taskbar widgets</value></data>
+  <data name="Twk_SearchIcon" xml:space="preserve"><value>Search box as icon</value></data>
+  <data name="Twk_ThisPC" xml:space="preserve"><value>Explorer opens "This PC"</value></data>
+  <data name="Twk_Dism" xml:space="preserve"><value>Windows component cleanup — DISM, slow (admin)</value></data>
+  <data name="Twk_Apply" xml:space="preserve"><value>Apply tweaks</value></data>
+  <data name="Twk_ElevNote" xml:space="preserve"><value>Actions marked (admin) share a single UAC prompt.</value></data>
+  <data name="Twk_LogTitle" xml:space="preserve"><value>Tweaks log</value></data>
+  <data name="Twk_LogHint" xml:space="preserve"><value>Check settings, then click Apply.&#x0a;A summary is shown before any change.</value></data>
+  <data name="Twk_LogNone" xml:space="preserve"><value>No option checked.</value></data>
+  <data name="Twk_ConfirmBody" xml:space="preserve"><value>The following actions will be applied:&#x0a;&#x0a;{0}</value></data>
+  <data name="Twk_Cancelled" xml:space="preserve"><value>Operation cancelled.</value></data>
+  <data name="Twk_LogStart" xml:space="preserve"><value>=== APPLYING TWEAKS ===</value></data>
+  <data name="Twk_LogEnd" xml:space="preserve"><value>=== TWEAKS APPLIED ===</value></data>
+  <data name="Twk_LogOk" xml:space="preserve"><value>{0} — OK</value></data>
+  <data name="Twk_LogFail" xml:space="preserve"><value>{0} — failed</value></data>
+  <data name="Twk_LogError" xml:space="preserve"><value>Error: {0}</value></data>
+  <data name="Twk_LogElevStart" xml:space="preserve"><value>Administrator actions: confirm the UAC prompt (minimized console).</value></data>
+  <data name="Twk_LogElevDenied" xml:space="preserve"><value>Administrator actions skipped (elevation declined).</value></data>
+  <data name="Twk_LogExplorerRestart" xml:space="preserve"><value>Explorer restarted.</value></data>
+  <data name="Twk_LogStartupOpened" xml:space="preserve"><value>Task Manager opened (Startup tab).</value></data>
   <data name="Hist_Title" xml:space="preserve"><value>History</value></data>
   <data name="Hist_Sub" xml:space="preserve"><value>Log of scans, cleanups, and security actions.</value></data>
   <data name="Hist_ExportHtml" xml:space="preserve"><value>Export HTML</value></data>
@@ -349,16 +422,17 @@
   <data name="Opt_TamperProtection" xml:space="preserve"><value>Anti-tamper protection</value></data>
   <data name="Opt_TamperProtectionSub" xml:space="preserve"><value>Restarts optiSCAN in the background if real-time protection is expected but the app was closed.</value></data>
   <data name="Opt_PlatformProtection" xml:space="preserve"><value>Windows system protection service</value></data>
-  <data name="Opt_PlatformProtectionSub" xml:space="preserve"><value>RTP/AMSI/minifilter engine in optiSCAN.Service (v8 IPC). Requires administrator rights at install time.</value></data>
+  <data name="Opt_PlatformProtectionSub" xml:space="preserve"><value>RTP/AMSI/minifilter engine in optiSCAN.Service (v9 IPC). Requires administrator rights at install time.</value></data>
   <data name="Repair_Quarantined" xml:space="preserve"><value>File quarantined.</value></data>
   <data name="Repair_QuarantineFailed" xml:space="preserve"><value>Quarantine failed.</value></data>
-  <data name="Platform_StatusTitle" xml:space="preserve"><value>System protection v8</value></data>
+  <data name="Platform_StatusTitle" xml:space="preserve"><value>System protection v9</value></data>
   <data name="Platform_IpcActive" xml:space="preserve"><value>IPC service / remote engine active</value></data>
   <data name="Platform_IpcInactive" xml:space="preserve"><value>IPC service unreachable (local RTP fallback possible)</value></data>
   <data name="Platform_IpcDisabled" xml:space="preserve"><value>Windows service disabled (RTP in application)</value></data>
   <data name="Platform_AmsiDllMissing" xml:space="preserve"><value>AMSI: optiSCAN.AmsiProvider.dll missing</value></data>
   <data name="Platform_AmsiNotRegistered" xml:space="preserve"><value>AMSI: provider not registered (admin required)</value></data>
   <data name="Platform_AmsiRegistered" xml:space="preserve"><value>AMSI: provider registered</value></data>
+  <data name="Platform_AmsiPresentInactive" xml:space="preserve"><value>AMSI: DLL present, inactive (platform protection off)</value></data>
   <data name="Platform_DefenderMayOverride" xml:space="preserve"><value>Defender active — may take AMSI priority on scripts</value></data>
   <data name="Platform_MinifilterLoaded" xml:space="preserve"><value>Kernel minifilter loaded</value></data>
   <data name="Platform_MinifilterNotLoaded" xml:space="preserve"><value>Minifilter present but not loaded (test signing / admin)</value></data>
@@ -396,6 +470,10 @@
   <data name="Opt_UpdateHint" xml:space="preserve"><value>optiSCAN does not automatically download a new program version. ClamAV signatures and YARA rules are managed under Antivirus → Signatures.</value></data>
   <data name="Opt_AboutUpdates" xml:space="preserve"><value>Version information…</value></data>
   <data name="Opt_SourceForge" xml:space="preserve"><value>SourceForge page</value></data>
+  <data name="Opt_PrivacyPolicy" xml:space="preserve"><value>Privacy policy</value></data>
+  <data name="Opt_License" xml:space="preserve"><value>License agreement (EULA)</value></data>
+  <data name="Opt_LegalHint" xml:space="preserve"><value>Legal documents shipped with optiSCAN.</value></data>
+  <data name="Opt_OpenDocError" xml:space="preserve"><value>Could not open document: {0}</value></data>
   <data name="Opt_Exclusions" xml:space="preserve"><value>Exclusions</value></data>
   <data name="Opt_ExclHint" xml:space="preserve"><value>Folders skipped during scans</value></data>
   <data name="Opt_Add" xml:space="preserve"><value>Add</value></data>
@@ -442,7 +520,7 @@
   <data name="Main_ClamOperational" xml:space="preserve"><value>ClamAV is operational.</value></data>
   <data name="Main_ClamNotFound" xml:space="preserve"><value>ClamAV was not found on this computer.</value></data>
   <data name="Main_RuntimeHint" xml:space="preserve"><value> — see README § 3 or scripts\verify-runtime-deps.ps1</value></data>
-  <data name="Rec_CleanSuggest" xml:space="preserve"><value>Consider cleaning temporary files and caches (Clean menu) if you have not done so recently.</value></data>
+  <data name="Rec_CleanSuggest" xml:space="preserve"><value>Consider cleaning temporary files and caches (Optimize menu) if you have not done so recently.</value></data>
   <data name="Rec_CleanRecent" xml:space="preserve"><value>Last cleanup recorded on {0} — low priority.</value></data>
   <data name="Rec_ActNone" xml:space="preserve"><value>No scans in history — run a quick scan (Antivirus).</value></data>
   <data name="Rec_ActThreats" xml:space="preserve"><value>Last 30 days: {0} threat(s) reported — see History / Scan tab.</value></data>
@@ -501,7 +579,7 @@
   <data name="Hist_SearchScan" xml:space="preserve"><value>Search (target, type, threat)…</value></data>
   <data name="Hist_SearchClean" xml:space="preserve"><value>Search (targets)…</value></data>
   <data name="Hist_DetailSelectClean" xml:space="preserve"><value>Select a cleanup to view the operation log.</value></data>
-  <data name="Hist_DetailThreatsLegacy" xml:space="preserve"><value>(Session saved under v7: threat paths were not stored. v8 scans keep full details.)</value></data>
+  <data name="Hist_DetailThreatsLegacy" xml:space="preserve"><value>(Session saved under v7: threat paths were not stored. v9 scans keep full details.)</value></data>
   <data name="Hist_ThreatsTitle" xml:space="preserve"><value>Session detections</value></data>
   <data name="Hist_TreatInAv" xml:space="preserve"><value>Treat in Scan</value></data>
   <data name="Hist_TooltipTreatInAv" xml:space="preserve"><value>Opens the Scan tab with this session's threats so you can quarantine, ignore, or delete them.</value></data>
@@ -587,6 +665,7 @@
   <data name="YaraForge_Cancelled" xml:space="preserve"><value>Rules update cancelled.</value></data>
   <data name="YaraForge_Error" xml:space="preserve"><value>Unexpected error during rules update: {0}</value></data>
   <data name="YaraForge_VersionAvailable" xml:space="preserve"><value>Available version: {0}</value></data>
+  <data name="YaraForge_IntegrityError" xml:space="preserve"><value>Downloaded package failed integrity verification (size or digest). Update cancelled.</value></data>
   <data name="Vm_QuarantineEmpty" xml:space="preserve"><value>No files in quarantine.</value></data>
   <data name="Vm_QuarantineAllShown" xml:space="preserve"><value>All entries shown ({0:N0}).</value></data>
   <data name="Vm_QuarantinePartial" xml:space="preserve"><value>{0:N0} of {1:N0} shown — click Load more for the rest.</value></data>
@@ -659,6 +738,17 @@
   <data name="Onboarding_Step1" xml:space="preserve"><value>optiSCAN protects and cleans your PC locally (ClamAV + YARA).&#10;&#10;This quick guide covers three useful first steps.</value></data>
   <data name="Onboarding_Step2" xml:space="preserve"><value>Update antivirus signatures now?&#10;(Antivirus → Signatures)</value></data>
   <data name="Onboarding_Step3" xml:space="preserve"><value>Next: run a quick scan with F5 from the Antivirus tab.&#10;&#10;Without administrator rights, full and scheduled scans remain partial.</value></data>
+  <data name="Onboarding_DefenderTitle" xml:space="preserve"><value>Windows Defender detected</value></data>
+  <data name="Onboarding_DefenderStep" xml:space="preserve"><value>Windows Defender already protects this PC in real time.&#10;&#10;Recommended: keep Defender active and use optiSCAN as a supplement (manual and scheduled scans with ClamAV + YARA).&#10;&#10;Yes = complement mode (smoother, fewer conflicts)&#10;No = also enable optiSCAN real-time protection</value></data>
+  <data name="Defender_Opt_Title" xml:space="preserve"><value>Coexistence with Windows Defender</value></data>
+  <data name="Defender_Opt_StatusInactive" xml:space="preserve"><value>Windows Defender is not the active antivirus service on this PC.</value></data>
+  <data name="Defender_Opt_StatusComplement" xml:space="preserve"><value>Complement mode: Defender keeps real-time protection; optiSCAN scans on demand (recommended).</value></data>
+  <data name="Defender_Opt_StatusParallel" xml:space="preserve"><value>optiSCAN protection runs alongside Defender (higher disk load).</value></data>
+  <data name="Defender_Opt_ExclusionsOk" xml:space="preserve"><value>Defender exclusions: configured for optiSCAN and ClamAV/YARA engines.</value></data>
+  <data name="Defender_Opt_ExclusionsPending" xml:space="preserve"><value>Defender exclusions: pending or not verified. Use the button below if needed.</value></data>
+  <data name="Defender_Opt_ExclusionsPartial" xml:space="preserve"><value>Defender exclusions: partially applied. Retry or add them manually in Windows Security.</value></data>
+  <data name="Defender_Opt_ExclusionsTamper" xml:space="preserve"><value>Defender exclusions: access denied (tamper protection?). Add them manually in Windows Security → Exclusions.</value></data>
+  <data name="Defender_Opt_RefreshExclusions" xml:space="preserve"><value>Re-apply Defender exclusions</value></data>
   <data name="SigUpd_HeaderStart" xml:space="preserve"><value>=== Signature update ===</value></data>
   <data name="SigUpd_StepClam" xml:space="preserve"><value>1. ClamAV signatures…</value></data>
   <data name="SigUpd_StepRules" xml:space="preserve"><value>2. Detection rules…</value></data>

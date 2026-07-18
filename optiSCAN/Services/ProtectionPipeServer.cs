@@ -19,6 +19,7 @@ public sealed class ProtectionPipeServer : IDisposable
     private const int MaxScanBufferBase64Length = 96 * 1024 * 1024;
 
     private readonly ScanOrchestrator _orchestrator;
+    private readonly IpcScanRateLimiter _scanRateLimiter;
     private readonly string _pipeName;
     private readonly string? _shutdownTokenOverride;
     private readonly Action? _onShutdown;
@@ -26,9 +27,15 @@ public sealed class ProtectionPipeServer : IDisposable
     private CancellationTokenSource? _cts;
     private Task? _listenTask;
 
-    public ProtectionPipeServer(ScanOrchestrator orchestrator, string? pipeName = null, string? shutdownToken = null, Action? onShutdown = null)
+    public ProtectionPipeServer(
+        ScanOrchestrator orchestrator,
+        string? pipeName = null,
+        string? shutdownToken = null,
+        Action? onShutdown = null,
+        IpcScanRateLimiter? scanRateLimiter = null)
     {
         _orchestrator = orchestrator;
+        _scanRateLimiter = scanRateLimiter ?? new IpcScanRateLimiter();
         _pipeName = pipeName ?? ProtectionPipeNames.Protection;
         _shutdownTokenOverride = shutdownToken;
         _onShutdown = onShutdown;
@@ -92,7 +99,7 @@ public sealed class ProtectionPipeServer : IDisposable
                     if (pipe.IsConnected)
                         pipe.Disconnect();
                 }
-                catch { /* best effort */ }
+                catch (Exception ex) { AppLogger.Debug("ProtectionPipeServer", $"Pipe disconnect: {ex.Message}"); }
                 await pipe.DisposeAsync().ConfigureAwait(false);
             }
         }
@@ -151,18 +158,28 @@ public sealed class ProtectionPipeServer : IDisposable
                 var fullPath = Path.GetFullPath(request.Path);
                 if (QuarantineManager.IsSensitivePath(fullPath))
                     return ProtectionPipeResponse.Error("Chemin refusé");
-                return ScanPath(fullPath);
+                return ExecuteScanWithRateLimit(() => ScanPath(fullPath));
 
             case ProtectionPipeOperations.ScanBuffer:
                 if (string.IsNullOrWhiteSpace(request.BufferBase64))
                     return ProtectionPipeResponse.Error("Buffer vide");
                 if (request.BufferBase64.Length > MaxScanBufferBase64Length)
                     return ProtectionPipeResponse.Error("Buffer trop volumineux");
-                return ScanBuffer(request.BufferBase64, request.ContentName ?? "amsi_buffer");
+                return ExecuteScanWithRateLimit(() =>
+                    ScanBuffer(request.BufferBase64, request.ContentName ?? "amsi_buffer"));
 
             default:
                 return ProtectionPipeResponse.Error($"Opération inconnue : {request.Operation}");
         }
+    }
+
+    private ProtectionPipeResponse ExecuteScanWithRateLimit(Func<ProtectionPipeResponse> scan)
+    {
+        if (!_scanRateLimiter.TryEnter(out var lease))
+            return ProtectionPipeResponse.Error("Limite de débit atteinte");
+
+        using (lease)
+            return scan();
     }
 
     private ProtectionPipeResponse ScanPath(string path)
@@ -191,7 +208,8 @@ public sealed class ProtectionPipeServer : IDisposable
         }
         finally
         {
-            try { Directory.Delete(tempDir, recursive: true); } catch { }
+            try { Directory.Delete(tempDir, recursive: true); }
+            catch (Exception ex) { AppLogger.Debug("ProtectionPipeServer", $"Temp IPC cleanup: {ex.Message}"); }
         }
     }
 

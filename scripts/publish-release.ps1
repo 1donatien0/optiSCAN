@@ -39,7 +39,14 @@ param(
     [switch]$SelfContained,
     [string]$SignToolPath,
     [string]$CertSubject,
-    [switch]$SkipInstaller
+    [switch]$SkipInstaller,
+    # Embarquer bases ClamAV + règles YARA dans l'installeur (offline).
+    # Défaut: non — téléchargement post-install (freshclam + YARA-Forge).
+    [switch]$EmbedOfflineSignatures,
+    # Embarquer uniquement la base ClamAV (~105 Mo).
+    [switch]$EmbedClamAvDatabase,
+    # Embarquer uniquement les règles YARA (.yar).
+    [switch]$EmbedYaraRules
 )
 
 $ErrorActionPreference = 'Stop'
@@ -99,7 +106,13 @@ if (-not $SkipInstaller) {
         }
     }
     if ($iscc) {
-        & $iscc (Join-Path $repo 'installer\setup.iss') /DAppVersion=8.0.0
+        $isccArgs = @((Join-Path $repo 'installer\setup.iss'), '/DAppVersion=9.0.0')
+        if ($EmbedOfflineSignatures) { $isccArgs += '/DEmbedOfflineSignatures' }
+        else {
+            if ($EmbedClamAvDatabase) { $isccArgs += '/DEmbedClamAvDatabase' }
+            if ($EmbedYaraRules) { $isccArgs += '/DEmbedYaraRules' }
+        }
+        & $iscc @isccArgs
         if ($LASTEXITCODE -ne 0) { throw "ISCC a échoué (code $LASTEXITCODE)." }
         Write-Host "Installeur généré dans installer\output\" -ForegroundColor Green
     }

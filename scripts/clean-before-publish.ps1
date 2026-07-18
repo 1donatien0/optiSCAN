@@ -127,4 +127,5 @@ Write-Host "  2. dotnet publish .\optiSCAN\optiSCAN.csproj -c Release /p:Publish
 Write-Host "  3. .\scripts\verify-runtime-deps.ps1"
 Write-Host "  4. .\installer\build-release-setup.ps1 -SkipPublish   # ou ISCC avec AppPublishSource win-x64"
 Write-Host ""
-Write-Host "Tout-en-un : .\scripts\prepare-release-v8.ps1  ou  .\installer\build-release-setup.ps1"
+Write-Host "Tout-en-un : .\scripts\prepare-release-v9.ps1  ou  .\installer\build-release-setup.ps1"
+exit 0

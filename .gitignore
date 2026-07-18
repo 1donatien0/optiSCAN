@@ -49,6 +49,14 @@ publish/
 # Dossier output de l'installer
 installer/output/
 
+# Inventaire généré localement (scripts/generate-tout-md.ps1)
+TOUT.md
+
 # Échantillons EICAR temporaires (tests d'intégration YARA)
 .eicar-test/
 
+
+# Runtime .NET embarque dans l installeur (optionnel, ~56 Mo)
+installer/redist/*.exe
+
+optiSCAN/clamav/database/freshclam.dat

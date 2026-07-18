@@ -19,4 +19,21 @@ public sealed class PlatformProtectionStatusServiceTests
     var path = Path.Combine(Path.GetTempPath(), "missing_amsi.dll");
     Assert.False(PlatformProtectionStatusService.IsAmsiProviderRegistered(path));
   }
+
+  [Fact]
+  public void Evaluate_shows_amsi_inactive_when_platform_disabled()
+  {
+    var prefs = new UserPreferences { UsePlatformProtectionService = false };
+    var accessor = new InMemoryPrefsAccessor(prefs);
+    var report = PlatformProtectionStatusService.Evaluate(accessor);
+
+    Assert.Contains(report.Components, c =>
+        c.LabelKey is "Platform_AmsiPresentInactive" or "Platform_AmsiDllMissing"
+        && c.State == PlatformComponentState.NotApplicable);
+  }
+
+  private sealed class InMemoryPrefsAccessor(UserPreferences current) : IUserPreferencesAccessor
+  {
+    public UserPreferences Current { get; } = current;
+  }
 }

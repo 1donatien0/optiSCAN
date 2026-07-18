@@ -6,7 +6,7 @@ namespace optiSCAN.Services
 {
     /// <summary>
     /// Regroupe les services à longue durée de vie (singleton <see cref="Default"/>).
-    /// Construction via <see cref="Microsoft.Extensions.DependencyInjection"/> (v8).
+    /// Construction via <see cref="Microsoft.Extensions.DependencyInjection"/> (v9).
     /// Points d'entrée légitimes pour <see cref="Default"/> : <see cref="App"/> (bootstrap),
     /// <see cref="ProtectionServiceHost"/>, et <see cref="ViewModels.ScanViewModel"/> sans paramètre (designer).
     /// Les vues reçoivent <see cref="IViewServices"/> / <see cref="IOptionsServices"/> via <c>Bind()</c>.
@@ -143,7 +143,7 @@ namespace optiSCAN.Services
             RequestProtectionStateRefresh();
         }
 
-        /// <summary>Active le service Windows de protection système (v8).</summary>
+        /// <summary>Active le service Windows de protection système (v9).</summary>
         public void ApplyPlatformProtectionService(bool enabled)
         {
             _userPreferences.Current.UsePlatformProtectionService = enabled;
@@ -162,6 +162,7 @@ namespace optiSCAN.Services
             else
             {
                 PlatformProtectionBootstrap.TryStopWindowsService();
+                PlatformRegistration.TryUnregisterAmsiProvider();
                 if (_exclusionSettings.Current.RealTimeEnabled)
                 {
                     RealTimeProtection.Start();
@@ -189,6 +190,12 @@ namespace optiSCAN.Services
             _exclusionSettings.Current.AutoQuarantineEnabled = enabled;
             _exclusionSettings.Current.Save();
         }
+
+        public DefenderCoexistenceStatus GetDefenderCoexistenceStatus() =>
+            DefenderCoexistenceService.BuildStatus(_userPreferences);
+
+        public void RefreshDefenderExclusions() =>
+            WindowsDefenderExclusionService.EnsureOptiscanExclusionsAsync();
 
         /// <summary>Active ou coupe les timers freshclam / règles YARA.</summary>
         public void ApplySignatureAutoUpdate(bool enabled)
@@ -233,6 +240,8 @@ namespace optiSCAN.Services
         /// <summary>Restaure RTP et MAJ auto selon les préférences persistées (appel au démarrage UI).</summary>
         public void ApplyPreferencesOnStartup()
         {
+            DefenderCoexistenceService.EnsureFirstLaunchExclusionSettings(_exclusionSettings, _userPreferences);
+
             ApplySignatureAutoUpdate(_userPreferences.Current.SignatureAutoUpdateEnabled);
             SignatureUpdatePolicy.ScheduleStartupRefreshIfStale(this, _userPreferences);
 
@@ -268,7 +277,7 @@ namespace optiSCAN.Services
                 TamperProtection.DeleteWatchdogTask();
 
             ApplyRemovableDriveAndEnginePrefs();
-            WindowsDefenderExclusionService.EnsureOptiscanExclusionsAsync();
+            // Exclusions Defender : opt-in uniquement (Options → Réappliquer), pas au démarrage.
         }
 
         private void ApplyRemovableDriveAndEnginePrefs()

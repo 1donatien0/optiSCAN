@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -13,7 +13,7 @@
     <AssemblyName>optiSCAN</AssemblyName>
     <RootNamespace>optiSCAN</RootNamespace>
     <Company>optiSCAN</Company>
-    <Product>optiSCAN v8.0 — ClamAV Edition</Product>
+    <Product>optiSCAN v9.0 — ClamAV Edition</Product>
     <Copyright>Copyright 2026 Dona By</Copyright>
     <!-- Icône embarquée dans l'exécutable (barre des tâches, Explorateur, installateur) -->
     <ApplicationIcon>optiSCAN.ico</ApplicationIcon>
@@ -52,18 +52,11 @@
     <Resource Include="ico.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Resource>
-    <Resource Include="optiSCAN.ico">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Resource>
     <Resource Include="optiSCAN.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Resource>
-    <Resource Include="optiSCAN_shield.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Resource>
-    <Resource Include="optiSCAN_hero.png">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </Resource>
+    <Resource Include="optiSCAN_hero.png" />
+    <Resource Include="optiSCAN_shield.png" />
     <Resource Include="icons8-historique-des-commandes-50.png">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Resource>
@@ -79,7 +72,33 @@
   </ItemGroup>
 
   <ItemGroup>
-    <!-- Binaires YARA -->
+    <!-- Sur disque : systray + verify-runtime-deps + Inno (Resource WPF n'est pas recopié au publish RID) -->
+    <Content Include="optiSCAN.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+      <CopyToPublishDirectory>PreserveNewest</CopyToPublishDirectory>
+    </Content>
+    <Content Include="..\LICENSE.txt">
+      <Link>LICENSE.txt</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\docs\POLITIQUE_CONFIDENTIALITE.md">
+      <Link>docs\POLITIQUE_CONFIDENTIALITE.md</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <!-- Images pack URI (Resource) aussi en fichiers pour verify / installateur -->
+  <Target Name="CopyEmbeddedAssetsToPublish" AfterTargets="Publish">
+    <ItemGroup>
+      <_PublishLooseAssets Include="$(MSBuildProjectDirectory)\optiSCAN_hero.png" />
+      <_PublishLooseAssets Include="$(MSBuildProjectDirectory)\optiSCAN_shield.png" />
+      <_PublishLooseAssets Include="$(MSBuildProjectDirectory)\optiSCAN.ico" />
+    </ItemGroup>
+    <Copy SourceFiles="@(_PublishLooseAssets)" DestinationFolder="$(PublishDir)" SkipUnchangedFiles="true"
+          Condition="'$(PublishDir)' != '' And Exists('%(_PublishLooseAssets.Identity)')" />
+  </Target>
+
+  <ItemGroup>
     <Content Include="yara\**\*">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
