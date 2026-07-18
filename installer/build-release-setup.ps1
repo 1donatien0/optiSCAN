@@ -46,7 +46,9 @@ $staleFlatPublish = Join-Path (Split-Path $targetPublishDir -Parent) 'optiSCAN.e
 if (-not $SkipPublish) {
     if (-not (Test-Path -LiteralPath $cleanScript)) { throw "Introuvable : $cleanScript" }
     & $cleanScript -Configuration Release -IncludeObj -IncludeCiPublish
-    if ($LASTEXITCODE -ne 0) { throw "clean-before-publish a echoue (code $LASTEXITCODE)." }
+    if ($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0) {
+        throw "clean-before-publish a echoue (code $LASTEXITCODE)."
+    }
     Write-Host 'dotnet publish (Release, FolderProfile -> publish\win-x64)...' -ForegroundColor Cyan
     dotnet publish $csproj -c Release /p:PublishProfile=FolderProfile
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish a echoue (code $LASTEXITCODE)." }
@@ -70,7 +72,9 @@ if (-not (Test-Path -LiteralPath $publishExe)) {
 if (Test-Path -LiteralPath $verifyScript) {
     Write-Host 'verify-runtime-deps...' -ForegroundColor Cyan
     & $verifyScript -PublishDir $targetPublishDir
-    if ($LASTEXITCODE -ne 0) { throw "verify-runtime-deps a echoue (code $LASTEXITCODE)." }
+    if ($null -ne $LASTEXITCODE -and $LASTEXITCODE -ne 0) {
+        throw "verify-runtime-deps a echoue (code $LASTEXITCODE)."
+    }
 }
 
 $iscc = @(
