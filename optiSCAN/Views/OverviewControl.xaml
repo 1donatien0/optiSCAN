@@ -151,7 +151,7 @@
                                 VerticalAlignment="Center" Margin="12,10">
                         <Border Width="38" Height="38" CornerRadius="10" Margin="0,0,10,0"
                                 Background="{DynamicResource AlertBg}">
-                            <md:PackIcon Kind="Broom" Width="20" Height="20"
+                            <md:PackIcon Kind="Speedometer" Width="20" Height="20"
                                          Foreground="{DynamicResource AlertGoldLight}"
                                          HorizontalAlignment="Center" VerticalAlignment="Center"/>
                         </Border>

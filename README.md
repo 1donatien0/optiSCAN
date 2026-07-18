@@ -144,7 +144,8 @@ optiSCAN.Service.exe  →  optiSCAN.exe --service-host
     │   └── ActivityEventRecord.cs     ← Événement immuable (activity_log.dat)
     │
     ├── ViewModels/                    ← ScanViewModel, HistoryViewModel, HistoryThreatRow, RelayCommand
-    ├── Views/                         ← Overview, Antivirus, Clean, History, Options
+    ├── Views/                         ← Overview, Antivirus, Clean (Optimiser : Nettoyage / Mises à jour / Tweaks), History, Options
+    │                                    CleanControl.xaml(.cs) + CleanControl.Updates.cs + CleanControl.Tweaks.cs
     │
     ├── Coordinators/                  ← Orchestration UI (MainWindow, Historique) — classes static sans état
     │   ├── MainWindowStartupCoordinator.cs / MainWindowShutdownCoordinator.cs
@@ -208,7 +209,9 @@ optiSCAN.Service.exe  →  optiSCAN.exe --service-host
     │   ├── HtmlExportService.cs       ← Rapport HTML
     │   ├── NotificationService.cs     ← Toasts Windows natifs
     │   ├── RiskScoringService.cs      ← Score, sévérités i18n, PDF
-    │   └── PdfReportGenerator.cs      ← Export PDF (QuestPDF)
+    │   ├── PdfReportGenerator.cs      ← Export PDF (QuestPDF)
+    │   ├── WingetUpdateService.cs     ← Liste / mise à jour apps (winget) — onglet Optimiser → Mises à jour
+    │   └── SystemTweaksService.cs     ← Tweaks perf / confidentialité / UI / DISM — onglet Optimiser → Tweaks
     │
     ├── Themes/
     │   ├── Donaby.Dark.xaml           ← Thème sombre
@@ -365,11 +368,11 @@ Les vues sont empilées dans un seul `Grid` (`MainWindow.xaml`) : une seule est 
 |---|---|---|---|
 | `Overview` | Vue d'ensemble | `OverviewControl` | Cartes d'action (boutons), bandeau UAC, statut protection, recommandations |
 | `Antivirus` | Antivirus | `AntivirusView` | Scans ; onglets **Analyse en cours** / **Quarantaine** / **Historique** / **Signatures** (`ScanViewModel`) |
-| `Clean` | Nettoyer | `CleanControl` | Analyse / nettoyage (caches navigateurs, temp, corbeille) + **historique local** (colonne **Libéré** = `BytesDisplay`) |
+| `Clean` | Optimiser | `CleanControl` | Trois sous-onglets : **Nettoyage** (caches navigateurs, temp, corbeille, cache Windows Update, DNS), **Mises à jour** (applications via winget + lien Windows Update, `WingetUpdateService`), **Tweaks** (performance, confidentialité, interface, DISM — `SystemTweaksService`, actions admin regroupées en une invite UAC) + **historique local** du nettoyage (colonne **Libéré** = `BytesDisplay`) |
 | `History` | Historique | `HistoryControl` + `HistoryViewModel` | Timeline `ActivityLogService.GetActivityFeed` ; 5 filtres (puces) ; traitement menaces ; exports **HTML** / **PDF** |
 | `Options` | Options | `OptionsControl` | **Langue** (fr/en, redémarrage), thème / `SyncWindowsTheme`, scan favori, RTP, **scan USB/SD** (auto à l'insertion, mode complet, inclure dans analyse complète), quarantaine auto, planif. (`ServiceContainer.ScheduledScan`, prochaine exécution, **Lancer maintenant**), exclusions |
 
-Raccourcis clavier : `Ctrl+1` … `Ctrl+5` (`KeyboardShortcuts`) — ordre des panneaux : **Vue d’ensemble**, **Antivirus**, **Nettoyer**, **Historique**, **Options**.
+Raccourcis clavier : `Ctrl+1` … `Ctrl+5` (`KeyboardShortcuts`) — ordre des panneaux : **Vue d’ensemble**, **Antivirus**, **Optimiser**, **Historique**, **Options**.
 
 ### 4.2 Fenêtre principale, barre système et icône
 
@@ -504,7 +507,7 @@ Pendant un **scan en cours**, `ScanViewModel.ActiveScanSessionId` lie les quaran
 Le panneau **Vue d'ensemble** (`OverviewControl`, clé `Overview`) regroupe :
 
 - **Hero** : titre de protection (« Votre ordinateur est protégé » ou « Protection incomplète » selon les moteurs) et **dernière analyse** uniquement ; pas de détail ClamAV/YARA sur cet écran (voir onglet **Antivirus**).
-- **Quatre cartes d'action** : Nettoyer, Antivirus, Historique, mise à jour des signatures (navigation via `ServiceContainer` / `INavigationService`).
+- **Quatre cartes d'action** : Optimiser, Antivirus, Historique, mise à jour des signatures (navigation via `ServiceContainer` / `INavigationService`).
 - **Deux colonnes** sous les cartes :
   - **Statistiques de protection** : `OverviewProtectionStatsFormatter` (30 j., analyses / fichiers / menaces depuis l’historique) — distinct des recommandations pour éviter le doublon « activité ».
   - **Recommandations** : `OverviewRecommendationsBuilder` (hygiène signatures, suggestion nettoyage) ; `MainWindow` collecte le contexte et met à jour `OverviewControl`.
@@ -673,6 +676,10 @@ Si la **protection contre la falsification** de Defender est active, l’ajout p
 
 ```powershell
 # Depuis la racine du dépôt (dossier contenant optiSCAN.sln)
+# Tout-en-un local (clean → publish FolderProfile → verify → ISCC) :
+.\installer\build-release-setup.ps1
+
+# Variante release complète (prepare-release-v9) :
 .\scripts\prepare-release-v9.ps1
 ```
 
@@ -681,7 +688,6 @@ Détails distribution (.NET auto, Embed signatures) : [`docs/GUIDE_DISTRIBUTION.
 
 Sortie publish : `optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\` (chemin attendu par `installer\setup.iss`). Installateur typique : `installer\output\optiSCAN_Setup_v9.0.0.exe` (**~26 Mo** sans CVD/.yar embarqués).
 
-**Chaîne locale alternative** : `.\installer\build-release-setup.ps1` (nettoie, publie, lance ISCC).  
 Offline avec bases + règles : `.\scripts\publish-release.ps1 -EmbedOfflineSignatures`.
 
 ### Ordre recommandé (équipe)
@@ -837,12 +843,13 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 
 ## 11. Historique des versions produit
 
-### v9.0 — Defender complément, install allégé, IPC v9
+### v9.0 — Defender complément, install allégé, IPC v9, Optimiser
 
 - **Version produit** — assembly **9.0.0** ; service Windows `optiSCANProtectionV9` ; pipe `optiSCAN_Protection_v9`
+- **Optimiser** (ex-Nettoyer) — panneau sidebar + 3 sous-onglets : **Nettoyage** (temp, navigateurs, corbeille, cache WU, DNS), **Mises à jour** (`WingetUpdateService` + lien Windows Update), **Tweaks** (`SystemTweaksService`, une invite UAC regroupée)
 - **Mode complément Defender** — coexistence recommandée : Defender garde le RTP ; optiSCAN scans manuels/planifiés
 - **Exclusions Defender** — **opt-in** (Options / script) ; plus d’exécution silencieuse à l’install ni au démarrage
-- **Installateur** — x64 only ; .NET 8 auto-download ; service plateforme décoché ; CVD ClamAV + règles YARA **post-install** (freshclam / YARA-Forge) ; AMSI/`.sys` livrés s’ils existent (comme v8)
+- **Installateur** — x64 only ; .NET 8 auto-download ; service plateforme décoché ; CVD ClamAV + règles YARA **post-install** (freshclam / YARA-Forge) ; AMSI/`.sys` livrés s’ils existent (comme v8) ; chaîne locale : `.\installer\build-release-setup.ps1`
 - **ClamAV 1.4.x** — binaires x64 ; correction `freshclam.conf` (retrait `CVDCertsDirectory`, certificats via `CVD_CERTS_DIR`)
 - **AMSI** — DLL présente mais inactive si protection plateforme désactivée ; désenregistrement AMSI à la coupure
 - **Upgrade v8** — l’installateur retire l’ancien service `optiSCANProtectionV8` si présent
@@ -891,7 +898,7 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 ### v5.0 — Version majeure (publication)
 
 - **Versioning unifié** — nom **v5.0** + build **5.0.0** (`Directory.Build.props`, Inno Setup, **LICENSE.txt**, manifeste, rapports PDF/HTML)
-- **Nettoyer** — historique des sessions dans `CleanControl` (colonne **Libéré** / `BytesDisplay`) + onglet Historique
+- **Optimiser (Nettoyage)** — historique des sessions dans `CleanControl` (colonne **Libéré** / `BytesDisplay`) + onglet Historique
 - **Stabilité** — `ThreatInfo.Id` SHA-256 déterministe ; quarantaine avec nom de menace réel ; `ServiceContainer.Shutdown()` à la fermeture
 - **UI / services** — cibles récentes, colonne **Risque**, planification partagée, journal des analyses, périmètres protégés optiSCAN
 - **Documentation** — README et CLUF alignés sur le code (plus de référence à `ClamDaemon.cs`)
