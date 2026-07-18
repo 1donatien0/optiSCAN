@@ -58,3 +58,5 @@ TOUT.md
 
 # Runtime .NET embarque dans l installeur (optionnel, ~56 Mo)
 installer/redist/*.exe
+
+optiSCAN/clamav/database/freshclam.dat
