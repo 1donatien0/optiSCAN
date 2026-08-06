@@ -5,7 +5,7 @@
 
 #define AppName        "optiSCAN"
 #ifndef AppVersion
-#define AppVersion     "9.0.0"
+#define AppVersion     "9.0.1"
 #endif
 #ifndef AppRelease
 #define AppRelease     "v9.0"

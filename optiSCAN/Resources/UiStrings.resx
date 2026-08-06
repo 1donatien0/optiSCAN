@@ -339,6 +339,16 @@
   <data name="Upd_LogUpgradeStart" xml:space="preserve"><value>Mise à jour de {0} application(s)...</value></data>
   <data name="Upd_LogUpgradeAllStart" xml:space="preserve"><value>Mise à jour de toutes les applications...</value></data>
   <data name="Upd_LogUpgradeDone" xml:space="preserve"><value>Mises à jour terminées ({0} réussie(s)).</value></data>
+  <data name="Upd_LogUpgradeSummary" xml:space="preserve"><value>Mises à jour terminées : {0} réussie(s), {1} non aboutie(s).</value></data>
+  <data name="Upd_LogRescan" xml:space="preserve"><value>Actualisation de la liste...</value></data>
+  <data name="Upd_LogPkgSuccess" xml:space="preserve"><value>✔ {0} mis à jour en {1}.</value></data>
+  <data name="Upd_LogPkgAlready" xml:space="preserve"><value>• {0} était déjà à jour.</value></data>
+  <data name="Upd_LogPkgReboot" xml:space="preserve"><value>⚠ {0} : redémarrage requis.</value></data>
+  <data name="Upd_LogPkgCancelled" xml:space="preserve"><value>✖ {0} : mise à jour annulée.</value></data>
+  <data name="Upd_LogPkgFailed" xml:space="preserve"><value>✖ {0} : échec (code {1}).</value></data>
+  <data name="Upd_TagReboot" xml:space="preserve"><value>redémarrage requis</value></data>
+  <data name="Upd_TagCancelled" xml:space="preserve"><value>annulé</value></data>
+  <data name="Upd_TagFailed" xml:space="preserve"><value>échec</value></data>
   <data name="Upd_LogUpgradeAllDone" xml:space="preserve"><value>Mise à jour globale terminée.</value></data>
   <data name="Upd_LogWindowsSettings" xml:space="preserve"><value>Paramètres Windows Update ouverts.</value></data>
   <data name="Upd_LogError" xml:space="preserve"><value>Erreur : {0}</value></data>
