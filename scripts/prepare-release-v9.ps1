@@ -93,4 +93,4 @@ if (-not $SkipInstaller) {
 
 Write-Host "`n=== Publication v9 prete ===" -ForegroundColor Green
 Write-Host "  Publish : $pubDir"
-Write-Host "  Setup   : installer\output\optiSCAN_Setup_v9.0.0.exe"
+Write-Host "  Setup   : installer\output\optiSCAN_Setup_v9.0.1.exe"

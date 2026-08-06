@@ -77,7 +77,7 @@ Panneaux UI 5/5 | Moteurs 5/5 | Protection plateforme 6/7 (minifilter stub)
 
 FAIT — Correctifs sécurité P0/P1 (quarantaine, thread-safety)
 FAIT — Tag git v9.0
-À FAIRE — GitHub Release avec optiSCAN_Setup_v9.0.0.exe (job publish main)
+À FAIRE — GitHub Release avec optiSCAN_Setup_v9.0.1.exe (job publish main)
 À FAIRE — Signature Authenticode (certificat EV)
 POST-RELEASE — Couverture cible 50–60 %, refactor HistoryControl restant (~594 L)
 
