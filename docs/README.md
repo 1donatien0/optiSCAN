@@ -2,7 +2,7 @@
 
 **Guide produit** : [README.md](../README.md) à la racine (architecture, release §8, audit §12).
 
-**Version** : release **v9.0**, assembly **9.0.0**. Scripts : `scripts/` · Installeur : `installer/` · CI : `.github/workflows/`.
+**Version** : release **v9.0**, assembly **9.0.1**. Scripts : `scripts/` · Installeur : `installer/` · CI : `.github/workflows/`.
 
 ---
 
