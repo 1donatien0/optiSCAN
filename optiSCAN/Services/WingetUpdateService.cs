@@ -14,6 +14,36 @@ namespace optiSCAN.Services
         public string AvailableVersion { get; init; } = string.Empty;
     }
 
+    /// <summary>Issue d'une tentative de mise à niveau d'un paquet.</summary>
+    public enum WingetUpgradeStatus
+    {
+        /// <summary>Mise à niveau appliquée avec succès.</summary>
+        Succeeded,
+        /// <summary>Rien à faire : winget considère le paquet déjà à jour.</summary>
+        AlreadyUpToDate,
+        /// <summary>Installée, mais un redémarrage est nécessaire pour finaliser.</summary>
+        RebootRequired,
+        /// <summary>Interrompue par l'utilisateur (UAC refusé, installateur annulé, Ctrl+C).</summary>
+        CancelledByUser,
+        /// <summary>Échec : le paquet reste à mettre à jour.</summary>
+        Failed,
+    }
+
+    /// <summary>Résultat détaillé de la mise à niveau d'un paquet.</summary>
+    public sealed class WingetUpgradeResult
+    {
+        public required WingetPackageUpdate Package { get; init; }
+        public int ExitCode { get; init; }
+        public WingetUpgradeStatus Status { get; init; }
+
+        /// <summary>
+        /// Vrai quand le paquet n'a plus lieu de figurer dans la liste des mises
+        /// à jour disponibles (déjà appliquée, ou déjà à jour côté winget).
+        /// </summary>
+        public bool IsResolved =>
+            Status is WingetUpgradeStatus.Succeeded or WingetUpgradeStatus.AlreadyUpToDate;
+    }
+
     /// <summary>
     /// Mises à jour d'applications via winget (panneau Optimiser → Mises à jour).
     /// Port C# de l'utilitaire OptiWin (GUI/OptiWin-GUI.ps1) : localisation de
@@ -199,38 +229,113 @@ namespace optiSCAN.Services
             return line[start..realEnd].Trim();
         }
 
+        // ── Codes de sortie winget ───────────────────────────────────────────
+        // Référence : https://github.com/microsoft/winget-cli/blob/master/doc/windows/package-manager/winget/returnCodes.md
+        // Process.ExitCode est un int signé : les codes 0x8A15xxxx doivent être
+        // convertis en unchecked pour être comparés correctement.
+        // « Rien à faire » : le paquet est réellement à jour.
+        private const int ErrUpdateNotApplicable = unchecked((int)0x8A15002B);      // No applicable update found
+        private const int ErrUpgradeVersionNotNewer = unchecked((int)0x8A15004F);   // Upgrade version is not newer
+
+        // Redémarrage impliqué (installation finalisée au reboot, ou à retenter après reboot).
+        private const int ErrInstallRebootRequiredToFinish = unchecked((int)0x8A150109);
+        private const int ErrInstallRebootRequiredForInstall = unchecked((int)0x8A15010A);
+        private const int ErrInstallRebootInitiated = unchecked((int)0x8A15010B);
+        private const int MsiRebootRequired = 3010;   // ERROR_SUCCESS_REBOOT_REQUIRED
+        private const int MsiRebootInitiated = 1641;  // ERROR_SUCCESS_REBOOT_INITIATED
+
+        // Interruption volontaire.
+        private const int ErrInstallCancelledByUser = unchecked((int)0x8A15010C);
+        private const int ErrCtrlSignalReceived = unchecked((int)0x8A150005);
+        private const int ErrAppTerminationReceived = unchecked((int)0x8A15006A);
+        private const int ErrAuthCancelledByUser = unchecked((int)0x8A150077);
+        private const int ErrorCancelled = 1223;      // ERROR_CANCELLED (UAC refusé)
+        private const int MsiUserExit = 1602;         // ERROR_INSTALL_USEREXIT
+
+        /// <summary>
+        /// Traduit un code de sortie winget en statut métier. Tout code inconnu
+        /// est classé <see cref="WingetUpgradeStatus.Failed"/> : le paquet reste
+        /// alors dans la liste, ce qui est le comportement prudent.
+        /// <para>
+        /// Attention aux faux amis : INSTALL_ALREADY_INSTALLED (0x8A15010D) et
+        /// INSTALL_UPGRADE_NOT_SUPPORTED (0x8A150114) signifient que la mise à
+        /// niveau n'a PAS eu lieu — ils restent donc des échecs.
+        /// </para>
+        /// </summary>
+        public static WingetUpgradeStatus ClassifyExitCode(int exitCode) => exitCode switch
+        {
+            0 => WingetUpgradeStatus.Succeeded,
+
+            // Rien à installer : winget considère le paquet à jour. Du point de
+            // vue de l'utilisateur la ligne n'a plus lieu d'être affichée.
+            ErrUpdateNotApplicable => WingetUpgradeStatus.AlreadyUpToDate,
+            ErrUpgradeVersionNotNewer => WingetUpgradeStatus.AlreadyUpToDate,
+
+            // Redémarrage impliqué : la ligne reste visible avec un marqueur,
+            // car l'utilisateur a une action à faire avant de conclure.
+            ErrInstallRebootRequiredToFinish => WingetUpgradeStatus.RebootRequired,
+            ErrInstallRebootRequiredForInstall => WingetUpgradeStatus.RebootRequired,
+            ErrInstallRebootInitiated => WingetUpgradeStatus.RebootRequired,
+            MsiRebootRequired => WingetUpgradeStatus.RebootRequired,
+            MsiRebootInitiated => WingetUpgradeStatus.RebootRequired,
+
+            ErrInstallCancelledByUser => WingetUpgradeStatus.CancelledByUser,
+            ErrCtrlSignalReceived => WingetUpgradeStatus.CancelledByUser,
+            ErrAppTerminationReceived => WingetUpgradeStatus.CancelledByUser,
+            ErrAuthCancelledByUser => WingetUpgradeStatus.CancelledByUser,
+            ErrorCancelled => WingetUpgradeStatus.CancelledByUser,
+            MsiUserExit => WingetUpgradeStatus.CancelledByUser,
+
+            _ => WingetUpgradeStatus.Failed,
+        };
+
         /// <summary>
         /// Met à niveau les paquets donnés (séquentiellement) en streamant la
         /// sortie vers <paramref name="onOutputLine"/>. Les installateurs
         /// déclenchent eux-mêmes l'invite UAC si nécessaire.
-        /// Renvoie le nombre de paquets dont winget s'est terminé avec code 0.
+        /// <para>
+        /// <paramref name="onPackageCompleted"/> est notifié après <b>chaque</b>
+        /// paquet, ce qui permet à l'UI de retirer les lignes au fil de l'eau
+        /// plutôt qu'à la fin du lot.
+        /// </para>
         /// </summary>
-        public async Task<int> UpgradePackagesAsync(
-            IEnumerable<string> packageIds,
+        public async Task<IReadOnlyList<WingetUpgradeResult>> UpgradePackagesAsync(
+            IEnumerable<WingetPackageUpdate> packages,
             Action<string> onOutputLine,
+            IProgress<WingetUpgradeResult>? onPackageCompleted = null,
             CancellationToken cancellationToken = default)
         {
+            var results = new List<WingetUpgradeResult>();
+
             var winget = ResolveWingetPath();
             if (winget == null)
-                return 0;
+                return results;
 
-            int succeeded = 0;
-            foreach (var id in packageIds)
+            foreach (var package in packages)
             {
                 cancellationToken.ThrowIfCancellationRequested();
+
                 var exitCode = await RunWingetStreamingAsync(
                     winget,
                     new[]
                     {
-                        "upgrade", "--id", id, "--include-unknown",
+                        "upgrade", "--id", package.Id, "--exact", "--include-unknown",
                         "--accept-source-agreements", "--accept-package-agreements",
                     },
                     onOutputLine,
                     cancellationToken).ConfigureAwait(false);
-                if (exitCode == 0)
-                    succeeded++;
+
+                var result = new WingetUpgradeResult
+                {
+                    Package = package,
+                    ExitCode = exitCode,
+                    Status = ClassifyExitCode(exitCode),
+                };
+                results.Add(result);
+                onPackageCompleted?.Report(result);
             }
-            return succeeded;
+
+            return results;
         }
 
         /// <summary>Met à niveau toutes les applications (« winget upgrade --all »).</summary>

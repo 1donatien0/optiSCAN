@@ -106,7 +106,12 @@ if (-not $SkipInstaller) {
         }
     }
     if ($iscc) {
-        $isccArgs = @((Join-Path $repo 'installer\setup.iss'), '/DAppVersion=9.0.0')
+        # Version lue depuis Directory.Build.props (source unique de vérité) :
+        # évite que l'installeur reparte sur un numéro figé après un bump.
+        [xml]$propsXml = Get-Content -LiteralPath (Join-Path $repo 'Directory.Build.props')
+        $appVersion = ($propsXml.Project.PropertyGroup.Version | Select-Object -First 1).'#text'
+        if ([string]::IsNullOrWhiteSpace($appVersion)) { $appVersion = '9.0.1' }
+        $isccArgs = @((Join-Path $repo 'installer\setup.iss'), "/DAppVersion=$appVersion")
         if ($EmbedOfflineSignatures) { $isccArgs += '/DEmbedOfflineSignatures' }
         else {
             if ($EmbedClamAvDatabase) { $isccArgs += '/DEmbedClamAvDatabase' }
