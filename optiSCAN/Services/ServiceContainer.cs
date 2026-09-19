@@ -243,7 +243,7 @@ namespace optiSCAN.Services
             DefenderCoexistenceService.EnsureFirstLaunchExclusionSettings(_exclusionSettings, _userPreferences);
 
             ApplySignatureAutoUpdate(_userPreferences.Current.SignatureAutoUpdateEnabled);
-            SignatureUpdatePolicy.ScheduleStartupRefreshIfStale(this, _userPreferences);
+            SignatureUpdatePolicy.NotifyAndScheduleStartupRefresh(this, _userPreferences);
 
             if (_userPreferences.Current.UsePlatformProtectionService)
             {

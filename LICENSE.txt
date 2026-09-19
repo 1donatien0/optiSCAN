@@ -14,7 +14,7 @@ pas le logiciel et supprimez toute copie en votre possession.
 ARTICLE 1 — DÉFINITIONS
 ------------------------------------------------------------------------------
 
-« Logiciel » désigne le programme optiSCAN v9.0 (édition ClamAV ; build 9.0.1), ses
+« Logiciel » désigne le programme optiSCAN v9.0 (édition ClamAV ; build 9.0.3), ses
 composants, ressources, fichiers de configuration et toute mise à jour fournie
 par l'auteur au titre de la branche v9.x du produit.
 

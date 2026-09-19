@@ -1,7 +1,7 @@
 # Guide Complet — optiSCAN v9.0
 
 > **Version de référence.** Architecture mono-fenêtre, services avancés + Donaby Design System.  
-> **Nomenclature** — **v9.0** : nom de release (documentation, CLUF). **9.0.1** : assembly et installateur (`Directory.Build.props`, Inno Setup).
+> **Nomenclature** — **v9.0** : nom de release (documentation, CLUF). **9.0.3** : assembly et installateur (`Directory.Build.props`, Inno Setup).
 >
 > **Design system : Donaby Design** — thème sombre/clair dynamique, tokens DynamicResource WPF.
 > Développé par **© 2026 Donatien Byakombe (Dona By)**.
@@ -106,7 +106,7 @@ optiSCAN.Service.exe  →  optiSCAN.exe --service-host
 ├── SECURITY.md                        ← Signalement + architecture sécurité
 ├── LICENSE.txt                        ← CLUF v9.0
 ├── .editorconfig                      ← Sévérités analyse Roslyn (alignement IDE / MSBuild)
-├── Directory.Build.props              ← Version 9.0.1, NetAnalyzers, TreatWarningsAsErrors (Release)
+├── Directory.Build.props              ← Version 9.0.3, NetAnalyzers, TreatWarningsAsErrors (Release)
 ├── .github/workflows/
 │   ├── ci.yml                         ← Build, tests (289), publish + SBOM (main)
 │   ├── codeql.yml                     ← Analyse CodeQL (C# + natif)
@@ -210,7 +210,7 @@ optiSCAN.Service.exe  →  optiSCAN.exe --service-host
     │   ├── NotificationService.cs     ← Toasts Windows natifs
     │   ├── RiskScoringService.cs      ← Score, sévérités i18n, PDF
     │   ├── PdfReportGenerator.cs      ← Export PDF (QuestPDF)
-    │   ├── WingetUpdateService.cs     ← Liste / mise à jour apps (winget) — onglet Optimiser → Mises à jour
+    │   ├── WingetUpdateService.cs     ← Liste / mise à jour apps (winget) ; --uninstall-previous + nettoyage des versions empilées
     │   └── SystemTweaksService.cs     ← Tweaks perf / confidentialité / UI / DISM — onglet Optimiser → Tweaks
     │
     ├── Themes/
@@ -368,7 +368,7 @@ Les vues sont empilées dans un seul `Grid` (`MainWindow.xaml`) : une seule est 
 |---|---|---|---|
 | `Overview` | Vue d'ensemble | `OverviewControl` | Cartes d'action (boutons), bandeau UAC, statut protection, recommandations |
 | `Antivirus` | Antivirus | `AntivirusView` | Scans ; onglets **Analyse en cours** / **Quarantaine** / **Historique** / **Signatures** (`ScanViewModel`) |
-| `Clean` | Optimiser | `CleanControl` | Trois sous-onglets : **Nettoyage** (caches navigateurs, temp, corbeille, cache Windows Update, DNS), **Mises à jour** (applications via winget + lien Windows Update, `WingetUpdateService`), **Tweaks** (performance, confidentialité, interface, DISM — `SystemTweaksService`, actions admin regroupées en une invite UAC) + **historique local** du nettoyage (colonne **Libéré** = `BytesDisplay`) |
+| `Clean` | Optimiser | `CleanControl` | Trois sous-onglets : **Nettoyage** (caches navigateurs, temp, corbeille, cache Windows Update, DNS), **Mises à jour** (applications via winget avec `--uninstall-previous` et retrait des versions empilées du même programme + lien Windows Update, `WingetUpdateService`), **Tweaks** (performance, confidentialité, interface, DISM — `SystemTweaksService`, actions admin regroupées en une invite UAC) + **historique local** du nettoyage (colonne **Libéré** = `BytesDisplay`) |
 | `History` | Historique | `HistoryControl` + `HistoryViewModel` | Timeline `ActivityLogService.GetActivityFeed` ; 5 filtres (puces) ; traitement menaces ; exports **HTML** / **PDF** |
 | `Options` | Options | `OptionsControl` | **Langue** (fr/en, redémarrage), thème / `SyncWindowsTheme`, scan favori, RTP, **scan USB/SD** (auto à l'insertion, mode complet, inclure dans analyse complète), quarantaine auto, planif. (`ServiceContainer.ScheduledScan`, prochaine exécution, **Lancer maintenant**), exclusions |
 
@@ -664,7 +664,7 @@ Si la **protection contre la falsification** de Defender est active, l’ajout p
 
 ## 8. Publication, installateur et checklist release (v9.0)
 
-> **Publication** : assembly **9.0.1** (`Directory.Build.props`, Inno Setup). **Branche** : `dev` → merge → `main` → artefacts CI / installateur — voir [Branches Git](#branches-git).
+> **Publication** : assembly **9.0.3** (`Directory.Build.props`, Inno Setup). **Branche** : `dev` → merge → `main` → artefacts CI / installateur — voir [Branches Git](#branches-git).
 
 ### Prérequis machine de build
 
@@ -686,7 +686,7 @@ Si la **protection contre la falsification** de Defender est active, l’ajout p
 Équivalent manuel : `clean-before-publish` → `dotnet publish` → `verify-runtime-deps` → `build-release-setup.ps1 -SkipPublish`.  
 Détails distribution (.NET auto, Embed signatures) : [`docs/GUIDE_DISTRIBUTION.md`](docs/GUIDE_DISTRIBUTION.md).
 
-Sortie publish : `optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\` (chemin attendu par `installer\setup.iss`). Installateur typique : `installer\output\optiSCAN_Setup_v9.0.1.exe` (**~26 Mo** sans CVD/.yar embarqués).
+Sortie publish : `optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\` (chemin attendu par `installer\setup.iss`). Installateur typique : `installer\output\optiSCAN_Setup_v9.0.3.exe` (**~26 Mo** sans CVD/.yar embarqués).
 
 Offline avec bases + règles : `.\scripts\publish-release.ps1 -EmbedOfflineSignatures`.
 
@@ -695,10 +695,10 @@ Offline avec bases + règles : `.\scripts\publish-release.ps1 -EmbedOfflineSigna
 1. Gel fonctionnel : `.\scripts\validate-release-readiness.ps1` (ou `dotnet test` Release — **289** tests).
 2. Dépendances : `.\scripts\fetch-runtime-deps.ps1` (binaires ClamAV/YARA ; freshclam optionnel — les CVD/`.yar` se téléchargent aussi **après install** via MAJ signatures).
 3. Publish local : `.\scripts\prepare-release-v9.ps1` ou `clean` → `dotnet publish` → `build-release-setup.ps1 -SkipPublish`.
-4. VM propre : installer `optiSCAN_Setup_v9.0.1.exe` ; **MAJ signatures** (freshclam + YARA-Forge) ; scan, RTP optionnelle, FR/EN.
+4. VM propre : installer `optiSCAN_Setup_v9.0.3.exe` ; **MAJ signatures** (freshclam + YARA-Forge) ; scan, RTP optionnelle, FR/EN.
 5. CI : push `main` → job **Publish win-x64** ; artefact `optiSCAN-setup-<sha>.exe`.
 6. Signature (opt.) : Authenticode — `installer/setup.iss.signing.example`.
-7. Tag / distribution : `git tag v9.0.1`, release GitHub, SourceForge ou site.
+7. Tag / distribution : `git tag v9.0.3`, release GitHub, SourceForge ou site.
 
 ### Étapes manuelles détaillées
 
@@ -734,7 +734,7 @@ $pub = ".\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64"
 **Contenu de l'installateur (~26 Mo par défaut, hors CVD/.yar) :**
 
 ```
-optiSCAN_Setup_v9.0.1.exe
+optiSCAN_Setup_v9.0.3.exe
     ├── optiSCAN.exe (+ DLL framework-dependent)
     ├── optiSCAN.ico / hero / shield
     ├── clamav/x64/          ← Binaires (clamscan, clamd, freshclam) — sans database/
@@ -762,7 +762,7 @@ Pipelines : [`.github/workflows/ci.yml`](.github/workflows/ci.yml), [`codeql.yml
 
 | Branche | Comportement |
 |---------|----------------|
-| **`main`** | `fetch-runtime-deps.ps1` → `fetch-runtime-deps.ps1 -RunFreshclam` (timeout 45 min) → build AMSI (optionnel) → `dotnet publish` → SBOM CycloneDX → Inno → `optiSCAN_Setup_v9.0.1.exe` |
+| **`main`** | `fetch-runtime-deps.ps1` → `fetch-runtime-deps.ps1 -RunFreshclam` (timeout 45 min) → build AMSI (optionnel) → `dotnet publish` → SBOM CycloneDX → Inno → `optiSCAN_Setup_v9.0.3.exe` |
 | **`dev`** | Build + tests + artefact binaire Release (sans installateur complet) |
 
 **Couverture** : seuil minimal **40 %** lignes (échec CI si en dessous) ; avertissement si &lt; **50 %** (cible progressive).
@@ -792,7 +792,7 @@ Pipelines : [`.github/workflows/ci.yml`](.github/workflows/ci.yml), [`codeql.yml
 
 ### Signature Authenticode (optionnelle)
 
-Windows affiche « Éditeur inconnu » sans certificat. Utile pour release publique ; nécessite un `.pfx` et des secrets CI (`CODESIGN_PFX`). Exemple : [`installer/setup.iss.signing.example`](installer/setup.iss.signing.example). Signer `optiSCAN.exe` + `optiSCAN_Setup_v9.0.1.exe` (`signtool`).
+Windows affiche « Éditeur inconnu » sans certificat. Utile pour release publique ; nécessite un `.pfx` et des secrets CI (`CODESIGN_PFX`). Exemple : [`installer/setup.iss.signing.example`](installer/setup.iss.signing.example). Signer `optiSCAN.exe` + `optiSCAN_Setup_v9.0.3.exe` (`signtool`).
 
 ---
 
@@ -845,7 +845,8 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 
 ### v9.0 — Defender complément, install allégé, IPC v9, Optimiser
 
-- **Version produit** — assembly **9.0.1** ; service Windows `optiSCANProtectionV9` ; pipe `optiSCAN_Protection_v9`
+- **Version produit** — assembly **9.0.3** ; service Windows `optiSCANProtectionV9` ; pipe `optiSCAN_Protection_v9`
+- **9.0.3** — Optimiser → Mises à jour : `winget upgrade --uninstall-previous` puis désinstallation des versions encore listées du même identifiant (hors runtimes côte à côte : VC++, .NET, DirectX), pour ne plus empiler v4, v5, v6… du même programme
 - **Optimiser** (ex-Nettoyer) — panneau sidebar + 3 sous-onglets : **Nettoyage** (temp, navigateurs, corbeille, cache WU, DNS), **Mises à jour** (`WingetUpdateService` + lien Windows Update), **Tweaks** (`SystemTweaksService`, une invite UAC regroupée)
 - **Mode complément Defender** — coexistence recommandée : Defender garde le RTP ; optiSCAN scans manuels/planifiés
 - **Exclusions Defender** — **opt-in** (Options / script) ; plus d’exécution silencieuse à l’install ni au démarrage

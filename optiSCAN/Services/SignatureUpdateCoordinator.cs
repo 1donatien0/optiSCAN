@@ -5,7 +5,7 @@ namespace optiSCAN.Services
     /// <summary>Journal utilisateur pour la mise à jour manuelle des signatures.</summary>
     public static class SignatureUpdateCoordinator
     {
-        private static readonly TimeSpan FullUpdateTimeout = TimeSpan.FromMinutes(5);
+        private static readonly TimeSpan FullUpdateTimeout = TimeSpan.FromMinutes(40);
 
         public static async Task<bool> RunFullSignatureUpdateAsync(
             FreshclamUpdater? freshclam,

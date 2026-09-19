@@ -161,6 +161,10 @@
   <data name="Notif_UpdateTitle" xml:space="preserve"><value>Updates available</value></data>
   <data name="Notif_UpdateBody" xml:space="preserve"><value>New ClamAV signatures v{0}</value></data>
   <data name="Notif_UpdateBtn" xml:space="preserve"><value>Update</value></data>
+  <data name="Notif_SigDownloadTitle" xml:space="preserve"><value>Downloading signatures</value></data>
+  <data name="Notif_SigDownloadBody" xml:space="preserve"><value>ClamAV and YARA definitions are updating in the background. No action is required.</value></data>
+  <data name="Notif_SigNeededTitle" xml:space="preserve"><value>Signatures need updating</value></data>
+  <data name="Notif_SigNeededBody" xml:space="preserve"><value>Antivirus definitions are missing or too old. Click to download them (Antivirus → Signatures).</value></data>
   <data name="Overview_Protected" xml:space="preserve"><value>Your PC is protected</value></data>
   <data name="Overview_ProtectionIncomplete" xml:space="preserve"><value>Protection incomplete</value></data>
   <data name="Overview_CleanTitle" xml:space="preserve"><value>Optimize</value></data>
@@ -322,7 +326,7 @@
   <data name="Clean_LogFreedHistory" xml:space="preserve"><value>Browsing history removed: {0}</value></data>
   <data name="Clean_LogHistoryFirefox" xml:space="preserve"><value>Firefox: history not supported (places.sqlite also stores bookmarks).</value></data>
   <data name="Clean_LogHistoryLocked" xml:space="preserve"><value>{0} history file(s) locked — close the browser and try again.</value></data>
-  <data name="Upd_Hint" xml:space="preserve"><value>Search for application updates (winget), check the ones to install, then run the update. The Windows Update button opens system settings.</value></data>
+  <data name="Upd_Hint" xml:space="preserve"><value>Search for application updates (winget), check the ones to install, then run the update. Previous versions of the same program are uninstalled. The Windows Update button opens system settings.</value></data>
   <data name="Upd_Scan" xml:space="preserve"><value>Search</value></data>
   <data name="Upd_InstallSelected" xml:space="preserve"><value>Update selection</value></data>
   <data name="Upd_InstallAll" xml:space="preserve"><value>Update all</value></data>
@@ -352,8 +356,11 @@
   <data name="Upd_LogUpgradeAllDone" xml:space="preserve"><value>Global update finished.</value></data>
   <data name="Upd_LogWindowsSettings" xml:space="preserve"><value>Windows Update settings opened.</value></data>
   <data name="Upd_LogError" xml:space="preserve"><value>Error: {0}</value></data>
-  <data name="Upd_ConfirmBody" xml:space="preserve"><value>The following applications will be updated:&#x0a;&#x0a;{0}</value></data>
-  <data name="Upd_ConfirmAllBody" xml:space="preserve"><value>All applications with an available update will be upgraded (winget upgrade --all).</value></data>
+  <data name="Upd_LogUninstallPrevious" xml:space="preserve"><value>Uninstalling version {1} of {0}...</value></data>
+  <data name="Upd_LogUninstallPreviousDone" xml:space="preserve"><value>✔ Previous version {1} of {0} uninstalled.</value></data>
+  <data name="Upd_LogUninstallPreviousFailed" xml:space="preserve"><value>⚠ Could not uninstall version {1} of {0} (code {2}).</value></data>
+  <data name="Upd_ConfirmBody" xml:space="preserve"><value>The following applications will be updated:&#x0a;&#x0a;{0}&#x0a;&#x0a;Previous versions of the same program will be uninstalled.</value></data>
+  <data name="Upd_ConfirmAllBody" xml:space="preserve"><value>All applications with an available update will be upgraded (winget upgrade --all). Previous versions of the same program will be uninstalled.</value></data>
   <data name="Upd_EmptyTitle" xml:space="preserve"><value>System up to date</value></data>
   <data name="Upd_EmptySub" xml:space="preserve"><value>No application updates detected.</value></data>
   <data name="Twk_SectionPerf" xml:space="preserve"><value>Performance</value></data>
@@ -374,6 +381,12 @@
   <data name="Twk_SearchIcon" xml:space="preserve"><value>Search box as icon</value></data>
   <data name="Twk_ThisPC" xml:space="preserve"><value>Explorer opens "This PC"</value></data>
   <data name="Twk_Dism" xml:space="preserve"><value>Windows component cleanup — DISM, slow (admin)</value></data>
+  <data name="Twk_DefenderHistory" xml:space="preserve"><value>Clear Windows Defender history and quarantine — restart required (admin)</value></data>
+  <data name="Twk_DefenderHistoryWarn" xml:space="preserve"><value>This action deletes Windows Defender protection history at the next startup: detections, quarantined items, and controlled folder access. Files quarantined by Defender will be permanently lost. The operation runs only once.</value></data>
+  <data name="Twk_DefenderHistoryRestartBody" xml:space="preserve"><value>A restart is required to clear Windows Defender history: the files stay locked while the service is running. Restart now?</value></data>
+  <data name="Twk_LogDefenderHistoryPending" xml:space="preserve"><value>Windows Defender history: cleanup scheduled for the next startup.</value></data>
+  <data name="Twk_LogRestarting" xml:space="preserve"><value>Restarting Windows…</value></data>
+  <data name="Twk_LogRestartLater" xml:space="preserve"><value>Restart Windows later to apply the Defender history cleanup.</value></data>
   <data name="Twk_Apply" xml:space="preserve"><value>Apply tweaks</value></data>
   <data name="Twk_ElevNote" xml:space="preserve"><value>Actions marked (admin) share a single UAC prompt.</value></data>
   <data name="Twk_LogTitle" xml:space="preserve"><value>Tweaks log</value></data>
@@ -477,7 +490,7 @@
   <data name="Opt_ScheduleTime" xml:space="preserve"><value>Time:</value></data>
   <data name="Opt_RunNow" xml:space="preserve"><value>Run now</value></data>
   <data name="Opt_App" xml:space="preserve"><value>Application</value></data>
-  <data name="Opt_UpdateHint" xml:space="preserve"><value>optiSCAN does not automatically download a new program version. ClamAV signatures and YARA rules are managed under Antivirus → Signatures.</value></data>
+  <data name="Opt_UpdateHint" xml:space="preserve"><value>The program does not download itself. ClamAV and YARA signatures update automatically in the background (can be turned off above). The button below shows the installed version and can open the download page.</value></data>
   <data name="Opt_AboutUpdates" xml:space="preserve"><value>Version information…</value></data>
   <data name="Opt_SourceForge" xml:space="preserve"><value>SourceForge page</value></data>
   <data name="Opt_PrivacyPolicy" xml:space="preserve"><value>Privacy policy</value></data>
@@ -647,7 +660,7 @@
   <data name="Runtime_YaracMissing" xml:space="preserve"><value> yarac missing — compile on first scan.</value></data>
   <data name="Opt_AppUpdateTitle" xml:space="preserve"><value>Application update</value></data>
   <data name="Opt_AppUpdateCheckError" xml:space="preserve"><value>Check failed: {0}</value></data>
-  <data name="Upd_NotConfigured" xml:space="preserve"><value>Installed version: {0} ({1})&#x0D;&#x0A;&#x0D;&#x0A;optiSCAN does not download program updates in the background yet.&#x0D;&#x0A;&#x0D;&#x0A;• ClamAV signatures and YARA rules: Antivirus → Signatures tab.&#x0D;&#x0A;• New program version: {2}&#x0D;&#x0A;&#x0D;&#x0A;Local staging folder: {3}</value></data>
+  <data name="Upd_NotConfigured" xml:space="preserve"><value>Installed version: {0} ({1})&#x0D;&#x0A;&#x0D;&#x0A;Antivirus signatures download automatically in the background (Options → auto-update). To run them manually: Antivirus → Signatures.&#x0D;&#x0A;&#x0D;&#x0A;optiSCAN does not download a new program version by itself.&#x0D;&#x0A;Open the download page ({2})?</value></data>
   <data name="Upd_StagingError" xml:space="preserve"><value>Installed version: {0} ({1})&#x0D;&#x0A;&#x0D;&#x0A;Could not prepare the update folder:&#x0D;&#x0A;{2}&#x0D;&#x0A;&#x0D;&#x0A;Signatures: Antivirus → Signatures tab.&#x0D;&#x0A;Program: {3}</value></data>
   <data name="Vm_QuarantineBatch" xml:space="preserve"><value>{0} file(s) moved to quarantine.</value></data>
   <data name="Vm_HistReviewLoaded" xml:space="preserve"><value>Session from {0:dd/MM/yyyy HH:mm} — {1} threat(s) loaded for remediation.</value></data>
@@ -746,7 +759,7 @@
   <data name="Export_PdfFilter" xml:space="preserve"><value>PDF document (*.pdf)|*.pdf|All files (*.*)|*.*</value></data>
   <data name="Onboarding_Title" xml:space="preserve"><value>Welcome to optiSCAN</value></data>
   <data name="Onboarding_Step1" xml:space="preserve"><value>optiSCAN protects and cleans your PC locally (ClamAV + YARA).&#10;&#10;This quick guide covers three useful first steps.</value></data>
-  <data name="Onboarding_Step2" xml:space="preserve"><value>Update antivirus signatures now?&#10;(Antivirus → Signatures)</value></data>
+  <data name="Onboarding_Step2" xml:space="preserve"><value>Antivirus signatures (ClamAV + YARA) download automatically in the background. No action is required.&#10;&#10;You can follow progress under Antivirus → Signatures, or turn off automatic downloads in Options.</value></data>
   <data name="Onboarding_Step3" xml:space="preserve"><value>Next: run a quick scan with F5 from the Antivirus tab.&#10;&#10;Without administrator rights, full and scheduled scans remain partial.</value></data>
   <data name="Onboarding_DefenderTitle" xml:space="preserve"><value>Windows Defender detected</value></data>
   <data name="Onboarding_DefenderStep" xml:space="preserve"><value>Windows Defender already protects this PC in real time.&#10;&#10;Recommended: keep Defender active and use optiSCAN as a supplement (manual and scheduled scans with ClamAV + YARA).&#10;&#10;Yes = complement mode (smoother, fewer conflicts)&#10;No = also enable optiSCAN real-time protection</value></data>
