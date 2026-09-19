@@ -586,11 +586,25 @@ namespace optiSCAN.Views
                 };
             }
 
-            System.Windows.MessageBox.Show(
+            if (System.Windows.MessageBox.Show(
                 result.UserMessage,
                 LocalizationService.GetString("Opt_AppUpdateTitle"),
-                MessageBoxButton.OK,
-                result.Success ? MessageBoxImage.Information : MessageBoxImage.Warning);
+                MessageBoxButton.YesNo,
+                result.Success ? MessageBoxImage.Information : MessageBoxImage.Warning) == MessageBoxResult.Yes)
+            {
+                try
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = OptiscanStrings.Urls.OptiscanSourceForge,
+                        UseShellExecute = true
+                    });
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Warn("OptionsControl", "Navigate SourceForge (update check)", ex);
+                }
+            }
         }
 
         private async void BtnOpenSourceForge_Click(object sender, RoutedEventArgs e)

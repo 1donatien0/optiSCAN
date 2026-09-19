@@ -17,8 +17,11 @@ namespace optiSCAN.Services
     {
         // ── Constantes ────────────────────────────────────────────────────────────
 
-        /// <summary>Délai max d'une mise à jour avant kill automatique.</summary>
-        private static readonly TimeSpan UpdateTimeout = TimeSpan.FromMinutes(5);
+        /// <summary>
+        /// Délai max d'une mise à jour avant kill automatique.
+        /// Premier téléchargement main.cvd + daily + bytecode ≈ 200+ Mo — 5 min est trop court.
+        /// </summary>
+        private static readonly TimeSpan UpdateTimeout = TimeSpan.FromMinutes(30);
 
         /// <summary>Âge à partir duquel un verrou freshclam est considéré orphelin.</summary>
         private static readonly TimeSpan StaleLockAge = TimeSpan.FromMinutes(10);
@@ -389,7 +392,7 @@ namespace optiSCAN.Services
 
         /// <summary>
         /// Supprime les verrous freshclam orphelins (mirrors.dat lock, freshclam.pid)
-        /// laissés par un process précédent qui aurait crashé.
+        /// et les dossiers tmp.* laissés par un timeout / crash précédent.
         /// </summary>
         private void CleanupStaleLocks()
         {
@@ -423,10 +426,40 @@ namespace optiSCAN.Services
                         AppLogger.Warn("FreshclamUpdater", $"Cleanup {lockPath}", ex);
                     }
                 }
+
+                CleanupPartialDownloadDirs();
             }
             catch (Exception ex)
             {
                 AppLogger.Warn("FreshclamUpdater", "CleanupStaleLocks", ex);
+            }
+        }
+
+        /// <summary>
+        /// Un timeout / kill laisse des tmp.* incomplets qui font échouer les MAJ suivantes.
+        /// On les retire toujours avant un nouveau freshclam (un seul update à la fois).
+        /// </summary>
+        private void CleanupPartialDownloadDirs()
+        {
+            try
+            {
+                foreach (var dir in Directory.EnumerateDirectories(_databaseDir, "tmp.*"))
+                {
+                    try
+                    {
+                        Directory.Delete(dir, recursive: true);
+                        SurSortieFreshclam(UiLogText.Info(LocalizationService.Format(
+                            "Freshclam_LogStaleLockRemoved", Path.GetFileName(dir))));
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Warn("FreshclamUpdater", $"Cleanup tmp {dir}", ex);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("FreshclamUpdater", "CleanupPartialDownloadDirs", ex);
             }
         }
 
@@ -553,17 +586,22 @@ namespace optiSCAN.Services
             try
             {
                 using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(3));
+                var psi = new ProcessStartInfo
+                {
+                    FileName = _freshclamExe,
+                    UseShellExecute = false,
+                    RedirectStandardOutput = true,
+                    RedirectStandardError = true,  // drainer stderr pour éviter deadlock pipe
+                    CreateNoWindow = true,
+                    WorkingDirectory = Path.GetDirectoryName(_freshclamExe) ?? string.Empty,
+                };
+                psi.ArgumentList.Add("--version");
+                var conf = EnsureConfExists();
+                if (conf != null)
+                    psi.ArgumentList.Add($"--config-file={conf}");
                 using var proc = new Process
                 {
-                    StartInfo = new ProcessStartInfo
-                    {
-                        FileName = _freshclamExe,
-                        Arguments = "--version",
-                        UseShellExecute = false,
-                        RedirectStandardOutput = true,
-                        RedirectStandardError = true,  // drainer stderr pour éviter deadlock pipe
-                        CreateNoWindow = true
-                    },
+                    StartInfo = psi,
                     EnableRaisingEvents = true
                 };
                 proc.Start();

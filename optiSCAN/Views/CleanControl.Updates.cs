@@ -155,7 +155,11 @@ namespace optiSCAN.Views
                 LockUpdateButtons();
                 AppendUpdateLog(LocalizationService.GetString("Upd_LogUpgradeAllStart"));
 
-                await _winget.UpgradeAllAsync(AppendWingetOutputLine);
+                await _winget.UpgradeAllAsync(
+                    AppendWingetOutputLine,
+                    _updateCheckBoxes
+                        .Select(cb => (WingetPackageUpdate)cb.Tag!)
+                        .ToList());
                 AppendUpdateLog(LocalizationService.GetString("Upd_LogUpgradeAllDone"));
                 completed = true;
             }

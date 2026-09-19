@@ -11,7 +11,7 @@ namespace optiSCAN.Views
     /// Panneau Optimiser — sous-onglet « Tweaks » (performance, confidentialité,
     /// interface, maintenance). Port C# des onglets Performance / Confidentialité /
     /// Interface d'OptiWin. Les actions HKCU sont appliquées directement ; les
-    /// actions admin (télémétrie, DISM) partagent une seule invite UAC.
+    /// actions admin (télémétrie, DISM, historique Defender) partagent une seule invite UAC.
     /// </summary>
     public partial class CleanControl
     {
@@ -32,11 +32,12 @@ namespace optiSCAN.Views
             public bool SearchIcon { get; init; }
             public bool ThisPc { get; init; }
             public bool Dism { get; init; }
+            public bool DefenderHistory { get; init; }
 
             public bool AnyUi => ShowExt || ShowHidden || TaskbarLeft || HideWidgets || SearchIcon || ThisPc;
-            public bool AnyElevated => Telemetry || Dism;
+            public bool AnyElevated => Telemetry || Dism || DefenderHistory;
             public bool Any => PowerPlan || VisualFx || Telemetry || Ads || Suggestions
-                               || Tailored || AnyUi || Dism;
+                               || Tailored || AnyUi || Dism || DefenderHistory;
         }
 
         private TweakSelection ReadTweakSelection() => new()
@@ -54,6 +55,7 @@ namespace optiSCAN.Views
             SearchIcon = chkTwkSearchIcon?.IsChecked == true,
             ThisPc = chkTwkThisPC?.IsChecked == true,
             Dism = chkTwkDism?.IsChecked == true,
+            DefenderHistory = chkTwkDefenderHistory?.IsChecked == true,
         };
 
         // ── Appliquer ────────────────────────────────────────────────────────
@@ -71,11 +73,14 @@ namespace optiSCAN.Views
             // Récapitulatif + confirmation (même pattern qu'OptiWin).
             var labels = BuildTweakLabels(sel);
             var summary = string.Join("\n", labels.Select(l => $" •  {l}"));
+            var confirmBody = LocalizationService.Format("Twk_ConfirmBody", summary);
+            if (sel.DefenderHistory)
+                confirmBody += "\n\n" + LocalizationService.GetString("Twk_DefenderHistoryWarn");
             var confirm = System.Windows.MessageBox.Show(
-                LocalizationService.Format("Twk_ConfirmBody", summary),
+                confirmBody,
                 OptiscanStrings.Confirmations.Title,
                 MessageBoxButton.OKCancel,
-                MessageBoxImage.Question);
+                sel.DefenderHistory ? MessageBoxImage.Warning : MessageBoxImage.Question);
             if (confirm != MessageBoxResult.OK)
             {
                 AppendTweaksLog(LocalizationService.GetString("Twk_Cancelled"));
@@ -88,6 +93,7 @@ namespace optiSCAN.Views
 
             try
             {
+                bool elevatedOk = true;
                 await Task.Run(() =>
                 {
                     // ── Actions sans élévation (HKCU / powercfg) ─────────────
@@ -122,13 +128,16 @@ namespace optiSCAN.Views
                             commands.AddRange(SystemTweaksService.ElevatedTelemetryCommands());
                         if (sel.Dism)
                             commands.AddRange(SystemTweaksService.ElevatedDismCleanupCommands());
+                        if (sel.DefenderHistory)
+                            commands.AddRange(SystemTweaksService.ElevatedClearDefenderHistoryCommands());
 
                         AppendTweaksLog(LocalizationService.GetString("Twk_LogElevStart"));
-                        bool ok = SystemTweaksService.RunElevatedBatch(commands, waitForExit: true);
-                        if (ok)
+                        elevatedOk = SystemTweaksService.RunElevatedBatch(commands, waitForExit: true);
+                        if (elevatedOk)
                         {
                             if (sel.Telemetry) LogTweakResult("Twk_Telemetry", true);
                             if (sel.Dism) LogTweakResult("Twk_Dism", true);
+                            if (sel.DefenderHistory) LogTweakResult("Twk_DefenderHistory", true);
                         }
                         else
                         {
@@ -145,6 +154,9 @@ namespace optiSCAN.Views
                 });
 
                 AppendTweaksLog(LocalizationService.GetString("Twk_LogEnd"));
+
+                if (sel.DefenderHistory && elevatedOk)
+                    PromptDefenderHistoryRestart();
             }
             catch (Exception ex)
             {
@@ -182,7 +194,29 @@ namespace optiSCAN.Views
             if (sel.SearchIcon) labels.Add(LocalizationService.GetString("Twk_SearchIcon"));
             if (sel.ThisPc) labels.Add(LocalizationService.GetString("Twk_ThisPC"));
             if (sel.Dism) labels.Add(LocalizationService.GetString("Twk_Dism"));
+            if (sel.DefenderHistory) labels.Add(LocalizationService.GetString("Twk_DefenderHistory"));
             return labels;
+        }
+
+        private void PromptDefenderHistoryRestart()
+        {
+            AppendTweaksLog(LocalizationService.GetString("Twk_LogDefenderHistoryPending"));
+            var restart = System.Windows.MessageBox.Show(
+                LocalizationService.GetString("Twk_DefenderHistoryRestartBody"),
+                OptiscanStrings.Confirmations.Title,
+                MessageBoxButton.YesNo,
+                MessageBoxImage.Warning);
+            if (restart == MessageBoxResult.Yes)
+            {
+                if (SystemTweaksService.RequestSystemRestart(0))
+                    AppendTweaksLog(LocalizationService.GetString("Twk_LogRestarting"));
+                else
+                    AppendTweaksLog(LocalizationService.GetString("Twk_LogRestartLater"));
+            }
+            else
+            {
+                AppendTweaksLog(LocalizationService.GetString("Twk_LogRestartLater"));
+            }
         }
 
         private void LogTweakResult(string labelKey, bool success)
