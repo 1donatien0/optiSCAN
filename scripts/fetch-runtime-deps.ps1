@@ -35,7 +35,7 @@ $cacheDir = Join-Path $root 'artifacts\deps-cache'
 New-Item -ItemType Directory -Force -Path $clamX64, $clamDb, $yaraDir, $cacheDir | Out-Null
 
 function Test-ClamReady {
-    @('clamscan.exe', 'freshclam.exe', 'clamd.exe', 'clambc.exe') |
+    @('clamscan.exe', 'freshclam.exe', 'clamd.exe', 'libclamav.dll', 'libfreshclam.dll') |
         ForEach-Object { Test-Path (Join-Path $clamX64 $_) } | Where-Object { $_ -eq $false } | Measure-Object |
         Select-Object -ExpandProperty Count
 }
@@ -58,6 +58,31 @@ function Copy-IfExists([string] $srcDir, [string] $destDir, [string[]] $names) {
             Write-Host "  OK $name" -ForegroundColor Green
         } else {
             Write-Warning "  Absent dans l'archive : $name"
+        }
+    }
+}
+
+function Copy-ClamAvRuntime([string] $srcDir, [string] $destDir) {
+    New-Item -ItemType Directory -Force -Path $destDir | Out-Null
+    $copied = @{}
+    $required = @(
+        'clamscan.exe', 'freshclam.exe', 'clamd.exe',
+        'libclamav.dll', 'libfreshclam.dll'
+    )
+    Get-ChildItem -Path $srcDir -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object {
+            $_.Extension -in '.exe', '.dll' -and
+            $_.Name -notmatch '^(sigtool|clamdtop|clamsubmit|clamconf)\.exe$'
+        } |
+        ForEach-Object {
+            if ($copied.ContainsKey($_.Name)) { return }
+            Copy-Item -LiteralPath $_.FullName -Destination (Join-Path $destDir $_.Name) -Force
+            $copied[$_.Name] = $true
+            Write-Host "  OK $($_.Name)" -ForegroundColor Green
+        }
+    foreach ($name in $required) {
+        if (-not (Test-Path (Join-Path $destDir $name))) {
+            throw "Binaire ClamAV manquant dans l'archive : $name"
         }
     }
 }
@@ -104,7 +129,8 @@ function Write-FreshclamCiConf {
         'DatabaseMirror database.clamav.net'
         'MaxAttempts 3'
         'ConnectTimeout 30'
-        'ReceiveTimeout 30'
+        'ReceiveTimeout 0'
+        'TestDatabases no'
     )
     $utf8NoBom = New-Object System.Text.UTF8Encoding $false
     [System.IO.File]::WriteAllText($ConfPath, ($lines -join "`n") + "`n", $utf8NoBom)
@@ -121,10 +147,8 @@ if ($Force -or (Test-ClamReady) -gt 0) {
     }
     $temp = Expand-ZipToTemp $zipPath
     try {
-        Copy-IfExists $temp $clamX64 @(
-            'clamscan.exe', 'freshclam.exe', 'clamd.exe', 'clambc.exe',
-            'libclamunrar.dll', 'libclamunrar_iface.dll', 'libclammspack.dll'
-        )
+        # freshclam/clamscan dynamiquement liés : libclamav, libfreshclam, OpenSSL, libcurl, etc.
+        Copy-ClamAvRuntime $temp $clamX64
     } finally {
         Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
     }

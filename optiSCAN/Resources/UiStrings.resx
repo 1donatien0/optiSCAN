@@ -161,6 +161,10 @@
   <data name="Notif_UpdateTitle" xml:space="preserve"><value>Mises à jour disponibles</value></data>
   <data name="Notif_UpdateBody" xml:space="preserve"><value>Nouvelles signatures ClamAV v{0}</value></data>
   <data name="Notif_UpdateBtn" xml:space="preserve"><value>Mettre à jour</value></data>
+  <data name="Notif_SigDownloadTitle" xml:space="preserve"><value>Téléchargement des signatures</value></data>
+  <data name="Notif_SigDownloadBody" xml:space="preserve"><value>Les définitions ClamAV et YARA se mettent à jour en arrière-plan. Aucune action n'est requise.</value></data>
+  <data name="Notif_SigNeededTitle" xml:space="preserve"><value>Signatures à mettre à jour</value></data>
+  <data name="Notif_SigNeededBody" xml:space="preserve"><value>Les définitions antivirus sont absentes ou trop anciennes. Cliquez pour les télécharger (Antivirus → Signatures).</value></data>
   <data name="Overview_Protected" xml:space="preserve"><value>Votre ordinateur est protégé</value></data>
   <data name="Overview_ProtectionIncomplete" xml:space="preserve"><value>Protection incomplète</value></data>
   <data name="Overview_CleanTitle" xml:space="preserve"><value>Optimiser</value></data>
@@ -322,7 +326,7 @@
   <data name="Clean_LogFreedHistory" xml:space="preserve"><value>Historique de navigation supprimé : {0}</value></data>
   <data name="Clean_LogHistoryFirefox" xml:space="preserve"><value>Firefox : historique non pris en charge (places.sqlite contient aussi les favoris).</value></data>
   <data name="Clean_LogHistoryLocked" xml:space="preserve"><value>{0} fichier(s) d'historique verrouillé(s) — fermez le navigateur puis relancez.</value></data>
-  <data name="Upd_Hint" xml:space="preserve"><value>Recherchez les mises à jour d'applications (winget), cochez celles à installer, puis lancez la mise à jour. Le bouton Windows Update ouvre les paramètres système.</value></data>
+  <data name="Upd_Hint" xml:space="preserve"><value>Recherchez les mises à jour d'applications (winget), cochez celles à installer, puis lancez la mise à jour. Les versions précédentes du même programme sont désinstallées. Le bouton Windows Update ouvre les paramètres système.</value></data>
   <data name="Upd_Scan" xml:space="preserve"><value>Rechercher</value></data>
   <data name="Upd_InstallSelected" xml:space="preserve"><value>Mettre à jour la sélection</value></data>
   <data name="Upd_InstallAll" xml:space="preserve"><value>Tout mettre à jour</value></data>
@@ -352,8 +356,11 @@
   <data name="Upd_LogUpgradeAllDone" xml:space="preserve"><value>Mise à jour globale terminée.</value></data>
   <data name="Upd_LogWindowsSettings" xml:space="preserve"><value>Paramètres Windows Update ouverts.</value></data>
   <data name="Upd_LogError" xml:space="preserve"><value>Erreur : {0}</value></data>
-  <data name="Upd_ConfirmBody" xml:space="preserve"><value>Les applications suivantes seront mises à jour :&#x0a;&#x0a;{0}</value></data>
-  <data name="Upd_ConfirmAllBody" xml:space="preserve"><value>Toutes les applications disposant d'une mise à jour seront mises à niveau (winget upgrade --all).</value></data>
+  <data name="Upd_LogUninstallPrevious" xml:space="preserve"><value>Désinstallation de la version {1} de {0}...</value></data>
+  <data name="Upd_LogUninstallPreviousDone" xml:space="preserve"><value>✔ Ancienne version {1} de {0} désinstallée.</value></data>
+  <data name="Upd_LogUninstallPreviousFailed" xml:space="preserve"><value>⚠ Impossible de désinstaller la version {1} de {0} (code {2}).</value></data>
+  <data name="Upd_ConfirmBody" xml:space="preserve"><value>Les applications suivantes seront mises à jour :&#x0a;&#x0a;{0}&#x0a;&#x0a;Les versions précédentes du même programme seront désinstallées.</value></data>
+  <data name="Upd_ConfirmAllBody" xml:space="preserve"><value>Toutes les applications disposant d'une mise à jour seront mises à niveau (winget upgrade --all). Les versions précédentes du même programme seront désinstallées.</value></data>
   <data name="Upd_EmptyTitle" xml:space="preserve"><value>Système à jour</value></data>
   <data name="Upd_EmptySub" xml:space="preserve"><value>Aucune mise à jour d'application détectée.</value></data>
   <data name="Twk_SectionPerf" xml:space="preserve"><value>Performance</value></data>
@@ -374,6 +381,12 @@
   <data name="Twk_SearchIcon" xml:space="preserve"><value>Recherche réduite à une icône</value></data>
   <data name="Twk_ThisPC" xml:space="preserve"><value>Explorateur ouvre « Ce PC »</value></data>
   <data name="Twk_Dism" xml:space="preserve"><value>Nettoyage des composants Windows — DISM, lent (admin)</value></data>
+  <data name="Twk_DefenderHistory" xml:space="preserve"><value>Vider l'historique et la quarantaine Windows Defender — redémarrage requis (admin)</value></data>
+  <data name="Twk_DefenderHistoryWarn" xml:space="preserve"><value>Cette action supprime, au prochain démarrage, l'historique de protection de Windows Defender : détections, éléments en quarantaine et accès contrôlé aux dossiers. Les fichiers mis en quarantaine par Defender seront définitivement perdus. L'opération n'est exécutée qu'une seule fois.</value></data>
+  <data name="Twk_DefenderHistoryRestartBody" xml:space="preserve"><value>Un redémarrage est nécessaire pour vider l'historique Windows Defender : les fichiers restent verrouillés tant que le service est actif. Redémarrer maintenant ?</value></data>
+  <data name="Twk_LogDefenderHistoryPending" xml:space="preserve"><value>Historique Windows Defender : nettoyage programmé au prochain démarrage.</value></data>
+  <data name="Twk_LogRestarting" xml:space="preserve"><value>Redémarrage de Windows…</value></data>
+  <data name="Twk_LogRestartLater" xml:space="preserve"><value>Redémarrez Windows plus tard pour appliquer le nettoyage de l'historique Defender.</value></data>
   <data name="Twk_Apply" xml:space="preserve"><value>Appliquer les tweaks</value></data>
   <data name="Twk_ElevNote" xml:space="preserve"><value>Les actions marquées (admin) sont regroupées dans une seule invite UAC.</value></data>
   <data name="Twk_LogTitle" xml:space="preserve"><value>Journal des tweaks</value></data>
@@ -477,7 +490,7 @@
   <data name="Opt_ScheduleTime" xml:space="preserve"><value>Heure :</value></data>
   <data name="Opt_RunNow" xml:space="preserve"><value>Lancer maintenant</value></data>
   <data name="Opt_App" xml:space="preserve"><value>Application</value></data>
-  <data name="Opt_UpdateHint" xml:space="preserve"><value>optiSCAN ne télécharge pas automatiquement une nouvelle version du programme. Les signatures ClamAV et YARA se gèrent dans Antivirus → Signatures.</value></data>
+  <data name="Opt_UpdateHint" xml:space="preserve"><value>Le programme ne se télécharge pas tout seul. Les signatures ClamAV et YARA se mettent à jour automatiquement en arrière-plan (désactivable ci-dessus). Le bouton ci-dessous affiche la version installée et propose d'ouvrir la page des versions.</value></data>
   <data name="Opt_AboutUpdates" xml:space="preserve"><value>Informations de version…</value></data>
   <data name="Opt_SourceForge" xml:space="preserve"><value>Page SourceForge</value></data>
   <data name="Opt_PrivacyPolicy" xml:space="preserve"><value>Politique de confidentialité</value></data>
@@ -647,7 +660,7 @@
   <data name="Runtime_YaracMissing" xml:space="preserve"><value> yarac absent — compilation au premier scan.</value></data>
   <data name="Opt_AppUpdateTitle" xml:space="preserve"><value>Mise à jour applicative</value></data>
   <data name="Opt_AppUpdateCheckError" xml:space="preserve"><value>Erreur lors du contrôle : {0}</value></data>
-  <data name="Upd_NotConfigured" xml:space="preserve"><value>Version installée : {0} ({1})&#x0D;&#x0A;&#x0D;&#x0A;optiSCAN ne télécharge pas encore les mises à jour du programme en arrière-plan.&#x0D;&#x0A;&#x0D;&#x0A;• Signatures ClamAV et règles YARA : Antivirus → onglet Signatures.&#x0D;&#x0A;• Nouvelle version du programme : {2}&#x0D;&#x0A;&#x0D;&#x0A;Dossier de préparation local : {3}</value></data>
+  <data name="Upd_NotConfigured" xml:space="preserve"><value>Version installée : {0} ({1})&#x0D;&#x0A;&#x0D;&#x0A;Les signatures antivirus se téléchargent automatiquement en arrière-plan (Options → mise à jour auto). Pour les lancer à la main : Antivirus → Signatures.&#x0D;&#x0A;&#x0D;&#x0A;optiSCAN ne télécharge pas tout seul une nouvelle version du programme.&#x0D;&#x0A;Ouvrir la page de téléchargement ({2}) ?</value></data>
   <data name="Upd_StagingError" xml:space="preserve"><value>Version installée : {0} ({1})&#x0D;&#x0A;&#x0D;&#x0A;Impossible de préparer le dossier de mises à jour :&#x0D;&#x0A;{2}&#x0D;&#x0A;&#x0D;&#x0A;Signatures : onglet Antivirus → Signatures.&#x0D;&#x0A;Programme : {3}</value></data>
   <data name="Vm_QuarantineBatch" xml:space="preserve"><value>{0} fichier(s) placé(s) en quarantaine.</value></data>
   <data name="Vm_HistReviewLoaded" xml:space="preserve"><value>Session du {0:dd/MM/yyyy HH:mm} — {1} menace(s) chargée(s) pour traitement.</value></data>
@@ -746,7 +759,7 @@
   <data name="Export_PdfFilter" xml:space="preserve"><value>Document PDF (*.pdf)|*.pdf|Tous les fichiers (*.*)|*.*</value></data>
   <data name="Onboarding_Title" xml:space="preserve"><value>Bienvenue dans optiSCAN</value></data>
   <data name="Onboarding_Step1" xml:space="preserve"><value>optiSCAN protège et nettoie votre PC localement (ClamAV + YARA).&#10;&#10;Ce guide rapide vous indique les trois gestes utiles au premier lancement.</value></data>
-  <data name="Onboarding_Step2" xml:space="preserve"><value>Mettre à jour les signatures antivirus maintenant ?&#10;(Antivirus → Signatures)</value></data>
+  <data name="Onboarding_Step2" xml:space="preserve"><value>Les signatures antivirus (ClamAV + YARA) se téléchargent automatiquement en arrière-plan. Aucune action n'est requise.&#10;&#10;Vous pouvez suivre l'avancement dans Antivirus → Signatures, ou désactiver le téléchargement automatique dans Options.</value></data>
   <data name="Onboarding_Step3" xml:space="preserve"><value>Étape suivante : lancez une analyse rapide avec F5 depuis l'onglet Antivirus.&#10;&#10;Sans droits administrateur, l'analyse complète et le scan planifié restent partiels.</value></data>
   <data name="Onboarding_DefenderTitle" xml:space="preserve"><value>Windows Defender détecté</value></data>
   <data name="Onboarding_DefenderStep" xml:space="preserve"><value>Windows Defender protège déjà votre PC en temps réel.&#10;&#10;Recommandé : laisser Defender actif et utiliser optiSCAN en complément (analyses manuelles et planifiées avec ClamAV + YARA).&#10;&#10;Oui = mode complément (plus fluide, moins de conflits)&#10;Non = activer aussi la protection temps réel optiSCAN</value></data>

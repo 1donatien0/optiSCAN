@@ -77,7 +77,12 @@ Invoke-Step 'dotnet publish' {
 }
 
 Invoke-Step 'Verification publish' {
-    & (Join-Path $root 'scripts\verify-runtime-deps.ps1') -PublishDir $pubDir
+    $verify = Join-Path $root 'scripts\verify-runtime-deps.ps1'
+    if ($SkipFreshclam) {
+        & $verify -PublishDir $pubDir -AllowMissingSignatures
+    } else {
+        & $verify -PublishDir $pubDir
+    }
 }
 
 if (-not $SkipInstaller) {
@@ -93,4 +98,4 @@ if (-not $SkipInstaller) {
 
 Write-Host "`n=== Publication v9 prete ===" -ForegroundColor Green
 Write-Host "  Publish : $pubDir"
-Write-Host "  Setup   : installer\output\optiSCAN_Setup_v9.0.1.exe"
+Write-Host "  Setup   : installer\output\optiSCAN_Setup_v9.0.3.exe"

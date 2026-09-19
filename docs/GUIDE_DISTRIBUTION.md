@@ -93,7 +93,7 @@ L'UI de publication de Visual Studio s'est révélée peu fiable ici. Préférer
 .\installer\build-release-setup.ps1 -SkipPublish
 ```
 
-Le script `publish-release.ps1` : désactive le watchdog, ferme les instances qui verrouillent les fichiers, nettoie `publish\`, publie, signe (si certificat), puis compile l'installeur Inno. Sortie typique : `installer\output\optiSCAN_Setup_v9.0.1.exe`.
+Le script `publish-release.ps1` : désactive le watchdog, ferme les instances qui verrouillent les fichiers, nettoie `publish\`, publie, signe (si certificat), puis compile l'installeur Inno. Sortie typique : `installer\output\optiSCAN_Setup_v9.0.3.exe`.
 
 Le publish WPF recopie aussi les assets disque (`optiSCAN.ico`, hero, shield) via la cible MSBuild `CopyEmbeddedAssetsToPublish` — nécessaires au systray, à `verify-runtime-deps` et à Inno.
 
@@ -109,4 +109,4 @@ Le publish WPF recopie aussi les assets disque (`optiSCAN.ico`, hero, shield) vi
 - [ ] Assets publish présents (`optiSCAN.ico`, hero, shield) — `verify-runtime-deps.ps1`.
 - [ ] Testé sur poste vierge + poste avec Kaspersky/Defender.
 - [ ] Politique de confidentialité accessible ([POLITIQUE_CONFIDENTIALITE.md](POLITIQUE_CONFIDENTIALITE.md) ; à exposer aussi dans l'app / site).
-- [ ] Numéro de version cohérent (`Directory.Build.props`, `LICENSE.txt`, Inno, README) — **v9.0 / 9.0.1**.
+- [ ] Numéro de version cohérent (`Directory.Build.props`, `LICENSE.txt`, Inno, README) — **v9.0 / 9.0.3**.

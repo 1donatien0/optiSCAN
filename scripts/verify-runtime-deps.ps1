@@ -47,6 +47,8 @@ Write-Host "`n[ ClamAV x64 ]"
 Check "clamav\x64\clamscan.exe"  "Scanner ClamAV"
 Check "clamav\x64\freshclam.exe" "Mise a jour signatures"
 Check "clamav\x64\clamd.exe"     "Daemon ClamAV (v9)"
+Check "clamav\x64\libclamav.dll" "Moteur libclamav"
+Check "clamav\x64\libfreshclam.dll" "Client freshclam"
 $clambc = Join-Path $PublishDir "clamav\x64\clambc.exe"
 if (Test-Path $clambc) {
     Write-Host "  OK        clamav\x64\clambc.exe" -ForegroundColor Green
