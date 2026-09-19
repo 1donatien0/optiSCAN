@@ -242,14 +242,41 @@ namespace optiSCAN.Services
 
         public void ShowUpdateAvailable(string version)
         {
+            ShowSignatureUpdateNeeded();
+            _ = version;
+        }
+
+        /// <summary>Téléchargement auto en cours — toast informatif, sans bouton.</summary>
+        public void ShowSignatureDownloadStarted()
+        {
+            if (!ShouldShowToast()) return;
+
+            try
+            {
+                new ToastContentBuilder()
+                    .AddArgument("action", "openav")
+                    .AddText(LocalizationService.GetString("Notif_SigDownloadTitle"))
+                    .AddText(LocalizationService.GetString("Notif_SigDownloadBody"))
+                    .SetToastDuration(ToastDuration.Short)
+                    .Show();
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("NotificationService", "ShowSignatureDownloadStarted", ex);
+            }
+        }
+
+        /// <summary>MAJ auto désactivée et signatures manquantes/obsolètes — action « Mettre à jour ».</summary>
+        public void ShowSignatureUpdateNeeded()
+        {
             if (!ShouldShowToast()) return;
 
             try
             {
                 new ToastContentBuilder()
                     .AddArgument("action", "update")
-                    .AddText(LocalizationService.GetString("Notif_UpdateTitle"))
-                    .AddText(LocalizationService.Format("Notif_UpdateBody", version))
+                    .AddText(LocalizationService.GetString("Notif_SigNeededTitle"))
+                    .AddText(LocalizationService.GetString("Notif_SigNeededBody"))
                     .AddButton(new ToastButton()
                         .SetContent(LocalizationService.GetString("Notif_UpdateBtn"))
                         .AddArgument("action", "update"))
@@ -257,7 +284,7 @@ namespace optiSCAN.Services
             }
             catch (Exception ex)
             {
-                AppLogger.Error("NotificationService", "ShowUpdateAvailable", ex);
+                AppLogger.Error("NotificationService", "ShowSignatureUpdateNeeded", ex);
             }
         }
 

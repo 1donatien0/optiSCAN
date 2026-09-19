@@ -1,3 +1,4 @@
+using optiSCAN.Localization;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.Versioning;
@@ -49,6 +50,9 @@ namespace optiSCAN.Services
     /// Port C# de l'utilitaire OptiWin (GUI/OptiWin-GUI.ps1) : localisation de
     /// winget.exe, parsing en colonnes de « winget upgrade », lancement des
     /// mises à niveau avec sortie streamée vers le journal de l'UI.
+    /// Les mises à niveau demandent <c>--uninstall-previous</c> puis retirent
+    /// les versions encore listées pour le même identifiant, afin d'éviter
+    /// d'empiler v4, v5, v6… du même programme.
     /// </summary>
     [SupportedOSPlatform("windows")]
     public sealed class WingetUpdateService
@@ -252,6 +256,22 @@ namespace optiSCAN.Services
         private const int ErrorCancelled = 1223;      // ERROR_CANCELLED (UAC refusé)
         private const int MsiUserExit = 1602;         // ERROR_INSTALL_USEREXIT
 
+        // Ancien winget : --uninstall-previous n'existe pas encore.
+        private const int ErrInvalidClArguments = unchecked((int)0x8A150010);
+
+        /// <summary>
+        /// Identifiants conçus pour cohabiter (runtimes). On n'y force pas la
+        /// suppression des versions antérieures : d'autres programmes peuvent
+        /// encore en dépendre.
+        /// </summary>
+        private static readonly string[] SideBySideIdPrefixes =
+        {
+            "Microsoft.VCRedist.",
+            "Microsoft.DotNet.",
+            "Microsoft.NET.",
+            "Microsoft.DirectX",
+        };
+
         /// <summary>
         /// Traduit un code de sortie winget en statut métier. Tout code inconnu
         /// est classé <see cref="WingetUpgradeStatus.Failed"/> : le paquet reste
@@ -289,6 +309,166 @@ namespace optiSCAN.Services
             _ => WingetUpgradeStatus.Failed,
         };
 
+        internal static bool AllowsPreviousVersionRemoval(string packageId)
+        {
+            if (string.IsNullOrWhiteSpace(packageId))
+                return false;
+            foreach (var prefix in SideBySideIdPrefixes)
+            {
+                if (packageId.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                    return false;
+            }
+            return true;
+        }
+
+        internal static bool IsUnknownVersion(string? version)
+        {
+            if (string.IsNullOrWhiteSpace(version))
+                return true;
+            var v = version.Trim();
+            return v.Equals("Unknown", StringComparison.OrdinalIgnoreCase)
+                || v.Equals("Inconnu", StringComparison.OrdinalIgnoreCase);
+        }
+
+        internal static IReadOnlyList<string> BuildUpgradePackageArguments(
+            string packageId, bool uninstallPrevious)
+        {
+            var args = new List<string>
+            {
+                "upgrade", "--id", packageId, "--exact", "--include-unknown",
+            };
+            if (uninstallPrevious)
+                args.Add("--uninstall-previous");
+            args.Add("--accept-source-agreements");
+            args.Add("--accept-package-agreements");
+            return args;
+        }
+
+        internal static IReadOnlyList<string> BuildUpgradeAllArguments() =>
+        [
+            "upgrade", "--all", "--include-unknown",
+            "--uninstall-previous",
+            "--accept-source-agreements", "--accept-package-agreements",
+        ];
+
+        internal static IReadOnlyList<string> BuildListPackageArguments(string packageId) =>
+        [
+            "list", "--id", packageId, "--exact", "--accept-source-agreements",
+        ];
+
+        internal static IReadOnlyList<string> BuildUninstallVersionArguments(
+            string packageId, string version) =>
+        [
+            "uninstall", "--id", packageId, "--version", version, "--exact",
+            "--accept-source-agreements", "--disable-interactivity",
+        ];
+
+        /// <summary>
+        /// Versions encore installées à retirer, seulement si la version à
+        /// conserver est bien présente dans la liste. Sinon on ne touche à
+        /// rien : la nouvelle version n'est peut-être pas encore enregistrée.
+        /// </summary>
+        internal static IReadOnlyList<string> SelectLeftoverVersions(
+            IEnumerable<string> installedVersions,
+            string versionToKeep)
+        {
+            if (IsUnknownVersion(versionToKeep))
+                return Array.Empty<string>();
+
+            var keep = versionToKeep.Trim();
+            var installed = installedVersions
+                .Select(v => v?.Trim() ?? string.Empty)
+                .Where(v => v.Length > 0 && !IsUnknownVersion(v))
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+
+            if (!installed.Any(v => string.Equals(v, keep, StringComparison.OrdinalIgnoreCase)))
+                return Array.Empty<string>();
+
+            return installed
+                .Where(v => !string.Equals(v, keep, StringComparison.OrdinalIgnoreCase))
+                .ToList();
+        }
+
+        /// <summary>
+        /// Parse « winget list » (fr ou en) et renvoie les couples Id / Version.
+        /// </summary>
+        public static IReadOnlyList<(string Id, string Version)> ParseListOutput(string output)
+        {
+            if (string.IsNullOrWhiteSpace(output))
+                return Array.Empty<(string, string)>();
+
+            var lines = output
+                .Replace("\r", string.Empty)
+                .Split('\n');
+
+            int headerIndex = -1;
+            for (int i = 0; i < lines.Length; i++)
+            {
+                var l = lines[i];
+                if ((l.StartsWith("Nom ", StringComparison.Ordinal) ||
+                     l.StartsWith("Name ", StringComparison.Ordinal)) &&
+                    l.Contains(" Id", StringComparison.Ordinal))
+                {
+                    headerIndex = i;
+                    break;
+                }
+            }
+            if (headerIndex < 0)
+                return Array.Empty<(string, string)>();
+
+            var header = lines[headerIndex];
+            int idxId = header.IndexOf("Id", StringComparison.Ordinal);
+            int idxVersion = header.IndexOf("Version", StringComparison.Ordinal);
+            int idxAvailable = header.IndexOf("Disponible", StringComparison.Ordinal);
+            if (idxAvailable < 0)
+                idxAvailable = header.IndexOf("Available", StringComparison.Ordinal);
+            int idxSource = header.IndexOf("Source", StringComparison.Ordinal);
+
+            if (idxId <= 0 || idxVersion <= idxId)
+                return Array.Empty<(string, string)>();
+
+            int idxVersionEnd = int.MaxValue;
+            if (idxAvailable > idxVersion)
+                idxVersionEnd = idxAvailable;
+            else if (idxSource > idxVersion)
+                idxVersionEnd = idxSource;
+
+            var result = new List<(string Id, string Version)>();
+            for (int i = headerIndex + 2; i < lines.Length; i++)
+            {
+                var l = lines[i];
+                if (string.IsNullOrWhiteSpace(l))
+                    break;
+                if (LooksLikeTableFooter(l))
+                    break;
+                if (l.Length <= idxVersion)
+                    continue;
+
+                var id = SafeColumn(l, idxId, idxVersion);
+                if (string.IsNullOrEmpty(id))
+                    continue;
+
+                result.Add((id, SafeColumn(l, idxVersion, idxVersionEnd)));
+            }
+            return result;
+        }
+
+        private static bool LooksLikeTableFooter(string line)
+        {
+            var t = line.TrimStart();
+            if (t.Length == 0)
+                return true;
+            if (!char.IsDigit(t[0]))
+                return false;
+            return t.Contains("disponible", StringComparison.OrdinalIgnoreCase)
+                || t.Contains("available", StringComparison.OrdinalIgnoreCase)
+                || t.Contains("installé", StringComparison.OrdinalIgnoreCase)
+                || t.Contains("installed", StringComparison.OrdinalIgnoreCase)
+                || t.Contains("package", StringComparison.OrdinalIgnoreCase)
+                || t.Contains("paquet", StringComparison.OrdinalIgnoreCase);
+        }
+
         /// <summary>
         /// Met à niveau les paquets donnés (séquentiellement) en streamant la
         /// sortie vers <paramref name="onOutputLine"/>. Les installateurs
@@ -315,21 +495,27 @@ namespace optiSCAN.Services
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var exitCode = await RunWingetStreamingAsync(
+                var uninstallPrevious = AllowsPreviousVersionRemoval(package.Id);
+                var exitCode = await RunUpgradeAsync(
                     winget,
-                    new[]
-                    {
-                        "upgrade", "--id", package.Id, "--exact", "--include-unknown",
-                        "--accept-source-agreements", "--accept-package-agreements",
-                    },
+                    BuildUpgradePackageArguments(package.Id, uninstallPrevious),
                     onOutputLine,
                     cancellationToken).ConfigureAwait(false);
+
+                var status = ClassifyExitCode(exitCode);
+                if (status is WingetUpgradeStatus.Succeeded
+                    or WingetUpgradeStatus.AlreadyUpToDate
+                    or WingetUpgradeStatus.RebootRequired)
+                {
+                    await UninstallLeftoverVersionsAsync(
+                        winget, package, onOutputLine, cancellationToken).ConfigureAwait(false);
+                }
 
                 var result = new WingetUpgradeResult
                 {
                     Package = package,
                     ExitCode = exitCode,
-                    Status = ClassifyExitCode(exitCode),
+                    Status = status,
                 };
                 results.Add(result);
                 onPackageCompleted?.Report(result);
@@ -341,21 +527,148 @@ namespace optiSCAN.Services
         /// <summary>Met à niveau toutes les applications (« winget upgrade --all »).</summary>
         public async Task<int> UpgradeAllAsync(
             Action<string> onOutputLine,
+            IEnumerable<WingetPackageUpdate>? packagesToClean = null,
             CancellationToken cancellationToken = default)
         {
             var winget = ResolveWingetPath();
             if (winget == null)
                 return -1;
 
-            return await RunWingetStreamingAsync(
+            var exitCode = await RunUpgradeAsync(
                 winget,
-                new[]
-                {
-                    "upgrade", "--all", "--include-unknown",
-                    "--accept-source-agreements", "--accept-package-agreements",
-                },
+                BuildUpgradeAllArguments(),
                 onOutputLine,
                 cancellationToken).ConfigureAwait(false);
+
+            if (packagesToClean != null
+                && ClassifyExitCode(exitCode) is not WingetUpgradeStatus.CancelledByUser)
+            {
+                foreach (var package in packagesToClean)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    await UninstallLeftoverVersionsAsync(
+                        winget, package, onOutputLine, cancellationToken).ConfigureAwait(false);
+                }
+            }
+
+            return exitCode;
+        }
+
+        /// <summary>
+        /// Lance une mise à niveau. Si winget refuse <c>--uninstall-previous</c>
+        /// (version trop ancienne), on retente sans ce drapeau.
+        /// </summary>
+        private static async Task<int> RunUpgradeAsync(
+            string wingetPath,
+            IReadOnlyList<string> arguments,
+            Action<string> onOutputLine,
+            CancellationToken cancellationToken)
+        {
+            var exitCode = await RunWingetStreamingAsync(
+                wingetPath, arguments, onOutputLine, cancellationToken).ConfigureAwait(false);
+            if (exitCode != ErrInvalidClArguments || !arguments.Contains("--uninstall-previous"))
+                return exitCode;
+
+            AppLogger.Warn(
+                "WingetUpdateService",
+                "winget ignore --uninstall-previous ; nouvel essai sans ce drapeau");
+            var retry = arguments.Where(a => a != "--uninstall-previous").ToArray();
+            return await RunWingetStreamingAsync(
+                wingetPath, retry, onOutputLine, cancellationToken).ConfigureAwait(false);
+        }
+
+        private static async Task UninstallLeftoverVersionsAsync(
+            string wingetPath,
+            WingetPackageUpdate package,
+            Action<string> onOutputLine,
+            CancellationToken cancellationToken)
+        {
+            if (!AllowsPreviousVersionRemoval(package.Id))
+                return;
+            if (IsUnknownVersion(package.AvailableVersion))
+                return;
+
+            var installed = await GetInstalledVersionsAsync(
+                wingetPath, package.Id, cancellationToken).ConfigureAwait(false);
+            var leftovers = SelectLeftoverVersions(installed, package.AvailableVersion);
+            foreach (var version in leftovers)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                onOutputLine(LocalizationService.Format(
+                    "Upd_LogUninstallPrevious", package.Name, version));
+                var exitCode = await RunWingetStreamingAsync(
+                    wingetPath,
+                    BuildUninstallVersionArguments(package.Id, version),
+                    onOutputLine,
+                    cancellationToken).ConfigureAwait(false);
+                if (exitCode == 0)
+                {
+                    onOutputLine(LocalizationService.Format(
+                        "Upd_LogUninstallPreviousDone", package.Name, version));
+                }
+                else
+                {
+                    AppLogger.Warn(
+                        "WingetUpdateService",
+                        $"Désinstallation {package.Id} {version} : code {exitCode}");
+                    onOutputLine(LocalizationService.Format(
+                        "Upd_LogUninstallPreviousFailed",
+                        package.Name, version, $"0x{exitCode:X8}"));
+                }
+            }
+        }
+
+        private static async Task<IReadOnlyList<string>> GetInstalledVersionsAsync(
+            string wingetPath,
+            string packageId,
+            CancellationToken cancellationToken)
+        {
+            var stdout = await RunWingetCaptureAsync(
+                wingetPath,
+                BuildListPackageArguments(packageId),
+                cancellationToken).ConfigureAwait(false);
+            return ParseListOutput(stdout)
+                .Where(p => string.Equals(p.Id, packageId, StringComparison.OrdinalIgnoreCase))
+                .Select(p => p.Version)
+                .ToList();
+        }
+
+        private static async Task<string> RunWingetCaptureAsync(
+            string wingetPath,
+            IReadOnlyList<string> arguments,
+            CancellationToken cancellationToken)
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = wingetPath,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+                StandardOutputEncoding = Encoding.UTF8,
+                StandardErrorEncoding = Encoding.UTF8,
+            };
+            foreach (var a in arguments)
+                psi.ArgumentList.Add(a);
+
+            try
+            {
+                using var process = Process.Start(psi);
+                if (process == null)
+                    return string.Empty;
+
+                var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
+                var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
+                await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+                var stdout = await stdoutTask.ConfigureAwait(false);
+                _ = await stderrTask.ConfigureAwait(false);
+                return stdout;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("WingetUpdateService", "Lecture winget list", ex);
+                return string.Empty;
+            }
         }
 
         private static async Task<int> RunWingetStreamingAsync(

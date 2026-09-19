@@ -101,7 +101,10 @@ namespace optiSCAN.Services
                 "DatabaseMirror database.clamav.net",
                 "MaxAttempts 3",
                 "ConnectTimeout 30",
-                "ReceiveTimeout 30",
+                // 0 = pas de timeout de lecture (le process a déjà un plafond optiSCAN).
+                "ReceiveTimeout 0",
+                // clamd v9 charge déjà la base : retester en RAM fait souvent échouer la MAJ.
+                "TestDatabases no",
             });
 
             var content = string.Join("\n", lines) + "\n";

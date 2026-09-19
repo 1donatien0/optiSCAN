@@ -71,18 +71,12 @@ namespace optiSCAN.Services
                 // Exclusions Defender : opt-in via Options (pas d'Add-MpPreference silencieux ici).
             }
 
-            var step2 = MessageBox.Show(
+            MessageBox.Show(
                 owner,
                 LocalizationService.GetString("Onboarding_Step2"),
                 title,
-                MessageBoxButton.YesNo,
-                MessageBoxImage.Question);
-            if (step2 == MessageBoxResult.Yes)
-            {
-                container?.Navigation?.NavigateTo(Strings.OptiscanStrings.PanelIds.Antivirus);
-                container?.RequestFocusAntivirusSignaturesTab();
-                container?.TriggerSignatureUpdate();
-            }
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
 
             MessageBox.Show(
                 owner,

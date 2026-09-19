@@ -1,5 +1,6 @@
 using Microsoft.Win32;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
@@ -20,6 +21,13 @@ namespace optiSCAN.Services
     {
         // GUID du plan d'alimentation « Performances élevées » (constante Windows).
         private const string HighPerformancePlanGuid = "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c";
+
+        /// <summary>
+        /// Tâche unique (SYSTEM, au démarrage) qui vide l'historique Defender
+        /// puis se supprime. Les fichiers sont verrouillés tant que le service
+        /// tourne : le nettoyage n'a lieu qu'après reboot.
+        /// </summary>
+        public const string ClearDefenderHistoryTaskName = "optiSCAN-ClearDefenderHistory";
 
         // ── Helpers registre (HKCU uniquement — pas d'élévation requise) ─────
         private static void SetHkcuValue(string subKey, string name, int value)
@@ -265,6 +273,78 @@ namespace optiSCAN.Services
         public static IEnumerable<string> ElevatedDismCleanupCommands()
         {
             yield return "Dism.exe /Online /Cleanup-Image /StartComponentCleanup";
+        }
+
+        /// <summary>
+        /// Script cmd optiSCAN exécuté une fois au démarrage (compte SYSTEM) :
+        /// historique des détections, quarantaine Defender, base d'accès
+        /// contrôlé aux dossiers. Se supprime ensuite avec la tâche planifiée.
+        /// Chemins Windows standard — pas de script tiers embarqué.
+        /// </summary>
+        public static string BuildClearDefenderHistoryHelperBatch()
+        {
+            return string.Join(Environment.NewLine, new[]
+            {
+                "@echo off",
+                "rem optiSCAN — nettoyage ponctuel de l'historique Windows Defender",
+                @"set ""WD=%ProgramData%\Microsoft\Windows Defender""",
+                @"if exist ""%WD%\Scans\History\Service"" rd /s /q ""%WD%\Scans\History\Service""",
+                @"if exist ""%WD%\Quarantine"" rd /s /q ""%WD%\Quarantine""",
+                @"del /f /q ""%WD%\Scans\mpenginedb.db*"" >nul 2>&1",
+                $@"schtasks /delete /f /tn ""{ClearDefenderHistoryTaskName}"" >nul 2>&1",
+                @"del /f /q ""%~f0"" >nul 2>&1",
+            });
+        }
+
+        /// <summary>
+        /// Copie le script d'aide vers ProgramData\optiSCAN et enregistre une
+        /// tâche de démarrage unique (schtasks), même modèle que DISM / télémétrie.
+        /// </summary>
+        public static IEnumerable<string> ElevatedClearDefenderHistoryCommands()
+        {
+            var helperSource = Path.Combine(
+                Path.GetTempPath(),
+                $"optiscan_wdh_{Guid.NewGuid():N}.cmd");
+            File.WriteAllText(helperSource, BuildClearDefenderHistoryHelperBatch(), new UTF8Encoding(false));
+
+            var helperDest = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
+                "optiSCAN",
+                "clear-wd-history.cmd");
+            var destDir = Path.GetDirectoryName(helperDest) ?? @"C:\ProgramData\optiSCAN";
+
+            return new[]
+            {
+                $"if not exist \"{destDir}\" mkdir \"{destDir}\"",
+                $"copy /y \"{helperSource}\" \"{helperDest}\"",
+                $"del /f /q \"{helperSource}\"",
+                $"schtasks /Create /TN \"{ClearDefenderHistoryTaskName}\" /SC ONSTART /RU SYSTEM /RL HIGHEST /F /TR \"{helperDest}\"",
+            };
+        }
+
+        /// <summary>Demande un redémarrage Windows (<c>shutdown /r</c>).</summary>
+        public static bool RequestSystemRestart(int delaySeconds = 0)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = "shutdown.exe",
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                };
+                psi.ArgumentList.Add("/r");
+                psi.ArgumentList.Add("/t");
+                psi.ArgumentList.Add(Math.Max(0, delaySeconds).ToString(CultureInfo.InvariantCulture));
+                using var p = Process.Start(psi);
+                p?.WaitForExit(15000);
+                return p is { ExitCode: 0 };
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("SystemTweaksService", "shutdown /r", ex);
+                return false;
+            }
         }
 
         /// <summary>
