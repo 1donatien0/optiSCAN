@@ -1,6 +1,7 @@
 using Microsoft.Win32;
 using optiSCAN.Localization;
 using optiSCAN.Models;
+using System.Diagnostics;
 using System.Runtime.Versioning;
 
 namespace optiSCAN.Services
@@ -9,11 +10,17 @@ namespace optiSCAN.Services
     [SupportedOSPlatform("windows")]
     public sealed class SecurityPostureService : ISecurityPostureService
     {
-        /// <summary>Navigation in-app (Overview → panneau Antivirus).</summary>
-        public const string FixNavigateAntivirus = "optiscan://panel/antivirus";
+        /// <summary>Active la protection temps réel (sans ouvrir Options).</summary>
+        public const string FixEnableProtection = "optiscan://fix/protection";
 
-        /// <summary>Navigation in-app (Overview → Options).</summary>
-        public const string FixNavigateOptions = "optiscan://panel/options";
+        /// <summary>Active les mises à jour automatiques de signatures.</summary>
+        public const string FixEnableSigAuto = "optiscan://fix/sigauto";
+
+        /// <summary>Retire les partages utilisateur exposés (ceux qui font échouer le contrôle).</summary>
+        public const string FixRemoveExposedShares = "optiscan://fix/shares";
+
+        /// <summary>Lance une analyse rapide.</summary>
+        public const string FixStartQuickScan = "optiscan://fix/scan";
 
         /// <summary>Ouvre les paramètres UAC (primaire) ; repli Panneau de configuration.</summary>
         public const string FixUac =
@@ -108,22 +115,7 @@ namespace optiSCAN.Services
             bool risky = false;
             try
             {
-                using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\lanmanserver\Shares");
-                if (key != null)
-                {
-                    foreach (var name in key.GetValueNames())
-                    {
-                        if (name is ("IPC$" or "ADMIN$" or "print$")
-                            || name.EndsWith('$'))
-                            continue;
-
-                        if (ShareRegistryValueIndicatesUserPath(key.GetValue(name)))
-                        {
-                            risky = true;
-                            break;
-                        }
-                    }
-                }
+                risky = ListExposedShareNames().Count > 0;
             }
             catch (Exception ex) { AppLogger.Warn("SecurityPosture", "Shares", ex); }
 
@@ -133,8 +125,8 @@ namespace optiSCAN.Services
                 Title = LocalizationService.GetString("Posture_Shares"),
                 Passed = !risky,
                 Weight = 10,
-                // ms-settings:advancedsharing (Win 11) ; repli control.exe si échoue (séparateur |).
-                FixUri = "ms-settings:advancedsharing|control.exe /name Microsoft.NetworkAndSharingCenter",
+                // Suppression réelle des partages exposés (pas une page Paramètres).
+                FixUri = FixRemoveExposedShares,
             };
         }
 
@@ -153,7 +145,7 @@ namespace optiSCAN.Services
                 Title = LocalizationService.GetString("Posture_Optiscan"),
                 Passed = level == ProtectionBadgeLevel.Active,
                 Weight = 25,
-                FixUri = FixNavigateOptions,
+                FixUri = FixEnableProtection,
             };
         }
 
@@ -166,7 +158,7 @@ namespace optiSCAN.Services
                 Title = LocalizationService.GetString("Posture_RecentScan"),
                 Passed = ok,
                 Weight = 15,
-                FixUri = FixNavigateAntivirus,
+                FixUri = FixStartQuickScan,
             };
         }
 
@@ -177,8 +169,81 @@ namespace optiSCAN.Services
                 Title = LocalizationService.GetString("Posture_SigAuto"),
                 Passed = enabled,
                 Weight = 10,
-                FixUri = FixNavigateOptions,
+                FixUri = FixEnableSigAuto,
             };
+
+        /// <summary>Noms des partages visibles (hors partages administratifs en $).</summary>
+        internal static IReadOnlyList<string> ListExposedShareNames()
+        {
+            var names = new List<string>();
+            using var key = Registry.LocalMachine.OpenSubKey(@"SYSTEM\CurrentControlSet\Services\lanmanserver\Shares");
+            if (key == null)
+                return names;
+
+            foreach (var name in key.GetValueNames())
+            {
+                if (name is ("IPC$" or "ADMIN$" or "print$") || name.EndsWith('$'))
+                    continue;
+                if (!IsSafeShareName(name))
+                    continue;
+                if (ShareRegistryValueIndicatesUserPath(key.GetValue(name)))
+                    names.Add(name);
+            }
+
+            return names;
+        }
+
+        /// <summary>
+        /// Supprime les partages exposés que l'utilisateur a confirmés (intersection avec l'état courant).
+        /// Demande l'UAC si l'app n'est pas élevée. Bloquant : à appeler hors thread UI.
+        /// </summary>
+        /// <returns><c>true</c> si tout a été supprimé ; <c>false</c> si échec ou UAC refusée.</returns>
+        internal static bool TryRemoveExposedShares(IReadOnlyCollection<string> confirmedNames)
+        {
+            ArgumentNullException.ThrowIfNull(confirmedNames);
+            var current = ListExposedShareNames();
+            var names = current
+                .Where(n => confirmedNames.Contains(n, StringComparer.OrdinalIgnoreCase))
+                .ToList();
+            if (names.Count == 0)
+                return true;
+
+            var script = string.Join(" & ", names.Select(n => $"net share \"{n}\" /delete"));
+            var psi = new ProcessStartInfo
+            {
+                FileName = "cmd.exe",
+                Arguments = "/c " + script,
+                UseShellExecute = true,
+                WindowStyle = ProcessWindowStyle.Hidden,
+            };
+            if (!ElevationHelper.IsRunningElevated())
+                psi.Verb = "runas";
+
+            try
+            {
+                using var proc = Process.Start(psi);
+                if (proc == null)
+                    return false;
+                if (!proc.WaitForExit(20_000))
+                {
+                    AppLogger.Warn("SecurityPosture", "Suppression des partages : délai dépassé (20 s)");
+                    return false;
+                }
+                if (proc.ExitCode != 0)
+                    AppLogger.Warn("SecurityPosture", $"Suppression des partages : code retour {proc.ExitCode}");
+                return proc.ExitCode == 0;
+            }
+            catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
+            {
+                // ERROR_CANCELLED : l'utilisateur a refusé l'invite UAC.
+                AppLogger.Info("SecurityPosture", "Suppression des partages annulée (UAC refusée)");
+                return false;
+            }
+        }
+
+        private static bool IsSafeShareName(string name) =>
+            name.Length is > 0 and <= 80
+            && name.All(c => char.IsLetterOrDigit(c) || c is ' ' or '-' or '_' or '.');
 
         /// <summary>Les entrées lanmanserver\Shares sont REG_MULTI_SZ (string[]).</summary>
         internal static bool ShareRegistryValueIndicatesUserPath(object? value)

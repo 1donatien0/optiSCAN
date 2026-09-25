@@ -516,6 +516,12 @@
   <data name="Posture_RecentScan" xml:space="preserve"><value>Analyse récente (&lt; 7 jours)</value></data>
   <data name="Posture_SigAuto" xml:space="preserve"><value>MAJ signatures automatiques</value></data>
   <data name="Posture_Fix" xml:space="preserve"><value>Corriger</value></data>
+  <data name="Posture_SharesConfirmTitle" xml:space="preserve"><value>Supprimer les partages réseau ?</value></data>
+  <data name="Posture_SharesConfirm" xml:space="preserve"><value>Les partages suivants exposent des dossiers utilisateur sur le réseau :
+
+{0}
+
+Les supprimer ? Les fichiers ne sont pas effacés, seul le partage est retiré. Les autres appareils n'y auront plus accès.</value></data>
   <data name="Clamd_NotReady" xml:space="preserve"><value>Le service clamd n'est pas disponible.</value></data>
   <data name="Opt_UseClamd" xml:space="preserve"><value>Moteur clamd (rapide)</value></data>
   <data name="Opt_UseClamdSub" xml:space="preserve"><value>Daemon ClamAV en mémoire ; repli sur clamscan si indisponible.</value></data>
@@ -549,7 +555,7 @@
   <data name="Rec_ActThreats" xml:space="preserve"><value>30 derniers jours : {0} menace(s) signalée(s) — consultez Historique / onglet Analyse.</value></data>
   <data name="Rec_ActOk" xml:space="preserve"><value>Historique d'analyses disponible — ouvrez l'onglet Historique pour le détail.</value></data>
   <data name="Rec_ClamMissing" xml:space="preserve"><value>ClamAV non installé — les analyses antivirus sont désactivées. Installez ClamAV via l'onglet Antivirus.</value></data>
-  <data name="Rec_SigAutoOff" xml:space="preserve"><value>Mise à jour automatique des signatures désactivée — vos définitions peuvent devenir obsolètes. Activez-la dans Options.</value></data>
+  <data name="Rec_SigAutoOff" xml:space="preserve"><value>Mise à jour automatique des signatures désactivée — vos définitions peuvent devenir obsolètes.</value></data>
   <data name="Rec_SigStale" xml:space="preserve"><value>Signatures ClamAV datant de plus de {0} jours — lancez une mise à jour (Antivirus ou Options).</value></data>
   <data name="Rec_SigNeverUpdated" xml:space="preserve"><value>Signatures ClamAV jamais mises à jour — lancez une première mise à jour via l'onglet Antivirus.</value></data>
   <data name="Rec_SigStaleAction" xml:space="preserve"><value>Mettre à jour maintenant →</value></data>

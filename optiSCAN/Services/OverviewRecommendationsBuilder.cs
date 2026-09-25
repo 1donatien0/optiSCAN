@@ -14,6 +14,8 @@ namespace optiSCAN.Services
             public string HygieneLine { get; init; } = string.Empty;
             public int HygieneSeverity { get; init; }
             public bool ShowSigUpdateLink { get; init; }
+            /// <summary>Action optiscan://fix/… affichée comme « Corriger ».</summary>
+            public string? FixAction { get; init; }
         }
 
         public sealed class Context
@@ -39,6 +41,7 @@ namespace optiSCAN.Services
                     ctx.LastCleanAt!.Value.ToString("d", LocalizationService.CurrentCulture));
             int hypSev = suggestClean ? 1 : 0;
             bool showLink = false;
+            string? fixAction = null;
 
             if (!ctx.ClamInstalled)
             {
@@ -61,6 +64,7 @@ namespace optiSCAN.Services
             {
                 hypLine = LocalizationService.GetString("Rec_SigAutoOff");
                 hypSev = 3;
+                fixAction = "sigauto";
             }
 
             return new Result
@@ -68,6 +72,7 @@ namespace optiSCAN.Services
                 HygieneLine = hypLine,
                 HygieneSeverity = hypSev,
                 ShowSigUpdateLink = showLink,
+                FixAction = fixAction,
             };
         }
     }

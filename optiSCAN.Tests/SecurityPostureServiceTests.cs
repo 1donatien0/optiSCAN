@@ -141,16 +141,25 @@ public sealed class SecurityPostureServiceTests
         Assert.Contains("WF.msc", check.FixUri, StringComparison.OrdinalIgnoreCase);
     }
 
-    [Fact]
-    public void Shares_check_FixUri_contains_advancedsharing_as_primary()
+    [Theory]
+    [InlineData("shares", SecurityPostureService.FixRemoveExposedShares)]
+    [InlineData("optiscan", SecurityPostureService.FixEnableProtection)]
+    [InlineData("scan", SecurityPostureService.FixStartQuickScan)]
+    [InlineData("sigauto", SecurityPostureService.FixEnableSigAuto)]
+    public void InApp_checks_use_optiscan_fix_actions(string checkId, string expectedFixUri)
     {
         var svc = new SecurityPostureService(new FakeWindowsUpdateProbe(DateTime.UtcNow));
-        var check = svc.Evaluate(MakeContext()).Checks.First(c => c.Id == "shares");
+        var check = svc.Evaluate(MakeContext()).Checks.First(c => c.Id == checkId);
 
-        Assert.Contains("advancedsharing", check.FixUri, StringComparison.OrdinalIgnoreCase);
-        // Doit aussi contenir le repli control.exe après le séparateur |
-        Assert.Contains("control.exe", check.FixUri, StringComparison.OrdinalIgnoreCase);
-        Assert.Contains("|", check.FixUri);
+        Assert.Equal(expectedFixUri, check.FixUri);
+        Assert.StartsWith("optiscan://fix/", check.FixUri, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void TryRemoveExposedShares_with_empty_confirmation_removes_nothing()
+    {
+        // Aucun nom confirmé → aucun appel à net share, succès immédiat.
+        Assert.True(SecurityPostureService.TryRemoveExposedShares(Array.Empty<string>()));
     }
 
     [Fact]

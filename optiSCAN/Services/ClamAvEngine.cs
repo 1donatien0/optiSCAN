@@ -44,6 +44,7 @@ namespace optiSCAN.Services
 
         // ── Vérification ─────────────────────────────────────────────────────────
 
+        private readonly object _installProbeGate = new();
         private bool? _cachedInstalled;
         private DateTime _cachedInstalledAtUtc = DateTime.MinValue;
         private static readonly TimeSpan InstallProbeCacheTtl = TimeSpan.FromSeconds(60);
@@ -54,14 +55,17 @@ namespace optiSCAN.Services
         /// </summary>
         public bool IsClamAvInstalled()
         {
-            if (_cachedInstalled.HasValue
-                && (DateTime.UtcNow - _cachedInstalledAtUtc) < InstallProbeCacheTtl)
-                return _cachedInstalled.Value;
+            lock (_installProbeGate)
+            {
+                if (_cachedInstalled.HasValue
+                    && (DateTime.UtcNow - _cachedInstalledAtUtc) < InstallProbeCacheTtl)
+                    return _cachedInstalled.Value;
 
-            var result = ProbeClamAvInstalled();
-            _cachedInstalled = result;
-            _cachedInstalledAtUtc = DateTime.UtcNow;
-            return result;
+                var result = ProbeClamAvInstalled();
+                _cachedInstalled = result;
+                _cachedInstalledAtUtc = DateTime.UtcNow;
+                return result;
+            }
         }
 
         private bool ProbeClamAvInstalled()

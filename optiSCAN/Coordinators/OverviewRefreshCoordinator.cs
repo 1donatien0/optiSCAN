@@ -17,7 +17,8 @@ public sealed record OverviewRefreshContext(
     bool RealTimeProtectionEnabled,
     bool RealTimeProtectionRunning,
     bool SignatureAutoUpdateEnabled,
-    ISecurityPostureService SecurityPosture);
+    ISecurityPostureService SecurityPosture,
+    PlatformProtectionStatusReport? PlatformStatus = null);
 
 /// <summary>Données pour rafraîchir les libellés de versions ClamAV / YARA.</summary>
 public sealed record SignaturesRefreshContext(
@@ -45,7 +46,8 @@ public static class OverviewRefreshCoordinator
         ctx.Panel.UpdateRecommendations(
             rec.HygieneLine,
             rec.HygieneSeverity,
-            rec.ShowSigUpdateLink);
+            rec.ShowSigUpdateLink,
+            rec.FixAction);
 
         var lastScan = ctx.ScanHistory.Count > 0 ? ctx.ScanHistory[0].StartedAt : (DateTime?)null;
         var posture = ctx.SecurityPosture.Evaluate(new SecurityPostureContext
@@ -59,7 +61,8 @@ public static class OverviewRefreshCoordinator
             SignatureAutoUpdateEnabled = ctx.SignatureAutoUpdateEnabled,
         });
         ctx.Panel.UpdateSecurityPosture(posture);
-        ctx.Panel.UpdatePlatformProtectionStatus(PlatformProtectionStatusService.Evaluate());
+        // PlatformStatus est calculé en arrière-plan (fltmc + ping pipe) ; repli synchrone si absent.
+        ctx.Panel.UpdatePlatformProtectionStatus(ctx.PlatformStatus ?? PlatformProtectionStatusService.Evaluate());
     }
 
     public static async Task RefreshSignaturesAsync(SignaturesRefreshContext ctx, bool forceRefresh = false)
@@ -87,20 +90,33 @@ public static class OverviewRefreshCoordinator
 /// <summary>Construit <see cref="OverviewRefreshContext"/> depuis le container applicatif.</summary>
 public static class OverviewRefreshContextBuilder
 {
-    public static OverviewRefreshContext FromContainer(IOverviewPanel panel, ServiceContainer container)
+    public static OverviewRefreshContext FromContainer(IOverviewPanel panel, ServiceContainer container) =>
+        FromContainer(panel, container, scanHistory: null, cleanHistory: null, includePlatformStatus: false);
+
+    /// <summary>
+    /// Variante appelable hors thread UI : les historiques (listes non thread-safe) doivent être
+    /// capturés au préalable sur le thread UI ; le statut plateforme (lent) est évalué ici.
+    /// </summary>
+    public static OverviewRefreshContext FromContainer(
+        IOverviewPanel panel,
+        ServiceContainer container,
+        IReadOnlyList<ScanSession>? scanHistory,
+        IReadOnlyList<CleanSession>? cleanHistory,
+        bool includePlatformStatus)
     {
         return new OverviewRefreshContext(
             panel,
             ClamInstalled: container.ClamAv.IsClamAvInstalled(),
             YaraRulesCount: container.Yara.RulesCount,
             YaraAvailable: container.Yara.IsAvailable,
-            CleanHistory: container.Logger.GetCleanHistory(),
-            ScanHistory: container.Logger.GetHistory(),
+            CleanHistory: cleanHistory ?? container.Logger.GetCleanHistory(),
+            ScanHistory: scanHistory ?? container.Logger.GetHistory(),
             LastFreshclamUpdate: container.FreshclamUpdater.GetLastSignatureUpdateTime(),
             RealTimeProtectionEnabled: container.ExclusionSettingsAccessor.Current.RealTimeEnabled,
             RealTimeProtectionRunning: container.RealTimeProtection.IsEnabled
                 || PlatformProtectionBootstrap.IsRemoteProtectionActive(),
             SignatureAutoUpdateEnabled: container.UserPreferencesAccessor.Current.SignatureAutoUpdateEnabled,
-            SecurityPosture: container.SecurityPosture);
+            SecurityPosture: container.SecurityPosture,
+            PlatformStatus: includePlatformStatus ? PlatformProtectionStatusService.Evaluate() : null);
     }
 }

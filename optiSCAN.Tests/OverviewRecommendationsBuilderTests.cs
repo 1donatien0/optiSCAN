@@ -129,6 +129,21 @@ public sealed class OverviewRecommendationsBuilderTests : IDisposable
 
         Assert.Equal(3, r.HygieneSeverity); // conseil bleu
         Assert.False(r.ShowSigUpdateLink);
+        Assert.Equal("sigauto", r.FixAction);
+    }
+
+    [Fact]
+    public void FixAction_is_null_when_signatures_stale()
+    {
+        UserPreferences.Current.SignatureStaleThresholdDays = 7;
+        UserPreferences.Current.SignatureAutoUpdateEnabled = false;
+
+        var r = OverviewRecommendationsBuilder.Build(BaseContext(
+            clam: true, lastFreshclam: DateTime.Now.AddDays(-30)));
+
+        // La MAJ manuelle prime : lien « Mettre à jour », pas « Corriger ».
+        Assert.True(r.ShowSigUpdateLink);
+        Assert.Null(r.FixAction);
     }
 
     // ── Hygiène : priorité ClamAV > SigNeverUpdated ──────────────────────────

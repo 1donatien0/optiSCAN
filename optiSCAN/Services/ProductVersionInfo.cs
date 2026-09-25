@@ -7,7 +7,7 @@ namespace optiSCAN.Services
     /// Convention alignée sur l’historique produit (README) :
     /// <list type="bullet">
     /// <item><description><b>vM.m</b> — nom de release (ex. v9.0, comme les sections v3.0 / v4.0).</description></item>
-    /// <item><description><b>M.m.p</b> — identifiant de build / assembly / installateur (ex. 9.0.3).</description></item>
+    /// <item><description><b>M.m.p</b> — identifiant de build / assembly / installateur (ex. 9.0.4).</description></item>
     /// </list>
     /// </summary>
     internal static class ProductVersionInfo

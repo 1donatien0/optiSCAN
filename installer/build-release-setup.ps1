@@ -92,9 +92,9 @@ $outDir = Join-Path $PSScriptRoot 'output'
 New-Item -ItemType Directory -Force -Path $outDir | Out-Null
 
 $propsPath = Join-Path $root 'Directory.Build.props'
-[xml]$propsXml = Get-Content -LiteralPath $propsPath
-$appVersion = ($propsXml.Project.PropertyGroup.Version | Select-Object -First 1).'#text'
-if ([string]::IsNullOrWhiteSpace($appVersion)) { $appVersion = '9.0.3' }
+$versionMatch = Select-String -LiteralPath $propsPath -Pattern '<Version>([^<]+)</Version>' | Select-Object -First 1
+$appVersion = if ($versionMatch) { $versionMatch.Matches[0].Groups[1].Value.Trim() } else { '' }
+if ([string]::IsNullOrWhiteSpace($appVersion)) { throw "Version introuvable dans $propsPath" }
 $parts = $appVersion.Split('.')
 $appRelease = if ($parts.Length -ge 2) { "v$($parts[0]).$($parts[1])" } else { "v$appVersion" }
 

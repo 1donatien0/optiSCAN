@@ -64,8 +64,11 @@ MinVersion=10.0.17763
 ; .NET copiés seraient inexécutables sur un Windows 32 bits).
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-CloseApplications=yes
-CloseApplicationsFilter=*.exe;*.dll
+; Même AppId : une 9.0.x déjà installée est mise à jour sur place (pas de désinstallation).
+UsePreviousAppDir=yes
+AppMutex=Global\optiSCAN_UniqueInstance
+CloseApplications=force
+CloseApplicationsFilter=optiSCAN.exe,optiSCAN.Service.exe
 RestartApplications=no
 VersionInfoVersion={#AppVersion}
 VersionInfoCompany={#AppPublisher}
@@ -542,6 +545,13 @@ begin
 
   if CurStep = ssInstall then
   begin
+    // Le service et l'exe verrouillent {app}. Sans cet arrêt, Windows refuse
+    // le remplacement et l'utilisateur doit désinstaller à la main.
+    Exec('taskkill.exe', '/F /IM optiSCAN.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec('taskkill.exe', '/F /IM optiSCAN.Service.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec('sc.exe', 'stop optiSCANProtectionV9', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec('sc.exe', 'stop optiSCANProtectionV8', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+
     ConfPath := ExpandConstant('{localappdata}\optiSCAN\clamav\freshclam.conf');
     if FileExists(ConfPath) then
     begin
