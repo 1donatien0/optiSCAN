@@ -516,6 +516,12 @@
   <data name="Posture_RecentScan" xml:space="preserve"><value>Recent scan (&lt; 7 days)</value></data>
   <data name="Posture_SigAuto" xml:space="preserve"><value>Automatic signature updates</value></data>
   <data name="Posture_Fix" xml:space="preserve"><value>Fix</value></data>
+  <data name="Posture_SharesConfirmTitle" xml:space="preserve"><value>Remove network shares?</value></data>
+  <data name="Posture_SharesConfirm" xml:space="preserve"><value>The following shares expose user folders on the network:
+
+{0}
+
+Remove them? Files are not deleted, only the share is removed. Other devices will no longer be able to access them.</value></data>
   <data name="Clamd_NotReady" xml:space="preserve"><value>The clamd service is not available.</value></data>
   <data name="Opt_UseClamd" xml:space="preserve"><value>clamd engine (fast)</value></data>
   <data name="Opt_UseClamdSub" xml:space="preserve"><value>In-memory ClamAV daemon; falls back to clamscan if unavailable.</value></data>
@@ -549,7 +555,7 @@
   <data name="Rec_ActThreats" xml:space="preserve"><value>Last 30 days: {0} threat(s) reported — see History / Scan tab.</value></data>
   <data name="Rec_ActOk" xml:space="preserve"><value>Scan history available — open the History tab for details.</value></data>
   <data name="Rec_ClamMissing" xml:space="preserve"><value>ClamAV not installed — antivirus scans are disabled. Install ClamAV via the Antivirus tab.</value></data>
-  <data name="Rec_SigAutoOff" xml:space="preserve"><value>Automatic signature updates disabled — your definitions may become outdated. Enable in Options.</value></data>
+  <data name="Rec_SigAutoOff" xml:space="preserve"><value>Automatic signature updates disabled — your definitions may become outdated.</value></data>
   <data name="Rec_SigStale" xml:space="preserve"><value>ClamAV signatures older than {0} days — run an update (Antivirus or Options).</value></data>
   <data name="Rec_SigNeverUpdated" xml:space="preserve"><value>ClamAV signatures have never been updated — run a first update via the Antivirus tab.</value></data>
   <data name="Rec_SigStaleAction" xml:space="preserve"><value>Update now →</value></data>

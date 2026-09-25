@@ -16,6 +16,7 @@ public sealed class UiEventBus : IUiEventBus
     private EventHandler<ScanSession>? _reviewHistorySessionHandlers;
     private EventHandler? _openQuarantineTabHandlers;
     private EventHandler? _protectionStateRefreshHandlers;
+    private EventHandler? _quickScanHandlers;
 
     public event EventHandler? RequestSignatureUpdate
     {
@@ -89,6 +90,15 @@ public sealed class UiEventBus : IUiEventBus
     public void RequestProtectionStateRefresh() =>
         _protectionStateRefreshHandlers?.Invoke(this, EventArgs.Empty);
 
+    public event EventHandler? QuickScanRequested
+    {
+        add => _quickScanHandlers += value;
+        remove => _quickScanHandlers -= value;
+    }
+
+    public void RequestQuickScan() =>
+        _quickScanHandlers?.Invoke(this, EventArgs.Empty);
+
     /// <summary>Libère les abonnements au shutdown applicatif.</summary>
     internal void ClearHandlers()
     {
@@ -100,5 +110,6 @@ public sealed class UiEventBus : IUiEventBus
         _reviewHistorySessionHandlers = null;
         _openQuarantineTabHandlers = null;
         _protectionStateRefreshHandlers = null;
+        _quickScanHandlers = null;
     }
 }

@@ -32,4 +32,7 @@ public interface IUiEventBus
 
     event EventHandler? ProtectionStateRefreshRequested;
     void RequestProtectionStateRefresh();
+
+    event EventHandler? QuickScanRequested;
+    void RequestQuickScan();
 }

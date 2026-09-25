@@ -13,7 +13,6 @@ public static class HistoryRefreshCoordinator
         public HistoryControl? HistoryPanel { get; init; }
         public OverviewControl? OverviewPanel { get; init; }
         public AntivirusView? AntivirusPanel { get; init; }
-        public required Action RefreshOverviewProtection { get; init; }
     }
 
     public static void Refresh(Host host)
@@ -22,7 +21,6 @@ public static class HistoryRefreshCoordinator
         host.HistoryPanel?.RefreshTimeline();
         ApplyLastScanSummary(host, sessions);
         host.OverviewPanel?.UpdateProtectionStatistics(sessions);
-        host.RefreshOverviewProtection();
     }
 
     private static void ApplyLastScanSummary(Host host, IReadOnlyList<ScanSession> sessions)

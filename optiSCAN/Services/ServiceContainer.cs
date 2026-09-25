@@ -237,6 +237,14 @@ namespace optiSCAN.Services
 
         public void RequestProtectionStateRefresh() => _uiEventBus.RequestProtectionStateRefresh();
 
+        public event EventHandler? QuickScanRequested
+        {
+            add => _uiEventBus.QuickScanRequested += value;
+            remove => _uiEventBus.QuickScanRequested -= value;
+        }
+
+        public void RequestQuickScan() => _uiEventBus.RequestQuickScan();
+
         /// <summary>Restaure RTP et MAJ auto selon les préférences persistées (appel au démarrage UI).</summary>
         public void ApplyPreferencesOnStartup()
         {
