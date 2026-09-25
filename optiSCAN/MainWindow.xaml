@@ -272,25 +272,6 @@
                             <GradientStop Color="#00000000" Offset="1"/>
                         </RadialGradientBrush>
                     </Ellipse.Fill>
-                    <Ellipse.RenderTransform>
-                        <TranslateTransform x:Name="blob1Transform" X="0" Y="0"/>
-                    </Ellipse.RenderTransform>
-                    <Ellipse.Triggers>
-                        <EventTrigger RoutedEvent="Loaded">
-                            <BeginStoryboard>
-                                <Storyboard RepeatBehavior="Forever" AutoReverse="True">
-                                    <DoubleAnimation Storyboard.TargetName="blob1Transform"
-                                                     Storyboard.TargetProperty="X"
-                                                     From="0" To="180" Duration="0:0:14"
-                                                     EasingFunction="{x:Null}"/>
-                                    <DoubleAnimation Storyboard.TargetName="blob1Transform"
-                                                     Storyboard.TargetProperty="Y"
-                                                     From="0" To="120" Duration="0:0:18"
-                                                     EasingFunction="{x:Null}"/>
-                                </Storyboard>
-                            </BeginStoryboard>
-                        </EventTrigger>
-                    </Ellipse.Triggers>
                 </Ellipse>
                 <!-- Tache bleue (bas-droite) -->
                 <Ellipse x:Name="meshBlob2"
@@ -303,25 +284,6 @@
                             <GradientStop Color="#00000000" Offset="1"/>
                         </RadialGradientBrush>
                     </Ellipse.Fill>
-                    <Ellipse.RenderTransform>
-                        <TranslateTransform x:Name="blob2Transform" X="0" Y="0"/>
-                    </Ellipse.RenderTransform>
-                    <Ellipse.Triggers>
-                        <EventTrigger RoutedEvent="Loaded">
-                            <BeginStoryboard>
-                                <Storyboard RepeatBehavior="Forever" AutoReverse="True">
-                                    <DoubleAnimation Storyboard.TargetName="blob2Transform"
-                                                     Storyboard.TargetProperty="X"
-                                                     From="0" To="-140" Duration="0:0:20"
-                                                     EasingFunction="{x:Null}"/>
-                                    <DoubleAnimation Storyboard.TargetName="blob2Transform"
-                                                     Storyboard.TargetProperty="Y"
-                                                     From="0" To="-90" Duration="0:0:15"
-                                                     EasingFunction="{x:Null}"/>
-                                </Storyboard>
-                            </BeginStoryboard>
-                        </EventTrigger>
-                    </Ellipse.Triggers>
                 </Ellipse>
             </Canvas>
 

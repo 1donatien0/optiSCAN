@@ -31,8 +31,7 @@ namespace optiSCAN.Services
     /// </summary>
     public class NavigationService : INavigationService
     {
-        private static readonly TimeSpan PanelFadeInDuration  = TimeSpan.FromMilliseconds(180);
-        private static readonly TimeSpan PanelFadeOutDuration = TimeSpan.FromMilliseconds(100);
+        private static readonly TimeSpan PanelFadeInDuration = TimeSpan.FromMilliseconds(70);
 
         private readonly Dictionary<string, UIElement> _panels = new(StringComparer.OrdinalIgnoreCase);
 
@@ -68,26 +67,9 @@ namespace optiSCAN.Services
             foreach (var panel in _panels.Values)
             {
                 if (panel == target) continue;
-                if (panel.Visibility != Visibility.Visible)
-                {
-                    panel.BeginAnimation(UIElement.OpacityProperty, null);
-                    panel.Opacity = 0;
-                    panel.Visibility = Visibility.Collapsed;
-                    continue;
-                }
-                // Fade sortant 1→0 puis Collapsed
-                var fadeOut = new DoubleAnimation(1, 0, PanelFadeOutDuration)
-                {
-                    EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseIn }
-                };
-                var capturedPanel = panel;
-                fadeOut.Completed += (_, _) =>
-                {
-                    capturedPanel.BeginAnimation(UIElement.OpacityProperty, null);
-                    capturedPanel.Opacity = 0;
-                    capturedPanel.Visibility = Visibility.Collapsed;
-                };
-                panel.BeginAnimation(UIElement.OpacityProperty, fadeOut);
+                panel.BeginAnimation(UIElement.OpacityProperty, null);
+                panel.Opacity = 0;
+                panel.Visibility = Visibility.Collapsed;
             }
 
             target.Visibility = Visibility.Visible;

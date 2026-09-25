@@ -12,6 +12,12 @@ public static class PlatformProtectionBootstrap
     public const string ServiceName = "optiSCANProtectionV9";
     public const string ServiceDisplayName = "optiSCAN Protection v9";
 
+    private static readonly object ReachabilityGate = new();
+    private static readonly TimeSpan ReachabilityTimeout = TimeSpan.FromMilliseconds(400);
+    private static readonly TimeSpan ReachabilityCacheTtl = TimeSpan.FromSeconds(5);
+    private static bool? _reachability;
+    private static DateTime _reachabilityAtUtc;
+
     private static IUserPreferencesAccessor _prefs = new DefaultUserPreferencesAccessor();
 
     public static void Initialize(IUserPreferencesAccessor? preferences = null)
@@ -23,20 +29,60 @@ public static class PlatformProtectionBootstrap
     public static bool IsPlatformModeEnabled() =>
         _prefs.Current.UsePlatformProtectionService;
 
-    public static bool IsRemoteProtectionActive()
+    public static bool IsRemoteProtectionActive() => IsRemoteProtectionActive(useCache: true);
+
+    /// <summary>
+    /// Ping court (400 ms) du service. Le cache évite de relancer le pipe à chaque clic.
+    /// La boucle de démarrage passe <paramref name="useCache"/> à false.
+    /// </summary>
+    public static bool IsRemoteProtectionActive(bool useCache)
     {
         if (!IsPlatformModeEnabled())
             return false;
 
+        if (useCache && TryReadReachabilityCache(out var cached))
+            return cached;
+
+        bool active;
         try
         {
-            using var client = new Platform.ProtectionPipeClient();
-            return client.IsServiceReachable();
+            using var client = new Platform.ProtectionPipeClient(timeout: ReachabilityTimeout);
+            active = client.IsServiceReachable();
         }
         catch
         {
-            return false;
+            active = false;
         }
+
+        lock (ReachabilityGate)
+        {
+            _reachability = active;
+            _reachabilityAtUtc = DateTime.UtcNow;
+        }
+
+        return active;
+    }
+
+    /// <summary>Force le prochain <see cref="IsRemoteProtectionActive()"/> à re-pinger le service.</summary>
+    public static void InvalidateReachabilityCache()
+    {
+        lock (ReachabilityGate)
+            _reachability = null;
+    }
+
+    private static bool TryReadReachabilityCache(out bool active)
+    {
+        lock (ReachabilityGate)
+        {
+            if (_reachability.HasValue && (DateTime.UtcNow - _reachabilityAtUtc) < ReachabilityCacheTtl)
+            {
+                active = _reachability.Value;
+                return true;
+            }
+        }
+
+        active = false;
+        return false;
     }
 
     public static void EnsurePlatformProtectionRunning()
@@ -91,12 +137,12 @@ public static class PlatformProtectionBootstrap
             RunSc($"start {ServiceName}");
             for (var i = 0; i < 10; i++)
             {
-                if (IsRemoteProtectionActive())
+                if (IsRemoteProtectionActive(useCache: false))
                     return true;
                 Thread.Sleep(500);
             }
 
-            return IsRemoteProtectionActive();
+            return IsRemoteProtectionActive(useCache: false);
         }
         catch (Exception ex)
         {

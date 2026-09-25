@@ -208,6 +208,9 @@ namespace optiSCAN.Views
             if (sender is not Hyperlink link || link.Tag is not string uri)
                 return;
 
+            if (TryApplyPostureFix(uri))
+                return;
+
             if (TryNavigatePosturePanel(uri))
                 return;
 
@@ -229,6 +232,89 @@ namespace optiSCAN.Views
             }
             if (lastEx != null)
                 AppLogger.Warn("OverviewControl", $"PostureFix — tous les replis ont échoué ({uri})", lastEx);
+        }
+
+        private bool TryApplyPostureFix(string uri)
+        {
+            const string prefix = "optiscan://fix/";
+            if (!uri.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+                return false;
+
+            var action = uri[prefix.Length..].Trim().TrimEnd('/');
+            if (_services is not IOptionsServices && action is not "scan")
+            {
+                AppLogger.Warn("OverviewControl", $"PostureFix — services indisponibles ({action})");
+                return true;
+            }
+
+            switch (action)
+            {
+                case "protection":
+                    if (_services is IOptionsServices protection)
+                    {
+                        protection.ApplyRealtimeProtection(true);
+                        if (protection.UserPreferencesAccessor.Current.UsePlatformProtectionService)
+                            protection.ApplyPlatformProtectionService(true);
+                    }
+                    break;
+                case "sigauto":
+                    if (_services is IOptionsServices signatures)
+                        signatures.ApplySignatureAutoUpdate(true);
+                    break;
+                case "scan":
+                    _services?.RequestQuickScan();
+                    break;
+                case "shares":
+                    _ = RemoveExposedSharesWithConfirmationAsync();
+                    break;
+                default:
+                    AppLogger.Warn("OverviewControl", $"PostureFix — action inconnue : {action}");
+                    break;
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// Liste les partages, demande confirmation (action destructive : un partage peut être voulu),
+        /// puis supprime hors thread UI (UAC + net share peuvent durer plusieurs secondes).
+        /// </summary>
+        private async Task RemoveExposedSharesWithConfirmationAsync()
+        {
+            try
+            {
+                var names = await Task.Run(() => SecurityPostureService.ListExposedShareNames()).ConfigureAwait(true);
+                if (names.Count == 0)
+                {
+                    _services?.RequestProtectionStateRefresh();
+                    return;
+                }
+
+                var message = string.Format(
+                    LocalizationService.CurrentCulture,
+                    LocalizationService.GetString("Posture_SharesConfirm"),
+                    string.Join(Environment.NewLine, names.Select(n => "  • " + n)));
+                var title = LocalizationService.GetString("Posture_SharesConfirmTitle");
+                var owner = Window.GetWindow(this);
+                var answer = owner != null
+                    ? System.Windows.MessageBox.Show(owner, message, title,
+                        MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No)
+                    : System.Windows.MessageBox.Show(message, title,
+                        MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No);
+                if (answer != MessageBoxResult.Yes)
+                    return;
+
+                bool removed = await Task.Run(() => SecurityPostureService.TryRemoveExposedShares(names))
+                    .ConfigureAwait(true);
+                if (!removed)
+                    AppLogger.Warn("OverviewControl", "Suppression des partages exposés incomplète");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("OverviewControl", "Suppression des partages exposés", ex);
+            }
+
+            _services?.RequestProtectionStateRefresh();
         }
 
         private bool TryNavigatePosturePanel(string uri)
@@ -299,15 +385,16 @@ namespace optiSCAN.Views
 
         public void UpdateRecommendations(
             string hygieneLine, int hygieneSeverity,
-            bool showSigUpdateLink = false)
+            bool showSigUpdateLink = false,
+            string? fixAction = null)
         {
             Dispatcher.InvokeAsync(() =>
             {
-                ApplyRecommendationRow(brRecHygiene, txtRecHygiene, icRecHygiene, hygieneLine, hygieneSeverity, showSigUpdateLink);
+                ApplyRecommendationRow(brRecHygiene, txtRecHygiene, icRecHygiene, hygieneLine, hygieneSeverity, showSigUpdateLink, fixAction);
             });
         }
 
-        private void ApplyRecommendationRow(Border? border, TextBlock? text, PackIcon? icon, string line, int severity, bool showUpdateLink = false)
+        private void ApplyRecommendationRow(Border? border, TextBlock? text, PackIcon? icon, string line, int severity, bool showUpdateLink = false, string? fixAction = null)
         {
             if (border == null || text == null) return;
 
@@ -317,22 +404,28 @@ namespace optiSCAN.Views
             // Si lien demandé : utiliser Inlines pour intercaler texte + hyperlien.
             // Sinon : Text simple (efface tout lien précédent).
             text.Inlines.Clear();
-            if (showUpdateLink)
+            if (showUpdateLink || !string.IsNullOrWhiteSpace(fixAction))
             {
                 border.Cursor = System.Windows.Input.Cursors.Hand;
                 border.MouseLeftButtonUp -= RecHygieneSigUpdate_Click;
-                border.MouseLeftButtonUp += RecHygieneSigUpdate_Click;
+                if (showUpdateLink)
+                    border.MouseLeftButtonUp += RecHygieneSigUpdate_Click;
 
                 text.Inlines.Add(new Run(line + " "));
-                var link = new Hyperlink(new Run(LocalizationService.GetString("Rec_SigStaleAction")))
+                var link = new Hyperlink(new Run(LocalizationService.GetString(
+                    showUpdateLink ? "Rec_SigStaleAction" : "Posture_Fix")))
                 {
                     Foreground = text.TryFindResource("TextAccent") as Brush
                                  ?? text.TryFindResource("AlertGold") as Brush,
+                    Tag = fixAction,
                 };
                 link.Click += (_, e) =>
                 {
                     e.Handled = true;
-                    NavigateToSignaturesAndUpdate();
+                    if (showUpdateLink)
+                        NavigateToSignaturesAndUpdate();
+                    else if (link.Tag is string action)
+                        TryApplyPostureFix("optiscan://fix/" + action);
                 };
                 text.Inlines.Add(link);
             }

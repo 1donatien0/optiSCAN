@@ -70,7 +70,7 @@ namespace optiSCAN.Views
         }
 
         private void SurDemandeRafraichissementProtection(object? sender, EventArgs e) =>
-            RefreshDefenderStatus();
+            LoadPreferences();
 
         private void SurChangementTheme(object? sender, bool isDark) => SyncThemeControls();
 
