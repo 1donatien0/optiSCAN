@@ -47,6 +47,7 @@ namespace optiSCAN
         private Services.NavigationRefreshCoordinator? _navRefreshCoordinator;
         private readonly SignatureUpdateUiRunner _signatureUpdateRunner = new();
         private readonly StatusFooterCoordinator _statusFooter = new();
+        private int _overviewRefreshGeneration;
         private readonly RoutedCommand _quickScanShortcutCommand = new();
         private bool _isClosing;
         private bool _wasScanning;
@@ -262,6 +263,10 @@ namespace optiSCAN
             var ui = UiBus;
             ui.FocusAntivirusSignaturesRequested -= SurDemandeFocusSignaturesAntivirus;
             ui.FocusAntivirusSignaturesRequested += SurDemandeFocusSignaturesAntivirus;
+            ui.QuickScanRequested -= SurDemandeAnalyseRapide;
+            ui.QuickScanRequested += SurDemandeAnalyseRapide;
+            ui.ProtectionStateRefreshRequested -= SurDemandeRafraichissementEtatProtection;
+            ui.ProtectionStateRefreshRequested += SurDemandeRafraichissementEtatProtection;
 
             // Le coordinateur gère les rafraîchissements par vue (extrait de MainWindow).
             _navRefreshCoordinator?.Detach();
@@ -289,6 +294,27 @@ namespace optiSCAN
 
         private void SurDemandeMiseAJourSignatures(object? sender, EventArgs e) =>
             BtnManualUpdateSignatures_Click(this, new RoutedEventArgs());
+
+        private void SurDemandeRafraichissementEtatProtection(object? sender, EventArgs e)
+        {
+            // L'état vient de changer (option, correctif…) : ne pas resservir les caches 5–8 s.
+            PlatformProtectionBootstrap.InvalidateReachabilityCache();
+            PlatformProtectionStatusService.InvalidateCache();
+            Dispatcher.BeginInvoke(RefreshOverviewProtectionAndRecommendations);
+        }
+
+        private void SurDemandeAnalyseRapide(object? sender, EventArgs e)
+        {
+            Dispatcher.BeginInvoke(() =>
+            {
+                _navigationService.NavigateTo(OptiscanStrings.PanelIds.Antivirus);
+                (panelAntivirus as Views.AntivirusView)?.SelectScanTab();
+                if (ViewModel?.QuickScanCommand?.CanExecute(null) == true)
+                    ViewModel.QuickScanCommand.Execute(null);
+                else
+                    AppLogger.Warn("MainWindow", "Analyse rapide refusée (commande indisponible)");
+            });
+        }
 
         private void SurDemandeRafraichissementHistorique(object? sender, EventArgs e) =>
             Dispatcher.BeginInvoke(RefreshHistory, GetHistoryRefreshPriority());
@@ -342,6 +368,8 @@ namespace optiSCAN
         {
             var ui = UiBus;
             ui.FocusAntivirusSignaturesRequested -= SurDemandeFocusSignaturesAntivirus;
+            ui.QuickScanRequested -= SurDemandeAnalyseRapide;
+            ui.ProtectionStateRefreshRequested -= SurDemandeRafraichissementEtatProtection;
             _serviceEvents.Detach();
         }
 
@@ -441,7 +469,6 @@ namespace optiSCAN
                 HistoryPanel = panelHistory as Views.HistoryControl,
                 OverviewPanel = panelOverview as Views.OverviewControl,
                 AntivirusPanel = panelAntivirus as Views.AntivirusView,
-                RefreshOverviewProtection = RefreshOverviewProtectionAndRecommendations,
             });
         }
 
@@ -506,8 +533,37 @@ namespace optiSCAN
             if (panelOverview is not IOverviewPanel overview)
                 return;
 
-            OverviewRefreshCoordinator.RefreshProtectionAndRecommendations(
-                OverviewRefreshContextBuilder.FromContainer(overview, _container));
+            var container = _container;
+            // Instantanés pris sur le thread UI : les listes d'historique ne sont pas thread-safe.
+            var scanHistory = container.Logger.GetHistory().ToList();
+            var cleanHistory = container.Logger.GetCleanHistory().ToList();
+            int generation = Interlocked.Increment(ref _overviewRefreshGeneration);
+            _ = Task.Run(() => OverviewRefreshContextBuilder.FromContainer(
+                    overview, container, scanHistory, cleanHistory, includePlatformStatus: true))
+                .ContinueWith(t =>
+                {
+                    if (t.IsFaulted)
+                    {
+                        AppLogger.Warn("MainWindow", "Rafraîchissement vue d'ensemble (arrière-plan) en échec",
+                            t.Exception?.GetBaseException());
+                        return;
+                    }
+                    if (generation != Volatile.Read(ref _overviewRefreshGeneration))
+                        return;
+                    Dispatcher.BeginInvoke(() =>
+                    {
+                        if (generation != Volatile.Read(ref _overviewRefreshGeneration))
+                            return;
+                        try
+                        {
+                            OverviewRefreshCoordinator.RefreshProtectionAndRecommendations(t.Result);
+                        }
+                        catch (Exception ex)
+                        {
+                            AppLogger.Warn("MainWindow", "Application du rafraîchissement vue d'ensemble", ex);
+                        }
+                    });
+                }, TaskScheduler.Default);
         }
 
         public async Task RefreshAntivirusDataAsync()
@@ -527,7 +583,14 @@ namespace optiSCAN
                     panelOverview as IOverviewPanel,
                     panelAntivirus as IAntivirusSignaturesPanel,
                     ViewModel,
-                    RefreshOverviewProtectionAndRecommendations),
+                    () =>
+                    {
+                        if (string.Equals(
+                                _navigationService.CurrentView,
+                                OptiscanStrings.PanelIds.Overview,
+                                StringComparison.OrdinalIgnoreCase))
+                            RefreshOverviewProtectionAndRecommendations();
+                    }),
                 forceRefresh).ConfigureAwait(true);
         }
 

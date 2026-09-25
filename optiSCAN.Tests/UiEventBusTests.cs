@@ -31,6 +31,31 @@ public sealed class UiEventBusTests
     }
 
     [Fact]
+    public void RequestQuickScan_raises_QuickScanRequested()
+    {
+        var bus = new UiEventBus();
+        int calls = 0;
+        bus.QuickScanRequested += (_, _) => calls++;
+
+        bus.RequestQuickScan();
+
+        Assert.Equal(1, calls);
+    }
+
+    [Fact]
+    public void ClearHandlers_drops_quick_scan_subscribers()
+    {
+        var bus = new UiEventBus();
+        int calls = 0;
+        bus.QuickScanRequested += (_, _) => calls++;
+        bus.ClearHandlers();
+
+        bus.RequestQuickScan();
+
+        Assert.Equal(0, calls);
+    }
+
+    [Fact]
     public void ClearHandlers_drops_subscribers()
     {
         var bus = new UiEventBus();

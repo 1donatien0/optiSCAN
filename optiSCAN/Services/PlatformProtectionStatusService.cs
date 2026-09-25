@@ -32,7 +32,37 @@ public static class PlatformProtectionStatusService
 {
     private const string AmsiProviderGuid = "{A8F4E2B1-9C3D-4E5F-8A7B-1C2D3E4F5A6B}";
 
+    private static readonly object ReportGate = new();
+    private static readonly TimeSpan ReportCacheTtl = TimeSpan.FromSeconds(8);
+    private static PlatformProtectionStatusReport? _cachedReport;
+    private static DateTime _cachedReportAtUtc;
+
     public static PlatformProtectionStatusReport Evaluate(IUserPreferencesAccessor? preferences = null)
+    {
+        lock (ReportGate)
+        {
+            if (_cachedReport != null && (DateTime.UtcNow - _cachedReportAtUtc) < ReportCacheTtl)
+                return _cachedReport;
+        }
+
+        var report = EvaluateCore(preferences);
+        lock (ReportGate)
+        {
+            _cachedReport = report;
+            _cachedReportAtUtc = DateTime.UtcNow;
+        }
+
+        return report;
+    }
+
+    /// <summary>Invalide le rapport mis en cache (après un changement d'option ou un correctif).</summary>
+    public static void InvalidateCache()
+    {
+        lock (ReportGate)
+            _cachedReport = null;
+    }
+
+    private static PlatformProtectionStatusReport EvaluateCore(IUserPreferencesAccessor? preferences)
     {
         var items = new List<PlatformComponentStatus>();
         var prefs = (preferences ?? new DefaultUserPreferencesAccessor()).Current;
@@ -171,7 +201,7 @@ public static class PlatformProtectionStatusService
                 return false;
 
             var output = proc.StandardOutput.ReadToEnd();
-            proc.WaitForExit(10_000);
+            proc.WaitForExit(800);
             return output.Contains("optiSCANMinifilter", StringComparison.OrdinalIgnoreCase)
                 || output.Contains("optiSCAN.Minifilter", StringComparison.OrdinalIgnoreCase);
         }

@@ -11,7 +11,8 @@ public interface IOverviewPanel
     void UpdateRecommendations(
         string hygieneLine,
         int hygieneSeverity,
-        bool showSigUpdateLink = false);
+        bool showSigUpdateLink = false,
+        string? fixAction = null);
 
     void UpdateSecurityPosture(SecurityPostureReport report);
 

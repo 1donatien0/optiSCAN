@@ -4,11 +4,15 @@
 **Périmètre :** sécurité · qualité du code · conformité RGPD/légale · gratuité & accessibilité · build/CI-CD
 **Méthode :** revue statique du dépôt `optiSCAN-stable` (revue de code, pas de pentest dynamique). ~30 600 lignes C# (projet principal ~23 900), 4 projets managés + 2 composants natifs (AMSI en C++, minifiltre en C), 87 fichiers de tests.
 **Base de code auditée :** commit `589c353` — *Release v9.0.0*.
-**Build actuel :** assembly **9.0.3** (`Directory.Build.props`).
+**Build actuel :** assembly **9.0.4** (`Directory.Build.props`). Mise à jour par-dessus une installation existante : l’installeur arrête l’application et le service, sans désinstallation.
 
 > Le code natif (`.dll` AMSI, `.sys` minifiltre) n'est pas compilé par la CI ; seuls les sources ont été examinés. Le minifiltre est aujourd'hui un **squelette** non fonctionnel (voir §2).
 
 > **Mise à jour doc (2026-07-16)** : CLUF aligné v9.0 (*R2*) ; politique rédigée dans `docs/POLITIQUE_CONFIDENTIALITE.md` (*R1* partiel) ; installeur x64 only + auto-install .NET documentés dans `docs/GUIDE_DISTRIBUTION.md`.
+>
+> **Mise à jour doc (2026-09-25)** : *S2* et *S3* marqués corrigés (livrés dans `6915b04`). 9.0.4 : suppression des partages exposés soumise à confirmation et exécutée hors thread UI ; rafraîchissement de l’accueil en arrière-plan (historique capturé sur le thread UI, erreurs journalisées, caches invalidés après un changement d’état).
+>
+> **Mise à jour doc (2026-09-24)** : assembly **9.0.4** — l’installeur met à jour une installation existante sans désinstallation (arrêt de l’exe et du service avant copie).
 >
 > **Mise à jour doc (2026-09-18)** : assembly **9.0.3** — Optimiser → Mises à jour : `winget upgrade --uninstall-previous` et nettoyage des versions empilées du même programme.
 
@@ -33,8 +37,8 @@ Les risques ne sont **pas** dans la conception mais dans quelques **durcissement
 ### Constats prioritaires
 
 1. **🔴 Signature de code absente** (installeur, `.exe`, `.dll` AMSI, pilote) — bloquant pour une diffusion tierce (SmartScreen, alertes AV, pilote non chargeable).
-2. **🟠 Jeton d'arrêt IPC en clair dans `ProgramData`** — lisible par tout utilisateur authentifié → un utilisateur local peut arrêter le service de protection (déni de service).
-3. **🟠 Pas de limitation de débit sur le pipe IPC** (`ScanPath`/`ScanBuffer`) accessible aux utilisateurs authentifiés → DoS local (déjà dans le backlog de durcissement).
+2. ✅ ~~**Jeton d'arrêt IPC en clair dans `ProgramData`**~~ — corrigé : ACL du fichier restreinte à SYSTEM + Administrateurs.
+3. ✅ ~~**Pas de limitation de débit sur le pipe IPC**~~ — corrigé : `IpcScanRateLimiter` sur `ScanPath`/`ScanBuffer`.
 4. **🟡 Politique de confidentialité rédigée mais non exposée** (app / site) — seul travail RGPD réellement restant.
 5. **🟡 Accessibilité partielle** — `AutomationProperties` présents dans 4 vues sur 7.
 
@@ -56,8 +60,8 @@ Les risques ne sont **pas** dans la conception mais dans quelques **durcissement
 | # | Sévérité | Constat | Recommandation |
 |---|:---:|---|---|
 | S1 | 🔴 Élevée (org.) | Aucun binaire signé (installeur, `optiSCAN.exe`, `optiSCAN.AmsiProvider.dll`, minifiltre). | Signer en Authenticode (EV pour le pilote). Bloquant pour diffusion tierce. Déjà listé dans le *hardening backlog*. |
-| S2 | 🟠 Moyenne | Jeton d'arrêt IPC persisté **en clair** dans `%ProgramData%\optiSCAN\ipc_shutdown.token`. `ProgramData` est lisible par les utilisateurs authentifiés → n'importe quel utilisateur local peut lire le jeton et envoyer `Shutdown` (arrêt de la protection). | Restreindre l'ACL du fichier à SYSTEM + Administrateurs, ou dériver le jeton d'un secret DPAPI machine, ou n'autoriser `Shutdown` que depuis un appelant SYSTEM/admin. |
-| S3 | 🟠 Moyenne | Pas de *rate-limiting* sur `ScanPath`/`ScanBuffer` ; le pipe est ouvert aux utilisateurs authentifiés. Un client local peut saturer le moteur (DoS). | Limiter le débit par client/temps ; envisager de restreindre le pipe aux seuls appelants nécessaires quand l'AMSI est désactivé. Déjà au backlog. |
+| S2 | ✅ Corrigé | ~~Jeton d'arrêt IPC lisible par tout utilisateur authentifié.~~ ACL du fichier `ipc_shutdown.token` restreinte à SYSTEM + Administrateurs (`ProtectionPipeShutdownToken.TryRestrictTokenFileAcl`, commit `6915b04`). | — |
+| S3 | ✅ Corrigé | ~~Pas de *rate-limiting* sur `ScanPath`/`ScanBuffer`.~~ `IpcScanRateLimiter` appliqué dans `ProtectionPipeServer` (commit `6915b04`). | — |
 | S4 | 🟡 Faible | Téléchargement des règles YARA-Forge : aucune vérification d'intégrité (hash/signature) au-delà de HTTPS + source GitHub. | Vérifier un hash/somme publié ou une signature du paquet avant extraction. |
 | S5 | 🟡 Faible | ~52 blocs `catch { }` vides côté app (hors tests). La plupart sont du nettoyage « best effort », mais certains peuvent masquer des erreurs. | Journaliser au minimum en `Debug` ; réserver le silence aux cas réellement inoffensifs. |
 | S6 | 🟡 Faible | ~69 binaires (moteur ClamAV, DLL) **versionnés dans git** alors que `.gitignore` les exclut (ajoutés avant le gitignore). Provenance non vérifiable dans l'historique + dépôt alourdi. | Retirer du suivi (`git rm --cached`), s'appuyer sur `scripts/fetch-runtime-deps.ps1` avec vérification de hash. |
@@ -148,8 +152,8 @@ Le CLUF (`LICENSE.txt`) accorde une **licence gratuite d'utilisation** et autori
 ## 7. Plan d'action recommandé (par priorité)
 
 1. **Signer** installeur + exécutables + AMSI (Authenticode), pilote en EV avant toute activation — *S1/B1*.
-2. **Protéger le jeton d'arrêt IPC** (ACL SYSTEM/Admins ou dérivation DPAPI machine) — *S2*.
-3. **Limiter le débit** des opérations IPC exposées aux utilisateurs authentifiés — *S3*.
+2. ✅ ~~**Protéger le jeton d'arrêt IPC** (ACL SYSTEM/Admins)~~ — fait — *S2*.
+3. ✅ ~~**Limiter le débit** des opérations IPC exposées aux utilisateurs authentifiés~~ — fait — *S3*.
 4. **Exposer** la politique de confidentialité (app + site) — *R1* (CLUF déjà en v9.0 — *R2* fait).
 5. **Compléter l'accessibilité** (`AutomationProperties` sur toutes les vues, vérif. WCAG AA) — *A2/A3*.
 6. **Hygiène du dépôt** : sortir binaires ClamAV et `TOUT.md` du suivi git, vérifier l'intégrité des téléchargements YARA — *S6/Q4/S4*.
