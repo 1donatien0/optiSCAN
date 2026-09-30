@@ -48,6 +48,7 @@ namespace optiSCAN.Services
         private List<ScanSession> _history;
         private List<CleanSession> _cleanHistory;
         private ActivityLogService? _activityLog;
+        private readonly object _saveGate = new();
 
         public ScanLogManager(string? logDir = null)
         {
@@ -77,9 +78,12 @@ namespace optiSCAN.Services
         public void SaveScanResult(ScanResult result)
         {
             var session = ScanSession.FromResult(result);
-            _history.Insert(0, session); // plus récent en premier
+            lock (_saveGate)
+            {
+                _history.Insert(0, session); // plus récent en premier
             TrimNewestFirstList(_history);
             PersistHistory();
+            }
             _activityLog?.RecordScanCompleted(session);
 
             WriteToLog(FormatScanDetail(result));

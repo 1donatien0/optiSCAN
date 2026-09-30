@@ -2,7 +2,7 @@
 
 **Guide produit** : [README.md](../README.md) à la racine (architecture, release §8, audit §12).
 
-**Version** : release **v9.0**, assembly **9.0.4**. Scripts : `scripts/` · Installeur : `installer/` · CI : `.github/workflows/`.
+**Version** : release **v3.0**, assembly **3.0.0**. Scripts : `scripts/` · Installeur : `installer/` · CI : `.github/workflows/`.
 
 ---
 
@@ -12,7 +12,7 @@
 |----------|------|
 | [GUIDE_DISTRIBUTION.md](GUIDE_DISTRIBUTION.md) | Signature, .NET auto, Embed CVD/YARA, publish / Inno, checklist |
 | [DIAGNOSTIC_INTEGRATION_WINDOWS.md](DIAGNOSTIC_INTEGRATION_WINDOWS.md) | Friction SmartScreen / AV ; profil install allégé façon v8 (2 moteurs) |
-| [POLITIQUE_CONFIDENTIALITE.md](POLITIQUE_CONFIDENTIALITE.md) | Politique de confidentialité utilisateur (v9.0) |
+| [POLITIQUE_CONFIDENTIALITE.md](POLITIQUE_CONFIDENTIALITE.md) | Politique de confidentialité utilisateur (v3.0) |
 | [CONFORMITE_RGPD.md](CONFORMITE_RGPD.md) | Analyse traitements / RGPD (note interne, pas un avis juridique) |
 | [README.md](README.md) | Cet index |
 
@@ -22,8 +22,8 @@
 |----------|------|
 | [../README.md](../README.md) | Guide unique (architecture, modules, release, langues, sécurité) |
 | [../SECURITY.md](../SECURITY.md) | Politique de sécurité, signalement, composants v9 |
-| [../LICENSE.txt](../LICENSE.txt) | CLUF v9.0 |
-| [../Audit.md](../Audit.md) | Audit statique v9.0 (sécurité, qualité, RGPD, CI) |
+| [../LICENSE.txt](../LICENSE.txt) | CLUF v3.0 |
+| [../Audit.md](../Audit.md) | Audit statique v3.0 (sécurité, qualité, RGPD, CI) |
 | [../installer/redist/LISEZMOI.md](../installer/redist/LISEZMOI.md) | Runtime .NET 8 embarqué optionnel dans l'installeur |
 
 ---

@@ -1,18 +1,18 @@
-# Audit complet — optiSCAN v9.0
+# Audit complet — optiSCAN v3.0
 
 **Date :** 8 juillet 2026
 **Périmètre :** sécurité · qualité du code · conformité RGPD/légale · gratuité & accessibilité · build/CI-CD
 **Méthode :** revue statique du dépôt `optiSCAN-stable` (revue de code, pas de pentest dynamique). ~30 600 lignes C# (projet principal ~23 900), 4 projets managés + 2 composants natifs (AMSI en C++, minifiltre en C), 87 fichiers de tests.
-**Base de code auditée :** commit `589c353` — *Release v9.0.0*.
-**Build actuel :** assembly **9.0.4** (`Directory.Build.props`). Mise à jour par-dessus une installation existante : l’installeur arrête l’application et le service, sans désinstallation.
+**Base de code auditée :** commit `589c353` — *Release v3.0.0*.
+**Build actuel :** assembly **3.0.0** (`Directory.Build.props`). Mise à jour par-dessus une installation existante : l’installeur arrête l’application et le service, sans désinstallation.
 
 > Le code natif (`.dll` AMSI, `.sys` minifiltre) n'est pas compilé par la CI ; seuls les sources ont été examinés. Le minifiltre est aujourd'hui un **squelette** non fonctionnel (voir §2).
 
-> **Mise à jour doc (2026-07-16)** : CLUF aligné v9.0 (*R2*) ; politique rédigée dans `docs/POLITIQUE_CONFIDENTIALITE.md` (*R1* partiel) ; installeur x64 only + auto-install .NET documentés dans `docs/GUIDE_DISTRIBUTION.md`.
+> **Mise à jour doc (2026-07-16)** : CLUF aligné v3.0 (*R2*) ; politique rédigée dans `docs/POLITIQUE_CONFIDENTIALITE.md` (*R1* partiel) ; installeur x64 only + auto-install .NET documentés dans `docs/GUIDE_DISTRIBUTION.md`.
 >
-> **Mise à jour doc (2026-09-25)** : *S2* et *S3* marqués corrigés (livrés dans `6915b04`). 9.0.4 : suppression des partages exposés soumise à confirmation et exécutée hors thread UI ; rafraîchissement de l’accueil en arrière-plan (historique capturé sur le thread UI, erreurs journalisées, caches invalidés après un changement d’état).
+> **Mise à jour doc (2026-09-25)** : *S2* et *S3* marqués corrigés (livrés dans `6915b04`). 3.0.0 : suppression des partages exposés soumise à confirmation et exécutée hors thread UI ; rafraîchissement de l’accueil en arrière-plan (historique capturé sur le thread UI, erreurs journalisées, caches invalidés après un changement d’état).
 >
-> **Mise à jour doc (2026-09-24)** : assembly **9.0.4** — l’installeur met à jour une installation existante sans désinstallation (arrêt de l’exe et du service avant copie).
+> **Mise à jour doc (2026-09-24)** : assembly **3.0.0** — l’installeur met à jour une installation existante sans désinstallation (arrêt de l’exe et du service avant copie).
 >
 > **Mise à jour doc (2026-09-18)** : assembly **9.0.3** — Optimiser → Mises à jour : `winget upgrade --uninstall-previous` et nettoyage des versions empilées du même programme.
 
@@ -104,7 +104,7 @@ Le point AMSI est correctement conçu en « présent mais inactif » (inerte tan
 | # | Sévérité | Constat | Recommandation |
 |---|:---:|---|---|
 | R1 | 🟡 Moyenne | Politique rédigée dans `docs/POLITIQUE_CONFIDENTIALITE.md`, mais **pas encore exposée** dans l'app ni sur le site de distribution. | Afficher / lier la politique (Options, setup, page SourceForge / release). |
-| R2 | ✅ Corrigé | ~~`LICENSE.txt` en v8.0~~ — aligné sur **v9.0 — 2026**. | — |
+| R2 | ✅ Corrigé | ~~`LICENSE.txt` en v8.0~~ — aligné sur **v3.0 — 2026**. | — |
 | R3 | ℹ️ Info | Le transfert de hash vers VirusTotal (US) doit être mentionné explicitement si la fonction est activée. | Lien vers la politique VirusTotal + mention « désactivé par défaut ». |
 
 Verdict RGPD : **design respectueux de la vie privée**, conforme dans l'esprit ; il manque la formalisation publiée.
@@ -154,7 +154,7 @@ Le CLUF (`LICENSE.txt`) accorde une **licence gratuite d'utilisation** et autori
 1. **Signer** installeur + exécutables + AMSI (Authenticode), pilote en EV avant toute activation — *S1/B1*.
 2. ✅ ~~**Protéger le jeton d'arrêt IPC** (ACL SYSTEM/Admins)~~ — fait — *S2*.
 3. ✅ ~~**Limiter le débit** des opérations IPC exposées aux utilisateurs authentifiés~~ — fait — *S3*.
-4. **Exposer** la politique de confidentialité (app + site) — *R1* (CLUF déjà en v9.0 — *R2* fait).
+4. **Exposer** la politique de confidentialité (app + site) — *R1* (CLUF déjà en v3.0 — *R2* fait).
 5. **Compléter l'accessibilité** (`AutomationProperties` sur toutes les vues, vérif. WCAG AA) — *A2/A3*.
 6. **Hygiène du dépôt** : sortir binaires ClamAV et `TOUT.md` du suivi git, vérifier l'intégrité des téléchargements YARA — *S6/Q4/S4*.
 7. **CI native** : compiler/signer AMSI (et minifiltre à terme) + génération automatisée du setup — *B2/B3*.

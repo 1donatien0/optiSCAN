@@ -1,4 +1,4 @@
-# Diagnostic — Intégration Windows (optiSCAN v9.0)
+# Diagnostic — Intégration Windows (optiSCAN v3.0)
 
 > Date : 2026-07-16 · **Mission :** alléger le profil d’installation **façon v8** (friction basse), tout en **conservant les gains v9** et les **deux moteurs ClamAV + YARA**. Ce n’est pas un alignement produit sur ClamWin.
 

@@ -94,6 +94,7 @@
   <data name="ScanType_Quick" xml:space="preserve"><value>Analyse rapide</value></data>
   <data name="ScanType_Default" xml:space="preserve"><value>Analyse</value></data>
   <data name="ScanType_Removable" xml:space="preserve"><value>Lecteur amovible</value></data>
+  <data name="ScanType_RealTime" xml:space="preserve"><value>Protection temps réel</value></data>
   <data name="ScanSummary_Running" xml:space="preserve"><value>Analyse en cours… ({0:N0} fichier(s) déjà parcourus)</value></data>
   <data name="ScanSummary_Clean" xml:space="preserve"><value>Aucune menace — {0:N0} fichier(s) en {1}</value></data>
   <data name="ScanSummary_Threats" xml:space="preserve"><value>Attention : {0} menace(s) sur {1:N0} fichier(s)</value></data>

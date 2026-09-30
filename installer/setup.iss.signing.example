@@ -9,7 +9,7 @@
 ;
 ; Fichiers à signer (ordre recommandé)
 ;   1. optiSCAN.exe (dossier publish win-x64)
-;   2. optiSCAN_Setup_v9.0.3.exe (sortie Inno)
+;   2. optiSCAN_Setup_v3.0.3.exe (sortie Inno)
 ;
 ; Secrets GitHub Actions (job publish sur main)
 ;   CODESIGN_PFX       — contenu base64 du fichier .pfx
@@ -32,7 +32,7 @@
 ;     run: |
 ;       signtool sign /fd SHA256 /f codesign.pfx /p $env:CODESIGN_PASSWORD `
 ;         /tr http://timestamp.digicert.com /td SHA256 `
-;         installer\output\optiSCAN_Setup_v9.0.3.exe
+;         installer\output\optiSCAN_Setup_v3.0.3.exe
 ;
 ; Configuration Inno Setup — ajouter dans [Setup] :
 ;

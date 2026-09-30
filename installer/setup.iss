@@ -1,7 +1,7 @@
 ; =============================================================================
 ; optiSCAN — Installateur Windows (Inno Setup)
 ; =============================================================================
-; AppRelease = nom vM.m (v9.0) · AppVersion = semver / Directory.Build.props
+; AppRelease = nom vM.m (v3.0) · AppVersion = semver / Directory.Build.props
 
 #define AppName        "optiSCAN"
 #ifndef AppVersion
@@ -360,37 +360,25 @@ begin
   RemoveExplorerShellMenu(HKCU, 'Software\Classes\*\shell', 'optiSCAN.Scan');
   RemoveExplorerShellMenu(HKCU, 'Software\Classes\*\shell', 'Scanner avec optiSCAN');
   RemoveExplorerShellMenu(HKCU, 'Software\Classes\*\shell', 'Scan with optiSCAN');
-  RemoveExplorerShellMenu(HKCU, 'Software\Classes\*\shell', 'Scanner avec optiCombat');
-  RemoveExplorerShellMenu(HKCU, 'Software\Classes\*\shell', 'Scan with optiCombat');
   RemoveExplorerShellMenu(HKCU, 'Software\Classes\*\shell', 'ScanWithOptiSCAN');
-  RemoveExplorerShellMenu(HKCU, 'Software\Classes\*\shell', 'ScanWithOptiCombat');
   RemoveExplorerShellMenu(HKCU, 'Software\Classes\*\shell', 'Shell_ScanWith');
 
   RemoveExplorerShellMenu(HKCU, 'Software\Classes\Directory\shell', 'optiSCAN.Scan');
   RemoveExplorerShellMenu(HKCU, 'Software\Classes\Directory\shell', 'Scanner avec optiSCAN');
   RemoveExplorerShellMenu(HKCU, 'Software\Classes\Directory\shell', 'Scan with optiSCAN');
-  RemoveExplorerShellMenu(HKCU, 'Software\Classes\Directory\shell', 'Scanner avec optiCombat');
-  RemoveExplorerShellMenu(HKCU, 'Software\Classes\Directory\shell', 'Scan with optiCombat');
   RemoveExplorerShellMenu(HKCU, 'Software\Classes\Directory\shell', 'ScanWithOptiSCAN');
-  RemoveExplorerShellMenu(HKCU, 'Software\Classes\Directory\shell', 'ScanWithOptiCombat');
   RemoveExplorerShellMenu(HKCU, 'Software\Classes\Directory\shell', 'Shell_ScanWith');
 
   RemoveExplorerShellMenu(HKCR, '*\shell', 'optiSCAN.Scan');
   RemoveExplorerShellMenu(HKCR, '*\shell', 'Scanner avec optiSCAN');
   RemoveExplorerShellMenu(HKCR, '*\shell', 'Scan with optiSCAN');
-  RemoveExplorerShellMenu(HKCR, '*\shell', 'Scanner avec optiCombat');
-  RemoveExplorerShellMenu(HKCR, '*\shell', 'Scan with optiCombat');
   RemoveExplorerShellMenu(HKCR, '*\shell', 'ScanWithOptiSCAN');
-  RemoveExplorerShellMenu(HKCR, '*\shell', 'ScanWithOptiCombat');
   RemoveExplorerShellMenu(HKCR, '*\shell', 'Shell_ScanWith');
 
   RemoveExplorerShellMenu(HKCR, 'Directory\shell', 'optiSCAN.Scan');
   RemoveExplorerShellMenu(HKCR, 'Directory\shell', 'Scanner avec optiSCAN');
   RemoveExplorerShellMenu(HKCR, 'Directory\shell', 'Scan with optiSCAN');
-  RemoveExplorerShellMenu(HKCR, 'Directory\shell', 'Scanner avec optiCombat');
-  RemoveExplorerShellMenu(HKCR, 'Directory\shell', 'Scan with optiCombat');
   RemoveExplorerShellMenu(HKCR, 'Directory\shell', 'ScanWithOptiSCAN');
-  RemoveExplorerShellMenu(HKCR, 'Directory\shell', 'ScanWithOptiCombat');
   RemoveExplorerShellMenu(HKCR, 'Directory\shell', 'Shell_ScanWith');
 end;
 

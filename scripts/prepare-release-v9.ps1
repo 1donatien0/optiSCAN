@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Chaîne complète de publication v9.0 (dépôt -> installateur testé).
+    Chaîne complète de publication v3.0 (dépôt -> installateur testé).
 
 .EXAMPLE
     .\scripts\prepare-release-v9.ps1
@@ -98,4 +98,4 @@ if (-not $SkipInstaller) {
 
 Write-Host "`n=== Publication v9 prete ===" -ForegroundColor Green
 Write-Host "  Publish : $pubDir"
-Write-Host "  Setup   : installer\output\optiSCAN_Setup_v9.0.3.exe"
+Write-Host "  Setup   : installer\output\optiSCAN_Setup_v3.0.3.exe"

@@ -18,16 +18,13 @@ namespace optiSCAN.Localization
             @"Software\Classes\Directory\shell",
         };
 
-        /// <summary>Toutes les clés shell historiques (y compris optiCombat et noms localisés).</summary>
+        /// <summary>Toutes les clés shell historiques optiSCAN (noms localisés).</summary>
         internal static readonly string[] LegacyMenuKeys =
         {
             StableMenuKey,
             "Scanner avec optiSCAN",
             "Scan with optiSCAN",
-            "Scanner avec optiCombat",
-            "Scan with optiCombat",
             "ScanWithOptiSCAN",
-            "ScanWithOptiCombat",
             "Shell_ScanWith",
         };
 

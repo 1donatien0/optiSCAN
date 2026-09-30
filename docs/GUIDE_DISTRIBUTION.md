@@ -1,6 +1,6 @@
 # Guide de distribution — optiSCAN
 
-Ce guide couvre la mise en production d'optiSCAN chez des utilisateurs tiers : **signature de code**, **cohabitation avec d'autres antivirus** et **chaîne de publication**. Il complète l'[audit v9.0](../Audit.md) et le [diagnostic d'intégration](DIAGNOSTIC_INTEGRATION_WINDOWS.md) (profil install **allégé façon v8**, deux moteurs ClamAV + YARA — pas un clone ClamWin).
+Ce guide couvre la mise en production d'optiSCAN chez des utilisateurs tiers : **signature de code**, **cohabitation avec d'autres antivirus** et **chaîne de publication**. Il complète l'[audit v3.0](../Audit.md) et le [diagnostic d'intégration](DIAGNOSTIC_INTEGRATION_WINDOWS.md) (profil install **allégé façon v8**, deux moteurs ClamAV + YARA — pas un clone ClamWin).
 
 ---
 
@@ -93,7 +93,7 @@ L'UI de publication de Visual Studio s'est révélée peu fiable ici. Préférer
 .\installer\build-release-setup.ps1 -SkipPublish
 ```
 
-Le script `publish-release.ps1` : désactive le watchdog, ferme les instances qui verrouillent les fichiers, nettoie `publish\`, publie, signe (si certificat), puis compile l'installeur Inno. Sortie typique : `installer\output\optiSCAN_Setup_v9.0.4.exe`.
+Le script `publish-release.ps1` : désactive le watchdog, ferme les instances qui verrouillent les fichiers, nettoie `publish\`, publie, signe (si certificat), puis compile l'installeur Inno. Sortie typique : `installer\output\optiSCAN_Setup_v3.0.0.exe`.
 
 Le publish WPF recopie aussi les assets disque (`optiSCAN.ico`, hero, shield) via la cible MSBuild `CopyEmbeddedAssetsToPublish` — nécessaires au systray, à `verify-runtime-deps` et à Inno.
 
@@ -109,4 +109,4 @@ Le publish WPF recopie aussi les assets disque (`optiSCAN.ico`, hero, shield) vi
 - [ ] Assets publish présents (`optiSCAN.ico`, hero, shield) — `verify-runtime-deps.ps1`.
 - [ ] Testé sur poste vierge + poste avec Kaspersky/Defender.
 - [ ] Politique de confidentialité accessible ([POLITIQUE_CONFIDENTIALITE.md](POLITIQUE_CONFIDENTIALITE.md) ; à exposer aussi dans l'app / site).
-- [ ] Numéro de version cohérent (`Directory.Build.props`, `LICENSE.txt`, Inno, README) — **v9.0 / 9.0.4**.
+- [ ] Numéro de version cohérent (`Directory.Build.props`, `LICENSE.txt`, Inno, README) — **v3.0 / 3.0.0**.

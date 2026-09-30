@@ -6,21 +6,21 @@ param(
 $ErrorActionPreference = "Stop"
 
 $content = @"
-optiSCAN v9.0 — Antivirus Windows (C# WPF .NET 8)
+optiSCAN v3.0 — Antivirus Windows (C# WPF .NET 8)
 Rapport d'audit technique — révision post-refactor
 
 Auteur : Donatien Byakombe (Dona By)
 Date : 16 juin 2026 (révision)
 Dépôt : github.com/1donatien0/optiSCAN-stable
-Tag : v9.0
+Tag : v3.0
 
 1. Résumé exécutif
 
-optiSCAN v9.0 est un antivirus Windows développé en solo : architecture C# WPF .NET 8, moteurs ClamAV (dual-mode) + YARA, couche plateforme (AMSI, IPC, service Windows) et protection avancée (RTP, USB, planificateur, quarantaine AES-GCM).
+optiSCAN v3.0 est un antivirus Windows développé en solo : architecture C# WPF .NET 8, moteurs ClamAV (dual-mode) + YARA, couche plateforme (AMSI, IPC, service Windows) et protection avancée (RTP, USB, planificateur, quarantaine AES-GCM).
 
 Depuis l'audit initial du 16 juin 2026, une vague de refactorings a été livrée : ~22 coordinateurs, prefs DI (IUserPreferencesAccessor / IExclusionSettingsAccessor), IViewServices / IHistoryServices, IPC shutdown token + ACL pipe, CI seuil 40 %, SBOM CycloneDX, dependency-review.
 
-Score global révisé : 84/100 — prêt pour release v9.0 côté technique (hors signature Authenticode EV).
+Score global révisé : 84/100 — prêt pour release v3.0 côté technique (hors signature Authenticode EV).
 
 2. Scores par dimension (révisés)
 
@@ -37,7 +37,7 @@ Async safety        86/100  (=)   10 async void gardés, ConfigureAwait(false)
 737 L MainWindow (était 1 009) | ~594 L HistoryControl (IHistoryServices)
 22 coordinateurs | 3 suppressions null!
 Seuil couverture CI : 40 % (warning 50 %)
-Tag git v9.0 sur main
+Tag git v3.0 sur main
 
 4. Constats — statut
 
@@ -68,7 +68,7 @@ RÉSOLU — ExportCoordinator sans tests
 OUVERT — Signature code installer (certificat EV requis)
 OUVERT — Minifilter kernel .sys (stub intentionnel, hors scope v8)
 
-5. Complétude fonctionnelle v9.0
+5. Complétude fonctionnelle v3.0
 
 Verdict inchangé : fonctionnellement complet. 0 NotImplementedException bloquant.
 Panneaux UI 5/5 | Moteurs 5/5 | Protection plateforme 6/7 (minifilter stub)
@@ -76,8 +76,8 @@ Panneaux UI 5/5 | Moteurs 5/5 | Protection plateforme 6/7 (minifilter stub)
 6. Recommandations release
 
 FAIT — Correctifs sécurité P0/P1 (quarantaine, thread-safety)
-FAIT — Tag git v9.0
-À FAIRE — GitHub Release avec optiSCAN_Setup_v9.0.3.exe (job publish main)
+FAIT — Tag git v3.0
+À FAIRE — GitHub Release avec optiSCAN_Setup_v3.0.3.exe (job publish main)
 À FAIRE — Signature Authenticode (certificat EV)
 POST-RELEASE — Couverture cible 50–60 %, refactor HistoryControl restant (~594 L)
 
