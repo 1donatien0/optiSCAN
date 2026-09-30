@@ -1,0 +1,192 @@
+<UserControl
+    x:Class="optiSCAN.WinUI.Views.CleanPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:models="using:optiSCAN.Models"
+    x:Name="Root">
+
+    <ScrollViewer Style="{StaticResource PageScrollViewerStyle}">
+        <StackPanel x:Name="ContentRoot" Style="{StaticResource PageContentPanelStyle}">
+            <!-- En-tête -->
+            <StackPanel Spacing="{StaticResource SpacingXS}">
+                <TextBlock x:Name="HeroTitleText" Style="{StaticResource PageTitleStyle}" />
+                <TextBlock x:Name="SubtitleText" Style="{StaticResource PageSubtitleStyle}" />
+            </StackPanel>
+
+            <!-- Panneau Optimiser : Nettoyage / Mises à jour / Tweaks -->
+            <TabView x:Name="OptimiserTabs" IsAddTabButtonVisible="False" TabWidthMode="SizeToContent"
+                     CanDragTabs="False" CanReorderTabs="False" AllowDropTabs="False">
+                <TabViewItem x:Name="CleanTab" IsClosable="False">
+                    <StackPanel Spacing="{StaticResource SpacingM}" Padding="{StaticResource TabContentPadding}">
+            <!-- Cartes métriques -->
+            <Grid ColumnSpacing="{StaticResource SpacingM}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Style="{StaticResource AppCardStyle}">
+                    <StackPanel Spacing="{StaticResource SpacingXS}">
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                            <Border Style="{StaticResource MetricIconBadgeStyle}" Background="{ThemeResource AlertBg}">
+                                <FontIcon Glyph="&#xE8B7;" FontSize="14" Foreground="{ThemeResource WarningBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock x:Name="TempLabel" Style="{StaticResource SectionTitleStyle}" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock x:Name="TempSizeText" Style="{StaticResource MetricValueStyle}" Foreground="{ThemeResource WarningBrush}" />
+                        <TextBlock x:Name="TempSubText" Style="{StaticResource MutedCaptionStyle}" TextWrapping="WrapWholeWords" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="1" Style="{StaticResource AppCardStyle}">
+                    <StackPanel Spacing="{StaticResource SpacingXS}">
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                            <Border Style="{StaticResource MetricIconBadgeStyle}" Background="{ThemeResource AlertBg}">
+                                <FontIcon Glyph="&#xE774;" FontSize="14" Foreground="{ThemeResource WarningBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock x:Name="BrowserLabel" Style="{StaticResource SectionTitleStyle}" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock x:Name="BrowserSizeText" Style="{StaticResource MetricValueStyle}" Foreground="{ThemeResource WarningBrush}" />
+                        <TextBlock x:Name="BrowserSubText" Style="{StaticResource MutedCaptionStyle}" TextWrapping="WrapWholeWords" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2" Style="{StaticResource AppAccentCardStyle}">
+                    <StackPanel Spacing="{StaticResource SpacingXS}">
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                            <Border Style="{StaticResource MetricIconBadgeStyle}" Background="{ThemeResource AccentTintBrush}">
+                                <FontIcon Glyph="&#xE9D2;" FontSize="14" Foreground="{ThemeResource AccentBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Border>
+                            <TextBlock x:Name="TotalLabel" Style="{StaticResource SectionTitleStyle}" VerticalAlignment="Center" />
+                        </StackPanel>
+                        <TextBlock x:Name="TotalSizeText" Style="{StaticResource MetricValueStyle}" Foreground="{ThemeResource AccentBrush}" />
+                        <TextBlock x:Name="TotalSubText" Style="{StaticResource MutedCaptionStyle}" />
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Actions -->
+            <Border Style="{StaticResource ToolbarCardStyle}">
+                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                    <ProgressRing x:Name="ActionProgress" Width="22" Height="22" IsActive="False" Visibility="Collapsed" VerticalAlignment="Center" />
+                    <Button x:Name="AnalyzeButton" Click="Analyze_Click" MinWidth="120">
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                            <FontIcon Glyph="&#xE721;" FontSize="14" />
+                            <TextBlock x:Name="AnalyzeButtonLabel" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                    <Button x:Name="CleanButton" Click="Clean_Click" IsEnabled="False" Style="{StaticResource AccentButtonStyle}" MinWidth="150">
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                            <FontIcon Glyph="&#xE790;" FontSize="14" />
+                            <TextBlock x:Name="CleanButtonLabel" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Button>
+                </StackPanel>
+            </Border>
+
+            <!-- Sélection + journal -->
+            <Grid ColumnSpacing="{StaticResource SpacingM}" MinHeight="240">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Border Grid.Column="0" Style="{StaticResource AppCardStyle}">
+                    <StackPanel Spacing="{StaticResource SpacingM}">
+                        <TextBlock x:Name="ItemsTitle" Style="{StaticResource SectionTitleStyle}" />
+
+                        <TabView x:Name="TargetTabs" IsAddTabButtonVisible="False" TabWidthMode="Equal" Height="Auto">
+                            <TabViewItem x:Name="SystemTab" Header="Système">
+                                <ListView x:Name="SystemItemsList"
+                                          ItemsSource="{x:Bind ViewModel.SystemItems, Mode=OneWay}"
+                                          SelectionMode="None"
+                                          Padding="{StaticResource TabContentPadding}">
+                                    <ListView.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <ItemsStackPanel />
+                                        </ItemsPanelTemplate>
+                                    </ListView.ItemsPanel>
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate x:DataType="models:CleanupItem">
+                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}" Margin="0,4">
+                                                <CheckBox IsChecked="{x:Bind IsSelected, Mode=TwoWay}" VerticalAlignment="Center" />
+                                                <StackPanel VerticalAlignment="Center" Spacing="{StaticResource SpacingXXS}">
+                                                    <TextBlock Text="{x:Bind DisplayName}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{x:Bind Details}" Style="{StaticResource MutedCaptionStyle}" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </TabViewItem>
+                            <TabViewItem x:Name="BrowsersTab" Header="Navigateurs">
+                                <ListView x:Name="BrowserItemsList"
+                                          ItemsSource="{x:Bind ViewModel.BrowserItems, Mode=OneWay}"
+                                          SelectionMode="None"
+                                          Padding="{StaticResource TabContentPadding}">
+                                    <ListView.ItemsPanel>
+                                        <ItemsPanelTemplate>
+                                            <ItemsStackPanel />
+                                        </ItemsPanelTemplate>
+                                    </ListView.ItemsPanel>
+                                    <ListView.ItemTemplate>
+                                        <DataTemplate x:DataType="models:CleanupItem">
+                                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}" Margin="0,4">
+                                                <CheckBox IsChecked="{x:Bind IsSelected, Mode=TwoWay}" VerticalAlignment="Center" />
+                                                <StackPanel VerticalAlignment="Center" Spacing="{StaticResource SpacingXXS}">
+                                                    <TextBlock Text="{x:Bind DisplayName}" FontWeight="SemiBold" />
+                                                    <TextBlock Text="{x:Bind Details}" Style="{StaticResource MutedCaptionStyle}" />
+                                                </StackPanel>
+                                            </StackPanel>
+                                        </DataTemplate>
+                                    </ListView.ItemTemplate>
+                                </ListView>
+                            </TabViewItem>
+                        </TabView>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="1" Style="{StaticResource AppCardStyle}">
+                    <Grid RowSpacing="{StaticResource SpacingS}">
+                        <Grid.RowDefinitions>
+                            <RowDefinition Height="Auto" />
+                            <RowDefinition Height="*" MinHeight="220" />
+                            <RowDefinition Height="Auto" />
+                        </Grid.RowDefinitions>
+                        <TextBlock x:Name="LogTitle" Grid.Row="0" Style="{StaticResource SectionTitleStyle}" />
+                        <Border Grid.Row="1" Style="{StaticResource LogConsoleBorderStyle}">
+                            <Grid x:Name="LogPanelRoot">
+                                <ScrollViewer x:Name="LogScroll" VerticalScrollBarVisibility="Auto">
+                                    <TextBlock x:Name="LogText" Style="{StaticResource LogMonospaceStyle}" />
+                                </ScrollViewer>
+                                <StackPanel x:Name="EmptyState" VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="{StaticResource SpacingS}" Visibility="Collapsed">
+                                    <FontIcon Glyph="&#xE73E;" FontSize="32" Foreground="{ThemeResource SuccessGreen}" HorizontalAlignment="Center" />
+                                    <TextBlock x:Name="EmptyTitle" Style="{StaticResource SectionTitleStyle}" HorizontalAlignment="Center" />
+                                    <TextBlock x:Name="EmptySubtitle" Style="{StaticResource PageSubtitleStyle}" HorizontalAlignment="Center" />
+                                </StackPanel>
+                                <ProgressRing x:Name="LogProgress" Width="36" Height="36" IsActive="False" Visibility="Collapsed"
+                                              HorizontalAlignment="Center" VerticalAlignment="Center" />
+                            </Grid>
+                        </Border>
+                        <Button
+                            x:Name="CopyLogButton"
+                            Grid.Row="2"
+                            HorizontalAlignment="Right"
+                            Click="CopyLog_Click">
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                                <FontIcon Glyph="&#xE8C8;" FontSize="14" />
+                                <TextBlock x:Name="CopyLogLabel" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
+                    </Grid>
+                </Border>
+            </Grid>
+                    </StackPanel>
+                </TabViewItem>
+                <TabViewItem x:Name="UpdatesTab" IsClosable="False" />
+                <TabViewItem x:Name="TweaksTab" IsClosable="False" />
+            </TabView>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

@@ -6,7 +6,7 @@ namespace optiSCAN.Tests;
 public sealed class SignatureRefreshCoordinatorTests
 {
     [Fact]
-    public async Task ScheduleRefreshAfterUpdate_invalidates_cache_and_refreshes_ui()
+    public void ScheduleRefreshAfterUpdate_invalidates_cache_and_refreshes_ui()
     {
         var freshclam = new FreshclamUpdater();
         var rules = new YaraForgeUpdater();

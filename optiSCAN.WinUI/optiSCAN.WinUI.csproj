@@ -1,0 +1,126 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <TargetPlatformMinVersion>10.0.17763.0</TargetPlatformMinVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UseWinUI>true</UseWinUI>
+    <EnableMsixTooling>false</EnableMsixTooling>
+    <WindowsPackageType>None</WindowsPackageType>
+    <Platforms>x64;x86;ARM64</Platforms>
+    <RuntimeIdentifiers>win-x64;win-x86;win-arm64</RuntimeIdentifiers>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AssemblyName>optiSCAN</AssemblyName>
+    <RootNamespace>optiSCAN.WinUI</RootNamespace>
+    <Company>optiSCAN</Company>
+    <Product>optiSCAN v1.0 — WinUI 3</Product>
+    <Copyright>Copyright 2026 Dona By</Copyright>
+    <ApplicationIcon>..\optiSCAN\optiSCAN.ico</ApplicationIcon>
+    <NoWarn>$(NoWarn);CS0618</NoWarn>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <CleanPublishArtifactsBeforePublish Condition="'$(CleanPublishArtifactsBeforePublish)' == ''">true</CleanPublishArtifactsBeforePublish>
+  </PropertyGroup>
+
+  <Target Name="CleanStalePublishOutput" BeforeTargets="BeforePublish" Condition="'$(CleanPublishArtifactsBeforePublish)' == 'true'">
+    <PropertyGroup>
+      <_StalePublishDir>$(MSBuildProjectDirectory)\bin\$(Configuration)\$(TargetFramework)\publish</_StalePublishDir>
+    </PropertyGroup>
+    <Message Importance="high" Text="optiSCAN.WinUI : nettoyage du dossier publish\ périmé avant publication..." />
+    <RemoveDir Directories="$(_StalePublishDir)" ContinueOnError="true" />
+  </Target>
+
+  <!--
+    Application WinUI non empaquetée : le runtime charge $(AssemblyName).pri à côté de l'exe
+    (Xaml + images ms-appx). Le SDK le génère dans bin\...\win-x64\ mais ne le recopie pas
+    dans publish\. Sans ce fichier, MainWindow.InitializeComponent lève XamlParseException
+    et le processus se ferme avant d'afficher la fenêtre.
+  -->
+  <Target Name="CopyUnpackagedPriToPublish" AfterTargets="Publish">
+    <PropertyGroup>
+      <_UnpackagedPriName Condition="Exists('$(TargetDir)$(AssemblyName).pri')">$(AssemblyName).pri</_UnpackagedPriName>
+      <_UnpackagedPriName Condition="'$(_UnpackagedPriName)' == '' and Exists('$(TargetDir)resources.pri')">resources.pri</_UnpackagedPriName>
+    </PropertyGroup>
+    <Error Condition="'$(_UnpackagedPriName)' == ''"
+           Text="optiSCAN : PRI introuvable dans $(TargetDir). L'application installée ne pourra pas s'ouvrir." />
+    <Copy SourceFiles="$(TargetDir)$(_UnpackagedPriName)"
+          DestinationFolder="$(PublishDir)"
+          SkipUnchangedFiles="false" />
+    <Message Importance="high" Text="optiSCAN.WinUI : $(_UnpackagedPriName) copié vers $(PublishDir)" />
+  </Target>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.WindowsAppSDK" Version="1.8.250907003" />
+    <PackageReference Include="System.Drawing.Common" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
+    <PackageReference Include="Microsoft.Toolkit.Uwp.Notifications" Version="7.1.3" />
+    <PackageReference Include="QuestPDF" Version="2024.12.2" />
+    <PackageReference Include="System.Management" Version="10.0.12" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.12" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\optiSCAN.Application\optiSCAN.Application.csproj" />
+    <ProjectReference Include="..\optiSCAN.IPC\optiSCAN.IPC.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="..\optiSCAN\optiSCAN.ico" Link="Assets\optiSCAN.ico">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\optiSCAN\optiSCAN_hero.png" Link="Assets\optiSCAN_hero.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\optiSCAN\optiSCAN_shield.png" Link="Assets\optiSCAN_shield.png">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\optiSCAN\yara\**\*">
+      <Link>yara\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\optiSCAN\rules\**\*">
+      <Link>rules\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\optiSCAN\clamav\database\**\*" Exclude="..\optiSCAN\clamav\database\tmp.*\**;..\optiSCAN\clamav\database\**\*.tmp">
+      <Link>clamav\database\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\optiSCAN\clamav\certs\clamav.crt">
+      <Link>clamav\certs\clamav.crt</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' Or '$(PlatformTarget)' == 'x64'">
+    <Content Include="..\optiSCAN\clamav\x64\**\*" Exclude="..\optiSCAN\clamav\x64\**\*.conf">
+      <Link>clamav\x64\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'win-x86' Or '$(PlatformTarget)' == 'x86'">
+    <Content Include="..\optiSCAN\clamav\x86\**\*" Exclude="..\optiSCAN\clamav\x86\**\*.conf">
+      <Link>clamav\x86\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == 'win-arm64' Or '$(PlatformTarget)' == 'ARM64'">
+    <Content Include="..\optiSCAN\clamav\arm64\**\*" Exclude="..\optiSCAN\clamav\arm64\**\*.conf">
+      <Link>clamav\arm64\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+  <ItemGroup Condition="'$(RuntimeIdentifier)' == '' And '$(PlatformTarget)' == ''">
+    <Content Include="..\optiSCAN\clamav\x64\**\*" Exclude="..\optiSCAN\clamav\x64\**\*.conf">
+      <Link>clamav\x64\%(RecursiveDir)%(Filename)%(Extension)</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>

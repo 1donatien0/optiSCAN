@@ -1,0 +1,31 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "optiSCAN (WinUI Debug x64)",
+      "type": "coreclr",
+      "request": "launch",
+      "preLaunchTask": "build-optiSCAN.WinUI-Debug",
+      "program": "${workspaceFolder}/optiSCAN.WinUI/bin/x64/Debug/net10.0-windows10.0.19041.0/optiSCAN.exe",
+      "args": [],
+      "cwd": "${workspaceFolder}/optiSCAN.WinUI/bin/x64/Debug/net10.0-windows10.0.19041.0",
+      "console": "internalConsole",
+      "stopAtEntry": false
+    },
+    {
+      "name": "optiSCAN.Tests",
+      "type": "coreclr",
+      "request": "launch",
+      "program": "dotnet",
+      "args": [
+        "test",
+        "${workspaceFolder}/optiSCAN.Tests/optiSCAN.Tests.csproj",
+        "-c",
+        "Debug",
+        "--no-build"
+      ],
+      "cwd": "${workspaceFolder}",
+      "console": "internalConsole"
+    }
+  ]
+}

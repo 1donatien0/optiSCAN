@@ -20,6 +20,18 @@ public sealed class ProtectionStatusEvaluatorTests
         Assert.Equal(expected, level);
     }
 
+    [Theory]
+    [InlineData(true, true, 5, false, false, ProtectionBadgeLevel.Active)]    // RTP déléguée à Defender : pas « dégradé »
+    [InlineData(true, true, 0, false, false, ProtectionBadgeLevel.Degraded)]  // règles YARA manquantes : reste dégradé
+    [InlineData(false, true, 5, false, false, ProtectionBadgeLevel.Inactive)] // ClamAV absent : inactif
+    public void Evaluate_complement_mode_does_not_penalize_disabled_rtp(
+        bool clam, bool yaraAvail, int rules, bool rtpSetting, bool rtpRunning, ProtectionBadgeLevel expected)
+    {
+        var level = ProtectionStatusEvaluator.Evaluate(clam, yaraAvail, rules, rtpSetting, rtpRunning,
+            realTimeDelegatedToDefender: true);
+        Assert.Equal(expected, level);
+    }
+
     [Fact]
     public void GetBadgeText_returns_french_labels()
     {

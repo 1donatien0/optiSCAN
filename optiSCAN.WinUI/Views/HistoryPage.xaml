@@ -1,0 +1,153 @@
+<UserControl
+    x:Class="optiSCAN.WinUI.Views.HistoryPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:conv="using:optiSCAN.WinUI.Converters"
+    xmlns:models="using:optiSCAN.Models"
+    xmlns:vms="using:optiSCAN.ViewModels"
+    xmlns:svc="using:optiSCAN.WinUI.Services">
+
+    <UserControl.Resources>
+        <conv:BooleanToVisibilityConverter x:Key="BoolToVis" />
+    </UserControl.Resources>
+
+    <Grid Padding="{StaticResource PagePadding}" RowSpacing="{StaticResource SpacingM}">
+
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" MinHeight="140" />
+        </Grid.RowDefinitions>
+
+        <StackPanel Grid.Row="0" Spacing="{StaticResource SpacingXS}">
+            <TextBlock x:Name="PageTitle" Style="{StaticResource PageTitleStyle}" />
+            <TextBlock x:Name="PageSubtitle" Style="{StaticResource PageSubtitleStyle}" />
+        </StackPanel>
+
+        <StackPanel Grid.Row="1" Spacing="{StaticResource SpacingM}">
+            <ScrollViewer HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled">
+                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                    <ToggleButton x:Name="ChipAll" Style="{StaticResource FilterChipStyle}" Click="Chip_Click" Tag="All" />
+                    <ToggleButton x:Name="ChipThreats" Style="{StaticResource FilterChipStyle}" Click="Chip_Click" Tag="Threats" />
+                    <ToggleButton x:Name="ChipCleanScans" Style="{StaticResource FilterChipStyle}" Click="Chip_Click" Tag="CleanScans" />
+                    <ToggleButton x:Name="ChipCleans" Style="{StaticResource FilterChipStyle}" Click="Chip_Click" Tag="Cleans" />
+                    <ToggleButton x:Name="ChipQuarantine" Style="{StaticResource FilterChipStyle}" Click="Chip_Click" Tag="Quarantine" />
+                </StackPanel>
+            </ScrollViewer>
+            <TextBox x:Name="SearchBox" TextChanged="SearchBox_TextChanged" />
+        </StackPanel>
+
+        <Border Grid.Row="2" Style="{StaticResource AppCardStyle}" Padding="8">
+            <Grid>
+                <ListView
+                    x:Name="TimelineList"
+                    SelectionChanged="TimelineList_SelectionChanged"
+                    MinHeight="180">
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="models:ActivityEntry">
+                            <StackPanel Padding="8,6" Spacing="{StaticResource SpacingXS}">
+                                <TextBlock Text="{x:Bind TypeDisplay}" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                <TextBlock Text="{x:Bind ResultSummary}" Style="{StaticResource MutedCaptionStyle}" TextWrapping="Wrap" />
+                                <TextBlock Text="{x:Bind DateDisplay}" Style="{StaticResource MutedCaptionStyle}" />
+                            </StackPanel>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+                <StackPanel
+                    x:Name="EmptyState"
+                    VerticalAlignment="Center"
+                    HorizontalAlignment="Center"
+                    Spacing="{StaticResource SpacingS}"
+                    Visibility="Collapsed">
+                    <FontIcon Glyph="&#xE81C;" FontSize="28" Foreground="{ThemeResource AccentBrush}" HorizontalAlignment="Center" />
+                    <TextBlock x:Name="EmptyTitleText" Style="{StaticResource SectionTitleStyle}" HorizontalAlignment="Center" />
+                    <TextBlock x:Name="EmptySubtitleText" Style="{StaticResource PageSubtitleStyle}" HorizontalAlignment="Center" />
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+            <Button x:Name="ExportHtmlButton" Click="ExportHtml_Click" />
+            <Button x:Name="ExportPdfButton" Click="ExportPdf_Click" />
+            <Button x:Name="TreatInAvButton" Click="TreatInAv_Click" Visibility="Collapsed" />
+            <Button x:Name="QuarantineAllButton" Click="QuarantineAll_Click" Visibility="Collapsed" />
+            <Button x:Name="OpenAvButton" Click="OpenQuarantineTab_Click" Style="{StaticResource AccentButtonStyle}" />
+        </StackPanel>
+
+        <Border Grid.Row="4" Style="{StaticResource AppCardStyle}">
+            <StackPanel Spacing="{StaticResource SpacingM}">
+                <TextBlock x:Name="SessionInfoText" Style="{StaticResource BodyStrongTextBlockStyle}" TextWrapping="WrapWholeWords" />
+                <TextBlock x:Name="DetailText" Style="{StaticResource MutedCaptionStyle}" TextWrapping="WrapWholeWords" />
+                <TextBlock x:Name="NoThreatsPanel" Style="{StaticResource MutedCaptionStyle}" Visibility="Collapsed" />
+                <TextBlock x:Name="ThreatsLegacyPanel" Style="{StaticResource MutedCaptionStyle}" TextWrapping="WrapWholeWords" Visibility="Collapsed" />
+                <StackPanel x:Name="QuarantineDetailPanel" Spacing="{StaticResource SpacingS}" Visibility="Collapsed">
+                    <TextBlock x:Name="QuarTitleText" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock x:Name="QuarPathText" Style="{StaticResource BodyTextBlockStyle}" TextWrapping="WrapWholeWords" />
+                    <TextBlock x:Name="QuarMetaText" Style="{StaticResource MutedCaptionStyle}" TextWrapping="WrapWholeWords" />
+                    <TextBlock x:Name="QuarStatusText" Style="{StaticResource MutedCaptionStyle}" />
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                        <Button x:Name="ViewSourceScanButton" Click="ViewSourceScan_Click" Visibility="Collapsed" />
+                        <Button x:Name="ManageInAvButton" Click="OpenQuarantineTab_Click" HorizontalAlignment="Left" />
+                    </StackPanel>
+                </StackPanel>
+                <Border x:Name="CleanLogPanel" Style="{StaticResource LogConsoleBorderStyle}" Visibility="Collapsed" MinHeight="120">
+                    <ScrollViewer VerticalScrollBarVisibility="Auto">
+                        <TextBlock x:Name="CleanLogText" Style="{StaticResource LogMonospaceStyle}" TextWrapping="Wrap" />
+                    </ScrollViewer>
+                </Border>
+                <ListView x:Name="ThreatsList" MinHeight="80" Visibility="Collapsed" SelectionMode="None">
+                    <ListView.ItemTemplate>
+                        <DataTemplate x:DataType="vms:HistoryThreatRow">
+                            <Grid ColumnSpacing="{StaticResource SpacingS}" Padding="4,2">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <Border Grid.Column="0" Style="{StaticResource RiskPillStyle}"
+                                        svc:ThemeBrush.BackgroundKey="{x:Bind RiskBrushKey}">
+                                    <TextBlock Text="{x:Bind Risk.Severity}" Style="{StaticResource RiskPillTextStyle}" />
+                                </Border>
+                                <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingXXS}">
+                                    <TextBlock Text="{x:Bind VirusName}" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                                    <TextBlock Text="{x:Bind FilePath}" Style="{StaticResource MutedCaptionStyle}" TextWrapping="Wrap" />
+                                </StackPanel>
+
+                                <!-- Boutons-icônes avec infobulle (remplacent les lettres « Q / Q / D / I / X » illisibles) -->
+                                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="{StaticResource SpacingXXS}" VerticalAlignment="Center">
+                                    <Button Style="{StaticResource RowIconButtonStyle}" Click="ViewInQuarantine_Click" Tag="{x:Bind FilePath}"
+                                            svc:LocalizedTip.Key="Hist_ViewInQuarantine"
+                                            Visibility="{x:Bind CanViewInQuarantine, Converter={StaticResource BoolToVis}}">
+                                        <FontIcon Glyph="&#xE8A7;" FontSize="14" />
+                                    </Button>
+                                    <Button Style="{StaticResource RowIconButtonStyle}" Click="QuarantineThreat_Click" Tag="{x:Bind FilePath}"
+                                            svc:LocalizedTip.Key="Av_QuarantineBtn"
+                                            Visibility="{x:Bind CanQuarantine, Converter={StaticResource BoolToVis}}">
+                                        <FontIcon Glyph="&#xE72E;" FontSize="14" Foreground="{ThemeResource AccentBrush}" />
+                                    </Button>
+                                    <Button Style="{StaticResource RowIconButtonStyle}" Click="DismissThreat_Click" Tag="{x:Bind FilePath}"
+                                            svc:LocalizedTip.Key="Hist_TooltipDismiss"
+                                            Visibility="{x:Bind CanDismiss, Converter={StaticResource BoolToVis}}">
+                                        <FontIcon Glyph="&#xE711;" FontSize="14" />
+                                    </Button>
+                                    <Button Style="{StaticResource RowIconButtonStyle}" Click="IgnoreThreat_Click" Tag="{x:Bind FilePath}"
+                                            svc:LocalizedTip.Key="Av_IgnoreBtn"
+                                            Visibility="{x:Bind IsFileAccessible, Converter={StaticResource BoolToVis}}">
+                                        <FontIcon Glyph="&#xED1A;" FontSize="14" />
+                                    </Button>
+                                    <Button Style="{StaticResource RowIconButtonStyle}" Click="DeleteThreat_Click" Tag="{x:Bind FilePath}"
+                                            svc:LocalizedTip.Key="Av_DeleteBtn"
+                                            Visibility="{x:Bind IsFileAccessible, Converter={StaticResource BoolToVis}}">
+                                        <FontIcon Glyph="&#xE74D;" FontSize="14" Foreground="{ThemeResource DangerRed}" />
+                                    </Button>
+                                </StackPanel>
+                            </Grid>
+                        </DataTemplate>
+                    </ListView.ItemTemplate>
+                </ListView>
+            </StackPanel>
+        </Border>
+    </Grid>
+</UserControl>

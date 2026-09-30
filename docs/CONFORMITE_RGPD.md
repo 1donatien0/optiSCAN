@@ -1,0 +1,58 @@
+# Conformité RGPD / vie privée — optiSCAN
+
+Note d'analyse des traitements de données d'optiSCAN, destinée à préparer une politique de confidentialité pour une diffusion (notamment en Europe). Ce n'est pas un avis juridique.
+
+---
+
+## 1. Données traitées localement (jamais transmises)
+
+| Donnée | Où | Rétention |
+|---|---|---|
+| Historique de scans / timeline | `%LOCALAPPDATA%\optiSCAN` (`scan_history.dat`, `activity_log.dat`, chiffrés DPAPI + HMAC) | Rotation (100 → 50 sessions, 150 événements) ou suppression par l'utilisateur |
+| Fichiers en quarantaine | `%LOCALAPPDATA%\optiSCAN\Quarantine` (chiffrés AES‑GCM) | Jusqu'à suppression par l'utilisateur |
+| Exclusions | `%LOCALAPPDATA%\optiSCAN\exclusions.dat` (DPAPI + HMAC) | Idem |
+| Préférences (dont clé VirusTotal) | `%APPDATA%\optiSCAN\preferences.dat` (DPAPI + HMAC — profil **itinérant** Windows) | Idem |
+| Copies de sécurité avant quarantaine (**option**, désactivée par défaut) | `%LOCALAPPDATA%\optiSCAN\SafetyBackups` (copie **non chiffrée**, 32 Mo max. par fichier) | Jusqu'à suppression par l'utilisateur |
+| Rapports PDF générés automatiquement | `%LOCALAPPDATA%\optiSCAN\Reports` | Idem |
+| Journaux applicatifs | `%LOCALAPPDATA%\optiSCAN\Logs` (`optiscan-*.log`) | **30 jours** (purge auto) |
+| Journal de plantage UI | `%LOCALAPPDATA%\optiSCAN\Logs\winui-crash.log` | Rotation à 1 Mo (`.old`), non purgé à 30 j |
+| Langue, options de l'installateur | `HKCU\Software\optiSCAN` | Supprimé à la désinstallation |
+
+- Les **chemins de fichiers** dans les journaux sont **caviardés** (`PathRedaction`) pour limiter l'exposition de données personnelles (noms d'utilisateur, etc.). Exception : `winui-crash.log` contient la trace brute de l'exception (peut inclure un chemin).
+- La quarantaine est **chiffrée** (clé AES‑GCM enveloppée par DPAPI, portée utilisateur).
+
+Aucune de ces données ne quitte le poste.
+
+## 2. Données transmises à des tiers
+
+### VirusTotal (réputation de menaces) — **opt-in**
+
+- **Ce qui est envoyé** : uniquement le **hash SHA‑256** d'un fichier (jamais le fichier lui‑même), via `GET https://www.virustotal.com/api/v3/files/{hash}`.
+- **Condition** : uniquement si l'utilisateur a saisi **sa propre clé API VirusTotal**. Sans clé, aucune requête n'est émise.
+- **Donnée personnelle ?** Un hash de fichier n'est normalement pas une donnée personnelle, mais il est transmis à un tiers (Google/VirusTotal) soumis à ses propres conditions.
+- **Recommandation** : mentionner ce traitement dans la politique de confidentialité, indiquer qu'il est **désactivé par défaut**, et lier la politique de VirusTotal.
+
+### Mises à jour de signatures (ClamAV/YARA)
+
+- `freshclam` et le téléchargement des règles (YARA-Forge sur GitHub) contactent les serveurs de signatures (téléchargement de bases publiques). Pas d'envoi de données utilisateur ; échange réseau standard de mise à jour.
+
+### Mises à jour de logiciels (onglet Optimiser → Mises à jour) — à l'initiative de l'utilisateur
+
+- `winget` (outil Microsoft) interroge ses sources (dépôt communautaire winget, Microsoft Store) pour lister et installer les mises à jour. optiSCAN ne transmet rien lui-même ; les échanges relèvent des conditions de Microsoft.
+
+### Installateur
+
+- Si le **.NET 10 Desktop Runtime** ou le **Windows App Runtime 1.8** manquent, l'installateur les télécharge depuis les serveurs Microsoft (liens officiels `aka.ms`) après confirmation. Aucune donnée utilisateur envoyée.
+
+## 3. Points à formaliser pour le RGPD
+
+1. **Politique de confidentialité** : texte rédigé dans [POLITIQUE_CONFIDENTIALITE.md](POLITIQUE_CONFIDENTIALITE.md) — reste à **exposer** dans l'app et sur le site / page de téléchargement.
+2. **Base légale** : intérêt légitime (sécurité) pour le fonctionnement local ; **consentement** explicite pour l'envoi de hash à VirusTotal (déjà opt-in via saisie de clé).
+3. **Minimisation** : confirmée (hash seul, pas de fichier ; logs caviardés ; rétention 30 j).
+4. **Droits** : l'utilisateur peut supprimer toutes ses données (la désinstallation propose explicitement la purge ; suppression manuelle possible dans `%LOCALAPPDATA%\optiSCAN`).
+5. **Transferts hors UE** : VirusTotal (États‑Unis) — déjà mentionné dans la politique ; à rappeler dans l'UI Options près du champ clé API.
+6. **Pas de télémétrie** tierce intrusive — déclaré dans la politique (« pas de télémétrie d'usage vers l'éditeur »).
+
+## 4. Verdict
+
+Le design est **respectueux de la vie privée** : traitement local par défaut, chiffrement de la quarantaine, caviardage des logs, rétention bornée, et le seul envoi externe (hash VirusTotal) est **opt-in**. La politique est **rédigée** ; le travail restant est surtout **d'exposition** (lien dans l'app / site), pas de conception technique.

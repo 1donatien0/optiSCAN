@@ -1,0 +1,239 @@
+<UserControl
+    x:Class="optiSCAN.WinUI.Views.OverviewPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    HorizontalAlignment="Stretch"
+    VerticalAlignment="Stretch"
+    SizeChanged="Page_SizeChanged">
+
+    <!-- Le contenu défile quand la fenêtre est plus basse que la page, comme une fenêtre classique. -->
+    <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+    <Grid Padding="{StaticResource PagePadding}">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+        </Grid.RowDefinitions>
+
+        <Border Style="{StaticResource AppCardStyle}" Padding="24,16">
+            <Grid ColumnSpacing="{StaticResource SpacingXL}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+
+                <StackPanel Spacing="8" VerticalAlignment="Center">
+                    <TextBlock
+                        x:Name="ProtectionHeadline"
+                        FontSize="26"
+                        FontWeight="SemiBold"
+                        TextWrapping="WrapWholeWords" />
+                    <TextBlock
+                        x:Name="ProtectionSubtitle"
+                        MaxWidth="480"
+                        Foreground="{ThemeResource TextMutedBrush}"
+                        FontSize="14"
+                        TextWrapping="WrapWholeWords"
+                        Visibility="Collapsed" />
+                    <StackPanel Orientation="Horizontal" Spacing="6">
+                        <FontIcon
+                            FontSize="13"
+                            Foreground="{ThemeResource AccentBrush}"
+                            Glyph="&#xE823;" />
+                        <TextBlock x:Name="HeroLastScanLabel" Foreground="{ThemeResource AccentBrush}" />
+                        <TextBlock
+                            x:Name="HeroLastScanText"
+                            Foreground="{ThemeResource AccentBrush}"
+                            FontWeight="SemiBold" />
+                    </StackPanel>
+                </StackPanel>
+
+                <StackPanel x:Name="HeroBrandPanel" Grid.Column="1" Orientation="Horizontal" Spacing="12" VerticalAlignment="Center">
+                    <Image
+                        x:Name="HeroShieldImage"
+                        Width="108"
+                        Height="108"
+                        Source="ms-appx:///Assets/optiSCAN_hero.png" />
+                    <StackPanel VerticalAlignment="Center">
+                        <TextBlock FontSize="36" FontWeight="Bold">
+                            <Run Text="opti" />
+                            <Run Foreground="{ThemeResource AccentBrush}" Text="SCAN" />
+                        </TextBlock>
+                        <TextBlock
+                            Foreground="{ThemeResource TextMutedBrush}"
+                            FontSize="12"
+                            FontWeight="SemiBold"
+                            Text="SCAN  -  CLEAN  -  PROTECT" />
+                    </StackPanel>
+                </StackPanel>
+            </Grid>
+        </Border>
+
+        <!-- Vignettes d'action : même gabarit que les vignettes du panneau Antivirus (TileButtonStyle) -->
+        <Grid x:Name="ActionGrid" Grid.Row="1" Margin="0,12,0,0" ColumnSpacing="{StaticResource SpacingS}" RowSpacing="{StaticResource SpacingS}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition x:Name="ActionCol0" Width="*" />
+                <ColumnDefinition x:Name="ActionCol1" Width="*" />
+                <ColumnDefinition x:Name="ActionCol2" Width="*" />
+                <ColumnDefinition x:Name="ActionCol3" Width="*" />
+            </Grid.ColumnDefinitions>
+            <Button x:Name="ActionCleanBtn" Grid.Column="0" Click="ActionClean_Click" Style="{StaticResource TileButtonStyle}">
+                <Grid ColumnSpacing="{StaticResource SpacingM}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xE90F;" FontSize="20" Foreground="{ThemeResource WarningBrush}" VerticalAlignment="Top" Margin="0,2,0,0" />
+                    <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingXXS}">
+                        <TextBlock x:Name="ActionCleanTitle" Style="{StaticResource TileTitleStyle}" />
+                        <TextBlock x:Name="ActionCleanSub" Style="{StaticResource TileSubtitleStyle}" />
+                    </StackPanel>
+                </Grid>
+            </Button>
+            <Button x:Name="ActionScanBtn" Grid.Column="1" Style="{StaticResource TileButtonStyle}">
+                <Grid ColumnSpacing="{StaticResource SpacingM}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xE83D;" FontSize="20" Foreground="{ThemeResource AccentBrush}" VerticalAlignment="Top" Margin="0,2,0,0" />
+                    <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingXXS}">
+                        <TextBlock x:Name="ActionScanTitle" Style="{StaticResource TileTitleStyle}" />
+                        <TextBlock x:Name="ActionScanSub" Style="{StaticResource TileSubtitleStyle}" />
+                    </StackPanel>
+                </Grid>
+            </Button>
+            <Button x:Name="ActionHistoryBtn" Grid.Column="2" Click="ActionHistory_Click" Style="{StaticResource TileButtonStyle}">
+                <Grid ColumnSpacing="{StaticResource SpacingM}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xE81C;" FontSize="20" Foreground="{ThemeResource InfoBrush}" VerticalAlignment="Top" Margin="0,2,0,0" />
+                    <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingXXS}">
+                        <TextBlock x:Name="ActionHistoryTitle" Style="{StaticResource TileTitleStyle}" />
+                        <TextBlock x:Name="ActionHistorySub" Style="{StaticResource TileSubtitleStyle}" />
+                    </StackPanel>
+                </Grid>
+            </Button>
+            <Button x:Name="ActionUpdateBtn" Grid.Column="3" Click="ActionUpdateSig_Click" Style="{StaticResource TileButtonStyle}">
+                <Grid ColumnSpacing="{StaticResource SpacingM}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <FontIcon Glyph="&#xE895;" FontSize="20" Foreground="{ThemeResource SuccessGreen}" VerticalAlignment="Top" Margin="0,2,0,0" />
+                    <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingXXS}">
+                        <TextBlock x:Name="ActionUpdateTitle" Style="{StaticResource TileTitleStyle}" />
+                        <TextBlock x:Name="ActionUpdateSub" Style="{StaticResource TileSubtitleStyle}" />
+                    </StackPanel>
+                </Grid>
+            </Button>
+        </Grid>
+
+        <Border
+            x:Name="ElevationBanner"
+            Grid.Row="2"
+            Margin="0,12,0,0"
+            Padding="12,8"
+            Background="{ThemeResource WarningTintBrush}"
+            BorderBrush="{ThemeResource WarningBrush}"
+            BorderThickness="1"
+            CornerRadius="8"
+            Visibility="Collapsed">
+            <Grid ColumnSpacing="12">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <FontIcon Foreground="{ThemeResource WarningBrush}" Glyph="&#xE7BA;" />
+                <TextBlock
+                    x:Name="ElevationBannerText"
+                    Grid.Column="1"
+                    Foreground="{ThemeResource WarningBrush}"
+                    TextWrapping="WrapWholeWords" />
+                <Button
+                    x:Name="RunAsAdminButton"
+                    Grid.Column="2"
+                    Click="RunAsAdmin_Click" />
+            </Grid>
+        </Border>
+
+        <Grid x:Name="BottomCardsGrid" Grid.Row="3" Margin="0,12,0,0" ColumnSpacing="{StaticResource SpacingM}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="4*" />
+                <ColumnDefinition Width="4*" />
+                <ColumnDefinition Width="3*" />
+            </Grid.ColumnDefinitions>
+
+            <Border x:Name="LastScanCard" Style="{StaticResource OverviewCardStyle}">
+                <StackPanel Spacing="8">
+                    <TextBlock x:Name="LastScanSectionTitle" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock
+                        x:Name="LastScanText"
+                        Style="{StaticResource MutedCaptionStyle}"
+                        TextWrapping="WrapWholeWords" />
+                    <TextBlock x:Name="StatsSectionTitle" Style="{StaticResource SectionTitleStyle}" Margin="0,4,0,0" />
+                    <Border Style="{StaticResource InsetPanelStyle}">
+                        <TextBlock
+                            x:Name="ProtectionStatsText"
+                            LineHeight="18"
+                            FontSize="12"
+                            TextWrapping="WrapWholeWords" />
+                    </Border>
+                    <TextBlock x:Name="ProtectionStatsUpdated" Style="{StaticResource MutedCaptionStyle}" />
+                </StackPanel>
+            </Border>
+
+            <Border x:Name="StatsCard" Grid.Column="1" Style="{StaticResource OverviewCardStyle}">
+                <StackPanel Spacing="8">
+                    <TextBlock x:Name="PostureSectionTitle" Style="{StaticResource SectionTitleStyle}" />
+                    <Border Style="{StaticResource InsetPanelStyle}">
+                        <StackPanel Spacing="6">
+                            <TextBlock x:Name="SecurityScoreLine" FontWeight="SemiBold" />
+                            <StackPanel x:Name="PostureIssuesPanel" Spacing="6" />
+                            <TextBlock
+                                x:Name="PostureFixStatusText"
+                                Foreground="{ThemeResource TextMutedBrush}"
+                                FontSize="12"
+                                TextWrapping="WrapWholeWords"
+                                Visibility="Collapsed" />
+                        </StackPanel>
+                    </Border>
+                    <Border Style="{StaticResource InsetPanelStyle}" Background="{ThemeResource AccentTintBrush}">
+                        <StackPanel Spacing="4">
+                            <TextBlock
+                                x:Name="HygieneRecommendation"
+                                Foreground="{ThemeResource AccentBrush}"
+                                FontSize="12"
+                                TextWrapping="WrapWholeWords" />
+                            <HyperlinkButton x:Name="SigUpdateLink" Visibility="Collapsed" Click="SigUpdateLink_Click" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+
+            <Border x:Name="SignaturesCard" Grid.Column="2" Style="{StaticResource OverviewCardStyle}">
+                <StackPanel Spacing="8">
+                    <TextBlock x:Name="SignaturesSectionTitle" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock x:Name="ClamSigText" FontSize="12" TextWrapping="WrapWholeWords" />
+                    <TextBlock x:Name="YaraSigText" FontSize="12" TextWrapping="WrapWholeWords" />
+                    <TextBlock
+                        x:Name="AntivirusCardText"
+                        FontSize="12"
+                        Foreground="{ThemeResource AccentBrush}"
+                        TextWrapping="WrapWholeWords" />
+                    <Border x:Name="PlatformStatusCard" Visibility="Collapsed">
+                        <StackPanel Spacing="4">
+                            <TextBlock x:Name="PlatformStatusTitle" FontSize="13" FontWeight="SemiBold" />
+                            <StackPanel x:Name="PlatformStatusPanel" Spacing="4" />
+                        </StackPanel>
+                    </Border>
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+    </ScrollViewer>
+</UserControl>

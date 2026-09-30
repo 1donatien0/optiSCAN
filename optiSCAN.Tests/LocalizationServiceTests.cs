@@ -72,6 +72,20 @@ public sealed class LocalizationServiceTests : IDisposable
             $"Clés présentes en EN mais absentes en FR ({missingInFr.Count}) :\n{string.Join("\n", missingInFr)}");
     }
 
+    [Fact]
+    public void Quick_scan_strings_do_not_mention_F5_keyboard_shortcut()
+    {
+        foreach (var culture in new[] { "fr-FR", "en-US" })
+        {
+            LocalizationService.ApplyCulture(culture);
+            foreach (var key in new[] { "Av_Tooltip_QuickScan", "Onboarding_Step3" })
+            {
+                var text = LocalizationService.GetString(key);
+                Assert.DoesNotContain("F5", text, StringComparison.OrdinalIgnoreCase);
+            }
+        }
+    }
+
     private static HashSet<string> GetResxKeys(System.Reflection.Assembly asm, string baseName, string culture)
     {
         var rm = new System.Resources.ResourceManager(baseName, asm);

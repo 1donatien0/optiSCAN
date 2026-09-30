@@ -1,13 +1,13 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using optiSCAN.Platform;
+using optiSCAN.IPC;
 using System.Diagnostics;
 
 namespace optiSCAN.Service;
 
 public sealed class ProtectionWindowsService : BackgroundService
 {
-    private const string EventSourceName = "optiSCAN Protection v8";
+    private const string EventSourceName = "optiSCAN Protection v1";
     private const string EventLogName = "Application";
 
     private readonly ServiceHostRestartPolicy _restartPolicy = new();

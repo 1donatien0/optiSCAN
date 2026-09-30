@@ -34,7 +34,7 @@ try {
     if ($WithPublishCheck) {
         Write-Host ""
         Write-Host "[ Publish runtime deps ]" -ForegroundColor Cyan
-        $pub = Join-Path $repo 'optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64'
+        $pub = Join-Path $repo 'optiSCAN.WinUI\bin\Release\net10.0-windows10.0.19041.0\publish\win-x64'
         if (-not (Test-Path (Join-Path $pub 'optiSCAN.exe'))) {
             $pub = Join-Path $repo 'publish\win-x64'
         }
@@ -43,7 +43,7 @@ try {
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         }
         else {
-            Write-Warning "Dossier publish absent - lancer dotnet publish ou .\scripts\prepare-release-v8.ps1"
+            Write-Warning "Dossier publish absent - lancer dotnet publish ou .\scripts\prepare-release.ps1"
         }
     }
 

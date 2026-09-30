@@ -216,8 +216,8 @@ public sealed class EicarIntegrationTests : IDisposable
         if (File.Exists(nextToTests))
             return Path.GetDirectoryName(nextToTests);
 
-        var nextToAppBuild = TryFindRepoFile("optiSCAN", "bin", "Release", "net8.0-windows10.0.17763.0", "yara", exe)
-            ?? TryFindRepoFile("optiSCAN", "bin", "Debug", "net8.0-windows10.0.17763.0", "yara", exe);
+        var nextToAppBuild = TryFindRepoFile("optiSCAN", "bin", "Release", "net10.0-windows10.0.17763.0", "yara", exe)
+            ?? TryFindRepoFile("optiSCAN", "bin", "Debug", "net10.0-windows10.0.17763.0", "yara", exe);
         if (nextToAppBuild != null)
             return Path.GetDirectoryName(nextToAppBuild);
 

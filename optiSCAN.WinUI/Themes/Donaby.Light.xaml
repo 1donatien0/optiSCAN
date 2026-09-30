@@ -1,0 +1,44 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- Donaby clair — accent violet.
+         Jeu de clés IDENTIQUE dans Light / Dark / HighContrast (vérifié par scripts/check-winui-theme-keys.ps1).
+         Textes principaux : ressources système WinUI (TextFillColor*). Ici : marque, sémantique,
+         surfaces (fond, volet, cartes). Toute couleur utilisée comme TEXTE vise un contraste ≥ 4,5:1
+         (WCAG AA) sur AppBackgroundBrush / CardBackgroundBrush / AccentTintBrush / AlertBg. -->
+
+    <!-- Accent (clé canonique : AccentBrush — surchargée à l'exécution par le preset / la couleur perso) -->
+    <SolidColorBrush x:Key="AccentBrush" Color="#534AB7" />
+    <SolidColorBrush x:Key="AccentTintBrush" Color="#EEEDFE" />
+    <!-- Alias historique utilisé par optiSCAN.Application (ActivityEntry.IconBrushKey) -->
+    <SolidColorBrush x:Key="TextAccent" Color="#534AB7" />
+
+    <!-- Jeu sémantique : Success / Warning / Danger / Info -->
+    <SolidColorBrush x:Key="SuccessGreen" Color="#0C7064" />
+    <SolidColorBrush x:Key="WarningBrush" Color="#946000" />
+    <SolidColorBrush x:Key="AlertBg" Color="#FAEEDA" />
+    <SolidColorBrush x:Key="DangerRed" Color="#C42B1C" />
+    <SolidColorBrush x:Key="InfoBrush" Color="#005FB8" />
+
+    <SolidColorBrush x:Key="TextMutedBrush" Color="#666666" />
+    <SolidColorBrush x:Key="TextOnPrimary" Color="#FFFFFF" />
+
+    <SolidColorBrush x:Key="AppBackgroundBrush" Color="#F5F5F5" />
+    <SolidColorBrush x:Key="SidebarBackgroundBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="CardBackgroundBrush" Color="#FFFFFF" />
+    <SolidColorBrush x:Key="CardAltBackgroundBrush" Color="#F6F6F7" />
+    <SolidColorBrush x:Key="CardBorderBrush" Color="#E6E6E6" />
+    <SolidColorBrush x:Key="WarningTintBrush" Color="#FDF3E1" />
+    <SolidColorBrush x:Key="DangerBrush" Color="#C42B1C" />
+
+    <!-- Niveaux de risque (clés fournies par RiskScoringService.GetSeverityBrushKey) -->
+    <SolidColorBrush x:Key="RiskCritical" Color="#C42B1C" />
+    <SolidColorBrush x:Key="RiskMajor" Color="#A33A0B" />
+    <SolidColorBrush x:Key="RiskMinor" Color="#946000" />
+    <SolidColorBrush x:Key="RiskInformational" Color="#0C7064" />
+
+    <!-- SystemAccentColor et ses variantes Light1..3 / Dark1..3 sont injectés par WinUiThemeManager
+         (le compilateur XAML WinUI ne reconnaît pas <Color> : avertissement WMC0001, bloquant en Release). -->
+
+</ResourceDictionary>
