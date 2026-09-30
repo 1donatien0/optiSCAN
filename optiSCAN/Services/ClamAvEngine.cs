@@ -50,8 +50,8 @@ namespace optiSCAN.Services
         private static readonly TimeSpan InstallProbeCacheTtl = TimeSpan.FromSeconds(60);
 
         /// <summary>
-        /// Vérifie que clamscan.exe est présent et fonctionnel en exécutant <c>--version</c>.
-        /// Résultat mis en cache 60 s pour limiter les lancements de processus à chaque navigation.
+        /// Vérifie que clamscan.exe est présent. Le contrôle <c>--version</c> est
+        /// fait par <see cref="GetVersionAsync"/>, hors du fil de l'interface.
         /// </summary>
         public bool IsClamAvInstalled()
         {
@@ -70,20 +70,10 @@ namespace optiSCAN.Services
 
         private bool ProbeClamAvInstalled()
         {
-            if (!File.Exists(_clamscanExe)) return false;
-            try
-            {
-                using var proc = new Process { StartInfo = BuildStartInfo(_clamscanExe, "--version") };
-                proc.Start();
-                string output = proc.StandardOutput.ReadToEnd();
-                proc.WaitForExit(3000);
-                return output.Contains("ClamAV");
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Warn("ClamAvEngine", "IsClamAvInstalled — version ou processus indisponible", ex);
-                return false;
-            }
+            // Pas de clamscan --version ici : lancé sur le fil UI au démarrage, il
+            // charge les bases (ou attend clamd) et laisse la fenêtre blanche.
+            // GetVersionAsync confirme ensuite que le binaire répond.
+            return File.Exists(_clamscanExe);
         }
 
         /// <summary>
@@ -414,10 +404,10 @@ namespace optiSCAN.Services
         {
             using var proc = new Process { StartInfo = BuildStartInfo(exe, args) };
             proc.Start();
-            var stdout = await proc.StandardOutput.ReadToEndAsync();
-            var stderr = await proc.StandardError.ReadToEndAsync();
+            var stdoutTask = proc.StandardOutput.ReadToEndAsync();
+            var stderrTask = proc.StandardError.ReadToEndAsync();
             await proc.WaitForExitAsync();
-            return (stdout, stderr);
+            return (await stdoutTask, await stderrTask);
         }
 
         private void ValidateInstallation()

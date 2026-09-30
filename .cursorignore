@@ -1,0 +1,8 @@
+﻿# Sorties de build .NET — code généré (XAML .g.cs, AssemblyInfo, etc.)
+**/bin/**
+**/obj/**
+**/publish/**
+**/.vs/**
+**/TestResults/**
+**/artifacts/**
+installer/output/**

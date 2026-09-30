@@ -9,14 +9,14 @@ namespace optiSCAN.Services
     /// <summary>
     /// Gère l'historique des scans et des nettoyages système et le journal texte.
     ///
-    /// Persistance sécurisée (v9) :
+    /// Persistance sécurisée (v3) :
     ///   - <c>scan_history.dat</c>  / <c>clean_history.dat</c> — chiffrés DPAPI + HMAC-SHA256
     ///     (même format que UserPreferences et ExclusionSettings).
     ///   - Migration transparente depuis les anciens <c>.json</c> en clair au premier chargement ;
     ///     le fichier clair est renommé en <c>.legacy</c> après migration réussie.
     ///
-    /// Sessions scan v9 : liste <see cref="Models.ThreatInfo"/> (chemin + nom) ;
-    /// entrées v7 : compteur de menaces sans chemins persistés.
+    /// Sessions scan v3 : liste <see cref="Models.ThreatInfo"/> (chemin + nom) ;
+    /// entrées v1 : compteur de menaces sans chemins persistés.
     ///
     /// Rétention implicite (scans et nettoyages) : la liste regrosse jusqu'à 100 entrées,
     /// puis les 50 plus anciennes sont supprimées (50 restantes), et le cycle reprend.
@@ -48,6 +48,7 @@ namespace optiSCAN.Services
         private List<ScanSession> _history;
         private List<CleanSession> _cleanHistory;
         private ActivityLogService? _activityLog;
+        private readonly object _saveGate = new();
 
         public ScanLogManager(string? logDir = null)
         {
@@ -77,9 +78,12 @@ namespace optiSCAN.Services
         public void SaveScanResult(ScanResult result)
         {
             var session = ScanSession.FromResult(result);
-            _history.Insert(0, session); // plus récent en premier
+            lock (_saveGate)
+            {
+                _history.Insert(0, session); // plus récent en premier
             TrimNewestFirstList(_history);
             PersistHistory();
+            }
             _activityLog?.RecordScanCompleted(session);
 
             WriteToLog(FormatScanDetail(result));

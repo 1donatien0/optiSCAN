@@ -94,4 +94,34 @@ public sealed class QuarantineManagerTests
             try { Directory.Delete(root, recursive: true); } catch { /* best effort */ }
         }
     }
+
+    /// <summary>
+    /// Mise à jour v1 → v2 : le HMAC du manifeste est calculé sur la sérialisation des
+    /// entrées. Une entrée sans session d'origine doit se sérialiser exactement comme en
+    /// version 1 (pas de clé SourceSessionId), sinon la quarantaine v1 est rejetée.
+    /// </summary>
+    [Fact]
+    public void QuarantineEntry_without_session_serializes_like_v1_for_manifest_hmac()
+    {
+        var entry = new QuarantineEntry
+        {
+            Id = "abc",
+            OriginalPath = @"C:\temp\x.exe",
+            QuarantinePath = @"C:\q\abc.qbin",
+            VirusName = "Eicar",
+            QuarantinedAt = new DateTime(2026, 6, 1, 12, 0, 0, DateTimeKind.Utc),
+            OriginalSize = 68,
+            Sha256 = "00",
+        };
+
+        var legacyJson = System.Text.Json.JsonSerializer.Serialize(new List<QuarantineEntry> { entry });
+        Assert.DoesNotContain("SourceSessionId", legacyJson);
+
+        entry.SourceSessionId = Guid.NewGuid();
+        var v2Json = System.Text.Json.JsonSerializer.Serialize(new List<QuarantineEntry> { entry });
+        Assert.Contains("SourceSessionId", v2Json);
+
+        var roundTrip = System.Text.Json.JsonSerializer.Deserialize<List<QuarantineEntry>>(v2Json)!;
+        Assert.Equal(entry.SourceSessionId, roundTrip[0].SourceSessionId);
+    }
 }

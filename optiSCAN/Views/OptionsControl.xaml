@@ -278,7 +278,7 @@
                             </StackPanel>
                         </StackPanel>
 
-                        <!-- Service Windows / protection système v9 -->
+                        <!-- Service Windows / protection système (identifiants : optiSCAN.Platform.ProtectionIdentifiers) -->
                         <StackPanel Orientation="Horizontal" Margin="0,0,0,20">
                             <CheckBox x:Name="chkPlatformProtection"
                                       IsChecked="True"

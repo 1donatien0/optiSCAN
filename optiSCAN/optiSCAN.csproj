@@ -13,7 +13,7 @@
     <AssemblyName>optiSCAN</AssemblyName>
     <RootNamespace>optiSCAN</RootNamespace>
     <Company>optiSCAN</Company>
-    <Product>optiSCAN v9.0 — ClamAV Edition</Product>
+    <Product>optiSCAN v3.0 — ClamAV Edition</Product>
     <Copyright>Copyright 2026 Dona By</Copyright>
     <!-- Icône embarquée dans l'exécutable (barre des tâches, Explorateur, installateur) -->
     <ApplicationIcon>optiSCAN.ico</ApplicationIcon>

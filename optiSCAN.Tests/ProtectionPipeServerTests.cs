@@ -185,6 +185,56 @@ public sealed class ProtectionPipeServerTests
     }
   }
 
+  [Fact]
+  public async Task Response_carries_current_protocol_version()
+  {
+    var pipeName = "optiSCAN_Test_" + Guid.NewGuid().ToString("N");
+    var server = new ProtectionPipeServer(new ScanOrchestrator(new FakeClam(), new FakeYara()), pipeName);
+    server.Start();
+
+    try
+    {
+      await Task.Delay(200);
+      using var client = new ProtectionPipeClient(pipeName, TimeSpan.FromSeconds(10));
+      var response = await client.SendAsync(new ProtectionPipeRequest { Operation = ProtectionPipeOperations.Ping });
+
+      Assert.True(response.Ok);
+      Assert.Equal(ProtectionIdentifiers.ProtocolVersion, response.ProtocolVersion);
+    }
+    finally
+    {
+      await server.StopAsync();
+      server.Dispose();
+    }
+  }
+
+  [Fact]
+  public async Task Newer_client_protocol_is_rejected_explicitly()
+  {
+    var pipeName = "optiSCAN_Test_" + Guid.NewGuid().ToString("N");
+    var server = new ProtectionPipeServer(new ScanOrchestrator(new FakeClam(), new FakeYara()), pipeName);
+    server.Start();
+
+    try
+    {
+      await Task.Delay(200);
+      using var client = new ProtectionPipeClient(pipeName, TimeSpan.FromSeconds(10));
+      var response = await client.SendAsync(new ProtectionPipeRequest
+      {
+        Operation = ProtectionPipeOperations.Ping,
+        ProtocolVersion = ProtectionIdentifiers.ProtocolVersion + 1,
+      });
+
+      Assert.False(response.Ok);
+      Assert.Contains("Protocole", response.Message ?? "", StringComparison.OrdinalIgnoreCase);
+    }
+    finally
+    {
+      await server.StopAsync();
+      server.Dispose();
+    }
+  }
+
   private sealed class FakeClam : IClamAvOrchestratorBackend
   {
     public bool IsClamAvInstalled() => true;

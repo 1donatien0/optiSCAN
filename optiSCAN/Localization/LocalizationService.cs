@@ -180,6 +180,7 @@ namespace optiSCAN.Localization
             ScanType.FullScan => GetString("ScanType_Full"),
             ScanType.QuickScan => GetString("ScanType_Quick"),
             ScanType.RemovableDrive => GetString("ScanType_Removable"),
+            ScanType.RealTime => GetString("ScanType_RealTime"),
             _ => GetString("ScanType_Default"),
         };
 

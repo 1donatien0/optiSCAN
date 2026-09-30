@@ -1,4 +1,4 @@
-; optiSCAN Minifilter INF stub (v8)
+; optiSCAN Minifilter INF stub (v3)
 ; Compilation complète requiert WDK + certificat EV
 
 [Version]
@@ -6,7 +6,7 @@ Signature="$Windows NT$"
 Class=ActivityMonitor
 ClassGuid={b86dff51-a31e-4bac-b3cf-e8cfe75c9fc2}
 Provider=%Manufacturer%
-DriverVer=06/15/2026,8.0.0.0
+DriverVer=10/01/2026,3.0.0.0
 CatalogFile=optiSCAN.Minifilter.cat
 PnpLockdown=1
 
@@ -27,4 +27,4 @@ optiSCAN.Minifilter.sys
 
 [Strings]
 Manufacturer="optiSCAN"
-DeviceName="optiSCAN File System Minifilter v8"
+DeviceName="optiSCAN File System Minifilter v3"

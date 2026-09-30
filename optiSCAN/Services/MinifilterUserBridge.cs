@@ -32,7 +32,7 @@ public static class MinifilterUserBridge
     private static async Task WorkerLoopAsync(CancellationToken ct)
     {
         // Le port de communication kernel sera branché lorsque le driver est signé et chargé.
-        // En v9, le stub noyau documente l'interface ; le pont reste inactif sans driver.
+        // En v3, le stub noyau documente l'interface ; le pont reste inactif sans driver.
         AppLogger.Info("MinifilterUserBridge", "Pont minifilter prêt (attente driver)");
         try
         {

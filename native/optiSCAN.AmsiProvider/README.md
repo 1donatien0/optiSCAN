@@ -1,7 +1,11 @@
-# optiSCAN AMSI Provider (v9)
+# optiSCAN AMSI Provider
 
 Fournisseur AMSI natif (`optiSCAN.AmsiProvider.dll`) qui transmet les buffers script
-à `optiSCAN.exe --service-host` via le pipe `\\.\pipe\optiSCAN_Protection_v9`.
+à `optiSCAN.exe --service-host` via le pipe `\\.\pipe\optiSCAN_Protection`.
+
+Le nom du pipe et la version du protocole IPC sont définis dans
+`protection_identifiers.h`, miroir de `optiSCAN.Platform/ProtectionIdentifiers.cs`
+(cohérence vérifiée par les tests unitaires). Ne pas y mettre de version produit.
 
 ## Build (Visual Studio 2022)
 
@@ -13,7 +17,7 @@ Fournisseur AMSI natif (`optiSCAN.AmsiProvider.dll`) qui transmet les buffers sc
 
 Effectué par `PlatformRegistration.TryRegisterAmsiProvider()` au démarrage du
 service plateforme (`--service-host` / `optiSCAN.Service`), si la protection
-système v9 est activée dans les Options (nécessite droits administrateur).
+système est activée dans les Options (nécessite droits administrateur).
 
 Désactivé par `TryUnregisterAmsiProvider()` quand la protection plateforme est
 coupée : la DLL peut rester dans le dossier d'installation sans être chargée.

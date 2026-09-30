@@ -1,7 +1,7 @@
-# Guide Complet — optiSCAN v9.0
+# Guide Complet — optiSCAN v3.0
 
 > **Version de référence.** Architecture mono-fenêtre, services avancés + Donaby Design System.  
-> **Nomenclature** — **v9.0** : nom de release (documentation, CLUF). **9.0.4** : assembly et installateur (`Directory.Build.props`, Inno Setup).
+> **Nomenclature** — **v3.0** : nom de release (documentation, CLUF). **3.0.0** : assembly et installateur (`Directory.Build.props`, Inno Setup).
 >
 > **Design system : Donaby Design** — thème sombre/clair dynamique, tokens DynamicResource WPF.
 > Développé par **© 2026 Donatien Byakombe (Dona By)**.
@@ -24,28 +24,23 @@
 | **12** | Audit et qualité |
 | **13** | Sécurité (posture /100, modèle de menace) |
 | **14** | Crédits |
-| — | [Branches Git](#branches-git) (main / dev uniquement) |
+| — | [Branches Git](#branches-git) (`main`, `dev`, `win`) |
 
 ---
 
 ## Branches Git
 
-Le dépôt **1donatien0/optiSCAN-stable** n’utilise que **deux** branches, partageant **le même historique Git linéaire** depuis l’origine du projet (aucune branche parallèle orpheline, pas de rebase qui efface l’historique public).
+`main` et `dev` ont le même historique : **version 1** (1 juin 2026, tag `v1`), **version 2** (23 juin 2026, tag `v2`) et **version 3** (30 septembre 2026, tag `v3`). `win` s’en sépare à la version 2 ; son commit `first commit` porte la même date que la version 3.
+
+L’historique a été regroupé autour de ces trois publications, en conservant les dates majeures.
 
 | Branche | Rôle |
 |---------|------|
-| **`main`** | Référence **publiée** : ce qui est sur GitHub pour les releases, CI publish + installateur Inno. |
-| **`dev`** | **Intégration** : développement courant ; fusion vers `main` quand une release est prête. |
+| **`main`** | Référence publiée de l’édition WPF. Même commit que `dev`. |
+| **`dev`** | Même historique que `main`. |
+| **`win`** | Édition WinUI 3, à partir de la version 2. |
 
-**Workflow habituel**
-
-1. Travailler et committer sur **`dev`** (`git checkout dev`).
-2. Quand une version est prête : `git checkout main` → `git merge dev` (souvent fast-forward) → `git push origin main`.
-3. Repasser sur **`dev`** pour la suite.
-
-Après une release, `main` et `dev` peuvent pointer sur le **même commit** (normal). Les prochains commits repartent sur `dev` jusqu’au prochain merge.
-
-Branche par défaut GitHub : **`main`**. CI : uniquement `main` et `dev` (voir [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
+Branche par défaut GitHub : **`main`**. CI : `main` et `dev` (voir [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 
 ---
 
@@ -60,13 +55,13 @@ Branche par défaut GitHub : **`main`**. CI : uniquement `main` et `dev` (voir [
 | MVVM + Binding UI | Oui — excellent | Partiel — différent | Non — manuel |
 | **Verdict** | **Retenu** | Non nécessaire | Non nécessaire |
 
-### Architecture plateforme v9 (protection système)
+### Architecture plateforme (v3.0)
 
-optiSCAN v9 rapproche un antivirus « classique » via une couche plateforme Windows :
+optiSCAN v3.0 rapproche un antivirus « classique » via une couche plateforme Windows :
 
 ```
 optiSCAN.exe (UI WPF)
-    ↔ IPC (optiSCAN.Platform — pipe optiSCAN_Protection_v9)
+    ↔ IPC (optiSCAN.Platform — pipe optiSCAN_Protection, protocole v1)
 optiSCAN.Service.exe  →  optiSCAN.exe --service-host
     ├── RTP + ProcessStartMonitor + scan USB
     ├── ProtectionPipeServer (scan path/buffer pour AMSI)
@@ -89,6 +84,17 @@ optiSCAN.Service.exe  →  optiSCAN.exe --service-host
 
 **Option UI** : *Service Windows de protection système* (Options → Protection). Si le service est injoignable, repli automatique sur la RTP locale.
 
+**Identifiants techniques** — définis une seule fois dans `optiSCAN.Platform/ProtectionIdentifiers.cs`, avec deux miroirs : `native/optiSCAN.AmsiProvider/protection_identifiers.h` (DLL AMSI) et `installer/protection_identifiers.iss` (Inno Setup). Le test `ProtectionIdentifiersTests` échoue si les trois divergent.
+
+| Identifiant | Valeur |
+|---|---|
+| Service Windows (SCM) | `optiSCANProtection` (affiché « optiSCAN Protection v3 ») |
+| Pipe nommé | `\\.\pipe\optiSCAN_Protection` |
+| Source journal d’événements | `optiSCAN Protection v3` |
+| Protocole IPC | champ JSON `proto` = `1` (absent = client historique v1) |
+
+Le service v3 s’appelle `optiSCANProtection` et le pipe `optiSCAN_Protection` : ces noms ne portent pas le numéro d’assembly. Seul `ProtocolVersion` s’incrémente si le format JSON change de façon incompatible ; le serveur refuse alors explicitement un client plus récent que lui. Une mise à jour par-dessus une installation existante arrête le service `optiSCANProtection` et les processus optiSCAN, puis recopie les fichiers. Ce service n’est enregistré que si la case « protection avancée » est cochée. Une installation neuve laisse cette case décochée. La ligne v2 utilisait `optiSCANProtectionV2` et `optiSCAN_Protection_v2` ; l’installeur v3 ne les cite pas.
+
 ---
 
 ### Structure des modules
@@ -99,14 +105,14 @@ optiSCAN.Service.exe  →  optiSCAN.exe --service-host
 ├── docs/
 │   ├── README.md                      ← Index doc (guides + renvois vers ce README)
 │   ├── GUIDE_DISTRIBUTION.md          ← Signature, .NET, publish / Inno, checklist
-│   ├── DIAGNOSTIC_INTEGRATION_WINDOWS.md ← Profil install allégé façon v8 (2 moteurs)
-│   ├── POLITIQUE_CONFIDENTIALITE.md   ← Politique utilisateur v9.0
+│   ├── DIAGNOSTIC_INTEGRATION_WINDOWS.md ← Profil install allégé façon version 2 (2 moteurs)
+│   ├── POLITIQUE_CONFIDENTIALITE.md   ← Politique utilisateur v3.0
 │   └── CONFORMITE_RGPD.md             ← Note traitements / RGPD
-├── Audit.md                           ← Audit statique v9.0
+├── AUDIT_optiSCAN_360.md              ← Audit 360 (2 octobre 2026)
 ├── SECURITY.md                        ← Signalement + architecture sécurité
-├── LICENSE.txt                        ← CLUF v9.0
+├── LICENSE.txt                        ← CLUF v3.0
 ├── .editorconfig                      ← Sévérités analyse Roslyn (alignement IDE / MSBuild)
-├── Directory.Build.props              ← Version 9.0.4, NetAnalyzers, TreatWarningsAsErrors (Release)
+├── Directory.Build.props              ← Version 3.0.0, NetAnalyzers, TreatWarningsAsErrors (Release)
 ├── .github/workflows/
 │   ├── ci.yml                         ← Build, tests (289), publish + SBOM (main)
 │   ├── codeql.yml                     ← Analyse CodeQL (C# + natif)
@@ -114,7 +120,7 @@ optiSCAN.Service.exe  →  optiSCAN.exe --service-host
 │   └── gitleaks.yml                   ← Détection fuites secrets
 ├── scripts/
 │   ├── fetch-runtime-deps.ps1         ← Télécharge ClamAV + YARA (CI / dev)
-│   ├── prepare-release-v9.ps1         ← Chaîne complète release v9
+│   ├── prepare-release-v3.ps1         ← Chaîne complète release v3.0
 │   ├── clean-before-publish.ps1       ← Nettoyage bin/obj avant release
 │   ├── add-defender-exclusions.ps1    ← Exclusions Defender (manuel / Options ; pas auto à l’install)
 │   ├── generate-sbom.ps1              ← SBOM CycloneDX (CI publish)
@@ -124,7 +130,7 @@ optiSCAN.Service.exe  →  optiSCAN.exe --service-host
 │   ├── validate-release-readiness.ps1 ← Tests Release (+ verify publish optionnel)
 │   └── runtime-versions.json          ← Versions URL ClamAV / YARA
 ├── optiSCAN.sln                       ← Solution Visual Studio
-├── optiSCAN.Platform/                 ← IPC protection système v9
+├── optiSCAN.Platform/                 ← IPC protection système (ProtectionIdentifiers = noms service/pipe)
 ├── optiSCAN.Service/                  ← Service Windows (supervise --service-host)
 ├── optiSCAN.Tests/                    ← Tests unitaires (xUnit)
 ├── native/
@@ -139,7 +145,7 @@ optiSCAN.Service.exe  →  optiSCAN.exe --service-host
     │   ├── ThreatInfo.cs              ← Menace détectée
     │   ├── ScanProgress.cs            ← Progression temps réel (IProgress<T>)
     │   ├── ScanResult.cs              ← Résultat global d'un scan (types dont RemovableDrive)
-    │   ├── ScanSession.cs             ← Entrée d'historique scan (v8 : Threats[] ; v7 : type legacy)
+    │   ├── ScanSession.cs             ← Entrée d'historique scan (v2 : Threats[] ; v1 : type legacy)
     │   ├── ActivityEntry.cs           ← Ligne timeline Historique (projection UI)
     │   └── ActivityEventRecord.cs     ← Événement immuable (activity_log.dat)
     │
@@ -356,7 +362,7 @@ après la date textuelle (le premier champ est une date lisible, pas un entier).
 
 ---
 
-## 4. Architecture mono-fenêtre (v9.0)
+## 4. Architecture mono-fenêtre (v3.0)
 
 Les sous-sections **4.1** à **4.11** suivent une lecture « produit » : navigation et panneaux, détail du panneau Antivirus, menaces et pipeline, options techniques (MAJ, exclusions, quarantaine, logs), exports, puis contenu de la vue d’ensemble.
 
@@ -421,7 +427,7 @@ ScanViewModel → ScanOrchestrator
     └─→ Progress<ScanProgress> → UI
 ```
 
-**v8.0** ajoute aussi : note de **posture sécurité** (Accueil), **réputation VirusTotal** (hash SHA-256, clé API Options), **mode jeu** (toasts / scans headless atténués).
+La **version 2** ajoute aussi : note de **posture sécurité** (Accueil), **réputation VirusTotal** (hash SHA-256, clé API Options), **mode jeu** (toasts / scans headless atténués).
 
 **Identifiant menace** — `ThreatInfo.Id` : hash **SHA-256** déterministe (`FilePath|VirusName|DetectedAt`) — stable entre redémarrages (pas `string.GetHashCode()`).
 
@@ -484,7 +490,7 @@ Pendant un **scan en cours**, `ScanViewModel.ActiveScanSessionId` lie les quaran
 | Fichier / service | Rôle |
 |---|---|
 | `ActivityLogService` → `%LocalAppData%\optiSCAN\Logs\activity_log.dat` | Timeline **Historique** (DPAPI + HMAC) ; événements immuables : `ScanCompleted`, `CleanCompleted`, `ThreatQuarantined`, `ThreatRestored`, `QuarantineDeleted` ; rétention **150** événements les plus récents (`MaxActivityEvents`) ; **migration unique** au premier lancement depuis `scan_history.dat` / `clean_history.dat` + entrées quarantaine actuelles si le fichier est vide |
-| `ScanLogManager` → `scan_history.dat` / `clean_history.dat` | Détail des sessions (menaces en attente, exports) ; rotation **100 → 50** (même règle qu’avant) ; **v8** : `Threats[]` ; migration `.json` → `.legacy` ; alimente `ActivityLogService` à chaque scan/nettoyage terminé |
+| `ScanLogManager` → `scan_history.dat` / `clean_history.dat` | Détail des sessions (menaces en attente, exports) ; rotation **100 → 50** (même règle qu’avant) ; **v2** : `Threats[]` ; migration `.json` → `.legacy` ; alimente `ActivityLogService` à chaque scan/nettoyage terminé |
 | `ScanLogManager` → `optiSCAN.log` | Journal texte volontairement **non chiffré** (diagnostic) ; `FormatScanDetailCore` applique `PathRedaction` sur cible et chemins de menaces — noms de virus, dates et compteurs restent lisibles ; résumé dans **Historique → Scan Antivirus** |
 | `AppLogger` → `optiscan-YYYY-MM-DD.log` | Logs applicatifs (composants, erreurs) ; purge **> 30 jours**, au plus **1×/jour** (marqueur `.lastcleanup` persisté) |
 
@@ -494,7 +500,7 @@ Pendant un **scan en cours**, `ScanViewModel.ActiveScanSessionId` lie les quaran
 - **Sélection stable** : clé `SelectionKey` — `SessionId` pour les scans, `EventId` pour quarantaine/restauration/suppression — conservée après `Refresh()`.
 - **Refresh** : `ReconcileQuarantinedThreats` retire des sessions persistées les menaces déjà en quarantaine (même chemin d’origine).
 - Détail **scan** : grille via `HistoryThreatRow` ; **Quarantaine** / **Ignorer** / **Supprimer** ; **Tout mettre en quarantaine** ; **Traiter dans Analyse**. Détail **quarantaine** : lecture seule ; chemin masqué selon contexte (`QuarantinePathVisibilityConverter`).
-- Sessions **v7** : badge menaces possible sans chemins (`Hist_DetailThreatsLegacy`) — relancer une analyse pour traiter.
+- Sessions **version 1** : badge menaces possible sans chemins (`Hist_DetailThreatsLegacy`) — relancer une analyse pour traiter.
 - Types affichés : analyse rapide/complète, fichier, dossier, **lecteur amovible** (`ScanType.RemovableDrive`), nettoyage système, événements quarantaine.
 
 ### 4.10 Exports PDF et HTML
@@ -518,7 +524,7 @@ Le panneau **Vue d'ensemble** (`OverviewControl`, clé `Overview`) regroupe :
 
 ### RealTimeProtection — surveillance temps réel
 
-`RealTimeProtection.cs` : `FileSystemWatcher` sur dossiers sensibles (profil utilisateur, `ProgramData`, `Temp`, etc.), filtre sur extensions à risque (`RiskyFileExtensions`), délai de stabilisation, déduplication et **SemaphoreSlim(3)** parallèle. Une instance est créée dans **`ServiceContainer`** ; **Options** active ou coupe la surveillance et persiste le réglage. Les menaces détectées remontent vers l’UI (badge / liste) via événements consommés par **`MainWindow`**.
+`RealTimeProtection.cs` : `FileSystemWatcher` sur dossiers sensibles (profil utilisateur, `ProgramData`, `Temp`, etc.), filtre sur extensions à risque (`RiskyFileExtensions`), délai de stabilisation, déduplication et **SemaphoreSlim(3)** parallèle. Une instance est créée dans **`ServiceContainer`** ; **Options** active ou coupe la surveillance et persiste le réglage. Les menaces détectées remontent vers l’UI (badge / liste) via événements consommés par **`MainWindow`**. Chaque détection (RTP et `ProcessStartMonitor`) est aussi **enregistrée dans l’Historique** par `DetectionHistoryRecorder` : session `ScanType.RealTime` (« Protection temps réel ») visible dans l’onglet **Menaces**, avec Quarantaine / Ignorer / Supprimer tant que le fichier n’est pas traité (le toast seul ne laissait aucune trace).
 
 ### RemovableDriveScanService — clés USB et cartes SD
 
@@ -592,7 +598,7 @@ Instance unique : **`ServiceContainer.Default.ScheduledScan`** (partagée avec *
 
 ---
 
-## 6. Workflow utilisateur optiSCAN v9.0
+## 6. Workflow utilisateur optiSCAN v3.0
 
 ```
 DÉMARRAGE (UI)
@@ -610,7 +616,7 @@ DÉMARRAGE (UI)
             ├─→ [VUE D'ENSEMBLE] — hero (protection + dernière analyse), cartes d’action, statistiques 30 j., recommandations
             ├─→ [NETTOYER] — temporaires, caches navigateurs (Edge, Chrome, Firefox, Brave, **Opera**, **Vivaldi**, **Arc**), corbeille, journaux Windows
             ├─→ [ANTIVIRUS] — scans rapide/complet/dossier/fichier, quarantaine, historique de session, signatures
-            ├─→ [HISTORIQUE] — timeline `activity_log.dat` (5 filtres) ; sessions v8 : détections, quarantaine / ignorer / supprimer, **Traiter dans Analyse** ; exports **HTML** / **PDF**
+            ├─→ [HISTORIQUE] — timeline `activity_log.dat` (5 filtres) ; sessions version 2 : détections, quarantaine / ignorer / supprimer, **Traiter dans Analyse** ; exports **HTML** / **PDF**
             └─→ [OPTIONS] — langue FR/EN, thème (sync Windows par défaut), scan favori, démarrage auto, MAJ auto, RTP, scan USB/SD, quarantaine auto, planification, exclusions
 
 FERMETURE
@@ -656,15 +662,15 @@ Voir aussi [§4.7](#47-système-dexclusions) (détail technique). Résumé :
 
 - **Opt-in** : Options → « Réappliquer les exclusions Defender », ou script admin `.\scripts\add-defender-exclusions.ps1`.
 - Chemins typiques : `Program Files\optiSCAN`, `%LOCALAPPDATA%\optiSCAN` ; processus `optiSCAN.exe`, `clamscan.exe`, `freshclam.exe`, `clamd.exe`, `yara64.exe`, etc.
-- L’installeur **ne lance plus** le script automatiquement (profil allégé façon v8).
+- L’installeur **ne lance plus** le script automatiquement (profil allégé façon version 2).
 
 Si la **protection contre la falsification** de Defender est active, l’ajout peut échouer — ajoutez les chemins dans *Sécurité Windows → Protection contre les virus et menaces → Exclusions*.
 
 ---
 
-## 8. Publication, installateur et checklist release (v9.0)
+## 8. Publication, installateur et checklist release (v3.0)
 
-> **Publication** : assembly **9.0.4** (`Directory.Build.props`, Inno Setup). **Branche** : `dev` → merge → `main` → artefacts CI / installateur — voir [Branches Git](#branches-git).
+> **Publication** : assembly **3.0.0** (`Directory.Build.props`, Inno Setup). **Branche** : `dev` → merge → `main` → artefacts CI / installateur — voir [Branches Git](#branches-git).
 
 ### Prérequis machine de build
 
@@ -679,14 +685,14 @@ Si la **protection contre la falsification** de Defender est active, l’ajout p
 # Tout-en-un local (clean → publish FolderProfile → verify → ISCC) :
 .\installer\build-release-setup.ps1
 
-# Variante release complète (prepare-release-v9) :
-.\scripts\prepare-release-v9.ps1
+# Variante release complète (prepare-release-v3) :
+.\scripts\prepare-release-v3.ps1
 ```
 
 Équivalent manuel : `clean-before-publish` → `dotnet publish` → `verify-runtime-deps` → `build-release-setup.ps1 -SkipPublish`.  
 Détails distribution (.NET auto, Embed signatures) : [`docs/GUIDE_DISTRIBUTION.md`](docs/GUIDE_DISTRIBUTION.md).
 
-Sortie publish : `optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\` (chemin attendu par `installer\setup.iss`). Installateur typique : `installer\output\optiSCAN_Setup_v9.0.4.exe` (**~26 Mo** sans CVD/.yar embarqués).
+Sortie publish : `optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\` (chemin attendu par `installer\setup.iss`). Installateur typique : `installer\output\optiSCAN_Setup_v3.0.0.exe` (**~26 Mo** sans CVD/.yar embarqués).
 
 Offline avec bases + règles : `.\scripts\publish-release.ps1 -EmbedOfflineSignatures`.
 
@@ -694,11 +700,11 @@ Offline avec bases + règles : `.\scripts\publish-release.ps1 -EmbedOfflineSigna
 
 1. Gel fonctionnel : `.\scripts\validate-release-readiness.ps1` (ou `dotnet test` Release — **289** tests).
 2. Dépendances : `.\scripts\fetch-runtime-deps.ps1` (binaires ClamAV/YARA ; freshclam optionnel — les CVD/`.yar` se téléchargent aussi **après install** via MAJ signatures).
-3. Publish local : `.\scripts\prepare-release-v9.ps1` ou `clean` → `dotnet publish` → `build-release-setup.ps1 -SkipPublish`.
-4. VM propre : installer `optiSCAN_Setup_v9.0.4.exe` ; **MAJ signatures** (freshclam + YARA-Forge) ; scan, RTP optionnelle, FR/EN.
+3. Publish local : `.\scripts\prepare-release-v3.ps1` ou `clean` → `dotnet publish` → `build-release-setup.ps1 -SkipPublish`.
+4. VM propre : installer `optiSCAN_Setup_v3.0.0.exe` ; **MAJ signatures** (freshclam + YARA-Forge) ; scan, RTP optionnelle, FR/EN.
 5. CI : push `main` → job **Publish win-x64** ; artefact `optiSCAN-setup-<sha>.exe`.
 6. Signature (opt.) : Authenticode — `installer/setup.iss.signing.example`.
-7. Tag / distribution : `git tag v9.0.4`, release GitHub, SourceForge ou site.
+7. Tag / distribution : `git tag v3.0.0`, release GitHub, SourceForge ou site.
 
 ### Étapes manuelles détaillées
 
@@ -729,12 +735,12 @@ $pub = ".\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64"
 ```
 
 **Installateur** : assistant **bilingue** (français / English) ; langue choisie → `UiCulture` en registre pour le premier lancement de l’app.  
-**Profil défaut** : x64 only ; .NET 8 auto-install si manquant ; service plateforme **décoché** ; AMSI/`.sys` **s’ils existent** (comme v8) ; **pas** d’exclusions Defender auto ; bases ClamAV et règles YARA via **MAJ signatures** après install.
+**Profil défaut** : x64 only ; .NET 8 auto-install si manquant ; service plateforme **décoché** ; AMSI/`.sys` **s’ils existent** (comme en version 2) ; **pas** d’exclusions Defender auto ; bases ClamAV et règles YARA via **MAJ signatures** après install.
 
 **Contenu de l'installateur (~26 Mo par défaut, hors CVD/.yar) :**
 
 ```
-optiSCAN_Setup_v9.0.4.exe
+optiSCAN_Setup_v3.0.0.exe
     ├── optiSCAN.exe (+ DLL framework-dependent)
     ├── optiSCAN.ico / hero / shield
     ├── clamav/x64/          ← Binaires (clamscan, clamd, freshclam) — sans database/
@@ -752,9 +758,9 @@ Offline complet : `publish-release.ps1 -EmbedOfflineSignatures` (CVD + `.yar` da
 - [ ] `.\scripts\verify-runtime-deps.ps1` — vert sur dossier publish
 - [ ] `clamscan.exe`, `freshclam.exe`, **`clamd.exe`**, `yara64.exe` (rules `.yar` : OK si absentes — MAJ post-install)
 - [ ] `clamav\database\` — optionnel dans le setup défaut ; après install : freshclam / MAJ signatures
-- [ ] Installateur FR/EN, sidebar **v9.0**, service plateforme décoché par défaut, .NET auto si besoin
+- [ ] Installateur FR/EN, sidebar **v3.0**, service plateforme décoché par défaut, .NET auto si besoin
 - [ ] Test post-install : **MAJ signatures** → scan fichier, quarantaine, historique ; exclusions Defender via Options si souhaité
-- [ ] Après upgrade depuis v7 : `scan_history.dat` présent (éventuellement `scan_history.json.legacy`)
+- [ ] Après upgrade depuis la version 1 : `scan_history.dat` présent (éventuellement `scan_history.json.legacy`)
 
 ### CI GitHub
 
@@ -762,7 +768,7 @@ Pipelines : [`.github/workflows/ci.yml`](.github/workflows/ci.yml), [`codeql.yml
 
 | Branche | Comportement |
 |---------|----------------|
-| **`main`** | `fetch-runtime-deps.ps1` → `fetch-runtime-deps.ps1 -RunFreshclam` (timeout 45 min) → build AMSI (optionnel) → `dotnet publish` → SBOM CycloneDX → Inno → `optiSCAN_Setup_v9.0.4.exe` |
+| **`main`** | `fetch-runtime-deps.ps1` → `fetch-runtime-deps.ps1 -RunFreshclam` (timeout 45 min) → build AMSI (optionnel) → `dotnet publish` → SBOM CycloneDX → Inno → `optiSCAN_Setup_v3.0.0.exe` |
 | **`dev`** | Build + tests + artefact binaire Release (sans installateur complet) |
 
 **Couverture** : seuil minimal **40 %** lignes (échec CI si en dessous) ; avertissement si &lt; **50 %** (cible progressive).
@@ -787,12 +793,12 @@ Pipelines : [`.github/workflows/ci.yml`](.github/workflows/ci.yml), [`codeql.yml
 ### Après publication
 
 - Conserver `main` et `dev` alignées (même tip après merge release).
-- **v7 → v8** : migration historique JSON → `scan_history.dat` (DPAPI) au premier lancement.
-- Maintenabilité et choix volontaires : [§12.1](#121-maintenabilité-et-choix-volontaires-non-bloquants-v8).
+- **Version 1 → version 2** : migration historique JSON → `scan_history.dat` (DPAPI) au premier lancement.
+- Maintenabilité et choix volontaires : [§12.1](#121-maintenabilité-et-choix-volontaires-non-bloquants-v30).
 
 ### Signature Authenticode (optionnelle)
 
-Windows affiche « Éditeur inconnu » sans certificat. Utile pour release publique ; nécessite un `.pfx` et des secrets CI (`CODESIGN_PFX`). Exemple : [`installer/setup.iss.signing.example`](installer/setup.iss.signing.example). Signer `optiSCAN.exe` + `optiSCAN_Setup_v9.0.4.exe` (`signtool`).
+Windows affiche « Éditeur inconnu » sans certificat. Utile pour release publique ; nécessite un `.pfx` et des secrets CI (`CODESIGN_PFX`). Exemple : [`installer/setup.iss.signing.example`](installer/setup.iss.signing.example). Signer `optiSCAN.exe` + `optiSCAN_Setup_v3.0.0.exe` (`signtool`).
 
 ---
 
@@ -843,20 +849,22 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 
 ## 11. Historique des versions produit
 
-### v9.0 — Defender complément, install allégé, IPC v9, Optimiser
+### v3.0 — 30 septembre 2026
 
-- **Version produit** — assembly **9.0.4** ; service Windows `optiSCANProtectionV9` ; pipe `optiSCAN_Protection_v9`
-- **9.0.4** — mise à jour par-dessus une installation existante : l’installeur ferme optiSCAN et arrête le service, sans désinstallation. Accueil : « Corriger » applique l’action (protection, MAJ auto, analyse rapide, suppression des partages après confirmation) ; le rafraîchissement de l’accueil se fait en arrière-plan
-- **9.0.3** — Optimiser → Mises à jour : `winget upgrade --uninstall-previous` puis désinstallation des versions encore listées du même identifiant (hors runtimes côte à côte : VC++, .NET, DirectX), pour ne plus empiler v4, v5, v6… du même programme
+- **Version produit** — assembly **3.0.0** ; service Windows `optiSCANProtection`, affiché « optiSCAN Protection v3 » ; pipe `optiSCAN_Protection`. L’installeur arrête ce service s’il existe déjà et ne le recrée que si la case « protection avancée » est cochée.
+- **3.0.0** — mise à jour par-dessus une installation existante : l’installeur ferme optiSCAN et arrête le service, sans désinstallation. Accueil : « Corriger » applique l’action (protection, MAJ auto, analyse rapide, suppression des partages après confirmation) ; le rafraîchissement de l’accueil se fait en arrière-plan
+- **Historique des détections** — les détections de la protection temps réel et de la surveillance des processus laissent une session « Protection temps réel » (`ScanType.RealTime`, `DetectionHistoryRecorder`) dans l’Historique ; écriture de `scan_history.dat` verrouillée (accès concurrents)
+- **Indépendance vis-à-vis des autres produits** — le nettoyage du menu contextuel (`ShellContextMenuSupport`, `setup.iss`) ne supprime plus les entrées « Scan with optiCombat » ; optiSCAN garde l’`AppId` Inno historique `F3A2C1D0-…`, distinct d’optiCOMBAT et d’optiSCAN WinUI 3
+- **18 septembre 2026** — Optimiser → Mises à jour : `winget upgrade --uninstall-previous` puis désinstallation des versions encore listées du même identifiant (hors runtimes côte à côte : VC++, .NET, DirectX), pour ne plus empiler v4, v5, v6… du même programme
 - **Optimiser** (ex-Nettoyer) — panneau sidebar + 3 sous-onglets : **Nettoyage** (temp, navigateurs, corbeille, cache WU, DNS), **Mises à jour** (`WingetUpdateService` + lien Windows Update), **Tweaks** (`SystemTweaksService`, une invite UAC regroupée)
 - **Mode complément Defender** — coexistence recommandée : Defender garde le RTP ; optiSCAN scans manuels/planifiés
 - **Exclusions Defender** — **opt-in** (Options / script) ; plus d’exécution silencieuse à l’install ni au démarrage
-- **Installateur** — x64 only ; .NET 8 auto-download ; service plateforme décoché ; CVD ClamAV + règles YARA **post-install** (freshclam / YARA-Forge) ; AMSI/`.sys` livrés s’ils existent (comme v8) ; chaîne locale : `.\installer\build-release-setup.ps1`
+- **Installateur** — x64 only ; .NET 8 auto-download ; service plateforme décoché ; CVD ClamAV + règles YARA **post-install** (freshclam / YARA-Forge) ; AMSI/`.sys` livrés s’ils existent (comme en version 2) ; chaîne locale : `.\installer\build-release-setup.ps1`
 - **ClamAV 1.4.x** — binaires x64 ; correction `freshclam.conf` (retrait `CVDCertsDirectory`, certificats via `CVD_CERTS_DIR`)
 - **AMSI** — DLL présente mais inactive si protection plateforme désactivée ; désenregistrement AMSI à la coupure
-- **Upgrade v8** — l’installateur retire l’ancien service `optiSCANProtectionV8` si présent
+- **Service v3** — `optiSCANProtection`, affiché « optiSCAN Protection v3 », n’est créé que si la case « protection avancée » est cochée
 
-### v8.0 — Clamd, posture, historique unifié, scan USB, coordinateurs
+### v2.0 — 23 juin 2026 — Clamd, posture, historique unifié, scan USB, coordinateurs
 
 - **Anti-autophagie** — `OptiscanProtectedPaths` : installation (Program Files + processus) et `%LOCALAPPDATA%\optiSCAN` (MAJ signatures, quarantaine, logs) exclus des scans / RTP / quarantaine auto ; dossiers obligatoires dans Options
 - **Exclusions Defender** — `WindowsDefenderExclusionService` + `scripts/add-defender-exclusions.ps1` : chemins et processus optiSCAN enregistrés à l’install et au démarrage (`--defender-exclusions` si UAC)
@@ -865,7 +873,7 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 - **Refactor UI** — ~22 coordinateurs (`optiSCAN/Coordinators/`) : startup/shutdown, systray, exports, historique, RTP/USB/toasts ; `MainWindow` allégé (~730 L)
 - **DI préférences** — `IUserPreferencesAccessor`, `IExclusionSettingsAccessor` ; vues via `IViewServices` / `IHistoryServices` / `IHistoryExportService`
 - **Qualité** — `.editorconfig` ; NetAnalyzers `latest-recommended` ; **289** tests ; SBOM CycloneDX en publish CI
-- **Historique** — `ActivityLogService` + `activity_log.dat` (150 événements, migration unique) ; `HistoryViewModel` (5 filtres, `SelectionKey`) ; menaces traitables (**Traiter dans Analyse**) ; `scan_history.dat` / `clean_history.dat` (rotation 100→50) ; compat v7 sans chemins
+- **Historique** — `ActivityLogService` + `activity_log.dat` (150 événements, migration unique) ; `HistoryViewModel` (5 filtres, `SelectionKey`) ; menaces traitables (**Traiter dans Analyse**) ; `scan_history.dat` / `clean_history.dat` (rotation 100→50) ; compat version 1 sans chemins
 - **Accueil** — `OverviewRecommendationsBuilder` + `OverviewProtectionStatsFormatter` (stats 30 j. sans doublon dans les recommandations)
 - **Scan USB/SD** — rapide = extensions à risque (4 000 max), moteurs **en série**, timeouts 10/45 min, repli récursif ; complet = `ScanFolderBackgroundAsync` ; statut barre + toasts début/fin
 - **Quarantaine** — rollback si suppression originale échoue ; `ReconcileQuarantinedThreats` ; session scan active (`ActiveScanSessionId`)
@@ -874,7 +882,7 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 - **Posture /100**, **VirusTotal**, **mode jeu** — voir [§13](#13-sécurité-posture-et-menaces) et Options
 - **Tests** — **289** tests Release — [§12](#12-audit-et-qualité) ; i18n **621** clés FR/EN ; coordinateurs + exports couverts par tests dédiés
 
-### v7.0 — Lifting UI Donaby + identité visuelle
+### v1.0 — 1 juin 2026 — interface Donaby
 
 - **Lifting apparence** — glassmorphism, fond mesh, cartes métriques, en-têtes unifiés
 - **Accueil** — hero `FontSize.Display`, dernière analyse détaillée, carte État de protection, stats/recommandations
@@ -889,25 +897,22 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 - **CI** — GitHub Actions ; tests Release ; artefact publish + installateur Inno (main)
 - **Doc** — guide unique `README.md` (sections 8–13)
 
-### v6.0 — Version majeure (publication)
+### Version 1 — 26 mai 2026
 
-- **Versioning unifié** — nom **v6.0** + build **6.0.0** (`Directory.Build.props`, Inno Setup, **LICENSE.txt**, manifeste, rapports PDF/HTML)
 - **Interface bilingue** — français et anglais embarqués (`LocalizationService`, `UiStrings` / `UiStrings.en`) ; installateur et Options avec redémarrage ; menu contextuel Explorateur localisé
 - **Documentation** — `README.md` ; scripts `clean-before-publish.ps1` et `build-release-setup.ps1`
 - **Expérience d’analyse** — libellés utilisateur unifiés (`ScanUserDisplay`) ; progression monotone (`ScanProgressRelay`) ; fusion menaces (`ScanThreatMerger`) ; tests unitaires étendus
 - **Antivirus** — analyse par boutons (rapide, complète, fichier, dossier) ; suppression du glisser-déposer
 
-### v5.0 — Version majeure (publication)
+### Version 1 — 22 mai 2026
 
-- **Versioning unifié** — nom **v5.0** + build **5.0.0** (`Directory.Build.props`, Inno Setup, **LICENSE.txt**, manifeste, rapports PDF/HTML)
 - **Optimiser (Nettoyage)** — historique des sessions dans `CleanControl` (colonne **Libéré** / `BytesDisplay`) + onglet Historique
 - **Stabilité** — `ThreatInfo.Id` SHA-256 déterministe ; quarantaine avec nom de menace réel ; `ServiceContainer.Shutdown()` à la fermeture
 - **UI / services** — cibles récentes, colonne **Risque**, planification partagée, journal des analyses, périmètres protégés optiSCAN
 - **Documentation** — README et CLUF alignés sur le code (plus de référence à `ClamDaemon.cs`)
 
-### v4.0 — Version majeure (alignement produit)
+### Version 1 — 14 mai 2026
 
-- **Versioning unifié** — nom **v4.0** + build **4.0.0** (`Directory.Build.props`, Inno Setup, **LICENSE.txt**, manifeste, rapports PDF/HTML)
 - **Interface d’analyse** — progression, fichier courant, fusion ClamAV + YARA (`ScanOrchestrator`)
 - **Vue d’ensemble** — statistiques sur 30 jours, recommandations et bannière de protection **branchées** sur les services et l’historique
 - **Options** — thème, `SyncWindowsTheme`, scan favori, RTP, quarantaine auto, planif. (`ScheduledScan` partagé, prochaine exécution, lancement immédiat), exclusions **DPAPI** (`exclusions.dat`)
@@ -922,7 +927,7 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 - **Manifeste** — **`asInvoker`** + élévation ponctuelle (`ElevationHelper`) pour réduire la surface d’attaque
 - **Français** — libellés et documentation alignés sur le comportement réel de l’application
 
-### v3.0 — Donaby Design System + Stabilisation
+### Version 1 — Donaby Design
 
 - **Donaby Design System complet** — refonte UI vers le thème clair Donaby Light par défaut
 - **OverviewControl** — hero (titre + dernière analyse), 4 cartes d'action cliquables ; statistiques et recommandations (sans panneau ClamAV/YARA sur l'accueil)
@@ -933,7 +938,7 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 - **README aligné code** — navigation, quarantaine AES-GCM, pipeline clamscan + YARA, RTP / planificateur / packaging
 - **MAJ auto** — `ServiceContainer` arme freshclam (4 h) + YARA-Forge (24 h) ; Options coupe/réactive les deux
 
-### v2.0 — Phase 2 : Services Avancés + Donaby Design
+### Version 1 — services avancés
 
 - **Donaby Design** — thème sombre/clair dynamique (`ThemeManager`, tokens `DynamicResource`)
 - Icône **system tray** (expérimental dans les versions précédentes ; l’UI actuelle reste fenêtre principale uniquement)
@@ -947,12 +952,12 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 - **Rapport PDF** (`PdfReportGenerator`, QuestPDF Community)
 - **Vue d'ensemble** — cartes d'action, encarts d'état / recommandations (évolution continue selon les versions)
 
-### v1.0 — Phase 1 : Fondations
+### Version 1 — 30 avril 2026, fondations
 
 - Scanner ClamAV (rapide / complet / dossier / fichier)
 - Moteur YARA comportemental + règles YARA-Forge
 - Quarantaine locale chiffrée (`.quar` + `manifest.json`)
-- Historique des scans (rotation 100→50 ; détail menaces et chiffrement **.dat** depuis **v8**)
+- Historique des scans (rotation 100→50 ; détail menaces et chiffrement **.dat** depuis la **version 2**)
 - Mise à jour automatique signatures (4 h) et règles (24 h)
 - Système d'exclusions (dossiers + règles)
 - Nettoyage fichiers temporaires
@@ -961,25 +966,39 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 
 ## 12. Audit et qualité
 
-**Verdict (v9.0)** : produit stable ; valider l’installateur sur une machine propre avant diffusion large.
+**Réévaluation du 2 octobre 2026** — base `main` (`0e8161f`, release 3.0.0) + branche `refactor/protection-identifiers`. Revue statique du dépôt, compilation Release de toute la solution (analyseurs actifs, avertissements = erreurs) et contrôles automatisés ; tests non exécutés ici (runtime WPF requis, voir Tests & CI).
 
-| Domaine | Note | Commentaire |
-|---------|:----:|-------------|
-| Architecture | 8/10 | `CompositeClamAvBackend`, posture injectable ; recommandations accueil extraites |
-| Sécurité locale | 8/10 | Quarantaine AES-GCM ; historique `.dat` DPAPI ; `optiSCAN.log` diagnostic (chemins redacted, pas de secret critique) |
-| UI / Donaby | 8/10 | Accueil posture ; VT optionnel |
-| Tests & CI | 9/10 | **289** tests (posture, coordinateurs, historique/timeline, USB, quarantaine, périmètres protégés, exclusions Defender) ; couverture ligne **≥ 40 %** (cible 50 %) |
-| Release Inno | 7/10 | Pipeline CI OK |
+**Verdict** : socle sain et cohérent. La compilation Release de toute la solution passe à nouveau (0 erreur, 0 avertissement) après correction de CA1863 et de 6 erreurs du projet de tests. Prochaine étape : exécuter les tests sous Windows et valider l’installateur sur une machine propre.
 
-**Dettes ouvertes (résumé)** : tests intégration clamd/schtasks réels ; signature Authenticode optionnelle. Voir §12.1 pour le reste (maintenabilité, choix volontaires).
+| Domaine | Note | Évolution | Commentaire |
+|---------|:----:|:---------:|-------------|
+| Architecture | 8/10 | = | DI (`ServiceContainer`), coordinateurs, `CompositeClamAvBackend`. **Nouveau** : identifiants de protection centralisés (`ProtectionIdentifiers`) avec miroirs C++/Inno testés, protocole IPC versionné (`proto`). Reste : 6 fichiers > 700 lignes (`MainWindow.xaml.cs` 793, `OptionsControl.xaml.cs` 766, `QuarantineManager` 764…) |
+| Qualité du code | 7/10 | *nouveau* | ~26 700 lignes C# (app) + 5 100 XAML ; 0 TODO, 0 `#pragma` ; mais 283 `catch` génériques dont 37 vides, 16 règles CA désactivées dans `.editorconfig`, 6 appels `GetAwaiter().GetResult()`. Bug de chemin `clamd --config-file` corrigé (test de non-régression `ClamdHostTests`) |
+| Sécurité locale | 8/10 | = | Quarantaine AES-GCM + HMAC, clé DPAPI ; exclusions et `SecureStore` DPAPI + HMAC ; `optiSCAN.log` avec chemins masqués (`PathRedaction`) |
+| Sécurité plateforme (service, IPC, AMSI) | 7/10 | *nouveau* | Pipe avec ACL, limitation de débit, jeton d’arrêt protégé, refus explicite des protocoles inconnus ; noms service/pipe du contrat v3 indépendants du numéro d’assembly (`optiSCANProtection`, `optiSCAN_Protection`). Limites : DLL AMSI non compilée par la CI, minifiltre = squelette (53 lignes), aucun binaire signé |
+| UI / accessibilité | 8/10 | = | `AutomationProperties` présents dans les 5 vues + `MainWindow` (audit de juillet : 4 vues sur 7) ; politique de confidentialité accessible depuis Options ; FR/EN |
+| Tests & CI | 9/10 | = | **330** méthodes de test (312 `[Fact]`, 18 `[Theory]`, ≈ 380 cas) contre 289 documentés ; CodeQL, gitleaks, dependency-review, SBOM, seuil de couverture 40 % (cible 50 %). Build Release de la solution rétablie (CA1863 dans `OverviewControl.xaml.cs`, CA1711 et CS1998 dans les tests). Couverture non remesurée |
+| Release Inno | 7/10 | = | Mise à jour sans désinstallation ; signature Authenticode toujours absente (SmartScreen) |
+
+**Note globale : 7,7/10** (7 domaines, moyenne simple) contre 8,0/10 sur l’ancienne grille de 5 domaines. L’écart vient des deux domaines ajoutés, plus exigeants (qualité du code, sécurité plateforme). Avant correction de la build Release, la note était de 7,4/10.
+
+**Dettes ouvertes, par priorité**
+
+1. ✅ ~~**Build Release cassée**~~ — corrigé : `OverviewControl` utilise `LocalizationService.Format` (CA1863) ; projet de tests : CA1711 désactivée pour les classes `[CollectionDefinition]` (convention xUnit), méthode de test `async` sans `await` rendue synchrone (CS1998).
+2. ✅ ~~**`clamd` ne démarrait pas si le profil Windows contient un espace**~~ — corrigé : `ClamdHost.BuildStartInfo` passe le chemin par `ProcessStartInfo.ArgumentList` ; test `ClamdHostTests`.
+3. **🟠 Signature Authenticode** de l’installeur, des `.exe` et de la DLL AMSI.
+4. **🟡 37 `catch` vides** à journaliser au minimum (`AppLogger.Debug`), en priorité dans `Services/`.
+5. **🟡 Découper les fichiers de plus de 700 lignes**, en commençant par `OptionsControl.xaml.cs` et `QuarantineManager`.
+6. **🟡 Tests d’intégration** réels clamd / schtasks / service Windows ; remesurer la couverture et viser 50 %.
 
 ```powershell
+dotnet build optiSCAN.sln -c Release
 dotnet test optiSCAN.Tests\optiSCAN.Tests.csproj -c Release
 ```
 
-### 12.1 Maintenabilité et choix volontaires (non bloquants v9)
+### 12.1 Maintenabilité et choix volontaires (non bloquants, v3.0)
 
-**`MainWindow` allégé (v8.1 refactor)** — la logique événementielle est dans `optiSCAN/Coordinators/` (classes `static` + hôtes typés). Il reste dans la fenêtre : enregistrement des panneaux, branchement `ServiceContainer`, et raccourcis navigation.
+**`MainWindow` allégé (version 2)** — la logique événementielle est dans `optiSCAN/Coordinators/` (classes `static` + hôtes typés). Il reste dans la fenêtre : enregistrement des panneaux, branchement `ServiceContainer`, et raccourcis navigation.
 
 **`optiSCAN.log` non chiffré** — choix intentionnel pour le support et le mode headless. Les lignes produites par `FormatScanDetail` / `FormatScanDetailCore` passent par `PathRedaction.RedactPath` sur `TargetPath` et `FilePath` : pas de chemins complets dans le journal. Restent lisibles : noms de menace, horodatages, compteurs — acceptable pour un log de diagnostic.
 
@@ -1011,7 +1030,7 @@ Liens **Corriger** (accueil) : `optiscan://panel/{id}` (antivirus, options, hist
 
 **Contrôles** : quarantaine AES-GCM + HMAC ; exclusions avec frontière `\` ; périmètres protégés optiSCAN (`OptiscanProtectedPaths`) ; exclusions Defender **opt-in** (`WindowsDefenderExclusionService`) ; UAC pour scan complet ; RTP ; clamd sur `127.0.0.1`.
 
-**Limites** : malware admin peut neutraliser l’AV local ; AMSI v9 via `optiSCAN.AmsiProvider.dll` (nécessite service + droits admin) ; minifilter encore stub ; VT envoie le hash ; `optiSCAN.log` non chiffré mais sans chemins complets (`PathRedaction` sur les lignes de scan).
+**Limites** : malware admin peut neutraliser l’AV local ; AMSI (v3.0) via `optiSCAN.AmsiProvider.dll` (nécessite service + droits admin) ; minifilter encore stub ; VT envoie le hash ; `optiSCAN.log` non chiffré mais sans chemins complets (`PathRedaction` sur les lignes de scan).
 
 ---
 

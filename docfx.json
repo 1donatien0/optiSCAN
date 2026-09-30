@@ -1,0 +1,24 @@
+{
+  "metadata": [
+    {
+      "name": "optiSCAN API",
+      "scope": "optiSCAN.Application"
+    }
+  ],
+  "build": {
+    "content": [
+      {
+        "files": [ "api/**.yml", "index.md", "toc.yml" ]
+      }
+    ],
+    "resource": [
+      {
+        "files": [ "images/**" ]
+      }
+    ],
+    "dest": "_site",
+    "globalMetadata": {
+      "_appTitle": "optiSCAN documentation"
+    }
+  }
+}

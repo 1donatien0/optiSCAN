@@ -6,7 +6,7 @@ namespace optiSCAN.Services
 {
     /// <summary>
     /// Regroupe les services à longue durée de vie (singleton <see cref="Default"/>).
-    /// Construction via <see cref="Microsoft.Extensions.DependencyInjection"/> (v9).
+    /// Construction via <see cref="Microsoft.Extensions.DependencyInjection"/> (v3).
     /// Points d'entrée légitimes pour <see cref="Default"/> : <see cref="App"/> (bootstrap),
     /// <see cref="ProtectionServiceHost"/>, et <see cref="ViewModels.ScanViewModel"/> sans paramètre (designer).
     /// Les vues reçoivent <see cref="IViewServices"/> / <see cref="IOptionsServices"/> via <c>Bind()</c>.
@@ -143,7 +143,7 @@ namespace optiSCAN.Services
             RequestProtectionStateRefresh();
         }
 
-        /// <summary>Active le service Windows de protection système (v9).</summary>
+        /// <summary>Active le service Windows de protection système.</summary>
         public void ApplyPlatformProtectionService(bool enabled)
         {
             _userPreferences.Current.UsePlatformProtectionService = enabled;

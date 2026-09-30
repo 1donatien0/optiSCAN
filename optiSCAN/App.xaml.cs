@@ -77,6 +77,9 @@ namespace optiSCAN
                 _instanceMutex = new Mutex(true, "Global\\optiSCAN_ServiceHost", out createdService);
                 if (!createdService)
                 {
+                    // Mutex non détenue : ne pas la libérer dans OnExit (ApplicationException).
+                    _instanceMutex.Close();
+                    _instanceMutex = null;
                     Shutdown();
                     return;
                 }

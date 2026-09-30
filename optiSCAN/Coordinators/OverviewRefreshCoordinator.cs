@@ -67,7 +67,8 @@ public static class OverviewRefreshCoordinator
 
     public static async Task RefreshSignaturesAsync(SignaturesRefreshContext ctx, bool forceRefresh = false)
     {
-        var snapshot = await ctx.SignatureStatus.GetSnapshotAsync(forceRefresh).ConfigureAwait(false);
+        // ConfigureAwait(true) : ViewModel et AfterSignaturesRefreshed sont liés à l'UI WPF.
+        var snapshot = await ctx.SignatureStatus.GetSnapshotAsync(forceRefresh).ConfigureAwait(true);
 
         ctx.AntivirusPanel?.UpdateSignaturesPanel(
             snapshot.YaraPackVersion,

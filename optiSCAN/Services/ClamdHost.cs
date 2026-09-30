@@ -8,6 +8,24 @@ namespace optiSCAN.Services
     [SupportedOSPlatform("windows")]
     internal sealed class ClamdHost : IDisposable
     {
+        /// <summary>
+        /// Ligne de commande de clamd. <see cref="ProcessStartInfo.ArgumentList"/> (et non
+        /// <c>Arguments</c>) : .NET met les guillemets lui-même, sinon un profil
+        /// « C:\Users\Jean Dupont » coupe le chemin en deux et clamd refuse de démarrer.
+        /// </summary>
+        internal static ProcessStartInfo BuildStartInfo(string clamdExe, string confPath)
+        {
+            var psi = new ProcessStartInfo
+            {
+                FileName = clamdExe,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+                WorkingDirectory = Path.GetDirectoryName(clamdExe) ?? Environment.CurrentDirectory,
+            };
+            psi.ArgumentList.Add("--config-file=" + confPath);
+            return psi;
+        }
+
         private static readonly object Gate = new();
         private static readonly SemaphoreSlim StartGate = new(1, 1);
         private static ClamdHost? _shared;
@@ -60,15 +78,7 @@ namespace optiSCAN.Services
                         var excludePatterns = AppInstallPaths.GetClamScanExcludePatterns().ToList();
                         ClamdConfSupport.EnsureConf(_databaseDir, excludePatterns);
 
-                        var psi = new ProcessStartInfo
-                        {
-                            FileName = _clamdExe,
-                            Arguments = $"--config-file={ClamdConfSupport.GetConfPath()}",
-                            UseShellExecute = false,
-                            CreateNoWindow = true,
-                            WorkingDirectory = Path.GetDirectoryName(_clamdExe) ?? Environment.CurrentDirectory,
-                        };
-
+                        var psi = BuildStartInfo(_clamdExe, ClamdConfSupport.GetConfPath());
                         _process = Process.Start(psi);
                         if (_process == null)
                             return false;

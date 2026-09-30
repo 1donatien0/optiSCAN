@@ -50,7 +50,8 @@ public static class MainWindowStartupCoordinator
         host.RefreshAntivirusStatus();
         host.RefreshQuarantineList();
         host.RefreshHistory();
-        await host.RefreshSignaturesDisplayAsync().ConfigureAwait(false);
+        // ConfigureAwait(true) : la suite (navigation, onboarding, Hide) touche l'UI WPF.
+        await host.RefreshSignaturesDisplayAsync().ConfigureAwait(true);
         host.ApplyElevationBanner();
 
         try
@@ -88,7 +89,7 @@ public static class MainWindowStartupCoordinator
         {
             var shellPath = host.PendingShellScanPath;
             host.PendingShellScanPath = null;
-            await host.ShellScan.RunShellScanAsync(shellPath).ConfigureAwait(false);
+            await host.ShellScan.RunShellScanAsync(shellPath).ConfigureAwait(true);
         }
     }
 }

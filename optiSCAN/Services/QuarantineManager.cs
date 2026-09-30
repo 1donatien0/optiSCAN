@@ -745,6 +745,13 @@ namespace optiSCAN.Services
         public string Sha256 { get; set; } = string.Empty;
 
         /// <summary>Session scan d'origine si connue (traçabilité Historique).</summary>
+        /// <remarks>
+        /// Omis du JSON quand il est absent : le HMAC du manifeste est calculé sur la
+        /// sérialisation des entrées. Les entrées écrites par la version 1 n'ont pas ce
+        /// champ ; l'écrire à <c>null</c> changeait l'empreinte, le manifeste v1 était
+        /// refusé (« HMAC manifest invalide ») et la quarantaine v1 disparaissait.
+        /// </remarks>
+        [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
         public Guid? SourceSessionId { get; set; }
 
         public string FileName => Path.GetFileName(OriginalPath);

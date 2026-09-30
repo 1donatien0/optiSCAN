@@ -47,7 +47,7 @@
 
 .EXAMPLE
     # 4. Signature du setup Inno
-    .\scripts\dev-codesign.ps1 -Path "installer\output\optiSCAN_Setup_v9.0.3.exe"
+    .\scripts\dev-codesign.ps1 -Path "installer\output\optiSCAN_Setup_v3.0.0.exe"
 
 .NOTES
     Cout : 0 EUR. Prerequis : Windows SDK (signtool.exe), inclus avec Visual Studio.
