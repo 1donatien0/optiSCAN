@@ -2,7 +2,7 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace optiSCAN.Services.DependencyInjection;
 
-/// <summary>Enregistrement DI Microsoft.Extensions pour optiSCAN (v9).</summary>
+/// <summary>Enregistrement DI Microsoft.Extensions pour optiSCAN (v3).</summary>
 public static class ServiceRegistration
 {
     public static IServiceCollection AddOptiscanCoreServices(this IServiceCollection services)
@@ -55,7 +55,9 @@ public static class ServiceRegistration
                 sp.GetRequiredService<QuarantineManager>(),
                 sp.GetRequiredService<NotificationService>(),
                 sp.GetRequiredService<IUserPreferencesAccessor>(),
-                sp.GetRequiredService<IExclusionSettingsAccessor>()));
+                sp.GetRequiredService<IExclusionSettingsAccessor>(),
+                sp.GetRequiredService<ScanLogManager>(),
+                sp.GetRequiredService<IUiEventBus>()));
         services.AddSingleton<ProcessStartMonitor>(sp =>
         {
             var rtp = sp.GetRequiredService<RealTimeProtection>();
@@ -65,7 +67,9 @@ public static class ServiceRegistration
                 sp.GetRequiredService<NotificationService>(),
                 () => rtp.IsPaused,
                 sp.GetRequiredService<IUserPreferencesAccessor>(),
-                sp.GetRequiredService<IExclusionSettingsAccessor>());
+                sp.GetRequiredService<IExclusionSettingsAccessor>(),
+                sp.GetRequiredService<ScanLogManager>(),
+                sp.GetRequiredService<IUiEventBus>());
         });
         services.AddSingleton<TamperProtectionService>(sp =>
             new TamperProtectionService(

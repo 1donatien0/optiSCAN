@@ -2,7 +2,7 @@
 
 **Guide produit** : [README.md](../README.md) à la racine (architecture, release §8, audit §12).
 
-**Version** : release **v9.0**, assembly **9.0.4**. Scripts : `scripts/` · Installeur : `installer/` · CI : `.github/workflows/`.
+**Version** : release **v3.0**, assembly **3.0.0**. Scripts : `scripts/` · Installeur : `installer/` · CI : `.github/workflows/`.
 
 ---
 
@@ -11,8 +11,8 @@
 | Document | Rôle |
 |----------|------|
 | [GUIDE_DISTRIBUTION.md](GUIDE_DISTRIBUTION.md) | Signature, .NET auto, Embed CVD/YARA, publish / Inno, checklist |
-| [DIAGNOSTIC_INTEGRATION_WINDOWS.md](DIAGNOSTIC_INTEGRATION_WINDOWS.md) | Friction SmartScreen / AV ; profil install allégé façon v8 (2 moteurs) |
-| [POLITIQUE_CONFIDENTIALITE.md](POLITIQUE_CONFIDENTIALITE.md) | Politique de confidentialité utilisateur (v9.0) |
+| [DIAGNOSTIC_INTEGRATION_WINDOWS.md](DIAGNOSTIC_INTEGRATION_WINDOWS.md) | Friction SmartScreen / AV ; profil install allégé façon version 2 (2 moteurs) |
+| [POLITIQUE_CONFIDENTIALITE.md](POLITIQUE_CONFIDENTIALITE.md) | Politique de confidentialité utilisateur (v3.0) |
 | [CONFORMITE_RGPD.md](CONFORMITE_RGPD.md) | Analyse traitements / RGPD (note interne, pas un avis juridique) |
 | [README.md](README.md) | Cet index |
 
@@ -21,9 +21,9 @@
 | Document | Rôle |
 |----------|------|
 | [../README.md](../README.md) | Guide unique (architecture, modules, release, langues, sécurité) |
-| [../SECURITY.md](../SECURITY.md) | Politique de sécurité, signalement, composants v9 |
-| [../LICENSE.txt](../LICENSE.txt) | CLUF v9.0 |
-| [../Audit.md](../Audit.md) | Audit statique v9.0 (sécurité, qualité, RGPD, CI) |
+| [../SECURITY.md](../SECURITY.md) | Politique de sécurité, signalement, composants v3.0 |
+| [../LICENSE.txt](../LICENSE.txt) | CLUF v3.0 |
+| [../AUDIT_optiSCAN_360.md](../AUDIT_optiSCAN_360.md) | Audit 360 (2 octobre 2026) |
 | [../installer/redist/LISEZMOI.md](../installer/redist/LISEZMOI.md) | Runtime .NET 8 embarqué optionnel dans l'installeur |
 
 ---
@@ -32,8 +32,8 @@
 
 | Sujet | Section README |
 |-------|----------------|
-| Build, publish, Inno, CI, SBOM, checklist | [§8](../README.md#8-publication-installateur-et-checklist-release-v90) |
-| Coordinateurs UI (`optiSCAN/Coordinators/`) | [§1](../README.md#structure-des-modules) · [§12.1](../README.md#121-maintenabilité-et-choix-volontaires-non-bloquants-v9) |
+| Build, publish, Inno, CI, SBOM, checklist | [§8](../README.md#8-publication-installateur-et-checklist-release-v30) |
+| Coordinateurs UI (`optiSCAN/Coordinators/`) | [§1](../README.md#structure-des-modules) · [§12.1](../README.md#121-maintenabilité-et-choix-volontaires-non-bloquants-v30) |
 | DI préférences (`IUserPreferencesAccessor`, …) | [§1](../README.md#structure-des-modules) |
 | FR / EN | [§9](../README.md#9-langues-de-linterface-fr-fr--en-us) |
 | Historique (`ActivityLogService`) | [§4.9](../README.md#49-journaux-et-historique) |

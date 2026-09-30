@@ -110,7 +110,7 @@ if (-not $SkipInstaller) {
         # évite que l'installeur reparte sur un numéro figé après un bump.
         [xml]$propsXml = Get-Content -LiteralPath (Join-Path $repo 'Directory.Build.props')
         $appVersion = ($propsXml.Project.PropertyGroup.Version | Select-Object -First 1).'#text'
-        if ([string]::IsNullOrWhiteSpace($appVersion)) { $appVersion = '9.0.3' }
+        if ([string]::IsNullOrWhiteSpace($appVersion)) { $appVersion = '3.0.0' }
         $isccArgs = @((Join-Path $repo 'installer\setup.iss'), "/DAppVersion=$appVersion")
         if ($EmbedOfflineSignatures) { $isccArgs += '/DEmbedOfflineSignatures' }
         else {

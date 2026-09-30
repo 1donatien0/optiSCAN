@@ -33,6 +33,8 @@ namespace optiSCAN.Services
 
         private readonly IUserPreferencesAccessor _prefs;
         private readonly IExclusionSettingsAccessor _exclusions;
+        private readonly ScanLogManager? _logger;
+        private readonly IUiEventBus? _uiEvents;
 
         public ProcessStartMonitor(
             ScanOrchestrator orchestrator,
@@ -40,8 +42,12 @@ namespace optiSCAN.Services
             NotificationService notifications,
             Func<bool>? isSuspended = null,
             IUserPreferencesAccessor? preferences = null,
-            IExclusionSettingsAccessor? exclusions = null)
+            IExclusionSettingsAccessor? exclusions = null,
+            ScanLogManager? logger = null,
+            IUiEventBus? uiEvents = null)
         {
+            _logger = logger;
+            _uiEvents = uiEvents;
             _prefs = preferences ?? new DefaultUserPreferencesAccessor();
             _exclusions = exclusions ?? new DefaultExclusionSettingsAccessor();
             _orchestrator = orchestrator;
@@ -181,6 +187,7 @@ namespace optiSCAN.Services
             try
             {
                 var result = await _orchestrator.ScanFileAsync(filePath).ConfigureAwait(false);
+                DetectionHistoryRecorder.Record(_logger, _uiEvents, result, filePath);
                 foreach (var threat in result.Threats)
                 {
                     _notifications.ShowThreatDetected(threat);
@@ -189,7 +196,7 @@ namespace optiSCAN.Services
                         if (_prefs.Current.BackupBeforeQuarantine)
                             ThreatRemediationService.TryCreateSafetyCopy(threat);
 
-                        if (_quarantineManager.Quarantine(threat))
+                        if (_quarantineManager.Quarantine(threat, result.SessionId))
                             _notifications.ShowQuarantined(threat);
                     }
 

@@ -130,6 +130,12 @@ public sealed class ProtectionPipeServer : IDisposable
 
     private ProtectionPipeResponse Dispatch(ProtectionPipeRequest request)
     {
+        // Client absent du champ "proto" = client historique (v1). Un client plus récent que le
+        // serveur est refusé explicitement plutôt que mal interprété.
+        var clientProto = request.ProtocolVersion ?? 1;
+        if (clientProto < 1 || clientProto > ProtectionIdentifiers.ProtocolVersion)
+            return ProtectionPipeResponse.Error($"Protocole IPC non supporté : {clientProto} (serveur : {ProtectionIdentifiers.ProtocolVersion})");
+
         switch (request.Operation)
         {
             case ProtectionPipeOperations.Ping:

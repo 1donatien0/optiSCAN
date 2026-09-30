@@ -44,14 +44,20 @@ namespace optiSCAN.Services
 
         private readonly IUserPreferencesAccessor _prefs;
         private readonly IExclusionSettingsAccessor _exclusions;
+        private readonly ScanLogManager? _logger;
+        private readonly IUiEventBus? _uiEvents;
 
         public RealTimeProtection(
             ScanOrchestrator orchestrator,
             QuarantineManager quarantineManager,
             NotificationService notifications,
             IUserPreferencesAccessor? preferences = null,
-            IExclusionSettingsAccessor? exclusions = null)
+            IExclusionSettingsAccessor? exclusions = null,
+            ScanLogManager? logger = null,
+            IUiEventBus? uiEvents = null)
         {
+            _logger = logger;
+            _uiEvents = uiEvents;
             _prefs = preferences ?? new DefaultUserPreferencesAccessor();
             _exclusions = exclusions ?? new DefaultExclusionSettingsAccessor();
             _orchestrator = orchestrator;
@@ -277,6 +283,9 @@ namespace optiSCAN.Services
 
                 if (result.ThreatsFound > 0)
                 {
+                    // Trace persistante (Historique) : le toast seul disparait sans laisser de trace.
+                    DetectionHistoryRecorder.Record(_logger, _uiEvents, result, filePath);
+
                     foreach (var threat in result.Threats)
                     {
                         // Notification toast
@@ -288,7 +297,7 @@ namespace optiSCAN.Services
                                 ThreatRemediationService.TryCreateSafetyCopy(threat);
 
                             // Quarantaine automatique activée par l'utilisateur
-                            if (_quarantineManager.Quarantine(threat))
+                            if (_quarantineManager.Quarantine(threat, result.SessionId))
                             {
                                 WriteLog($"[RTP] Quarantaine auto : {threat.FileName} ({threat.VirusName})");
                                 _notifications.ShowQuarantined(threat);

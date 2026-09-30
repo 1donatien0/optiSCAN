@@ -31,8 +31,6 @@ namespace optiSCAN.Services
     /// </summary>
     public class NavigationService : INavigationService
     {
-        private static readonly TimeSpan PanelFadeInDuration = TimeSpan.FromMilliseconds(70);
-
         private readonly Dictionary<string, UIElement> _panels = new(StringComparer.OrdinalIgnoreCase);
 
         public string CurrentView { get; private set; } = string.Empty;
@@ -72,15 +70,11 @@ namespace optiSCAN.Services
                 panel.Visibility = Visibility.Collapsed;
             }
 
+            // Pas de fondu 0→1 : démarré avant l'affichage de la fenêtre, il reste
+            // figé à 0 et l'accueil s'ouvre vide alors que la barre latérale est là.
             target.Visibility = Visibility.Visible;
             target.BeginAnimation(UIElement.OpacityProperty, null);
-            target.Opacity = 0;
-
-            var fadeIn = new DoubleAnimation(0, 1, PanelFadeInDuration)
-            {
-                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
-            };
-            target.BeginAnimation(UIElement.OpacityProperty, fadeIn);
+            target.Opacity = 1;
 
             CurrentView = name;
             Navigated?.Invoke(this, name);

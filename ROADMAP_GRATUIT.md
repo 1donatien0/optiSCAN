@@ -151,4 +151,4 @@ Trois choses, dans cet ordre, toutes gratuites et rapides :
 - **Un OS libre solo, c'est réaliste en voie A, pas en voie B.** Kali et Tails sont partis de Debian, pas de zéro.
 - **Le chantier 3 est le vrai test.** S'il aboutit, le chantier 4 est surtout de l'assemblage et de l'empaquetage. S'il cale, l'OS n'aura pas d'identité propre.
 - **La licence est le point bloquant le plus sous-estimé.** Sans relicenciement, le projet ne peut pas être libre, quelle que soit la qualité du code.
-- **Continuer à investir massivement dans le WPF Windows** est orthogonal à l'objectif. Il reste pertinent de finir la v9.0 pour la distribuer, mais chaque nouvelle fonctionnalité WPF est du code qui ne migrera pas.
+- **Continuer à investir massivement dans le WPF Windows** est orthogonal à l'objectif. Il reste pertinent de finir la v3.0 pour la distribuer, mais chaque nouvelle fonctionnalité WPF est du code qui ne migrera pas.

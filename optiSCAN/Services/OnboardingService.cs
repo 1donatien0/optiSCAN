@@ -5,7 +5,7 @@ using MessageBox = System.Windows.MessageBox;
 
 namespace optiSCAN.Services
 {
-    /// <summary>Premier lancement : parcours court en 3 étapes (v7).</summary>
+    /// <summary>Premier lancement : parcours court en 3 étapes (v1).</summary>
     public static class OnboardingService
     {
         public static void ShowIfNeeded(Window owner, IViewServices ui) =>

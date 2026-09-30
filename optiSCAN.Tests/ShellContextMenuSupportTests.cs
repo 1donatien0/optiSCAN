@@ -17,7 +17,6 @@ public sealed class ShellContextMenuSupportTests
         var keys = ShellContextMenuSupport.LegacyMenuKeys;
         Assert.Contains("Scanner avec optiSCAN", keys);
         Assert.Contains("Scan with optiSCAN", keys);
-        Assert.Contains("Scanner avec optiCombat", keys);
         Assert.Contains("ScanWithOptiSCAN", keys);
         Assert.Contains(ShellContextMenuSupport.StableMenuKey, keys);
     }

@@ -200,7 +200,7 @@
         </Setter>
     </Style>
 
-    <!-- ── Antivirus — panneaux verre (v7) ── -->
+    <!-- ── Antivirus — panneaux verre (v1) ── -->
     <Style x:Key="AvGlassTabShell" TargetType="Border">
         <Setter Property="CornerRadius" Value="12"/>
         <Setter Property="ClipToBounds" Value="True"/>

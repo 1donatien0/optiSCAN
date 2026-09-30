@@ -7,7 +7,7 @@ namespace optiSCAN.Service;
 
 public sealed class ProtectionWindowsService : BackgroundService
 {
-    private const string EventSourceName = "optiSCAN Protection v9";
+    private const string EventSourceName = ProtectionIdentifiers.EventSourceName;
     private const string EventLogName = "Application";
 
     private readonly ServiceHostRestartPolicy _restartPolicy = new();
@@ -15,6 +15,8 @@ public sealed class ProtectionWindowsService : BackgroundService
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        RemoveLegacyEventSources();
+
         var exe = Path.Combine(AppContext.BaseDirectory, "optiSCAN.exe");
         if (!File.Exists(exe))
         {
@@ -103,6 +105,23 @@ public sealed class ProtectionWindowsService : BackgroundService
 
         WriteEvent("Service Windows arrêté", EventLogEntryType.Information);
         await base.StopAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>Supprime les anciennes sources du journal (y compris l'ancien libellé sans version), remplacées par la source v3.</summary>
+    private static void RemoveLegacyEventSources()
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        foreach (var legacy in ProtectionIdentifiers.LegacyEventSourceNames)
+        {
+            try
+            {
+                if (EventLog.SourceExists(legacy))
+                    EventLog.DeleteEventSource(legacy);
+            }
+            catch { /* droits insuffisants : sans conséquence */ }
+        }
     }
 
     private static void WriteEvent(string message, EventLogEntryType type)

@@ -1,16 +1,21 @@
 using optiSCAN.Models;
+using optiSCAN.Platform;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.Versioning;
 
 namespace optiSCAN.Services;
 
-/// <summary>Installation et supervision du service Windows optiSCAN.Service (protection système v9).</summary>
+/// <summary>
+/// Installation et supervision du service Windows optiSCAN.Service (protection système).
+/// Les identifiants (nom de service, pipe) viennent de <see cref="ProtectionIdentifiers"/>
+/// et ne dépendent pas de la version produit.
+/// </summary>
 [SupportedOSPlatform("windows")]
 public static class PlatformProtectionBootstrap
 {
-    public const string ServiceName = "optiSCANProtectionV9";
-    public const string ServiceDisplayName = "optiSCAN Protection v9";
+    public const string ServiceName = ProtectionIdentifiers.ServiceName;
+    public const string ServiceDisplayName = ProtectionIdentifiers.ServiceDisplayName;
 
     private static readonly object ReachabilityGate = new();
     private static readonly TimeSpan ReachabilityTimeout = TimeSpan.FromMilliseconds(400);
@@ -115,7 +120,7 @@ public static class PlatformProtectionBootstrap
 
             var binPath = $"\"{serviceExe}\"";
             RunSc($"create {ServiceName} binPath= {binPath} start= auto DisplayName= \"{ServiceDisplayName}\"");
-            RunSc($"description {ServiceName} \"Moteur de protection optiSCAN v9 (RTP, AMSI, IPC)\"");
+            RunSc($"description {ServiceName} \"{ProtectionIdentifiers.ServiceDescription}\"");
             AppLogger.Info("PlatformProtection", "Service Windows enregistré");
             return true;
         }
@@ -202,14 +207,16 @@ public static class PlatformProtectionBootstrap
         }
     }
 
-    private static bool IsServiceInstalled()
+    private static bool IsServiceInstalled() => IsServiceInstalled(ServiceName);
+
+    private static bool IsServiceInstalled(string serviceName)
     {
         try
         {
             using var proc = Process.Start(new ProcessStartInfo
             {
                 FileName = "sc.exe",
-                Arguments = $"query {ServiceName}",
+                Arguments = $"query {serviceName}",
                 UseShellExecute = false,
                 CreateNoWindow = true,
                 RedirectStandardOutput = true,

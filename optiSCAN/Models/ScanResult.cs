@@ -96,7 +96,9 @@ namespace optiSCAN.Models
         /// <summary>Analyse complète de tous les lecteurs.</summary>
         FullScan,
         /// <summary>Analyse automatique d'un lecteur amovible (USB, carte SD…).</summary>
-        RemovableDrive
+        RemovableDrive,
+        /// <summary>Detection de la protection temps reel ou de la surveillance des processus.</summary>
+        RealTime
     }
 
     /// <summary>État d'avancement du scan.</summary>

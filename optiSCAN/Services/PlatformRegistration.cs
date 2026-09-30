@@ -10,7 +10,7 @@ namespace optiSCAN.Services;
 public static class PlatformRegistration
 {
     private const string AmsiProviderGuid = "{A8F4E2B1-9C3D-4E5F-8A7B-1C2D3E4F5A6B}";
-    private const string AmsiProviderName = "optiSCAN AMSI Provider v9";
+    private const string AmsiProviderName = "optiSCAN AMSI Provider v3";
 
     public static void TryRegisterAmsiProvider()
     {

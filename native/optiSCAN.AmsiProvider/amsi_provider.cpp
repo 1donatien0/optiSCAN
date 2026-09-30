@@ -5,6 +5,7 @@
 #include <string>
 #include <vector>
 #include "pipe_client.h"
+#include "protection_identifiers.h"
 
 #pragma comment(lib, "crypt32.lib")
 
@@ -96,9 +97,10 @@ public:
         if (b64data.empty())
             return S_OK;
 
-        const std::string request = std::string(R"({"op":"scan_buffer","buffer_b64":")") + b64data + R"(","content_name":"amsi_buffer"})";
+        const std::string request = std::string(R"({"proto":)") + optiscan::ids::kProtocolVersionJson
+            + R"(,"op":"scan_buffer","buffer_b64":")" + b64data + R"(","content_name":"amsi_buffer"})";
         std::string response;
-        if (!optiscan::ipc::ScanBufferViaPipe(L"\\\\.\\pipe\\optiSCAN_Protection_v9", request, response))
+        if (!optiscan::ipc::ScanBufferViaPipe(optiscan::ids::kProtectionPipePath, request, response))
             return S_OK;
 
         if (response.find("\"clean\":false") != std::string::npos)
