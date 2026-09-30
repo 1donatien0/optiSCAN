@@ -1,7 +1,7 @@
 ; =============================================================================
 ; optiSCAN — Installateur Windows (Inno Setup)
 ; =============================================================================
-; AppRelease = nom vM.m (v9.0) · AppVersion = semver / Directory.Build.props
+; AppRelease = nom vM.m (v3.0) · AppVersion = semver / Directory.Build.props
 
 #define AppName        "optiSCAN"
 #ifndef AppVersion
@@ -64,9 +64,12 @@ MinVersion=10.0.17763
 ; .NET copiés seraient inexécutables sur un Windows 32 bits).
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
-; Même AppId : une 9.0.x déjà installée est mise à jour sur place (pas de désinstallation).
+; Même AppId que les versions 1 et 2 : installation par-dessus, même dossier.
 UsePreviousAppDir=yes
-AppMutex=Global\optiSCAN_UniqueInstance
+DisableDirPage=auto
+DisableProgramGroupPage=auto
+; Pas d'AppMutex ici : il bloquerait l'assistant tant qu'une version
+; déjà lancée tient Global\optiSCAN_UniqueInstance. StopRunningOptiScan la ferme.
 CloseApplications=force
 CloseApplicationsFilter=optiSCAN.exe,optiSCAN.Service.exe
 RestartApplications=no
@@ -95,12 +98,12 @@ Name: "french"; MessagesFile: "compiler:Languages\French.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
-; Profil d'install allégé façon v8 : défaut = UI + ClamAV + YARA (+ MAJ signatures).
+; Profil d'install allégé façon v2 : défaut = UI + ClamAV + YARA (+ MAJ signatures).
 ; Service plateforme / RTP avancé = opt-in explicite (Flags: unchecked).
 Name: "desktopicon";   Description: "Créer une icône sur le Bureau";                              GroupDescription: "Icônes supplémentaires"
 Name: "startupicon";   Description: "Lancer optiSCAN au démarrage de Windows";                   GroupDescription: "Options avancées"; Flags: unchecked
 Name: "autoUpdateSig"; Description: "Activer les mises à jour auto des signatures (recommandé)"; GroupDescription: "Moteurs ClamAV + YARA"; Flags: checkedonce
-Name: "platformservice"; Description: "Installer le service Windows de protection système v9 (RTP/AMSI/IPC — avancé)"; GroupDescription: "Protection avancée (optionnel)"; Flags: unchecked
+Name: "platformservice"; Description: "Installer le service Windows de protection système v3 (RTP/AMSI/IPC — avancé)"; GroupDescription: "Protection avancée (optionnel)"; Flags: unchecked
 
 [Files]
 ; ── Application principale ───────────────────────────────────────────────────
@@ -122,7 +125,7 @@ Source: "..\optiSCAN\clamav\certs\clamav.crt"; DestDir: "{app}\clamav\x64\certs"
 #endif
 ; ── Base de signatures ClamAV (~105 Mo incompressibles) ─────────────────────
 ; Par défaut : NON embarquée — freshclam / bouton MAJ signatures les télécharge
-; après installation (réseau requis au 1er lancement). Aligné setup v8 léger.
+; après installation (réseau requis au 1er lancement). Aligné setup v2 léger.
 ; Offline : /DEmbedClamAvDatabase ou /DEmbedOfflineSignatures
 #ifdef EmbedClamAvDatabase
 Source: "..\optiSCAN\clamav\database\*"; DestDir: "{app}\clamav\database"; Excludes: "*.log"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
@@ -139,9 +142,9 @@ Source: "..\optiSCAN\yara\*"; DestDir: "{app}\yara"; Flags: ignoreversion recurs
 Source: "..\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\optiSCAN.Service.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "..\optiSCAN.Service\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\optiSCAN.Service.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 ; Script exclusions Defender : copié pour usage manuel / depuis l'app — PAS exécuté
-; automatiquement à l'install (évite le marqueur heuristique « tamper » post-v8).
+; automatiquement à l'install (évite le marqueur heuristique « tamper » post-v2).
 Source: "..\scripts\add-defender-exclusions.ps1"; DestDir: "{app}\scripts"; Flags: ignoreversion
-; AMSI / minifiltre — comme v8 : livrés s'ils existent sur la machine de build
+; AMSI / minifiltre — comme v2 : livrés s'ils existent sur la machine de build
 ; (skipifsourcedoesntexist). Sans signature Authenticode/EV ils restent inopérants
 ; sous Windows x64, mais disponibles pour tests / builds signés ultérieurs.
 Source: "..\native\optiSCAN.AmsiProvider\x64\Release\optiSCAN.AmsiProvider.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
@@ -212,6 +215,47 @@ Type: filesandordirs; Name: "{app}\quarantine"
 ; en supplément par CurUninstallStepChanged ci-dessous, avec confirmation.
 
 [Code]
+
+procedure Sleep(dwMilliseconds: LongInt);
+  external 'Sleep@kernel32.dll stdcall';
+
+function OptiScanProcessStillRunning(): Boolean;
+var
+  WbemLocator, WbemServices, Processes: Variant;
+begin
+  Result := False;
+  try
+    WbemLocator := CreateOleObject('WbemScripting.SWbemLocator');
+    WbemServices := WbemLocator.ConnectServer('.', 'root\CIMV2');
+    Processes := WbemServices.ExecQuery('SELECT ProcessId FROM Win32_Process WHERE Name="optiSCAN.exe" OR Name="optiSCAN.Service.exe"');
+    Result := Integer(Processes.Count) > 0;
+  except
+    Result := False;
+  end;
+end;
+
+procedure StopRunningOptiScan();
+var
+  ResultCode, Attempt: Integer;
+begin
+  Exec('sc.exe', 'stop optiSCANProtectionV9', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec('sc.exe', 'stop optiSCANProtectionV8', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  for Attempt := 1 to 15 do
+  begin
+    Exec('taskkill.exe', '/F /IM optiSCAN.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec('taskkill.exe', '/F /IM optiSCAN.Service.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    if not OptiScanProcessStillRunning() then
+      Break;
+    Sleep(200);
+  end;
+  Sleep(400);
+end;
+
+function InitializeSetup(): Boolean;
+begin
+  StopRunningOptiScan();
+  Result := True;
+end;
 
 function IsDotNet8Installed(): Boolean;
 var
@@ -360,37 +404,25 @@ begin
   RemoveExplorerShellMenu(HKCU, 'Software\Classes\*\shell', 'optiSCAN.Scan');
   RemoveExplorerShellMenu(HKCU, 'Software\Classes\*\shell', 'Scanner avec optiSCAN');
   RemoveExplorerShellMenu(HKCU, 'Software\Classes\*\shell', 'Scan with optiSCAN');
-  RemoveExplorerShellMenu(HKCU, 'Software\Classes\*\shell', 'Scanner avec optiCombat');
-  RemoveExplorerShellMenu(HKCU, 'Software\Classes\*\shell', 'Scan with optiCombat');
   RemoveExplorerShellMenu(HKCU, 'Software\Classes\*\shell', 'ScanWithOptiSCAN');
-  RemoveExplorerShellMenu(HKCU, 'Software\Classes\*\shell', 'ScanWithOptiCombat');
   RemoveExplorerShellMenu(HKCU, 'Software\Classes\*\shell', 'Shell_ScanWith');
 
   RemoveExplorerShellMenu(HKCU, 'Software\Classes\Directory\shell', 'optiSCAN.Scan');
   RemoveExplorerShellMenu(HKCU, 'Software\Classes\Directory\shell', 'Scanner avec optiSCAN');
   RemoveExplorerShellMenu(HKCU, 'Software\Classes\Directory\shell', 'Scan with optiSCAN');
-  RemoveExplorerShellMenu(HKCU, 'Software\Classes\Directory\shell', 'Scanner avec optiCombat');
-  RemoveExplorerShellMenu(HKCU, 'Software\Classes\Directory\shell', 'Scan with optiCombat');
   RemoveExplorerShellMenu(HKCU, 'Software\Classes\Directory\shell', 'ScanWithOptiSCAN');
-  RemoveExplorerShellMenu(HKCU, 'Software\Classes\Directory\shell', 'ScanWithOptiCombat');
   RemoveExplorerShellMenu(HKCU, 'Software\Classes\Directory\shell', 'Shell_ScanWith');
 
   RemoveExplorerShellMenu(HKCR, '*\shell', 'optiSCAN.Scan');
   RemoveExplorerShellMenu(HKCR, '*\shell', 'Scanner avec optiSCAN');
   RemoveExplorerShellMenu(HKCR, '*\shell', 'Scan with optiSCAN');
-  RemoveExplorerShellMenu(HKCR, '*\shell', 'Scanner avec optiCombat');
-  RemoveExplorerShellMenu(HKCR, '*\shell', 'Scan with optiCombat');
   RemoveExplorerShellMenu(HKCR, '*\shell', 'ScanWithOptiSCAN');
-  RemoveExplorerShellMenu(HKCR, '*\shell', 'ScanWithOptiCombat');
   RemoveExplorerShellMenu(HKCR, '*\shell', 'Shell_ScanWith');
 
   RemoveExplorerShellMenu(HKCR, 'Directory\shell', 'optiSCAN.Scan');
   RemoveExplorerShellMenu(HKCR, 'Directory\shell', 'Scanner avec optiSCAN');
   RemoveExplorerShellMenu(HKCR, 'Directory\shell', 'Scan with optiSCAN');
-  RemoveExplorerShellMenu(HKCR, 'Directory\shell', 'Scanner avec optiCombat');
-  RemoveExplorerShellMenu(HKCR, 'Directory\shell', 'Scan with optiCombat');
   RemoveExplorerShellMenu(HKCR, 'Directory\shell', 'ScanWithOptiSCAN');
-  RemoveExplorerShellMenu(HKCR, 'Directory\shell', 'ScanWithOptiCombat');
   RemoveExplorerShellMenu(HKCR, 'Directory\shell', 'Shell_ScanWith');
 end;
 
@@ -511,7 +543,7 @@ begin
   RegWriteStringValue(HKCU, 'Software\Classes\Directory\shell\' + MenuKey + '\command', '', Cmd);
 end;
 
-// Exclusions Defender : volontairement NON appelées ici (profil allégé v8).
+// Exclusions Defender : volontairement NON appelées ici (profil allégé v2).
 // Le script reste dans {app}\scripts pour un opt-in depuis l'application.
 
 procedure CurStepChanged(CurStep: TSetupStep);
@@ -529,8 +561,8 @@ begin
     begin
       if FileExists(ExpandConstant('{app}\optiSCAN.Service.exe')) then
       begin
-        Exec('sc.exe', 'create optiSCANProtectionV9 binPath= "\"' + ExpandConstant('{app}\optiSCAN.Service.exe') + '\"" start= auto DisplayName= "optiSCAN Protection v9"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-        Exec('sc.exe', 'description optiSCANProtectionV9 "Moteur de protection optiSCAN v9 (RTP, AMSI, IPC)"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+        Exec('sc.exe', 'create optiSCANProtectionV9 binPath= "\"' + ExpandConstant('{app}\optiSCAN.Service.exe') + '\"" start= auto DisplayName= "optiSCAN Protection v3"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+        Exec('sc.exe', 'description optiSCANProtectionV9 "Moteur de protection optiSCAN v3 (RTP, AMSI, IPC)"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
         Exec('sc.exe', 'start optiSCANProtectionV9', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
       end
       else
@@ -545,12 +577,8 @@ begin
 
   if CurStep = ssInstall then
   begin
-    // Le service et l'exe verrouillent {app}. Sans cet arrêt, Windows refuse
-    // le remplacement et l'utilisateur doit désinstaller à la main.
-    Exec('taskkill.exe', '/F /IM optiSCAN.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    Exec('taskkill.exe', '/F /IM optiSCAN.Service.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    Exec('sc.exe', 'stop optiSCANProtectionV9', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    Exec('sc.exe', 'stop optiSCANProtectionV8', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    // Au cas où l'utilisateur a relancé optiSCAN pendant l'assistant.
+    StopRunningOptiScan();
 
     ConfPath := ExpandConstant('{localappdata}\optiSCAN\clamav\freshclam.conf');
     if FileExists(ConfPath) then

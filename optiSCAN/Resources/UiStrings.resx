@@ -94,6 +94,7 @@
   <data name="ScanType_Quick" xml:space="preserve"><value>Analyse rapide</value></data>
   <data name="ScanType_Default" xml:space="preserve"><value>Analyse</value></data>
   <data name="ScanType_Removable" xml:space="preserve"><value>Lecteur amovible</value></data>
+  <data name="ScanType_RealTime" xml:space="preserve"><value>Protection temps réel</value></data>
   <data name="ScanSummary_Running" xml:space="preserve"><value>Analyse en cours… ({0:N0} fichier(s) déjà parcourus)</value></data>
   <data name="ScanSummary_Clean" xml:space="preserve"><value>Aucune menace — {0:N0} fichier(s) en {1}</value></data>
   <data name="ScanSummary_Threats" xml:space="preserve"><value>Attention : {0} menace(s) sur {1:N0} fichier(s)</value></data>
@@ -445,10 +446,10 @@
   <data name="Opt_TamperProtection" xml:space="preserve"><value>Protection anti-manipulation</value></data>
   <data name="Opt_TamperProtectionSub" xml:space="preserve"><value>Relance optiSCAN en arrière-plan si la protection temps réel est attendue mais l'application est arrêtée.</value></data>
   <data name="Opt_PlatformProtection" xml:space="preserve"><value>Service Windows de protection système</value></data>
-  <data name="Opt_PlatformProtectionSub" xml:space="preserve"><value>Moteur RTP/AMSI/minifilter dans optiSCAN.Service (IPC v9). Nécessite des droits administrateur à l'installation.</value></data>
+  <data name="Opt_PlatformProtectionSub" xml:space="preserve"><value>Moteur RTP/AMSI/minifilter dans optiSCAN.Service (IPC v3). Nécessite des droits administrateur à l'installation.</value></data>
   <data name="Repair_Quarantined" xml:space="preserve"><value>Fichier mis en quarantaine.</value></data>
   <data name="Repair_QuarantineFailed" xml:space="preserve"><value>Échec de la quarantaine.</value></data>
-  <data name="Platform_StatusTitle" xml:space="preserve"><value>Protection système v9</value></data>
+  <data name="Platform_StatusTitle" xml:space="preserve"><value>Protection système v3</value></data>
   <data name="Platform_IpcActive" xml:space="preserve"><value>Service IPC / moteur distant actif</value></data>
   <data name="Platform_IpcInactive" xml:space="preserve"><value>Service IPC injoignable (repli RTP locale possible)</value></data>
   <data name="Platform_IpcDisabled" xml:space="preserve"><value>Service Windows désactivé (RTP dans l'application)</value></data>
@@ -608,14 +609,14 @@ Les supprimer ? Les fichiers ne sont pas effacés, seul le partage est retiré. 
   <data name="Hist_SearchScan" xml:space="preserve"><value>Rechercher (cible, type, menace)…</value></data>
   <data name="Hist_SearchClean" xml:space="preserve"><value>Rechercher (cibles)…</value></data>
   <data name="Hist_DetailSelectClean" xml:space="preserve"><value>Sélectionnez un nettoyage pour afficher le journal d'opérations.</value></data>
-  <data name="Hist_DetailThreatsLegacy" xml:space="preserve"><value>(Session enregistrée sous v7 : chemins des menaces non conservés. Les analyses v9 enregistrent le détail.)</value></data>
+  <data name="Hist_DetailThreatsLegacy" xml:space="preserve"><value>(Session enregistrée sous v1 : chemins des menaces non conservés. Les analyses v3 enregistrent le détail.)</value></data>
   <data name="Hist_ThreatsTitle" xml:space="preserve"><value>Détections de la session</value></data>
   <data name="Hist_TreatInAv" xml:space="preserve"><value>Traiter dans Analyse</value></data>
   <data name="Hist_TooltipTreatInAv" xml:space="preserve"><value>Ouvre l'onglet Analyse avec les menaces de cette session pour les traiter comme après un scan.</value></data>
   <data name="Hist_QuarantineAll" xml:space="preserve"><value>Tout mettre en quarantaine</value></data>
   <data name="Hist_SelectScanHint" xml:space="preserve"><value>Sélectionnez une entrée ci-dessus pour afficher le détail.</value></data>
   <data name="Hist_NoThreatsInSession" xml:space="preserve"><value>Aucune menace détectée lors de cette analyse.</value></data>
-  <data name="Hist_ThreatsLegacy" xml:space="preserve"><value>Menaces détectées (chemins non enregistrés — session v7). Relancez une analyse pour le détail.</value></data>
+  <data name="Hist_ThreatsLegacy" xml:space="preserve"><value>Menaces détectées (chemins non enregistrés — session v1). Relancez une analyse pour le détail.</value></data>
   <data name="Hist_InfoFiles" xml:space="preserve"><value>{0} fichiers</value></data>
   <data name="Hist_InfoThreats" xml:space="preserve"><value>{0} menace(s)</value></data>
   <data name="Hist_InfoClean" xml:space="preserve"><value>Aucune menace</value></data>

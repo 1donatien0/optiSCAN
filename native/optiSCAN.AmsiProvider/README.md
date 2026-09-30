@@ -1,4 +1,4 @@
-# optiSCAN AMSI Provider (v9)
+# optiSCAN AMSI Provider (v3.0)
 
 Fournisseur AMSI natif (`optiSCAN.AmsiProvider.dll`) qui transmet les buffers script
 à `optiSCAN.exe --service-host` via le pipe `\\.\pipe\optiSCAN_Protection_v9`.
@@ -13,7 +13,7 @@ Fournisseur AMSI natif (`optiSCAN.AmsiProvider.dll`) qui transmet les buffers sc
 
 Effectué par `PlatformRegistration.TryRegisterAmsiProvider()` au démarrage du
 service plateforme (`--service-host` / `optiSCAN.Service`), si la protection
-système v9 est activée dans les Options (nécessite droits administrateur).
+système v3 est activée dans les Options (nécessite droits administrateur).
 
 Désactivé par `TryUnregisterAmsiProvider()` quand la protection plateforme est
 coupée : la DLL peut rester dans le dossier d'installation sans être chargée.

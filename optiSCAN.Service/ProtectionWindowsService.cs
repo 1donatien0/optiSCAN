@@ -7,7 +7,7 @@ namespace optiSCAN.Service;
 
 public sealed class ProtectionWindowsService : BackgroundService
 {
-    private const string EventSourceName = "optiSCAN Protection v9";
+    private const string EventSourceName = "optiSCAN Protection v3";
     private const string EventLogName = "Application";
 
     private readonly ServiceHostRestartPolicy _restartPolicy = new();

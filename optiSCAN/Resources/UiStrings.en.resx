@@ -94,6 +94,7 @@
   <data name="ScanType_Quick" xml:space="preserve"><value>Quick scan</value></data>
   <data name="ScanType_Default" xml:space="preserve"><value>Scan</value></data>
   <data name="ScanType_Removable" xml:space="preserve"><value>Removable drive</value></data>
+  <data name="ScanType_RealTime" xml:space="preserve"><value>Real-time protection</value></data>
   <data name="ScanSummary_Running" xml:space="preserve"><value>Scan in progress… ({0:N0} file(s) scanned so far)</value></data>
   <data name="ScanSummary_Clean" xml:space="preserve"><value>No threats — {0:N0} file(s) in {1}</value></data>
   <data name="ScanSummary_Threats" xml:space="preserve"><value>Warning: {0} threat(s) found in {1:N0} file(s)</value></data>
@@ -445,10 +446,10 @@
   <data name="Opt_TamperProtection" xml:space="preserve"><value>Anti-tamper protection</value></data>
   <data name="Opt_TamperProtectionSub" xml:space="preserve"><value>Restarts optiSCAN in the background if real-time protection is expected but the app was closed.</value></data>
   <data name="Opt_PlatformProtection" xml:space="preserve"><value>Windows system protection service</value></data>
-  <data name="Opt_PlatformProtectionSub" xml:space="preserve"><value>RTP/AMSI/minifilter engine in optiSCAN.Service (v9 IPC). Requires administrator rights at install time.</value></data>
+  <data name="Opt_PlatformProtectionSub" xml:space="preserve"><value>RTP/AMSI/minifilter engine in optiSCAN.Service (v3 IPC). Requires administrator rights at install time.</value></data>
   <data name="Repair_Quarantined" xml:space="preserve"><value>File quarantined.</value></data>
   <data name="Repair_QuarantineFailed" xml:space="preserve"><value>Quarantine failed.</value></data>
-  <data name="Platform_StatusTitle" xml:space="preserve"><value>System protection v9</value></data>
+  <data name="Platform_StatusTitle" xml:space="preserve"><value>System protection v3</value></data>
   <data name="Platform_IpcActive" xml:space="preserve"><value>IPC service / remote engine active</value></data>
   <data name="Platform_IpcInactive" xml:space="preserve"><value>IPC service unreachable (local RTP fallback possible)</value></data>
   <data name="Platform_IpcDisabled" xml:space="preserve"><value>Windows service disabled (RTP in application)</value></data>
@@ -608,14 +609,14 @@ Remove them? Files are not deleted, only the share is removed. Other devices wil
   <data name="Hist_SearchScan" xml:space="preserve"><value>Search (target, type, threat)…</value></data>
   <data name="Hist_SearchClean" xml:space="preserve"><value>Search (targets)…</value></data>
   <data name="Hist_DetailSelectClean" xml:space="preserve"><value>Select a cleanup to view the operation log.</value></data>
-  <data name="Hist_DetailThreatsLegacy" xml:space="preserve"><value>(Session saved under v7: threat paths were not stored. v9 scans keep full details.)</value></data>
+  <data name="Hist_DetailThreatsLegacy" xml:space="preserve"><value>(Session saved under v1: threat paths were not stored. v3 scans keep full details.)</value></data>
   <data name="Hist_ThreatsTitle" xml:space="preserve"><value>Session detections</value></data>
   <data name="Hist_TreatInAv" xml:space="preserve"><value>Treat in Scan</value></data>
   <data name="Hist_TooltipTreatInAv" xml:space="preserve"><value>Opens the Scan tab with this session's threats so you can quarantine, ignore, or delete them.</value></data>
   <data name="Hist_QuarantineAll" xml:space="preserve"><value>Quarantine all</value></data>
   <data name="Hist_SelectScanHint" xml:space="preserve"><value>Select an entry above to view details.</value></data>
   <data name="Hist_NoThreatsInSession" xml:space="preserve"><value>No threats detected in this scan.</value></data>
-  <data name="Hist_ThreatsLegacy" xml:space="preserve"><value>Threats detected (paths not stored — v7 session). Run a new scan for details.</value></data>
+  <data name="Hist_ThreatsLegacy" xml:space="preserve"><value>Threats detected (paths not stored — v1 session). Run a new scan for details.</value></data>
   <data name="Hist_InfoFiles" xml:space="preserve"><value>{0} files</value></data>
   <data name="Hist_InfoThreats" xml:space="preserve"><value>{0} threat(s)</value></data>
   <data name="Hist_InfoClean" xml:space="preserve"><value>No threats</value></data>

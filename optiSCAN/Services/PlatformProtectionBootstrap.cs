@@ -5,12 +5,12 @@ using System.Runtime.Versioning;
 
 namespace optiSCAN.Services;
 
-/// <summary>Installation et supervision du service Windows optiSCAN.Service (protection système v9).</summary>
+/// <summary>Installation et supervision du service Windows optiSCAN.Service (protection système v3).</summary>
 [SupportedOSPlatform("windows")]
 public static class PlatformProtectionBootstrap
 {
     public const string ServiceName = "optiSCANProtectionV9";
-    public const string ServiceDisplayName = "optiSCAN Protection v9";
+    public const string ServiceDisplayName = "optiSCAN Protection v3";
 
     private static readonly object ReachabilityGate = new();
     private static readonly TimeSpan ReachabilityTimeout = TimeSpan.FromMilliseconds(400);
@@ -115,7 +115,7 @@ public static class PlatformProtectionBootstrap
 
             var binPath = $"\"{serviceExe}\"";
             RunSc($"create {ServiceName} binPath= {binPath} start= auto DisplayName= \"{ServiceDisplayName}\"");
-            RunSc($"description {ServiceName} \"Moteur de protection optiSCAN v9 (RTP, AMSI, IPC)\"");
+            RunSc($"description {ServiceName} \"Moteur de protection optiSCAN v3 (RTP, AMSI, IPC)\"");
             AppLogger.Info("PlatformProtection", "Service Windows enregistré");
             return true;
         }

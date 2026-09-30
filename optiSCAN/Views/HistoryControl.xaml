@@ -551,7 +551,7 @@
                                    HorizontalAlignment="Center" Margin="0,8,0,0"/>
                     </StackPanel>
 
-                    <!-- Message legacy (v7) -->
+                    <!-- Message legacy (v1) -->
                     <TextBlock x:Name="txtHistThreatsLegacy" Grid.Row="2"
                                Visibility="Collapsed"
                                Text="{loc:Loc Key=Hist_ThreatsLegacy}"

@@ -1,4 +1,4 @@
-# Politique de confidentialité — optiSCAN v9.0
+# Politique de confidentialité — optiSCAN v3.0
 
 **Dernière mise à jour :** 8 juillet 2026  
 **Éditeur :** Dona By — optiSCAN (édition ClamAV)

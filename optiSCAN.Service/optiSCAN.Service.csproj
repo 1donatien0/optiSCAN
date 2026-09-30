@@ -7,7 +7,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <RootNamespace>optiSCAN.Service</RootNamespace>
     <AssemblyName>optiSCAN.Service</AssemblyName>
-    <Product>optiSCAN v9.0 Protection Service</Product>
+    <Product>optiSCAN v3.0 Protection Service</Product>
   </PropertyGroup>
 
   <ItemGroup>
