@@ -3,7 +3,7 @@
 **Dernière mise à jour :** 30 septembre 2026  
 **Éditeur :** Dona By — optiSCAN (édition ClamAV)
 
-Ce document décrit comment optiSCAN traite vos données. Il complète le contrat de licence ([LICENSE.txt](../LICENSE.txt)) et la note interne [CONFORMITE_RGPD.md](CONFORMITE_RGPD.md). Ce n'est pas un avis juridique.
+Ce document décrit comment optiSCAN traite vos données. Il complète la licence GNU GPL v3 ([LICENSE.txt](../LICENSE.txt), [COPYING](../COPYING)) et la note interne [CONFORMITE_RGPD.md](CONFORMITE_RGPD.md). Ce n'est pas un avis juridique.
 
 ---
 

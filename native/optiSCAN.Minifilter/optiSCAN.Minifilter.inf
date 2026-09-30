@@ -1,30 +1,71 @@
-; optiSCAN Minifilter INF stub (v1)
-; Compilation complète requiert WDK + certificat EV
+; optiSCAN Minifilter INF (v1) - pilote "primitive" de type filtre d'activite.
+; Installation : DefaultInstall (InstallHinfSection, ou pnputil /add-driver /install
+; une fois le catalogue signe). Compilation complete : WDK + signature.
 
 [Version]
-Signature="$Windows NT$"
-Class=ActivityMonitor
-ClassGuid={b86dff51-a31e-4bac-b3cf-e8cfe75c9fc2}
-Provider=%Manufacturer%
-DriverVer=06/15/2026,1.0.0.0
-CatalogFile=optiSCAN.Minifilter.cat
-PnpLockdown=1
+Signature   = "$WINDOWS NT$"
+Class       = "ActivityMonitor"
+ClassGuid   = {b86dff51-a31e-4bac-b3cf-e8cfe75c9fc2}
+Provider    = %ManufacturerName%
+DriverVer   = 06/15/2026,1.0.0.0
+CatalogFile = optiSCAN.Minifilter.cat
+PnpLockdown = 1
 
 [DestinationDirs]
-DefaultDestDir = 12
+OptiscanMinifilter.DriverFiles = 12          ; %windir%\system32\drivers
 
-[Manufacturer]
-%Manufacturer%=Standard,NTamd64
+[SourceDisksNames]
+1 = %DiskName%,,,""
 
-[Standard.NTamd64]
-%DeviceName%=optiSCAN_Minifilter, optiSCANMinifilter
+[SourceDisksFiles]
+optiSCAN.Minifilter.sys = 1,,
 
-[optiSCAN_Minifilter.NT]
-CopyFiles = optiSCAN_Minifilter_Copy
+; --- Installation ------------------------------------------------------------
+[DefaultInstall.NTamd64]
+OptionDesc = %ServiceDescription%
+CopyFiles  = OptiscanMinifilter.DriverFiles
 
-[optiSCAN_Minifilter_Copy]
-optiSCAN.Minifilter.sys
+[DefaultInstall.NTamd64.Services]
+AddService = %ServiceName%,,OptiscanMinifilter.Service
+
+; --- Desinstallation ---------------------------------------------------------
+[DefaultUninstall.NTamd64]
+LegacyUninstall = 1
+DelFiles        = OptiscanMinifilter.DriverFiles
+
+[DefaultUninstall.NTamd64.Services]
+DelService = %ServiceName%,0x200              ; SPSVCINST_STOPSERVICE
+
+; --- Service noyau -----------------------------------------------------------
+[OptiscanMinifilter.Service]
+DisplayName      = %ServiceName%
+Description      = %ServiceDescription%
+ServiceBinary    = %12%\%DriverName%.sys
+Dependencies     = "FltMgr"
+ServiceType      = 2                          ; SERVICE_FILE_SYSTEM_DRIVER
+StartType        = 3                          ; SERVICE_DEMAND_START
+ErrorControl     = 1                          ; SERVICE_ERROR_NORMAL
+LoadOrderGroup   = "FSFilter Activity Monitor"
+AddReg           = OptiscanMinifilter.AddRegistry
+
+[OptiscanMinifilter.AddRegistry]
+HKR,"Parameters","SupportedFeatures",0x00010001,0x3
+HKR,"Instances","DefaultInstance",0x00000000,%DefaultInstance%
+HKR,"Instances\"%Instance1.Name%,"Altitude",0x00000000,%Instance1.Altitude%
+HKR,"Instances\"%Instance1.Name%,"Flags",0x00010001,%Instance1.Flags%
+
+[OptiscanMinifilter.DriverFiles]
+%DriverName%.sys
 
 [Strings]
-Manufacturer="optiSCAN"
-DeviceName="optiSCAN File System Minifilter v1"
+ManufacturerName   = "optiSCAN"
+DiskName           = "optiSCAN Minifilter Installation Disk"
+ServiceName        = "optiSCANMinifilter"
+DriverName         = "optiSCAN.Minifilter"
+ServiceDescription = "optiSCAN File System Minifilter v1"
+DefaultInstance    = "optiSCAN Instance"
+Instance1.Name     = "optiSCAN Instance"
+; Altitude provisoire dans la plage FSFilter Activity Monitor (360000-389999).
+; A remplacer par l'altitude attribuee par Microsoft avant distribution signee.
+Instance1.Altitude = "385210"
+Instance1.Flags    = 0x0

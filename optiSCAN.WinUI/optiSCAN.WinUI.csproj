@@ -68,6 +68,15 @@
   </ItemGroup>
 
   <ItemGroup>
+    <Content Include="..\LICENSE.txt" Link="LICENSE.txt">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\COPYING" Link="COPYING">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\docs\POLITIQUE_CONFIDENTIALITE.md" Link="docs\POLITIQUE_CONFIDENTIALITE.md">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
     <Content Include="..\optiSCAN\optiSCAN.ico" Link="Assets\optiSCAN.ico">
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
@@ -91,6 +100,10 @@
     </Content>
     <Content Include="..\optiSCAN\clamav\certs\clamav.crt">
       <Link>clamav\certs\clamav.crt</Link>
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+    <Content Include="..\native\optiSCAN.Minifilter\optiSCAN.Minifilter.inf" Condition="Exists('..\native\optiSCAN.Minifilter\optiSCAN.Minifilter.inf')">
+      <Link>optiSCAN.Minifilter.inf</Link>
       <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
     </Content>
   </ItemGroup>

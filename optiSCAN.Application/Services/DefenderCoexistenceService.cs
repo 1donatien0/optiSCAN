@@ -71,14 +71,14 @@ public static class DefenderCoexistenceService
     {
         var prefs = preferences.Current;
         prefs.DefenderComplementModeEnabled = false;
-        prefs.UsePlatformProtectionService = false;
+        prefs.UsePlatformProtectionService = PlatformProtectionFeatureGate.IsUserActivatable;
         prefs.ProcessMonitorEnabled = true;
         prefs.Save();
 
         exclusions.Current.RealTimeEnabled = true;
         exclusions.Current.Save();
 
-        applyPlatformProtection?.Invoke(false);
+        applyPlatformProtection?.Invoke(prefs.UsePlatformProtectionService);
         applyProcessMonitor?.Invoke(true);
         applyRealtimeProtection?.Invoke(true);
     }

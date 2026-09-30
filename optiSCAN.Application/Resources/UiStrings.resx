@@ -453,7 +453,7 @@
   <data name="Opt_TamperProtection" xml:space="preserve"><value>Protection anti-manipulation</value></data>
   <data name="Opt_TamperProtectionSub" xml:space="preserve"><value>Relance optiSCAN en arrière-plan si la protection temps réel est attendue mais l'application est arrêtée.</value></data>
   <data name="Opt_PlatformProtection" xml:space="preserve"><value>Service Windows de protection système</value></data>
-  <data name="Opt_PlatformProtectionSub" xml:space="preserve"><value>Prévu dans 3 à 5 ans (pilote noyau signé requis). Indisponible dans cette version. La protection temps réel de l'application reste active.</value></data>
+  <data name="Opt_PlatformProtectionSub" xml:space="preserve"><value>Service Windows, AMSI et minifiltre. Le pilote noyau ne se charge que s'il est accepté par Windows (signature Authenticode plus tard). La protection temps réel de l'application reste le repli.</value></data>
   <data name="Repair_Quarantined" xml:space="preserve"><value>Fichier mis en quarantaine.</value></data>
   <data name="Repair_QuarantineFailed" xml:space="preserve"><value>Échec de la quarantaine.</value></data>
   <data name="Platform_StatusTitle" xml:space="preserve"><value>Protection système</value></data>
@@ -502,7 +502,7 @@
   <data name="Opt_AboutUpdates" xml:space="preserve"><value>Informations de version…</value></data>
   <data name="Opt_SourceForge" xml:space="preserve"><value>Page SourceForge</value></data>
   <data name="Opt_PrivacyPolicy" xml:space="preserve"><value>Politique de confidentialité</value></data>
-  <data name="Opt_License" xml:space="preserve"><value>Contrat de licence (EULA)</value></data>
+  <data name="Opt_License" xml:space="preserve"><value>Licence GNU GPL v3</value></data>
   <data name="Opt_LegalHint" xml:space="preserve"><value>Documents légaux fournis avec optiSCAN.</value></data>
   <data name="Opt_OpenDocError" xml:space="preserve"><value>Impossible d'ouvrir le document : {0}</value></data>
   <data name="Opt_Exclusions" xml:space="preserve"><value>Exclusions</value></data>
@@ -780,7 +780,7 @@
   <data name="Onboarding_Title" xml:space="preserve"><value>Bienvenue dans optiSCAN</value></data>
   <data name="Onboarding_Step1" xml:space="preserve"><value>optiSCAN protège et nettoie votre PC localement (ClamAV + YARA).&#10;&#10;Ce guide rapide vous indique les trois gestes utiles au premier lancement.</value></data>
   <data name="Onboarding_Step2" xml:space="preserve"><value>Les signatures antivirus (ClamAV + YARA) se téléchargent automatiquement en arrière-plan. Aucune action n'est requise.&#10;&#10;Vous pouvez suivre l'avancement dans Antivirus → Signatures, ou désactiver le téléchargement automatique dans Options.</value></data>
-  <data name="Onboarding_Step3" xml:space="preserve"><value>Étape suivante : lancez une analyse rapide avec F5 depuis l'onglet Antivirus.&#10;&#10;Sans droits administrateur, l'analyse complète et le scan planifié restent partiels.</value></data>
+  <data name="Onboarding_Step3" xml:space="preserve"><value>Étape suivante : lancez une analyse rapide depuis l'onglet Antivirus.&#10;&#10;Sans droits administrateur, l'analyse complète et le scan planifié restent partiels.</value></data>
   <data name="Onboarding_DefenderTitle" xml:space="preserve"><value>Windows Defender détecté</value></data>
   <data name="Onboarding_DefenderStep" xml:space="preserve"><value>Windows Defender protège déjà votre PC en temps réel.&#10;&#10;Recommandé : laisser Defender actif et utiliser optiSCAN en complément (analyses manuelles et planifiées avec ClamAV + YARA).&#10;&#10;Oui = mode complément (plus fluide, moins de conflits)&#10;Non = activer aussi la protection temps réel optiSCAN</value></data>
   <data name="Defender_Opt_Title" xml:space="preserve"><value>Cohabitation avec Windows Defender</value></data>

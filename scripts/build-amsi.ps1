@@ -28,8 +28,8 @@ if (-not (Test-Path -LiteralPath $vswhere)) {
     exit 0
 }
 
-$msbuild = & $vswhere -latest -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe' | Select-Object -First 1
-if (-not $msbuild) {
+$msbuild = [string](@(& $vswhere -latest -requires Microsoft.Component.MSBuild -find 'MSBuild\**\Bin\MSBuild.exe') | Select-Object -First 1)
+if ([string]::IsNullOrWhiteSpace($msbuild) -or -not (Test-Path -LiteralPath $msbuild)) {
     Write-Warning "MSBuild introuvable — build AMSI ignoré."
     exit 0
 }

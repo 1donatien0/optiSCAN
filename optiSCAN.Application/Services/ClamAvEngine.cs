@@ -241,10 +241,14 @@ namespace optiSCAN.Services
                     if (!string.IsNullOrWhiteSpace(e.Data))
                         ParseScanLine(e.Data, result, progress);
                 };
+                string? lastStderrLine = null;
                 proc.ErrorDataReceived += (_, e) =>
                 {
                     if (!string.IsNullOrWhiteSpace(e.Data))
+                    {
+                        lastStderrLine = e.Data;
                         AppLogger.Warn("ClamAV", $"stderr: {e.Data}");
+                    }
                 };
 
                 proc.Start();
@@ -262,6 +266,21 @@ namespace optiSCAN.Services
 
                 if (ct.IsCancellationRequested && !proc.HasExited)
                     proc.Kill(entireProcessTree: true);
+
+                // clamscan : 0 = propre, 1 = menace, 2 = erreur. Une erreur sans aucun
+                // fichier analysé (base absente, chemin illisible, option invalide) ne
+                // doit pas être présentée comme « aucune menace ».
+                if (result.Status == ScanStatus.Completed
+                    && proc.HasExited
+                    && proc.ExitCode == 2
+                    && result.FilesScanned == 0
+                    && result.Threats.Count == 0)
+                {
+                    result.Status = ScanStatus.Error;
+                    result.ErrorMessage = string.IsNullOrWhiteSpace(lastStderrLine)
+                        ? "clamscan a échoué (code 2) sans analyser de fichier."
+                        : lastStderrLine;
+                }
             }
             catch (OperationCanceledException)
             {
@@ -387,22 +406,20 @@ namespace optiSCAN.Services
 
         private static async Task WaitForProcessAsync(Process proc, CancellationToken ct)
         {
-            var tcs = new TaskCompletionSource<bool>();
-            proc.EnableRaisingEvents = true;
-            proc.Exited += (_, _) => tcs.TrySetResult(true);
-
-            using (ct.Register(() =>
+            // WaitForExitAsync n'a pas la course de l'ancien abonnement à Exited
+            // (posé après EnableRaisingEvents : un clamscan très bref pouvait
+            // se terminer entre les deux et bloquer l'attente indéfiniment).
+            try
+            {
+                await proc.WaitForExitAsync(ct).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException)
             {
                 try { if (!proc.HasExited) proc.Kill(entireProcessTree: true); }
                 catch (Exception ex)
                 {
                     AppLogger.Warn("ClamAvEngine", "Annulation — arrêt clamscan", ex);
                 }
-                tcs.TrySetCanceled();
-            }))
-            {
-                try { await tcs.Task; }
-                catch (TaskCanceledException) { }
             }
         }
 

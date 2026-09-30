@@ -124,10 +124,9 @@ namespace optiSCAN.Services
         public bool AggressiveSignatureUpdates { get; set; }
 
         /// <summary>
-        /// Utiliser le service Windows / minifiltre noyau pour la protection système.
-        /// Défaut : <c>false</c> — la protection temps réel user-mode (FileSystemWatcher) fonctionne SANS
-        /// pilote ni signature Microsoft. Le mode plateforme nécessite un pilote minifiltre SIGNÉ
-        /// (Partner Center / EV) : à n'activer que lorsque ce pilote est disponible et signé.
+        /// Service Windows de protection système (IPC, AMSI, tentative de minifiltre).
+        /// La protection temps réel user-mode reste le repli si le service n'est pas joignable.
+        /// Le minifiltre ne se charge que si Windows accepte le pilote (signature plus tard).
         /// </summary>
         public bool UsePlatformProtectionService { get; set; }
 
@@ -239,8 +238,12 @@ namespace optiSCAN.Services
             // Inno écrit HKCU\Software\optiSCAN\AutoUpdateSignatures (dword 1/0) quand la tâche est
             // cochée/décochée. Sans cette lecture, UserPreferences ignore le choix de l'installateur.
             var prefs = new UserPreferences();
-            ApplyInnoSetupDefaults(prefs);
+            var innoSetPlatform = ApplyInnoSetupDefaults(prefs);
             DefenderCoexistenceService.ApplyNewInstallDefaults(prefs);
+            if (!innoSetPlatform
+                && !prefs.DefenderComplementModeEnabled
+                && PlatformProtectionFeatureGate.IsUserActivatable)
+                prefs.UsePlatformProtectionService = true;
             return prefs;
         }
 
@@ -248,23 +251,35 @@ namespace optiSCAN.Services
         /// Lit les clés registre écrites par Inno Setup et les applique aux préférences
         /// par défaut. Appelé uniquement au premier lancement (aucun fichier de prefs existant).
         /// </summary>
-        private static void ApplyInnoSetupDefaults(UserPreferences prefs)
+        /// <returns><c>true</c> si Inno a écrit <c>PlatformProtection</c>.</returns>
+        private static bool ApplyInnoSetupDefaults(UserPreferences prefs)
         {
+            var innoSetPlatform = false;
             try
             {
                 using var key = Registry.CurrentUser.OpenSubKey(@"Software\optiSCAN");
-                if (key == null) return;
+                if (key == null) return false;
 
                 // AutoUpdateSignatures : 1 = activé, 0 = désactivé
                 if (key.GetValue("AutoUpdateSignatures") is int autoUpdate)
                     prefs.SignatureAutoUpdateEnabled = autoUpdate != 0;
 
-                AppLogger.Info("UserPreferences", $"Valeurs Inno appliquées : AutoUpdateSignatures={prefs.SignatureAutoUpdateEnabled}");
+                if (key.GetValue("PlatformProtection") is int platform
+                    && PlatformProtectionFeatureGate.IsUserActivatable)
+                {
+                    prefs.UsePlatformProtectionService = platform != 0;
+                    innoSetPlatform = true;
+                }
+
+                AppLogger.Info("UserPreferences",
+                    $"Valeurs Inno appliquées : AutoUpdateSignatures={prefs.SignatureAutoUpdateEnabled}, PlatformProtection={prefs.UsePlatformProtectionService}");
             }
             catch (Exception ex)
             {
                 AppLogger.Warn("UserPreferences", "ApplyInnoSetupDefaults", ex);
             }
+
+            return innoSetPlatform;
         }
 
         /// <summary>Sauvegarde vers un chemin explicite (tests).</summary>

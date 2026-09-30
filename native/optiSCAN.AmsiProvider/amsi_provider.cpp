@@ -7,6 +7,7 @@
 #include "pipe_client.h"
 
 #pragma comment(lib, "crypt32.lib")
+#pragma comment(lib, "ole32.lib")
 
 namespace
 {
@@ -84,12 +85,17 @@ public:
         *result = AMSI_RESULT_CLEAN;
 
         ULONGLONG size = 0;
-        if (FAILED(stream->GetAttribute(AMSI_ATTRIBUTE_CONTENT_SIZE, &size)) || size == 0 || size > 4 * 1024 * 1024)
+        ULONG retData = 0;
+        if (FAILED(stream->GetAttribute(
+                AMSI_ATTRIBUTE_CONTENT_SIZE,
+                sizeof(size),
+                reinterpret_cast<unsigned char*>(&size),
+                &retData)) || size == 0 || size > 4ull * 1024 * 1024)
             return S_OK;
 
         std::vector<BYTE> data(static_cast<size_t>(size));
         ULONG read = 0;
-        if (FAILED(stream->Read(data.data(), static_cast<ULONG>(data.size()), &read)) || read == 0)
+        if (FAILED(stream->Read(0, static_cast<ULONG>(data.size()), data.data(), &read)) || read == 0)
             return S_OK;
 
         const std::string b64data = EncodeBase64(data.data(), read);
@@ -107,7 +113,23 @@ public:
         return S_OK;
     }
 
-    STDMETHODIMP CloseSession() override { return S_OK; }
+    STDMETHODIMP_(void) CloseSession(ULONGLONG /*session*/) override
+    {
+    }
+
+    STDMETHODIMP DisplayName(LPWSTR* displayName) override
+    {
+        if (!displayName)
+            return E_POINTER;
+
+        const wchar_t name[] = L"optiSCAN";
+        auto* buf = static_cast<LPWSTR>(CoTaskMemAlloc(sizeof(name)));
+        if (!buf)
+            return E_OUTOFMEMORY;
+        memcpy(buf, name, sizeof(name));
+        *displayName = buf;
+        return S_OK;
+    }
 };
 
 class OptiscanClassFactory final : public IClassFactory

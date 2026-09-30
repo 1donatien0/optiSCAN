@@ -16,6 +16,12 @@ du service (nécessite droits administrateur).
 
 Clé : `HKLM\SOFTWARE\Microsoft\AMSI\Providers\{A8F4E2B1-9C3D-4E5F-8A7B-1C2D3E4F5A6B}`
 
+Le fournisseur implémente `IAntimalwareProvider` du SDK Windows actuel :
+`Scan`, `CloseSession(ULONGLONG)`, `DisplayName`, et `IAmsiStream::GetAttribute` /
+`Read` à 4 arguments. Il s’enregistre quand le service de protection est installé
+(`PlatformProtectionFeatureGate.IsUserActivatable = true`). Une signature
+Authenticode (SignPath plus tard) améliore l’acceptation par AMSI.
+
 ## Limites
 
 - Coexistence avec Defender : un seul fournisseur AMSI « actif » par processus hôte selon la politique Windows.

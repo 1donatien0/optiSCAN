@@ -1,7 +1,7 @@
 # Guide Complet — optiSCAN v1.0 (édition WinUI 3)
 
-> **Version de référence.** Édition WinUI 3 (branche `win`), dérivée de la **version 2** d’optiSCAN (WPF). Architecture mono-fenêtre, services avancés + Donaby Design System.  
-> **Nomenclature** — **v1.0** : nom de release de l’édition WinUI 3 (documentation, CLUF), propre à cette branche. **1.0.0** : assembly et installateur (`Directory.Build.props`, Inno Setup).
+> **Version de référence.** Édition WinUI 3 (branche `win`). Jusqu’à la v2, les commits sont **les mêmes** que sur `main` / `dev` (historique réécrit : courriel perso, etc.). Le `first commit` ouvre le shell WinUI 3 ; la v3 WPF reste sur `main` / `dev`. Architecture mono-fenêtre, services avancés + Donaby Design System.  
+> **Nomenclature** — **v1.0** : nom de release de l’édition WinUI 3 (documentation, GNU GPL v3), propre à cette branche. **1.0.0** : assembly et installateur (`Directory.Build.props`, Inno Setup).
 >
 > **Design system : Donaby Design** — thème sombre/clair dynamique, tokens ThemeResource WinUI 3 (ThemeDictionaries).
 > Développé par **© 2026 Donatien Byakombe (Dona By)**.
@@ -20,25 +20,25 @@
 | **8** | Édition WinUI 3 issue du commit `first commit`, puis son installeur |
 | **9** | Langues de l’interface (fr-FR / en-US) |
 | **10** | Dépendances et licences |
-| **11** | Historique : v1, v2, puis la v1 WinUI |
+| **11** | Historique : v1 et v2 communes avec `main` / `dev`, puis la v1 WinUI |
 | **12** | Audit et qualité de l’édition WinUI |
 | **13** | Sécurité de l’édition WinUI (posture /100) |
 | **14** | Crédits |
-| — | [Branches Git](#branches-git) (`main`, `dev`, `win`) |
+| — | [Branches Git](#branches-git) — édition WinUI 3 (`win`) | 
 
 ---
 
 ## Branches Git
 
-`main` et `dev` portent l’édition WPF. `win` est l’édition WinUI 3 : elle s’en sépare à la version 2, et son commit `first commit` (30 septembre 2026) en est le point de départ.
+`main` et `dev` portent l’édition WPF. `win` est l’édition WinUI 3. La **partie commune** (v1 et v2) est **le même historique** que `main` / `dev` : mêmes commits, mêmes auteurs, courriel perso (`byakombe@outlook.fr`) à la place de l’adresse étudiante. À partir du `first commit`, `win` n’est plus du WPF : c’est WinUI 3, aux antipodes des v2 / v3 WPF. Elle évolue **isolément** (licence GPL-3, runtime .NET 10) ; elle peut s’inspirer de `main` sans en reprendre la v3.
 
 L’historique WPF a été regroupé autour de ses publications, en conservant les dates majeures. Ce README décrit seulement l’édition WinUI.
 
 | Branche | Rôle |
 |---------|------|
-| **`main`** | Référence publiée de l’édition WPF. Même commit que `dev`. |
-| **`dev`** | Même historique que `main`. |
-| **`win`** | Cette édition WinUI 3, à partir de la version 2. |
+| **`main`** | Référence publiée de l’édition WPF (v3). |
+| **`dev`** | Édition WPF en cours, en avance sur `main`. |
+| **`win`** | Édition WinUI 3. Mêmes commits que `main` / `dev` jusqu’à `6a23313` (v2), puis `first commit`. |
 
 Branche par défaut GitHub : **`main`**. CI : `main`, `dev` et `win` (voir [`.github/workflows/ci.yml`](.github/workflows/ci.yml)).
 
@@ -50,7 +50,7 @@ Branche par défaut GitHub : **`main`**. CI : `main`, `dev` et `win` (voir [`.gi
 
 > **Pile WinUI 3.** L'UI repose sur Windows App SDK 1.8, publié en **framework-dependent** par défaut
 > (installateur léger : il télécharge et installe **.NET 10 Desktop Runtime** et **Windows App Runtime 1.8**
-> s'ils manquent — voir [§8](#8-publication-installateur-et-checklist-release-v10)) : `NavigationView`, `SelectorBar`, `TabView`, FontIcon Segoe Fluent,
+> s'ils manquent — voir [§8](#8-édition-winui-3-issue-du-commit-first-commit)) : `NavigationView`, `SelectorBar`, `TabView`, FontIcon Segoe Fluent,
 > ThemeDictionaries Donaby, systray Win32 `Shell_NotifyIcon` (`WinUiTrayHost`, sans dépendance),
 > toasts `Microsoft.Toolkit.Uwp.Notifications`. Comparatif des piles envisagées ci-dessous.
 
@@ -63,15 +63,17 @@ Branche par défaut GitHub : **`main`**. CI : `main`, `dev` et `win` (voir [`.gi
 
 ### Architecture plateforme v1.0 (protection système)
 
-> **⚠️ Couche présente mais DORMANTE par défaut.** Cette couche plateforme (service Windows +
-> minifiltre noyau + AMSI) nécessite un **pilote signé** (certificat EV + Microsoft Partner
-> Center) et n'est **pas activée** dans les versions actuelles. Elle reste **en place dans le
-> code**, prête à être activée lors d'une phase ultérieure (voir `docs/GUIDE_DISTRIBUTION.md`).
-> **Par défaut**, optiSCAN assure la protection temps réel en **mode user-mode
-> (`FileSystemWatcher`)**, qui ne requiert **aucun pilote ni signature**
-> (`UsePlatformProtectionService = false`).
+> **Couche activable, active par défaut hors mode complémentaire Defender.**
+> `PlatformProtectionFeatureGate.IsUserActivatable = true` : la tâche *Protection système* de
+> l'installateur est cochée au premier install, et une nouvelle installation sans Defender actif
+> active le service (`UsePlatformProtectionService`). Le service Windows et AMSI s'installent sans
+> pilote signé. Le **minifiltre** est enregistré (service noyau `optiSCANMinifilter` + instance,
+> altitude provisoire `385210`) puis tenté par `fltmc load` ; Windows x64 le refuse tant que le
+> `.sys` n'est pas signé (SignPath plus tard — voir `docs/GUIDE_DISTRIBUTION.md`).
+> **Repli** : si le service est injoignable, optiSCAN assure la protection temps réel en
+> **user-mode (`FileSystemWatcher`)**, sans pilote ni signature.
 
-optiSCAN v1.0 rapproche un antivirus « classique » via une couche plateforme Windows (activable ultérieurement) :
+optiSCAN v1.0 rapproche un antivirus « classique » via une couche plateforme Windows :
 
 ```
 optiSCAN.exe (UI WinUI 3 — projet optiSCAN.WinUI)
@@ -80,7 +82,7 @@ optiSCAN.Service.exe  →  optiSCAN.exe --service-host
     ├── RTP + ProcessStartMonitor + scan USB
     ├── ProtectionPipeServer (scan path/buffer pour AMSI)
     ├── optiSCAN.AmsiProvider.dll (COM AMSI → IPC)     [build MSVC / WDK]
-    └── optiSCAN.Minifilter.sys (noyau, stub + test signing)
+    └── optiSCAN.Minifilter.sys (noyau, stub — chargé seulement si signé)
 ```
 
 | Composant | Rôle |
@@ -130,7 +132,7 @@ Solution `optiSCAN.sln` : **5 projets** — `optiSCAN.WinUI`, `optiSCAN.Applicat
 │   ├── clean-before-publish.ps1       ← Nettoyage bin/obj avant release
 │   ├── add-defender-exclusions.ps1    ← Exclusions Windows Defender (install / manuel)
 │   ├── generate-sbom.ps1              ← SBOM CycloneDX (CI publish)
-│   ├── build-amsi.ps1 / stage-amsi.ps1← DLL AMSI native (publish)
+│   ├── build-amsi.ps1 / stage-amsi.ps1← DLL AMSI native + fichiers minifiltre .inf/.sys/.cat (publish)
 │   ├── verify-runtime-deps.ps1        ← Vérifie clamav + clamd + yara + rules
 │   ├── validate-release-readiness.ps1 ← Tests Release (+ verify publish optionnel)
 │   ├── check-winui-theme-keys.ps1     ← Parité des clés Light / Dark / HighContrast
@@ -345,6 +347,8 @@ après la date textuelle (le premier champ est une date lisible, pas un entier).
 | 1 | Menace(s) détectée(s) |
 | 2 | Erreur de scan |
 
+Un code **2** sans aucun fichier analysé ni menace (base absente, chemin illisible…) donne le statut **Erreur**, jamais « aucune menace » (`ClamAvEngine`). L'attente de fin de processus passe par `WaitForExitAsync` (arrêt de clamscan si l'analyse est annulée).
+
 ---
 
 ## 4. Architecture mono-fenêtre (v1.0)
@@ -407,7 +411,7 @@ Au-dessus de la liste, le bouton **Tout mettre en quarantaine** (`QuarantineAll_
 
 Les scans interactifs passent par `AntivirusViewModel.StartScanAsync` → `ScanOrchestrator` : pour chaque cible, **ClamAV** (daemon **clamd** ou repli **clamscan.exe**) et **YARA** tournent en parallèle (`Task.WhenAll`), puis fusion. Les scans **multi-dossiers** passent par `MultiTargetScanAggregator`. Les **périmètres protégés** optiSCAN (installation + `%LOCALAPPDATA%\optiSCAN`) sont exclus (`OptiscanProtectedPaths` + `ExclusionSettings`). **`RiskScoringService`** alimente la colonne **Risque**, les toasts et le PDF.
 
-> **clamd** — si `clamd.exe` est présent et l’option **Moteur clamd** est activée (Options), les scans utilisent le daemon TCP (`127.0.0.1:3310`) ; sinon repli sur **`clamscan.exe`**. Note posture Accueil : [§13 Sécurité](#13-sécurité-de-lédition-winui).
+> **clamd** — si `clamd.exe` est présent et l’option **Moteur clamd** est activée (Options), les scans utilisent le daemon TCP (`127.0.0.1:3310`) ; sinon repli sur **`clamscan.exe`**. `CompositeClamAvBackend` relance aussi l'analyse avec clamscan quand clamd échoue en cours de route : socket coupée, réponse incomplète, ou cible illisible pour clamd (lignes `… ERROR` sans aucun fichier analysé). Une annulation ne déclenche pas de repli. Les listes de fichiers (`--file-list`, scan USB rapide) passent directement par clamscan. Note posture Accueil : [§13 Sécurité](#13-sécurité-de-lédition-winui).
 
 ```
 AntivirusViewModel → ScanOrchestrator
@@ -434,7 +438,7 @@ AntivirusViewModel → ScanOrchestrator
 ```
 %LOCALAPPDATA%\optiSCAN\exclusions.dat
 ```
-(chiffrement **DPAPI** + **HMAC** ; format `.dat` unique, aucun format hérité).
+(chiffrement **DPAPI** + **HMAC** ; un ancien `exclusions.json` en clair est migré une fois au premier chargement, `SecureStore.MigrateFromPlaintext`).
 
 **Périmètres protégés** (`OptiscanProtectedPaths`) — jamais analysés (scans, RTP, quarantaine auto) pour éviter l’**auto-détection** sur les propres fichiers optiSCAN :
 
@@ -496,7 +500,7 @@ Pendant un **scan en cours**, `AntivirusViewModel.ActiveScanSessionId` lie les q
 
 ### 4.10 Exports PDF et HTML
 
-- **PDF** — `PdfReportGenerator` : déclenché via `ServiceContainer` (`ExportScanSessionPdfRequested` → `MainWindow.TryExportScanSessionPdf`). Bouton **Historique** : **PDF (sélection)** sur la ligne choisie dans Scan Antivirus.
+- **PDF** — `PdfReportGenerator` : déclenché via `ServiceContainer` (`ExportScanSessionPdfRequested` → `MainWindow.OnExportPdfRequested` → `ExportCoordinator.TryExportSessionPdf`). Bouton **Historique** : **PDF (sélection)** sur la ligne choisie dans Scan Antivirus.
 - **HTML** — `HtmlExportService` : `RequestExportScanHistoryHtml()` depuis **Historique**.
 
 ### 4.11 Accueil (dashboard)
@@ -520,7 +524,7 @@ Le panneau **Accueil** (`OverviewPage`, tag `overview`) regroupe :
 
 ### DefenderCoexistenceService — mode complémentaire Windows Defender
 
-Nouvelle installation avec **Windows Defender actif** (`WinDefend` en marche) : optiSCAN propose le **mode complémentaire** (`DefenderComplementModeEnabled`, défaut). Defender garde le **temps réel** ; optiSCAN se concentre sur les analyses à la demande / planifiées / USB (ClamAV + YARA) — RTP optiSCAN et surveillance des processus sont **coupées** pour éviter le double scan. L'utilisateur peut basculer en **protection optiSCAN complète** (`ApplyFullOptiscanMode`). En mode complémentaire, le temps réel est considéré **délégué** (`DefenderCoexistenceService.IsRealTimeDelegated`) : le badge Antivirus reste **Actif** et le critère posture `optiscan` n'est pas pénalisé.
+Nouvelle installation avec **Windows Defender actif** (`WinDefend` en marche) : optiSCAN propose le **mode complémentaire** (`DefenderComplementModeEnabled`, défaut). Defender garde le **temps réel** ; optiSCAN se concentre sur les analyses à la demande / planifiées / USB (ClamAV + YARA) — RTP optiSCAN et surveillance des processus sont **coupées** pour éviter le double scan. L'utilisateur peut basculer en **protection optiSCAN complète** (`ApplyFullOptiscanMode`), qui réactive la RTP, la surveillance des processus et le service de protection système. En mode complémentaire, le temps réel est considéré **délégué** (`DefenderCoexistenceService.IsRealTimeDelegated`) : le badge Antivirus reste **Actif** et le critère posture `optiscan` n'est pas pénalisé.
 
 ### RemovableDriveScanService — clés USB et cartes SD
 
@@ -649,7 +653,7 @@ L’application est publiée en **`asInvoker`** (`app.manifest`) : exécution av
 
 - `SuspiciousDownloads` exclue par défaut (trop agressive sur le dossier Downloads)
 - Ne jamais supprimer automatiquement — toujours mettre en quarantaine en premier
-- L'utilisateur confirme avant toute action destructrice (`ContentDialog` via `WinUiUserConfirmService`)
+- L'utilisateur confirme avant toute action destructrice (boîte `MessageBoxW` Win32 via `WinUiUserConfirmService`)
 - Le test EICAR est couvert par la règle YARA embarquée `rules/test_rules.yar` (`EICAR_Test`) ; ClamAV le détecte aussi si la base est à jour
 
 ### Exclusion Windows Defender
@@ -671,9 +675,9 @@ Si la **protection contre la falsification** de Defender est active, l’ajout p
 
 ## 8. Édition WinUI 3 issue du commit `first commit`
 
-Cette édition commence au commit `ff96e3a` (`first commit`, 30 septembre 2026), sur la branche `win`. Elle part de la **version 2** (`7eaab75`, release du 23 juin 2026, tag `v2`). C’est la **v1** WinUI : release **v1.0**, assembly **1.0.0** (`Directory.Build.props`).
+Cette édition commence au commit `2ab25cc` (`first commit`), sur la branche `win`. Son parent git est `6a23313` (`release: optiSCAN 2`, tag `v2`) : **les mêmes objets** que sur `main` et `dev` (historique réécrit). La v3 WPF n’est pas dans cette branche. C’est la **v1** WinUI : release **v1.0**, assembly **1.0.0** (`Directory.Build.props`).
 
-`first commit` pose le shell WinUI 3 (`optiSCAN.WinUI`), donne à l’installeur un `AppId` propre (`8680BFF9-…`) et un dossier `{autopf}\optiSCAN WinUI`, et laisse la couche plateforme (service, AMSI, minifiltre) dormante. Le détail, après les publications **v1** et **v2**, est en [§11](#11-historique).
+`first commit` pose le shell WinUI 3 (`optiSCAN.WinUI`), donne à l’installeur un `AppId` propre (`8680BFF9-…`) et un dossier `{autopf}\optiSCAN WinUI`. La couche plateforme (service, AMSI, tentative de minifiltre) est en place ; Windows x64 refuse encore un `.sys` non signé. Le détail, après les publications **v1** et **v2**, est en [§11](#11-historique).
 
 La CI lance le build et les tests sur `win`. Le job qui produit l’installeur ne part que sur `main`. Cette édition se publie donc en local, et `win` n’est pas fusionnée dans `main` — voir [Branches Git](#branches-git).
 
@@ -698,7 +702,7 @@ Sortie publish : `optiSCAN.WinUI\bin\Release\net10.0-windows10.0.19041.0\publish
 
 ### Ordre recommandé (équipe)
 
-1. Gel fonctionnel : `.\scripts\validate-release-readiness.ps1` (ou `dotnet test` Release — **383** tests).
+1. Gel fonctionnel : `.\scripts\validate-release-readiness.ps1` (ou `dotnet test` Release — **398** tests).
 2. Dépendances : `.\scripts\fetch-runtime-deps.ps1` (+ `-RunFreshclam` pour l’installateur).
 3. Publish local : `.\scripts\prepare-release.ps1` (ou étapes manuelles ci-dessous).
 4. VM propre : installer `optiSCAN_Setup_v1.0.0.exe` ; scan, RTP, clamd, posture, FR/EN.
@@ -743,7 +747,7 @@ $pub = ".\optiSCAN.WinUI\bin\Release\net10.0-windows10.0.19041.0\publish\win-x64
 & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" .\installer\setup.iss
 ```
 
-**Installateur** : assistant **bilingue** (français / English) ; langue choisie → `UiCulture` en registre pour le premier lancement de l’app.
+**Installateur** : assistant **bilingue** (français / English), langue détectée d'après Windows (voir [§9](#9-langues-de-linterface-fr-fr-en-us)) ; langue retenue → `UiCulture` en registre pour le premier lancement de l’app.
 
 **Contenu de l'installateur (léger, sans bases de signatures) :**
 
@@ -762,7 +766,7 @@ Les bases ClamAV sont téléchargées par freshclam au premier lancement.
 
 ### Checklist binaire (bloquant)
 
-- [ ] `dotnet test` Release — **383** tests OK
+- [ ] `dotnet test` Release — **398** tests OK
 - [ ] `.\scripts\verify-runtime-deps.ps1` — vert sur dossier publish (dont `optiSCAN.pri`)
 - [ ] VM **sans** .NET 10 ni Windows App Runtime : l'installateur les propose, les installe, puis optiSCAN démarre
 - [ ] `clamscan.exe`, `freshclam.exe`, **`clamd.exe`**, `yara64.exe`, règles `.yar`
@@ -783,7 +787,7 @@ Contenu du workflow `ci.yml` : job **build-test** (build, tests, couverture) sur
 
 **Freshclam en CI** : génère un `freshclam.conf` minimal dans `clamav\x64\` (non versionné dans Git, comme en production via `FreshclamUpdater`). **Erreur connue (corrigée)** : `Can't open/parse freshclam.conf` si freshclam est lancé sans `--config-file`.
 
-**Repères de couverture tests (release, 383 au total — voir checklist)** :
+**Repères de couverture tests (release, 398 au total — voir checklist)** :
 
 | Module | Fichier de tests |
 |--------|------------------|
@@ -814,7 +818,7 @@ Windows affiche « Éditeur inconnu » sans certificat. Utile pour release publi
 
 | Canal | Comportement |
 |-------|----------------|
-| **Installateur Inno** | Choix FR ou EN → `HKCU\Software\optiSCAN\UiCulture` |
+| **Installateur Inno** | Langue de Windows détectée (`ShowLanguageDialog=auto`) : FR ou EN directement, choix proposé seulement pour une autre langue (français présélectionné) ; mise à jour = langue précédente ; `/LANG=english` force. Résultat → `HKCU\Software\optiSCAN\UiCulture` |
 | **Options → Langue** | Français / English → confirmation → **redémarrage** de l’app |
 | **Ressources** | `UiStrings.resx` + `UiStrings.en.resx` (**839** clés FR/EN, parité vérifiée en CI) |
 | **Menu contextuel** | « Scanner avec optiSCAN » ou « Scan with optiSCAN » sur **fichiers et dossiers** (`--scan`) |
@@ -842,7 +846,8 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 
 | Composant | Version | Licence | Notes |
 |---|---|---|---|
-| ClamAV | Dernière stable | GPLv2 | Inclure la licence dans l'installateur |
+| optiSCAN (édition WinUI 3) | 1.0.0 | **GNU GPL v3 ou ultérieure** | `LICENSE.txt` (notice) + `COPYING` (texte complet) |
+| ClamAV | Dernière stable | GPLv2 | Processus séparés (`clamscan` / `clamd`) — agrégation, pas de liaison |
 | .NET 10 + WinUI 3 (Windows App SDK) | 1.8.x | MIT | Framework-dependent par défaut (runtimes installés par l'installateur si absents) ; self-contained en option ; systray en Win32 natif (`WinUiTrayHost`), sans paquet tiers |
 | Microsoft.Data.Sqlite | 10.0.12 | MIT | Historique des scans paginé (`ScanLogSqliteStore`) |
 | Microsoft.Extensions.DependencyInjection | 10.0.12 | MIT | Conteneur de services |
@@ -860,7 +865,7 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 
 ### v1 — 1 juin 2026
 
-> Publication `release: optiSCAN 1` (`949ec94`).
+> Publication `release: optiSCAN 1` (`7092a34`, tag `v1`).
 
 - **Dépôt** — initialisation du projet (30 avril 2026)
 - **Moteurs** — ClamAV, YARA, installateur et services
@@ -868,19 +873,19 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 
 ### v2 — 23 juin 2026
 
-> Publication `release: optiSCAN 2` (`7eaab75`, tag `v2`). Parent du commit `first commit`.
+> Publication `release: optiSCAN 2` (`6a23313`, tag `v2`). Dernier commit **commun** avec `main` / `dev` ; parent du `first commit` WinUI.
 
 - **Interface** — i18n et suppression des fichiers détectés
 - **Analyse** — clamd, scan USB, historique et quarantaine
 - **Plateforme** — protection système et scan contextuel
 - **Socle** — architecture, sécurité et coordinateurs
 
-### v1 WinUI — 30 septembre 2026
+### v1 WinUI — `first commit`
 
-> Version issue du commit `first commit` (`ff96e3a`) : c’est la **v1** avec WinUI — voir [§8](#8-édition-winui-3-issue-du-commit-first-commit). Release **v1.0**, assembly **1.0.0**. Moteurs ClamAV (dual-mode) + YARA, quarantaine chiffrée **AES-256-GCM**, protection temps réel, historique unifié, posture de sécurité /100, et couche plateforme dormante (AMSI, IPC, service).
+> Commit `2ab25cc` (`first commit`) : c’est la **v1** avec WinUI — voir [§8](#8-édition-winui-3-issue-du-commit-first-commit). Release **v1.0**, assembly **1.0.0**. Moteurs ClamAV (dual-mode) + YARA, quarantaine chiffrée **AES-256-GCM**, protection temps réel, historique unifié, posture de sécurité /100, et couche plateforme (service, AMSI, tentative de minifiltre). La v3 WPF reste sur `main` / `dev`.
 
 - **Installateur léger** — publication framework-dependent (`FolderProfile`) ; `setup.iss` installe .NET 10 Desktop Runtime et Windows App Runtime 1.8 s'ils manquent ; dossier par défaut `{autopf}\optiSCAN WinUI` ; mutex `Global\optiSCAN_WinUI_UniqueInstance`
-- **Mode complémentaire Defender** — Defender garde le temps réel ; badge et posture ne pénalisent plus ce choix ([§5](#defendercoexistenceservice--mode-complémentaire-windows-defender))
+- **Mode complémentaire Defender** — Defender garde le temps réel ; badge et posture ne pénalisent plus ce choix ([§5](#defendercoexistenceservice-mode-complémentaire-windows-defender))
 - **Dépôt** — l’interface de cette édition est `optiSCAN.WinUI` ; `optiSCAN/` ne garde que les assets. Les 9 sources encore testées sont dans `optiSCAN.Tests/Legacy/`.
 - **Historique des détections** — les détections de la protection temps réel et de la surveillance des processus laissent une session « Protection temps réel » (`ScanType.RealTime`, `DetectionHistoryRecorder`) dans l’Historique ; écriture de `scan_history.dat` verrouillée (accès concurrents)
 - **Installeur propre à cette édition** — `AppId` Inno `8680BFF9-…` (`InnoUninstallGuid` aligné), distinct d’optiCOMBAT ; le nettoyage du menu contextuel ne supprime plus les entrées « Scan with optiCombat ».
@@ -890,15 +895,15 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 - **Publish** — cible MSBuild `CleanStalePublishOutput` : nettoyage de `publish\` uniquement (évite publish cassé)
 - **Refactor UI** — coordinateurs `optiSCAN.Application/Coordinators/` (14) + `optiSCAN.WinUI/Services/WinUi*Coordinator` : startup/shutdown, systray, exports, historique, RTP/USB/toasts ; `MainWindow` allégé (~720 L)
 - **DI préférences** — `IUserPreferencesAccessor`, `IExclusionSettingsAccessor` ; vues via `IViewServices` / `IHistoryServices` / `IHistoryExportService`
-- **Qualité** — `.editorconfig` ; NetAnalyzers `latest-recommended` ; **377** tests ; SBOM CycloneDX en publish CI
+- **Qualité** — `.editorconfig` ; NetAnalyzers `latest-recommended` ; tests Release ; SBOM CycloneDX en publish CI
 - **Historique** — `ActivityLogService` + `activity_log.dat` (150 événements, migration unique) ; `HistoryViewModel` (5 filtres, `SelectionKey`) ; menaces traitables (**Traiter dans Analyse**) ; `scan_history.dat` / `clean_history.dat` (rotation 100→50) ; compat format hérité sans chemins
 - **Accueil** — `OverviewRecommendationsBuilder` + `OverviewProtectionStatsFormatter` (stats 30 j. sans doublon dans les recommandations)
 - **Scan USB/SD** — rapide = extensions à risque (4 000 max), moteurs **en série**, timeouts 10/45 min, repli récursif ; complet = `ScanFolderBackgroundAsync` ; statut barre + toasts début/fin
 - **Quarantaine** — rollback si suppression originale échoue ; `ReconcileQuarantinedThreats` ; session scan active (`ActiveScanSessionId`)
-- **Thème Windows** — `SyncWindowsTheme` par défaut ; case Options (thème opposé à Windows) ; `WinUiThemeManager` : presets d’accent, couleur perso, contraste renforcé ([§2](#2-donaby-design--système-de-thèmes))
+- **Thème Windows** — `SyncWindowsTheme` par défaut ; case Options (thème opposé à Windows) ; `WinUiThemeManager` : presets d’accent, couleur perso, contraste renforcé ([§2](#2-donaby-design-système-de-thèmes))
 - **clamd** — `CompositeClamAvBackend`, TCP `127.0.0.1:3310`, repli `clamscan.exe`
 - **Posture /100**, **VirusTotal**, **mode jeu** — voir [§13](#13-sécurité-de-lédition-winui) et Options
-- **Tests** — **377** tests Release — [§12](#12-audit-et-qualité) ; i18n **839** clés FR/EN ; coordinateurs + exports couverts par tests dédiés
+- **Tests** — tests Release — [§12](#12-audit-et-qualité-de-lédition-winui) ; i18n **839** clés FR/EN ; coordinateurs + exports couverts par tests dédiés
 
 ---
 
@@ -910,10 +915,10 @@ Ce chapitre porte sur la **v1 WinUI** (branche `win`, `optiSCAN.WinUI`). Le dét
 
 | Domaine | Note | État sur `win` |
 |---------|:----:|----------------|
-| Architecture | 8/10 | Shell WinUI 3, coordinateurs, ClamAV + YARA. Service, AMSI et minifiltre hors du produit livré |
+| Architecture | 8/10 | Shell WinUI 3, coordinateurs, ClamAV + YARA. Service et AMSI livrés ; minifiltre tenté, charge refusé sans signature |
 | Sécurité locale | 8/10 | Quarantaine AES-GCM, historique DPAPI, périmètres protégés. Exclusion Defender encore large, scripts Tweaks dans `%TEMP%`, copie de sécurité non chiffrée |
 | UI / Donaby | 8/10 | Thèmes clair, sombre, contraste ; volet au thème ; accueil adaptable ; onglet Antivirus marqué. Pas de passe visuelle sur machine vierge |
-| Tests et CI | 8/10 | **383** tests ; build et tests sur `win`. Pas d’intégration réelle clamd / `schtasks`. Couverture au seuil **40 %** (cible 50 %) |
+| Tests et CI | 8/10 | **398** tests ; build et tests sur `win`. Pas d’intégration réelle clamd / `schtasks`. Couverture au seuil **40 %** (cible 50 %) |
 | Release | 7/10 | Installeur léger produit en local, sans bases `.cvd`. Non rejoué sur machine vierge, non signé |
 
 **En place sur cette branche**
@@ -922,9 +927,9 @@ Ce chapitre porte sur la **v1 WinUI** (branche `win`, `optiSCAN.WinUI`). Le dét
 - **Thèmes** — clair, sombre, contraste renforcé ; accent tenu à 4,5:1 ; `ThemeBrush` suit le thème choisi. Le volet utilise le fond de la fenêtre (blanc en clair, `#141414` en sombre).
 - **Fenêtre** — minimum 720×480 ; l’accueil défile et se réagence en dessous de 720 px.
 - **Antivirus** — l’onglet cliqué est celui qui est marqué (fond teinté, texte accent, soulignement). `Ctrl+1`…`5` passent par `PreviewKeyDown`.
-- **Protection** — temps réel de l’application actif. La protection système (service, AMSI, minifiltre) reste dormante, case grisée, horizon 3 à 5 ans. Service prévu : `optiSCANProtection`.
+- **Protection** — temps réel de l’application en repli. Service `optiSCANProtection` et AMSI installables ; le minifiltre est enregistré (service noyau + altitude) puis tenté (`fltmc`) et Windows x64 le refuse tant qu’il n’est pas signé.
 - **Installeur** — framework-dependent, sans bases `.cvd` ; freshclam au premier lancement ; `AppId` `8680BFF9-…` ; dossier `{autopf}\optiSCAN WinUI`.
-- **Filet** — **383** tests Release, **839** clés FR/EN. Sur `win`, la CI lance le build et les tests. L’installeur de cette édition ne sort pas de ce job : il se construit ici.
+- **Filet** — **398** tests Release, **839** clés FR/EN. Sur `win`, la CI lance le build et les tests. L’installeur de cette édition ne sort pas de ce job : il se construit ici.
 
 **Encore ouvert sur cette branche**
 
@@ -950,7 +955,7 @@ dotnet test optiSCAN.Tests\optiSCAN.Tests.csproj -c Release
 
 ## 13. Sécurité de l’édition WinUI
 
-Périmètre de la **v1 WinUI** : la protection **user-mode**. ClamAV, YARA, quarantaine, protection temps réel de l’application, historique. Le service Windows, l’AMSI et le minifiltre sont dans le dépôt et restent dormants (`PlatformProtectionFeatureGate.IsUserActivatable = false`). Ils ne comptent pas parmi les contrôles de cette version.
+Périmètre de la **v1 WinUI** : ClamAV, YARA, quarantaine, protection temps réel de l’application, historique, service Windows et AMSI. Le minifiltre est tenté au chargement ; sans signature Authenticode / attestation Microsoft, Windows x64 le refuse. La note posture ne mesure pas le pilote noyau.
 
 ### Note posture /100 (Accueil)
 
@@ -976,11 +981,12 @@ Liens **Corriger** (accueil) : `optiscan://panel/{id}` (antivirus, options, hist
 
 **Contrôles actifs** : quarantaine AES-GCM + HMAC ; exclusions avec frontière `\` ; périmètres protégés (`OptiscanProtectedPaths`) ; exclusions Defender posées au démarrage de l’application ; élévation pour l’analyse complète ; protection temps réel de l’application ; clamd sur `127.0.0.1`, repli `clamscan.exe`.
 
-**Hors de cette version** : service `optiSCANProtection`, fournisseur AMSI, minifiltre. La case est visible et grisée (horizon 3 à 5 ans, pilote signé requis). Un logiciel qui tourne déjà en administrateur peut couper un antivirus local. VirusTotal, s’il est activé, envoie le condensat. `optiSCAN.log` reste un journal de diagnostic : chemins de scan réduits par `PathRedaction`, fichier non chiffré. Les dettes encore ouvertes sont au [§12](#12-audit-et-qualité-de-lédition-winui).
+**Limite noyau** : le minifiltre ne se charge pas tant que le `.sys` n’est pas signé (SignPath prévu plus tard). Un logiciel qui tourne déjà en administrateur peut couper un antivirus local. VirusTotal, s’il est activé, envoie le condensat. `optiSCAN.log` reste un journal de diagnostic : chemins de scan réduits par `PathRedaction`, fichier non chiffré. Les dettes encore ouvertes sont au [§12](#12-audit-et-qualité-de-lédition-winui).
 
 ---
 
 ## 14. Crédits
 
 Développé par **© 2026 Donatien Byakombe**  
-Design system : **Donaby Design**
+Design system : **Donaby Design**  
+Licence de l’édition WinUI 3 : **GNU GPL v3 ou ultérieure** (`LICENSE.txt`, `COPYING`).

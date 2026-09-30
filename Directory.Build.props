@@ -1,10 +1,13 @@
 <Project>
-  <!-- vM.m = nom de release (README, CLUF) ; <Version> = semver build / Inno AppVersion -->
+  <!-- vM.m = nom de release (README, GPL-3) ; <Version> = semver build / Inno AppVersion -->
   <PropertyGroup>
     <Version>1.0.0</Version>
     <AssemblyVersion>1.0.0.0</AssemblyVersion>
     <FileVersion>1.0.0.0</FileVersion>
     <InformationalVersion>1.0.0</InformationalVersion>
+    <Authors>Dona By</Authors>
+    <PackageLicenseExpression>GPL-3.0-or-later</PackageLicenseExpression>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
     <EnableNETAnalyzers>true</EnableNETAnalyzers>
     <AnalysisLevel>latest-recommended</AnalysisLevel>
     <_SkipUpgradeNetAnalyzersNuGetWarning>true</_SkipUpgradeNetAnalyzersNuGetWarning>

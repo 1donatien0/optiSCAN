@@ -50,7 +50,35 @@ public sealed class DefenderCoexistenceServiceTests
             _ => { });
 
         Assert.True(prefs.DefenderComplementModeEnabled);
+        Assert.False(prefs.UsePlatformProtectionService);
         Assert.False(exclusions.RealTimeEnabled);
+    }
+
+    [Fact]
+    public void ApplyFullOptiscanMode_enables_platform_when_gate_is_open()
+    {
+        var prefs = new UserPreferences
+        {
+            DefenderComplementModeEnabled = true,
+            UsePlatformProtectionService = false,
+            ProcessMonitorEnabled = false
+        };
+        var exclusions = new ExclusionSettings { RealTimeEnabled = false };
+        var prefsAccessor = new InMemoryPreferencesAccessor(prefs);
+        var exclAccessor = new InMemoryExclusionSettingsAccessor(exclusions);
+        var platform = false;
+
+        DefenderCoexistenceService.ApplyFullOptiscanMode(
+            prefsAccessor,
+            exclAccessor,
+            _ => { },
+            enabled => platform = enabled,
+            _ => { });
+
+        Assert.False(prefs.DefenderComplementModeEnabled);
+        Assert.Equal(PlatformProtectionFeatureGate.IsUserActivatable, prefs.UsePlatformProtectionService);
+        Assert.True(exclusions.RealTimeEnabled);
+        Assert.Equal(PlatformProtectionFeatureGate.IsUserActivatable, platform);
     }
 
     private sealed class InMemoryPreferencesAccessor(UserPreferences current) : IUserPreferencesAccessor

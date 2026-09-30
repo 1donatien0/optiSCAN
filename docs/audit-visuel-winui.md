@@ -217,8 +217,8 @@ Windows** (clair, sombre, contraste renforcé, preset + couleur d'accent perso).
 ### Reste à faire
 
 - ~~`Services/WinUiThemeColors.cs` non utilisé~~ — supprimé (passe de septembre 2026).
-- `ActivityEntry.IconBrushKey` renvoie `WarningOrange`, clé inexistante en WinUI (non utilisée par les
-  vues WinUI aujourd'hui).
+- ~~`ActivityEntry.IconBrushKey` renvoie `WarningOrange`, clé inexistante en WinUI~~ — corrigé
+  (octobre 2026) : renvoie `WarningBrush`.
 
 ---
 

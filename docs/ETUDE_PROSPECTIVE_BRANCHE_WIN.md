@@ -8,14 +8,14 @@ Ce texte décrit ce que la branche fait déjà, où le comportement et le rendu 
 
 ## 1. Position de la branche
 
-`win` est l’édition WinUI 3 d’optiSCAN. Elle quitte l’historique WPF à la version 2 et porte le nom de release **v1.0** (assembly **1.0.0**), indépendant des versions 1 à 3 de l’édition WPF (`main` / `dev`).
+`win` est l’édition WinUI 3 d’optiSCAN. Jusqu’à la v2, les commits sont ceux de `main` / `dev` (historique réécrit, courriel perso). Le `first commit` ouvre WinUI 3 ; la v3 WPF reste sur `main` / `dev`. Le nom de release **v1.0** (assembly **1.0.0**) est propre à WinUI.
 
 | Fait | Conséquence |
 |------|-------------|
 | UI WPF retirée de `optiSCAN/` (assets seulement) | Cette branche est le produit, pas un prototype à côté de WPF. |
 | `AppId` Inno distinct de l’édition WPF et d’optiCOMBAT | Les deux éditions peuvent cohabiter. Un passage transparent depuis WPF demanderait de reprendre l’`AppId` WPF. |
 | CI déclenchée sur `main`, `dev` et `win` | Build Release et tests (`ci.yml`), CodeQL, gitleaks et dependency-review couvrent `win`. Le publish, le SBOM et l’installeur ne partent que sur `main`. |
-| Protection plateforme (service, AMSI, minifiltre) présente et **dormante** | Le produit distribuable aujourd’hui est user-mode : `FileSystemWatcher`, ClamAV, YARA, quarantaine. Le pilote signé est une phase ultérieure (3 à 5 ans dans le guide de distribution). |
+| Protection plateforme (service, AMSI) **activable** ; minifiltre tenté | Service et AMSI s’installent. Windows x64 refuse un `.sys` non signé. SignPath plus tard (~1 an) pour la réputation puis l’attestation noyau. Repli : `FileSystemWatcher`. |
 | Publication **framework-dependent** par défaut | L’installeur est léger ; .NET 10 Desktop et Windows App Runtime 1.8 sont téléchargés s’ils manquent. |
 
 Le produit est déjà une application installable : `optiSCAN.exe` publié, puis `installer\output\optiSCAN_Setup_v1.0.0.exe`. La suite de l’évolution est une question de clarté, de fiabilité de la chaîne locale, et de ce qu’on choisit d’activer — pas de « finir l’application ».
@@ -67,7 +67,7 @@ Comportement attendu : « Mettre à jour » ouvre Signatures, l’onglet Signatu
 - Quarantaine AES-256-GCM, périmètres protégés (`OptiscanProtectedPaths`), exclusions Defender au démarrage.
 - Mode complémentaire Defender : si Defender fait le temps réel, optiSCAN ne le double pas, et la posture ne compte pas ça comme une protection dégradée.
 - Thèmes Donaby clair / sombre / contraste renforcé, accent ajusté à 4,5:1, `ThemeBrush` pour ne pas figer les couleurs au changement de thème.
-- 383 tests, 839 clés FR/EN, coordinateurs qui ont allégé `MainWindow`.
+- 398 tests, 839 clés FR/EN, coordinateurs qui ont allégé `MainWindow`.
 - Installeur Inno : moteurs, règles YARA, script d’exclusions. Les bases `.cvd` peuvent être absentes au moment du build (`AllowMissingSignatures`) : la mise à jour se fait au premier lancement.
 
 ### 2.4 Frottements de la chaîne locale
@@ -107,9 +107,9 @@ Reste à vérifier sur un build publié, dans les trois thèmes.
 
 La signature Authenticode reste optionnelle en phase 1. La poser maintenant améliorerait SmartScreen ; elle n’est pas requise pour que ClamAV et YARA, déjà signés par leurs éditeurs, fonctionnent.
 
-### C. Ne pas ouvrir la phase plateforme
+### C. Phase plateforme : ouverte sans le pilote noyau
 
-Service Windows, AMSI et minifiltre sont dans le dépôt et grisés dans l’installeur et dans Options. Les activer sans certificat EV et sans signature Microsoft du pilote ne charge pas le `.sys` et complique le support. Le guide de distribution a déjà tranché : user-mode pour les prochaines années.
+*Mise à jour d’octobre 2026 : cette piste a été tranchée autrement que prévu au départ.* Service Windows et AMSI sont **activables** (`PlatformProtectionFeatureGate.IsUserActivatable = true`) : tâche cochée dans l’installeur, case active dans Options, et activés par défaut hors mode complémentaire Defender. Le minifiltre est enregistré et tenté, mais ne se charge pas sans signature Microsoft. Ce qui reste exclu : forcer le pilote non signé (test signing) chez l’utilisateur.
 
 ---
 
@@ -137,7 +137,7 @@ Le produit s’installe. Le prochain gain n’est pas une fonction nouvelle.
 
 1. Certificat Authenticode (OV) pour l’exe et l’installeur, si SmartScreen devient le frein principal.
 2. Reprise éventuelle de l’`AppId` WPF le jour où l’édition WinUI remplace l’édition WPF chez les mêmes utilisateurs.
-3. Phase plateforme (EV, Partner Center, pilote, AMSI signé) lorsque `PlatformProtectionFeatureGate` pourra passer à activable. D’ici là, la case reste visible et grisée.
+3. SignPath (~1 an) : Authenticode de l’exe, de l’installeur et d’AMSI, puis attestation du minifiltre. D’ici là, `fltmc load` est tenté et le refus Windows est attendu.
 
 ---
 
@@ -145,7 +145,7 @@ Le produit s’installe. Le prochain gain n’est pas une fonction nouvelle.
 
 - Rebrancher « Mettre à jour » vers un autre panneau : la cible Signatures est la bonne.
 - Remplacer le `SelectorBar` par un autre contrôle seulement pour « réparer » un clic qui fonctionne. Le défaut est le repère visuel du template (texte identique, fond transparent, trait de 16×3 px), plus le hub d’analyse qui ne change pas de section.
-- Activer le minifiltre ou l’AMSI dans l’installeur grand public avant signature noyau.
+- Activer le test signing (`bcdedit`) sur les machines des utilisateurs pour forcer le minifiltre non signé.
 - Publier en self-contained par défaut : l’installeur gonfle (~75 Mo) alors que le chemin léger est déjà celui du produit.
 - Prendre un publish local pour seule preuve que `win` tient : le build Release et les tests partent déjà sur cette branche. L’installeur, lui, ne sort que de `main` ou d’une publication locale.
 
@@ -153,4 +153,4 @@ Le produit s’installe. Le prochain gain n’est pas une fonction nouvelle.
 
 ## 6. Lecture courte
 
-La branche `win` est une v1.0 installable, user-mode, avec une UI déjà câblée. Le malentendu « Mise à jour m’envoie sur Analyse » venait de l’apparence ; l’onglet actif est désormais marqué et le hub d’analyse ne s’affiche plus hors de l’onglet Analyse (à confirmer sur un build publié). Le build, les tests et le script de publication tiennent. La suite utile est de vérifier l’installeur sur une machine sans runtime .NET 10, et de laisser la couche noyau dormante.
+La branche `win` est une v1.0 installable, avec une UI déjà câblée et la couche plateforme posée (service, AMSI, tentative de minifiltre). Le malentendu « Mise à jour m’envoie sur Analyse » venait de l’apparence ; l’onglet actif est désormais marqué et le hub d’analyse ne s’affiche plus hors de l’onglet Analyse (à confirmer sur un build publié). Le build, les tests et le script de publication tiennent. La suite utile est de vérifier l’installeur sur une machine sans runtime .NET 10. Windows refusera le `.sys` non signé jusqu’à SignPath.

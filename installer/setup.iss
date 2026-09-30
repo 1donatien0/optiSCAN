@@ -111,18 +111,19 @@ Name: "french"; MessagesFile: "compiler:Languages\French.isl"
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [CustomMessages]
-french.PlatformGroup=Protection système (à venir)
-english.PlatformGroup=System protection (planned)
-french.PlatformTask=Service Windows de protection système — prévu dans 3 à 5 ans (pilote noyau signé requis, indisponible dans cette version)
-english.PlatformTask=Windows system protection service — planned in 3 to 5 years (signed kernel driver required, unavailable in this version)
+french.PlatformGroup=Protection système
+english.PlatformGroup=System protection
+french.PlatformTask=Service Windows, AMSI et minifiltre (le pilote noyau ne se charge que s'il est accepté par Windows)
+english.PlatformTask=Windows service, AMSI and minifilter (the kernel driver loads only if Windows accepts it)
 
 [Tasks]
 Name: "desktopicon";   Description: "Créer une icône sur le Bureau";                              GroupDescription: "Icônes supplémentaires"
 Name: "startupicon";   Description: "Lancer optiSCAN au démarrage de Windows";                   GroupDescription: "Options avancées"; Flags: unchecked
 Name: "autoUpdateSig"; Description: "Activer les mises à jour auto des signatures (recommandé)"; GroupDescription: "Antivirus ClamAV"; Flags: checkedonce
-; Service + minifiltre : prévus dans 3 à 5 ans (pilote signé). Case visible mais grisée.
-; La protection temps réel de l'application fonctionne sans ce service.
-Name: "platformservice"; Description: "{cm:PlatformTask}"; GroupDescription: "{cm:PlatformGroup}"; Flags: unchecked
+; Service + AMSI installés si la case est cochée (défaut au premier install).
+; Le minifiltre est tenté : Windows x64 refuse un .sys non signé jusqu'à SignPath.
+; La protection temps réel de l'application reste le repli.
+Name: "platformservice"; Description: "{cm:PlatformTask}"; GroupDescription: "{cm:PlatformGroup}"; Flags: checkedonce
 
 [Files]
 ; ── Application principale ───────────────────────────────────────────────────
@@ -130,6 +131,9 @@ Name: "platformservice"; Description: "{cm:PlatformTask}"; GroupDescription: "{c
 ; Le chemin exact est résolu par le préprocesseur (AppPublishSource).
 ; clamav\*, rules\* et yara\* sont exclus ici — gérés séparément ci-dessous.
 Source: "{#AppPublishSource}"; DestDir: "{app}"; Excludes: "clamav\*,rules\*,yara\*"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\LICENSE.txt"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\COPYING"; DestDir: "{app}"; Flags: ignoreversion
+Source: "..\docs\POLITIQUE_CONFIDENTIALITE.md"; DestDir: "{app}\docs"; Flags: ignoreversion
 ; ── ClamAV (outils dev sigtool/clambc & co exclus, comme optiCombat) — ignoré si le dossier n'existe pas (clone partiel) ──
 #if DirExists(AddBackslash(SourcePath) + "..\optiSCAN\clamav\x64")
 Source: "..\optiSCAN\clamav\x64\*"; DestDir: "{app}\clamav\x64"; Excludes: "sigtool.exe,clambc.exe,clamdtop.exe,clamsubmit.exe,clamconf.exe"; Flags: ignoreversion recursesubdirs createallsubdirs; Check: IsWin64
@@ -149,6 +153,8 @@ Source: "..\optiSCAN\yara\*"; DestDir: "{app}\yara"; Flags: ignoreversion recurs
 Source: "{#AppPublishSource}\optiSCAN.Service.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "..\native\optiSCAN.AmsiProvider\x64\Release\optiSCAN.AmsiProvider.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "..\native\optiSCAN.Minifilter\x64\optiSCAN.Minifilter.sys"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\native\optiSCAN.Minifilter\optiSCAN.Minifilter.inf"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\native\optiSCAN.Minifilter\x64\optiSCAN.Minifilter.cat"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 Source: "..\scripts\add-defender-exclusions.ps1"; DestDir: "{app}\scripts"; Flags: ignoreversion
 
 [Icons]
@@ -160,6 +166,8 @@ Name: "{userstartup}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: startu
 [Registry]
 ; Menu contextuel Explorateur : enregistré en [Code] selon la langue de l'installateur (HKCU\Software\Classes).
 Root: HKCU; Subkey: "Software\optiSCAN"; ValueName: "AutoUpdateSignatures"; ValueType: dword; ValueData: "1"; Tasks: autoUpdateSig
+Root: HKCU; Subkey: "Software\optiSCAN"; ValueName: "PlatformProtection"; ValueType: dword; ValueData: "1"; Tasks: platformservice
+Root: HKCU; Subkey: "Software\optiSCAN"; ValueName: "PlatformProtection"; ValueType: dword; ValueData: "0"; Tasks: not platformservice
 Root: HKCU; Subkey: "Software\optiSCAN"; ValueName: "Version"; ValueType: string; ValueData: "{#AppVersion}"; Flags: uninsdeletekey
 ; UiCulture est réécrit à chaque install / mise à jour (fr-FR ou en-US selon la langue Inno).
 
@@ -411,31 +419,6 @@ begin
   end;
 end;
 
-procedure DisablePlatformServiceTask();
-var
-  I: Integer;
-  ItemText: string;
-begin
-  for I := 0 to WizardForm.TasksList.Items.Count - 1 do
-  begin
-    ItemText := LowerCase(WizardForm.TasksList.Items[I]);
-    if (Pos('service windows de protection système', ItemText) > 0)
-      or (Pos('windows system protection service', ItemText) > 0)
-      or (Pos('protection système avancée', ItemText) > 0)
-      or (Pos('system protection v1', ItemText) > 0) then
-    begin
-      WizardForm.TasksList.ItemEnabled[I] := False;
-      WizardForm.TasksList.Checked[I] := False;
-    end;
-  end;
-end;
-
-procedure CurPageChanged(CurPageID: Integer);
-begin
-  if CurPageID = wpSelectTasks then
-    DisablePlatformServiceTask();
-end;
-
 procedure RemoveExplorerShellMenu(const Root: Integer; const ParentKey, MenuKey: string);
 begin
   if RegKeyExists(Root, ParentKey + '\' + MenuKey) then
@@ -480,6 +463,8 @@ begin
   Exec('schtasks.exe', '/Delete /TN "optiSCAN_Watchdog" /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 
   Exec('fltmc.exe', 'unload optiSCANMinifilter', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec('sc.exe', 'delete optiSCANMinifilter', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  DeleteFile(ExpandConstant('{sys}\drivers\optiSCAN.Minifilter.sys'));
   Exec('sc.exe', 'stop optiSCANProtection', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Exec('sc.exe', 'delete optiSCANProtection', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Exec('sc.exe', 'stop optiSCANProtectionV9', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
@@ -593,12 +578,61 @@ end;
 // Exclusions Defender : volontairement NON appelées ici (profil allégé v8).
 // Le script reste dans {app}\scripts pour un opt-in depuis l'application.
 
+procedure TryInstallPlatformLayer();
+var
+  ResultCode: Integer;
+  AppDir, Svc, AmsiDll, SysPath, InfPath, Drivers: string;
+begin
+  AppDir := ExpandConstant('{app}');
+  Svc := AppDir + '\optiSCAN.Service.exe';
+  AmsiDll := AppDir + '\optiSCAN.AmsiProvider.dll';
+  SysPath := AppDir + '\optiSCAN.Minifilter.sys';
+  InfPath := AppDir + '\optiSCAN.Minifilter.inf';
+
+  if FileExists(Svc) then
+  begin
+    Exec('sc.exe', 'create optiSCANProtection binPath= "\"' + Svc + '\"" start= auto DisplayName= "optiSCAN Protection"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec('sc.exe', 'description optiSCANProtection "Moteur de protection optiSCAN (temps réel, AMSI, IPC)"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec('sc.exe', 'start optiSCANProtection', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  end
+  else if ActiveLanguage = 'english' then
+    MsgBox('The system protection service (optiSCAN.Service.exe) was not included in this build. Real-time protection (RTP/AMSI/IPC) will be unavailable.', mbInformation, MB_OK)
+  else
+    MsgBox('Le service de protection système (optiSCAN.Service.exe) n''est pas inclus dans cette version. La protection temps réel (RTP/AMSI/IPC) sera indisponible.', mbInformation, MB_OK);
+
+  if FileExists(AmsiDll) then
+  begin
+    RegWriteStringValue(HKLM, 'SOFTWARE\Microsoft\AMSI\Providers\{A8F4E2B1-9C3D-4E5F-8A7B-1C2D3E4F5A6B}', '', 'optiSCAN AMSI Provider');
+    RegWriteStringValue(HKLM, 'SOFTWARE\Microsoft\AMSI\Providers\{A8F4E2B1-9C3D-4E5F-8A7B-1C2D3E4F5A6B}', 'Path', AmsiDll);
+  end;
+
+  { Minifiltre : tentative. Windows x64 refuse un .sys non signé ; on n'échoue pas l'install.
+    Le service noyau et sa clé Instances (altitude) sont indispensables à fltmc load ;
+    valeurs alignées sur optiSCAN.Minifilter.inf et PlatformRegistration.cs. }
+  if FileExists(SysPath) then
+  begin
+    Drivers := ExpandConstant('{sys}\drivers\optiSCAN.Minifilter.sys');
+    FileCopy(SysPath, Drivers, False);
+    { pnputil n'aboutit qu'avec un catalogue signé (.cat) à côté de l'INF. }
+    if FileExists(InfPath) and FileExists(AppDir + '\optiSCAN.Minifilter.cat') then
+      Exec('pnputil.exe', '/add-driver "' + InfPath + '" /install', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    if not RegKeyExists(HKLM, 'SYSTEM\CurrentControlSet\Services\optiSCANMinifilter') then
+      Exec('sc.exe', 'create optiSCANMinifilter type= filesys start= demand error= normal binPath= "System32\drivers\optiSCAN.Minifilter.sys" group= "FSFilter Activity Monitor" depend= FltMgr DisplayName= "optiSCAN Minifilter"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    if RegKeyExists(HKLM, 'SYSTEM\CurrentControlSet\Services\optiSCANMinifilter') then
+    begin
+      RegWriteStringValue(HKLM, 'SYSTEM\CurrentControlSet\Services\optiSCANMinifilter\Instances', 'DefaultInstance', 'optiSCAN Instance');
+      RegWriteStringValue(HKLM, 'SYSTEM\CurrentControlSet\Services\optiSCANMinifilter\Instances\optiSCAN Instance', 'Altitude', '385210');
+      RegWriteDWordValue(HKLM, 'SYSTEM\CurrentControlSet\Services\optiSCANMinifilter\Instances\optiSCAN Instance', 'Flags', 0);
+      Exec('fltmc.exe', 'load optiSCANMinifilter', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    end;
+  end;
+end;
+
 procedure CurStepChanged(CurStep: TSetupStep);
 var
   ConfPath: string;
   Content: AnsiString;
   ShouldReset: Boolean;
-  ResultCode: Integer;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -606,44 +640,7 @@ begin
     RegisterExplorerContextMenu();
     // Exclusions Defender : opt-in depuis l'application (Options), non appliquées à l'installation.
     if IsTaskSelected('platformservice') then
-    begin
-      if ActiveLanguage = 'english' then
-        MsgBox(
-          'The Windows system protection service is not available in this version.' + #13#10 +
-          'It is planned in 3 to 5 years (signed kernel driver required).' + #13#10 + #13#10 +
-          'Application real-time protection stays active.',
-          mbInformation, MB_OK)
-      else
-        MsgBox(
-          'Le service Windows de protection système n''est pas disponible dans cette version.' + #13#10 +
-          'Il est prévu dans 3 à 5 ans (pilote noyau signé requis).' + #13#10 + #13#10 +
-          'La protection temps réel de l''application reste active.',
-          mbInformation, MB_OK);
-    end;
-
-    { ── Installation service / minifilter : conservé pour phase 2 (pilote signé).
-       Réactiver quand PlatformProtectionFeatureGate.IsUserActivatable = true. }
-    if False and IsTaskSelected('platformservice') then
-    begin
-      if FileExists(ExpandConstant('{app}\optiSCAN.Service.exe')) then
-      begin
-        Exec('sc.exe', 'create optiSCANProtection binPath= "\"' + ExpandConstant('{app}\optiSCAN.Service.exe') + '\"" start= auto DisplayName= "optiSCAN Protection"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-        Exec('sc.exe', 'description optiSCANProtection "Moteur de protection optiSCAN (temps réel, AMSI, IPC)"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-        Exec('sc.exe', 'start optiSCANProtection', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-      end
-      else if ActiveLanguage = 'english' then
-        MsgBox('The system protection service (optiSCAN.Service.exe) was not included in this build. Real-time protection (RTP/AMSI/IPC) will be unavailable.', mbInformation, MB_OK)
-      else
-        MsgBox('Le service de protection système (optiSCAN.Service.exe) n''est pas inclus dans cette version. La protection temps réel (RTP/AMSI/IPC) sera indisponible.', mbInformation, MB_OK);
-
-      if not FileExists(ExpandConstant('{app}\optiSCAN.Minifilter.sys')) then
-      begin
-        if ActiveLanguage = 'english' then
-          MsgBox('Note: the kernel minifilter driver (optiSCAN.Minifilter.sys) is absent or unsigned. Kernel-level real-time protection will not load on 64-bit Windows without a properly signed driver.', mbInformation, MB_OK)
-        else
-          MsgBox('Note : le pilote minifiltre noyau (optiSCAN.Minifilter.sys) est absent ou non signé. La protection temps réel au niveau noyau ne se chargera pas sous Windows 64 bits sans pilote signé.', mbInformation, MB_OK);
-      end;
-    end;
+      TryInstallPlatformLayer();
   end;
 
   if CurStep = ssInstall then

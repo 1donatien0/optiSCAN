@@ -17,6 +17,30 @@
 
 PFLT_FILTER g_OptiscanFilter = NULL;
 
+NTSTATUS OptiscanUnload(_In_ FLT_FILTER_UNLOAD_FLAGS Flags);
+
+/* Globales : le gestionnaire de filtres garde des références vers ces tables. */
+static const FLT_OPERATION_REGISTRATION g_Callbacks[] = {
+    { IRP_MJ_CREATE, 0, NULL, NULL },
+    { IRP_MJ_OPERATION_END }
+};
+
+static const FLT_REGISTRATION g_Registration = {
+    sizeof(FLT_REGISTRATION),
+    FLT_REGISTRATION_VERSION,
+    0,                  /* Flags */
+    NULL,               /* ContextRegistration */
+    g_Callbacks,        /* OperationRegistration */
+    OptiscanUnload,     /* FilterUnloadCallback */
+    NULL,               /* InstanceSetupCallback */
+    NULL,               /* InstanceQueryTeardownCallback */
+    NULL,               /* InstanceTeardownStartCallback */
+    NULL,               /* InstanceTeardownCompleteCallback */
+    NULL,               /* GenerateFileNameCallback */
+    NULL,               /* NormalizeNameComponentCallback */
+    NULL,               /* NormalizeContextCleanupCallback */
+};
+
 NTSTATUS OptiscanUnload(_In_ FLT_FILTER_UNLOAD_FLAGS Flags)
 {
     UNREFERENCED_PARAMETER(Flags);
@@ -32,22 +56,18 @@ NTSTATUS DriverEntry(_In_ PDRIVER_OBJECT DriverObject, _In_ PUNICODE_STRING Regi
 {
     UNREFERENCED_PARAMETER(RegistryPath);
 
-    const FLT_OPERATION_REGISTRATION callbacks[] = {
-        { IRP_MJ_CREATE, 0, NULL, NULL, NULL, NULL, NULL, NULL },
-        { IRP_MJ_OPERATION_END }
-    };
+    NTSTATUS status = FltRegisterFilter(DriverObject, &g_Registration, &g_OptiscanFilter);
+    if (!NT_SUCCESS(status))
+        return status;
 
-    const FLT_REGISTRATION registration = {
-        sizeof(FLT_REGISTRATION),
-        FLT_REGISTRATION_VERSION,
-        0,
-        NULL,
-        callbacks,
-        OptiscanUnload,
-        NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL
-    };
-
-    return FltRegisterFilter(DriverObject, &registration, &g_OptiscanFilter);
+    /* Sans FltStartFiltering, le filtre est enregistré mais ne reçoit aucune opération. */
+    status = FltStartFiltering(g_OptiscanFilter);
+    if (!NT_SUCCESS(status))
+    {
+        FltUnregisterFilter(g_OptiscanFilter);
+        g_OptiscanFilter = NULL;
+    }
+    return status;
 }
 
 #endif /* OPTISCAN_MINIFILTER_BUILD */

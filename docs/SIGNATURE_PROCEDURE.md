@@ -4,7 +4,7 @@ Guide pratique pour signer optiSCAN. Un antivirus complet a **quatre** artefacts
 
 > **Quand utiliser ce document ?**
 > - **Phase 1 (maintenant, sans pilote, produit gratuit)** : **aucune signature obligatoire**. ClamAV/YARA officiels sont déjà signés. Signer `optiSCAN.exe` + l'installeur (§3) est **facultatif** — confort SmartScreen sur *votre* coquille.
-> - **Phase 2 (~3 ans, activation de la couche plateforme)** : EV + pilote Microsoft (§2.1, §4) ; signature DLL AMSI si mode plateforme activé.
+> - **Phase 2 (SignPath, ~1 an)** : Authenticode de l'exe, de l'installeur et de la DLL AMSI (la couche plateforme est déjà activable), puis EV + attestation Microsoft du pilote (§2.1, §4).
 >
 > Vérifié en juin 2026. Les prix et portails évoluent — recouper avec les liens en bas.
 
@@ -81,7 +81,7 @@ Le `.sys` ne se charge pas sur Windows 10/11 x64 sans signature Microsoft. Voie 
 4. **Soumettre** sur le Partner Center hardware : nouveau « Driver submission » → **attestation signing** → téléverser le `.cab` signé (renseigner nom du produit / infos matériel demandées).
 5. **Microsoft re-signe** : il ajoute une signature embarquée SHA-2 Microsoft et génère un **catalogue (`.cat`) signé** par un certificat Microsoft SHA-2.
 6. **Télécharger** le paquet signé → tu distribues le **`.sys` re-signé + le `.cat`**.
-   - L'installeur doit installer le `.cat` à côté du `.sys` (ou installer le pilote via son `.inf` qui référence le catalogue).
+   - Déposer le `.sys` et le `.cat` dans `native\optiSCAN.Minifilter\x64\` : l'installeur et `scripts\stage-amsi.ps1` les copient avec l'INF ; dès qu'un `.cat` est présent, le pilote est installé par `pnputil /add-driver … /install`.
 
 > Limites de l'attestation : Windows 10 Desktop et ultérieur. Pour une certification complète / autres éditions, passer par WHQL (tests HLK).
 
@@ -127,7 +127,7 @@ Un horodatage valide doit apparaître ; sans lui, tout casse à l'expiration du 
 1. `dotnet publish` (ou `scripts\publish-release.ps1`).
 2. Signer `optiSCAN.exe` + `optiSCAN.AmsiProvider.dll` (EV).
 3. Faire signer le pilote par Microsoft (Partner Center) → récupérer `.sys` + `.cat`.
-4. Placer pilote+catalogue signés à l'emplacement attendu par l'installeur.
+4. Placer pilote + catalogue signés dans `native\optiSCAN.Minifilter\x64\` (emplacement lu par l'installeur).
 5. Compiler l'installeur Inno (signature auto si configurée).
 6. Signer l'installeur si non auto.
 7. `signtool verify` sur tout.

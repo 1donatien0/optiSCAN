@@ -192,7 +192,7 @@ namespace optiSCAN.Models
             ActivityKind.Clean => "TextAccent",
             ActivityKind.Quarantine when EventKind == ActivityEventKind.ThreatRestored => "SuccessGreen",
             ActivityKind.Quarantine when EventKind == ActivityEventKind.QuarantineDeleted => "DangerRed",
-            ActivityKind.Quarantine => "WarningOrange",
+            ActivityKind.Quarantine => "WarningBrush",
             _ when HasThreats => "DangerRed",
             _ => "SuccessGreen",
         };
