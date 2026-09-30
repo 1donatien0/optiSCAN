@@ -17,7 +17,7 @@ param (
 
 if ([string]::IsNullOrWhiteSpace($PublishDir)) {
     $repo = Split-Path -Parent $PSScriptRoot
-    $PublishDir = Join-Path $repo 'optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64'
+    $PublishDir = Join-Path $repo 'optiSCAN.WinUI\bin\Release\net10.0-windows10.0.19041.0\publish\win-x64'
     if (-not (Test-Path (Join-Path $PublishDir 'optiSCAN.exe'))) {
         $PublishDir = Join-Path $repo 'publish\win-x64'
     }
@@ -25,16 +25,37 @@ if ([string]::IsNullOrWhiteSpace($PublishDir)) {
 $PublishDir = (Resolve-Path -LiteralPath $PublishDir).Path
 
 $ErrorActionPreference = 'Stop'
+$repo = Split-Path -Parent $PSScriptRoot
+$sourceRoot = Join-Path $repo 'optiSCAN'
 $failed = @()
+$warned = @()
+
+function Resolve-SourceOrPublishPath([string]$RelPath) {
+    $inPublish = Join-Path $PublishDir $RelPath
+    if (Test-Path -LiteralPath $inPublish) { return $inPublish }
+    $inSource = Join-Path $sourceRoot $RelPath
+    if (Test-Path -LiteralPath $inSource) { return $inSource }
+    return $null
+}
 
 function Check {
-    param([string]$RelPath, [string]$Description)
-    $full = Join-Path $PublishDir $RelPath
-    if (-not (Test-Path $full)) {
-        Write-Host "  MANQUANT  $RelPath  ($Description)" -ForegroundColor Red
-        $script:failed += $RelPath
+    param(
+        [string]$RelPath,
+        [string]$Description,
+        [switch]$Optional
+    )
+    $resolved = Resolve-SourceOrPublishPath $RelPath
+    if ($null -eq $resolved) {
+        if ($Optional) {
+            Write-Host "  SKIP      $RelPath  ($Description, optionnel)" -ForegroundColor Yellow
+            $script:warned += $RelPath
+        } else {
+            Write-Host "  MANQUANT  $RelPath  ($Description)" -ForegroundColor Red
+            $script:failed += $RelPath
+        }
     } else {
-        Write-Host "  OK        $RelPath" -ForegroundColor Green
+        $label = if ($resolved.StartsWith($PublishDir, [StringComparison]::OrdinalIgnoreCase)) { $RelPath } else { "$RelPath (source projet)" }
+        Write-Host "  OK        $label" -ForegroundColor Green
     }
 }
 
@@ -42,11 +63,18 @@ Write-Host "`n=== verify-runtime-deps.ps1 - $PublishDir ===`n" -ForegroundColor 
 
 Write-Host "[ Executable ]"
 Check "optiSCAN.exe" "Executable principal"
+# WinUI non empaquete : sans le .pri a cote de l'exe, InitializeComponent echoue au demarrage.
+if ((Test-Path -LiteralPath (Join-Path $PublishDir 'optiSCAN.pri')) -or (Test-Path -LiteralPath (Join-Path $PublishDir 'resources.pri'))) {
+    Write-Host "  OK        optiSCAN.pri" -ForegroundColor Green
+} else {
+    Write-Host "  MANQUANT  optiSCAN.pri  (ressources XAML WinUI - l'application ne demarrera pas)" -ForegroundColor Red
+    $script:failed += 'optiSCAN.pri'
+}
 
 Write-Host "`n[ ClamAV x64 ]"
 Check "clamav\x64\clamscan.exe"  "Scanner ClamAV"
 Check "clamav\x64\freshclam.exe" "Mise a jour signatures"
-Check "clamav\x64\clamd.exe"     "Daemon ClamAV (v8)"
+Check "clamav\x64\clamd.exe"     "Daemon ClamAV (v1.0)"
 $clambc = Join-Path $PublishDir "clamav\x64\clambc.exe"
 if (Test-Path $clambc) {
     Write-Host "  OK        clamav\x64\clambc.exe" -ForegroundColor Green
@@ -56,20 +84,28 @@ if (Test-Path $clambc) {
 Check "clamav\certs\clamav.crt"  "Certificat CA Cisco-Talos"
 
 Write-Host "`n[ Signatures ClamAV ]"
-$sigFiles = Get-ChildItem -Path (Join-Path $PublishDir "clamav\database") -Filter "*.cvd" -ErrorAction SilentlyContinue
-if ($sigFiles.Count -eq 0) {
-    $sigFiles = Get-ChildItem -Path (Join-Path $PublishDir "clamav\database") -Filter "*.cld" -ErrorAction SilentlyContinue
+$dbPublish = Join-Path $PublishDir "clamav\database"
+$dbSource = Join-Path $sourceRoot "clamav\database"
+$sigFiles = @()
+foreach ($db in @($dbPublish, $dbSource)) {
+    if (Test-Path -LiteralPath $db) {
+        $sigFiles += Get-ChildItem -Path $db -Filter "*.cvd" -ErrorAction SilentlyContinue
+        if ($sigFiles.Count -eq 0) {
+            $sigFiles += Get-ChildItem -Path $db -Filter "*.cld" -ErrorAction SilentlyContinue
+        }
+    }
 }
+$sigFiles = $sigFiles | Select-Object -Unique FullName
 if ($sigFiles.Count -eq 0) {
     if ($AllowMissingSignatures) {
-        Write-Host "  SKIP      clamav\database (AllowMissingSignatures)" -ForegroundColor Yellow
+        Write-Host "  SKIP      clamav\database (AllowMissingSignatures, MAJ au 1er lancement)" -ForegroundColor Yellow
     } else {
-        Write-Host "  MANQUANT  clamav\database\*.cvd / *.cld  (lancer freshclam ou prepare-release-v8 -RunFreshclam)" -ForegroundColor Red
+        Write-Host "  MANQUANT  clamav\database\*.cvd / *.cld  (fetch-runtime-deps.ps1 -RunFreshclam)" -ForegroundColor Red
         $failed += "clamav\database\*.cvd"
     }
 } else {
     foreach ($f in $sigFiles) {
-        Write-Host "  OK        clamav\database\$($f.Name)" -ForegroundColor Green
+        Write-Host "  OK        $($f.FullName.Replace($repo + '\', ''))" -ForegroundColor Green
     }
 }
 
@@ -84,6 +120,9 @@ if (Test-Path $yara32) {
 
 $yaraRules = Get-ChildItem -Path (Join-Path $PublishDir "rules") -Filter "*.yar" -Recurse -ErrorAction SilentlyContinue
 if ($yaraRules.Count -eq 0) {
+    $yaraRules = Get-ChildItem -Path (Join-Path $sourceRoot "rules") -Filter "*.yar" -Recurse -ErrorAction SilentlyContinue
+}
+if ($yaraRules.Count -eq 0) {
     Write-Host "  MANQUANT  rules\*.yar  (regles YARA)" -ForegroundColor Red
     $failed += "rules\*.yar"
 } else {
@@ -91,8 +130,8 @@ if ($yaraRules.Count -eq 0) {
 }
 
 Write-Host "`n[ Ressources ]"
-Check "optiSCAN.ico"      "Icone application"
-Check "optiSCAN_hero.png" "Image hero bouclier"
+Check "optiSCAN.ico" "Icone application" -Optional
+Check "optiSCAN_hero.png" "Image hero bouclier" -Optional
 
 Write-Host ""
 if ($failed.Count -eq 0) {

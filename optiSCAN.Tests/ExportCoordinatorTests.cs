@@ -13,12 +13,11 @@ public sealed class ExportCoordinatorTests
         public HistoryExportResult PdfResult { get; init; } = HistoryExportResult.UserCancelled;
 
         public HistoryExportResult TryExportHtml(
-            Window owner,
             ScanLogManager? logManager,
             IEnumerable<ThreatInfo> threats,
             IEnumerable<QuarantineEntry> quarantine) => HtmlResult;
 
-        public HistoryExportResult TryExportSessionPdf(Window owner, ScanSession session) => PdfResult;
+        public HistoryExportResult TryExportSessionPdf(ScanSession session) => PdfResult;
     }
 
     [Fact]
@@ -28,7 +27,6 @@ public sealed class ExportCoordinatorTests
         string? status = null;
 
         coordinator.TryExportHtml(new ExportContext(
-            null!,
             null,
             Array.Empty<ThreatInfo>(),
             Array.Empty<QuarantineEntry>(),
@@ -48,7 +46,6 @@ public sealed class ExportCoordinatorTests
         bool? isError = null;
 
         coordinator.TryExportHtml(new ExportContext(
-            null!,
             null,
             Array.Empty<ThreatInfo>(),
             Array.Empty<QuarantineEntry>(),

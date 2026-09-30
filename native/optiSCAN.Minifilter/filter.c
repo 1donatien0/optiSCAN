@@ -1,5 +1,5 @@
 /*
- * optiSCAN Minifilter v8 — squelette WDK
+ * optiSCAN Minifilter v1 — squelette WDK
  *
  * Compilation : Windows Driver Kit 10 + certificat EV (production) ou test signing (dev).
  * Ce fichier documente l'interface minimale ; le .sys n'est pas produit par la CI dotnet.

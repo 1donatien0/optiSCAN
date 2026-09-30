@@ -1,8 +1,8 @@
-# optiSCAN Minifilter (v8 — stub)
+# optiSCAN Minifilter (v1.0 — stub)
 
 Driver noyau `optiSCAN.Minifilter.sys` pour interception des accès fichiers **avant** exécution.
 
-## État v8
+## État v1.0
 
 Le dépôt fournit :
 

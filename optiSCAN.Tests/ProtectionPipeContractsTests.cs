@@ -1,4 +1,4 @@
-using optiSCAN.Platform;
+using optiSCAN.IPC;
 using System.Text.Json;
 
 namespace optiSCAN.Tests;

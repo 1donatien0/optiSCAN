@@ -31,7 +31,7 @@ public sealed class MainWindowStartupCoordinatorTests
             SetStatus = (msg, _, _) => status = msg,
             WarmUpYaraRulesAsync = () => Task.CompletedTask,
             ShowWindow = () => { },
-            ShellScan = null,
+            RunShellScanAsync = null,
             GuardSession = true,
             ShowOnboardingIfNeeded = (_, _) => { },
         };

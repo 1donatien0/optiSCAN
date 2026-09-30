@@ -16,15 +16,23 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$tfm = 'net8.0-windows10.0.17763.0'
-$binDir = Join-Path $root "optiSCAN\bin\$Configuration\$tfm"
-$objDir = Join-Path $root "optiSCAN\obj\$Configuration\$tfm"
+$tfm = 'net10.0-windows10.0.19041.0'
+$binDir = Join-Path $root "optiSCAN.WinUI\bin\$Configuration\$tfm"
+$objDir = Join-Path $root "optiSCAN.WinUI\obj\$Configuration\$tfm"
+$legacyVsBinDir = Join-Path $root "optiSCAN.WinUI\bin\$Configuration\net8.0"
+$legacyVsObjDir = Join-Path $root "optiSCAN.WinUI\obj\$Configuration\net8.0"
+$ridOutputDir = Join-Path $binDir 'win-x64'
 $publishRoot = Join-Path $binDir 'publish'
 $publishWinX64 = Join-Path $publishRoot 'win-x64'
+$legacyPublishWinX64 = Join-Path $legacyVsBinDir 'publish\win-x64'
+$legacyPublishRoot = Join-Path $legacyVsBinDir 'publish'
 $ciPublishRoot = Join-Path $root 'publish'
 $testsBin = Join-Path $root 'optiSCAN.Tests\bin'
 $testsObj = Join-Path $root 'optiSCAN.Tests\obj'
 $installerOut = Join-Path $root 'installer\output'
+$ipcLegacyBin = Join-Path $root "optiSCAN.IPC\bin\$Configuration\net8.0"
+$ipcObjPublish = Join-Path $root 'optiSCAN.IPC\obj\publish'
+$winUiObjPublish = Join-Path $root 'optiSCAN.WinUI\obj\publish'
 
 function Remove-PathIfExists([string] $path, [string] $label) {
     if (-not (Test-Path -LiteralPath $path)) { return $false }
@@ -77,9 +85,22 @@ Stop-ProcessesLockingPublish $binDir
 
 $removed = 0
 
+# Ancienne cible Visual Studio erronee (bin\Release\net8.0\publish\...)
+if (Remove-PathIfExists $legacyPublishWinX64 'publish\win-x64 (ancien profil VS net8.0)') { $removed++ }
+if (Remove-PathIfExists $legacyPublishRoot 'publish\ (ancien profil VS net8.0)') { $removed++ }
+if (Remove-PathIfExists $legacyVsBinDir "Dossier bin\$Configuration\net8.0 (profil VS obsolete)") { $removed++ }
+if (Remove-PathIfExists $legacyVsObjDir "Dossier obj\$Configuration\net8.0 (profil VS obsolete)") { $removed++ }
+
 # Publish residuel (prioritaire - evite le fallback Inno setup.iss publish\*.exe)
 if (Remove-PathIfExists $publishWinX64 'publish\win-x64 (Inno / FolderProfile)') { $removed++ }
 if (Remove-PathIfExists $publishRoot 'publish\ (racine, exe plat obsolete)') { $removed++ }
+if (Remove-PathIfExists $ridOutputDir 'win-x64 intermediaire (hors publish\)') { $removed++ }
+
+# Publish residuels projets satellites / obj
+if (Remove-PathIfExists (Join-Path $ipcLegacyBin 'publish') 'optiSCAN.IPC publish (net8.0 obsolete)') { $removed++ }
+if (Remove-PathIfExists $ipcLegacyBin 'optiSCAN.IPC bin\net8.0 (obsolete)') { $removed++ }
+if (Remove-PathIfExists $ipcObjPublish 'optiSCAN.IPC\obj\publish') { $removed++ }
+if (Remove-PathIfExists $winUiObjPublish 'optiSCAN.WinUI\obj\publish') { $removed++ }
 
 if ($IncludeCiPublish) {
     if (Remove-PathIfExists $ciPublishRoot 'publish\ a la racine du depot (CI)') { $removed++ }
@@ -94,8 +115,8 @@ if ($Configuration -eq 'Release') {
 
 # Securite : exe residuels hors bin (publish partiel, ancien RID, etc.)
 $extraDirs = @(
-    (Join-Path $root "optiSCAN\bin\$Configuration"),
-    (Join-Path $root 'optiSCAN\bin')
+    (Join-Path $root "optiSCAN.WinUI\bin\$Configuration"),
+    (Join-Path $root 'optiSCAN.WinUI\bin')
 )
 foreach ($dir in $extraDirs) {
     if (Test-Path -LiteralPath $dir) {
@@ -123,8 +144,8 @@ Write-Host ""
 Write-Host "Nettoyage termine ($removed operation(s))." -ForegroundColor Green
 Write-Host "Ordre obligatoire avant Inno (sans publish frais = installateur obsolete) :" -ForegroundColor Yellow
 Write-Host "  1. .\scripts\clean-before-publish.ps1 -IncludeObj [-IncludeInstallerOutput]"
-Write-Host "  2. dotnet publish .\optiSCAN\optiSCAN.csproj -c Release /p:PublishProfile=FolderProfile"
+Write-Host "  2. dotnet publish .\optiSCAN.WinUI\optiSCAN.WinUI.csproj -c Release -p:PublishProfile=FolderProfile-SelfContained"
 Write-Host "  3. .\scripts\verify-runtime-deps.ps1"
 Write-Host "  4. .\installer\build-release-setup.ps1 -SkipPublish   # ou ISCC avec AppPublishSource win-x64"
 Write-Host ""
-Write-Host "Tout-en-un : .\scripts\prepare-release-v8.ps1  ou  .\installer\build-release-setup.ps1"
+Write-Host "Tout-en-un : .\scripts\prepare-release.ps1  ou  .\installer\build-release-setup.ps1"

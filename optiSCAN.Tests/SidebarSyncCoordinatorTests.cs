@@ -9,7 +9,7 @@ public sealed class SidebarSyncCoordinatorTests
     [Fact]
     public void ApplySync_invokes_matching_sidebar_action()
     {
-        var navigation = new NavigationService();
+        var navigation = new TestNavigationService();
         string? selected = null;
         var coordinator = new SidebarSyncCoordinator(
             navigation,
@@ -28,7 +28,7 @@ public sealed class SidebarSyncCoordinatorTests
     [Fact]
     public void ApplySync_ignores_unknown_panel()
     {
-        var navigation = new NavigationService();
+        var navigation = new TestNavigationService();
         int calls = 0;
         var coordinator = new SidebarSyncCoordinator(
             navigation,
@@ -46,7 +46,7 @@ public sealed class SidebarSyncCoordinatorTests
     [Fact]
     public void Detach_stops_navigated_handler()
     {
-        var navigation = new NavigationService();
+        var navigation = new TestNavigationService();
         int calls = 0;
         var coordinator = new SidebarSyncCoordinator(
             navigation,

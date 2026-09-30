@@ -1,4 +1,4 @@
-using optiSCAN.Platform;
+using optiSCAN.IPC;
 
 namespace optiSCAN.Tests;
 

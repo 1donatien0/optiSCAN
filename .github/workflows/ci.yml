@@ -2,9 +2,9 @@ name: CI — Build, Test & Publish
 
 on:
   push:
-    branches: [ main, dev ]
+    branches: [ main, dev, win ]
   pull_request:
-    branches: [ main, dev ]
+    branches: [ main, dev, win ]
   workflow_dispatch:
 
 permissions:
@@ -17,12 +17,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Setup .NET 8
-        uses: actions/setup-dotnet@v5
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
-          dotnet-version: '8.0.x'
+          global-json-file: global.json
 
       - name: Restore NuGet packages
         run: dotnet restore optiSCAN.sln
@@ -42,14 +42,14 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: test-results
           path: TestResults/*.trx
 
       - name: Upload code coverage
         if: always()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: coverage-report
           path: TestResults/**/coverage.cobertura.xml
@@ -71,6 +71,20 @@ jobs:
           $branchRate = [double]$xml.coverage.'branch-rate'
           Write-Host ("Line coverage: {0:P1} (floor {1:P0}, target {2:P0})" -f $lineRate, $floor, $target)
           Write-Host ("Branch coverage: {0:P1}" -f $branchRate)
+
+          # T-1 : ventilation par assembly (informatif, non bloquant). Les moteurs coeur
+          # (optiSCAN.IPC, services de scan/quarantaine/crypto) doivent viser >= 80 %.
+          $coreTarget = 0.80
+          Write-Host "--- Couverture par assembly ---"
+          foreach ($pkg in $xml.coverage.packages.package) {
+            $name = [string]$pkg.name
+            $rate = [double]$pkg.'line-rate'
+            Write-Host ("  {0,-32} {1:P1}" -f $name, $rate)
+            if ($name -like '*optiSCAN.IPC*' -and $rate -lt $coreTarget) {
+              Write-Host ("::warning::Couverture de {0} sous la cible coeur ({1:P0})." -f $name, $coreTarget)
+            }
+          }
+
           if ($lineRate -lt $target) {
             Write-Host "::warning::Line coverage below progressive target ($([int]($target * 100))%)."
           }
@@ -84,10 +98,10 @@ jobs:
 
       - name: Upload Release build (dev)
         if: github.ref == 'refs/heads/dev'
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: optiSCAN-Release-build-${{ github.sha }}
-          path: optiSCAN/bin/Release/
+          path: optiSCAN.WinUI/bin/Release/
           retention-days: 7
 
   publish:
@@ -99,12 +113,12 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v6
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
 
-      - name: Setup .NET 8
-        uses: actions/setup-dotnet@v5
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
         with:
-          dotnet-version: '8.0.x'
+          global-json-file: global.json
 
       - name: Restore NuGet packages
         run: dotnet restore optiSCAN.sln
@@ -122,13 +136,13 @@ jobs:
         continue-on-error: true
         run: pwsh -File scripts/build-amsi.ps1
 
-      - name: Publish win-x64 (self-contained)
+      # Framework-dependent (profil FolderProfile) : installateur leger ; setup.iss installe
+      # .NET 10 Desktop Runtime + Windows App Runtime 1.8 s'ils manquent sur le poste.
+      - name: Publish win-x64 (framework-dependent)
         run: >
-          dotnet publish optiSCAN/optiSCAN.csproj
+          dotnet publish optiSCAN.WinUI/optiSCAN.WinUI.csproj
           --configuration Release
-          --runtime win-x64
-          --self-contained true
-          -p:PublishSingleFile=false
+          -p:PublishProfile=FolderProfile
           --output publish/win-x64
 
       - name: Publish protection service (win-x64)
@@ -136,7 +150,7 @@ jobs:
           dotnet publish optiSCAN.Service/optiSCAN.Service.csproj
           --configuration Release
           --runtime win-x64
-          --self-contained true
+          --self-contained false
           -p:PublishSingleFile=false
           --output publish/win-x64
 
@@ -159,27 +173,75 @@ jobs:
         shell: pwsh
         run: pwsh -File installer/build-release-setup.ps1 -SkipPublish -PublishDir publish/win-x64
 
+      - name: Sign publish artifacts (optional)
+        shell: pwsh
+        env:
+          SIGN_CERT_SUBJECT: ${{ secrets.SIGN_CERT_SUBJECT }}
+        run: pwsh -File scripts/sign-publish-artifacts.ps1 -PublishDir publish/win-x64
+
       - name: Generate SBOM (CycloneDX)
         shell: pwsh
         run: pwsh -File scripts/generate-sbom.ps1 -OutputDir sbom
 
       - name: Upload SBOM artifacts
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: optiSCAN-sbom-${{ github.sha }}
           path: sbom/*.json
           retention-days: 90
 
       - name: Upload publish artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: optiSCAN-win-x64-${{ github.sha }}
           path: publish/win-x64/
           retention-days: 14
 
       - name: Upload installer artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: optiSCAN-setup-${{ github.sha }}
           path: installer/output/*.exe
           retention-days: 14
+
+  engine-docker-smoke:
+    name: ClamAV/YARA Docker smoke
+    runs-on: ubuntu-latest
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - name: Build and run engine smoke image
+        run: |
+          docker build -t optiscan-engine-tests -f docker/clamav-yara-tests/Dockerfile .
+          docker run --rm optiscan-engine-tests
+
+  sonar:
+    name: SonarQube scan (optional)
+    runs-on: windows-latest
+    needs: build-test
+    if: github.event_name == 'workflow_dispatch' && vars.SONAR_ENABLED == 'true'
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+      - name: Install SonarScanner
+        run: dotnet tool install --global dotnet-sonarscanner
+      - name: Sonar begin
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: >
+          dotnet sonarscanner begin
+          /k:"optiSCAN"
+          /d:sonar.host.url="${{ vars.SONAR_HOST_URL }}"
+          /d:sonar.token="${{ secrets.SONAR_TOKEN }}"
+      - run: dotnet build optiSCAN.sln -c Release
+      - name: Sonar end
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        run: dotnet sonarscanner end /d:sonar.token="${{ secrets.SONAR_TOKEN }}"

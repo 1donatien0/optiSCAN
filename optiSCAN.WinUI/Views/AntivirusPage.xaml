@@ -1,0 +1,614 @@
+<UserControl
+    x:Class="optiSCAN.WinUI.Views.AntivirusPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:conv="using:optiSCAN.WinUI.Converters"
+    xmlns:models="using:optiSCAN.Models"
+    xmlns:core="using:optiSCAN.Services"
+    xmlns:svc="using:optiSCAN.WinUI.Services">
+
+    <UserControl.Resources>
+        <!-- Vignette d'analyse principale (fond accent) -->
+        <Style x:Key="TileAccentButtonStyle" TargetType="Button" BasedOn="{StaticResource AccentButtonStyle}">
+            <Setter Property="HorizontalAlignment" Value="Stretch" />
+            <Setter Property="VerticalAlignment" Value="Stretch" />
+            <Setter Property="HorizontalContentAlignment" Value="Left" />
+            <Setter Property="VerticalContentAlignment" Value="Top" />
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="MinHeight" Value="64" />
+            <Setter Property="CornerRadius" Value="8" />
+        </Style>
+
+        <!-- Sous-titre sur fond accent : hérite de la couleur du bouton (texte sur accent) -->
+        <Style x:Key="TileAccentSubtitleStyle" TargetType="TextBlock" BasedOn="{StaticResource CaptionTextBlockStyle}">
+            <Setter Property="Opacity" Value="0.85" />
+            <Setter Property="TextWrapping" Value="WrapWholeWords" />
+        </Style>
+
+        <Style x:Key="ChipButtonStyle" TargetType="Button" BasedOn="{StaticResource DefaultButtonStyle}">
+            <Setter Property="MinHeight" Value="28" />
+            <Setter Property="Padding" Value="12,4" />
+            <Setter Property="CornerRadius" Value="14" />
+            <Setter Property="MaxWidth" Value="260" />
+        </Style>
+
+        <Style x:Key="StatValueStyle" TargetType="TextBlock" BasedOn="{StaticResource MetricValueStyle}">
+            <Setter Property="HorizontalAlignment" Value="Left" />
+        </Style>
+
+        <!-- Onglet de section : le trait WinUI (16×3 px, texte inchangé) ne dit pas où l'on est. -->
+        <Style x:Key="AntivirusSectionTabStyle" TargetType="SelectorBarItem">
+            <Setter Property="Padding" Value="12,8" />
+            <Setter Property="Margin" Value="0,0,4,0" />
+            <Setter Property="FontSize" Value="14" />
+            <Setter Property="HorizontalAlignment" Value="Left" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="SelectorBarItem">
+                        <Grid x:Name="PART_ContainerRoot" Background="{TemplateBinding Background}" CornerRadius="6" RowDefinitions="Auto, Auto">
+                            <VisualStateManager.VisualStateGroups>
+                                <!-- Storyboards : GoToState(useTransitions: true) ignore les Setters seuls,
+                                     donc un SelectedItem posé depuis le code laissait le trait sur Analyse. -->
+                                <VisualStateGroup x:Name="CombinedStates">
+                                    <VisualState x:Name="UnselectedNormal">
+                                        <Storyboard>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PART_ContainerRoot" Storyboard.TargetProperty="Background">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource SelectorBarItemBackground}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PART_TextVisual" Storyboard.TargetProperty="Foreground">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource SelectorBarItemForeground}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PART_TextVisual" Storyboard.TargetProperty="FontWeight">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="Normal" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PART_IconVisual" Storyboard.TargetProperty="Foreground">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource SelectorBarItemForeground}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <DoubleAnimation Storyboard.TargetName="PART_SelectionVisual" Storyboard.TargetProperty="Opacity" To="0" Duration="0" />
+                                        </Storyboard>
+                                    </VisualState>
+                                    <VisualState x:Name="UnselectedPointerOver">
+                                        <Storyboard>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PART_ContainerRoot" Storyboard.TargetProperty="Background">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource CardAltBackgroundBrush}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PART_TextVisual" Storyboard.TargetProperty="Foreground">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource SelectorBarItemForeground}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PART_TextVisual" Storyboard.TargetProperty="FontWeight">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="Normal" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PART_IconVisual" Storyboard.TargetProperty="Foreground">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource SelectorBarItemForeground}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <DoubleAnimation Storyboard.TargetName="PART_SelectionVisual" Storyboard.TargetProperty="Opacity" To="0" Duration="0" />
+                                        </Storyboard>
+                                    </VisualState>
+                                    <VisualState x:Name="UnselectedPressed">
+                                        <Storyboard>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PART_ContainerRoot" Storyboard.TargetProperty="Background">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource CardAltBackgroundBrush}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PART_TextVisual" Storyboard.TargetProperty="Foreground">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource SelectorBarItemForeground}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PART_TextVisual" Storyboard.TargetProperty="FontWeight">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="Normal" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PART_IconVisual" Storyboard.TargetProperty="Foreground">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource SelectorBarItemForeground}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <DoubleAnimation Storyboard.TargetName="PART_SelectionVisual" Storyboard.TargetProperty="Opacity" To="0" Duration="0" />
+                                        </Storyboard>
+                                    </VisualState>
+                                    <VisualState x:Name="SelectedNormal">
+                                        <Storyboard>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PART_ContainerRoot" Storyboard.TargetProperty="Background">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource AccentTintBrush}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PART_TextVisual" Storyboard.TargetProperty="Foreground">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource AccentBrush}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PART_TextVisual" Storyboard.TargetProperty="FontWeight">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="SemiBold" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PART_IconVisual" Storyboard.TargetProperty="Foreground">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource AccentBrush}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <DoubleAnimation Storyboard.TargetName="PART_SelectionVisual" Storyboard.TargetProperty="Opacity" To="1" Duration="0" />
+                                        </Storyboard>
+                                    </VisualState>
+                                    <VisualState x:Name="SelectedPointerOver">
+                                        <Storyboard>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PART_ContainerRoot" Storyboard.TargetProperty="Background">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource AccentTintBrush}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PART_TextVisual" Storyboard.TargetProperty="Foreground">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource AccentBrush}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PART_TextVisual" Storyboard.TargetProperty="FontWeight">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="SemiBold" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PART_IconVisual" Storyboard.TargetProperty="Foreground">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource AccentBrush}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <DoubleAnimation Storyboard.TargetName="PART_SelectionVisual" Storyboard.TargetProperty="Opacity" To="1" Duration="0" />
+                                        </Storyboard>
+                                    </VisualState>
+                                    <VisualState x:Name="SelectedPressed">
+                                        <Storyboard>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PART_ContainerRoot" Storyboard.TargetProperty="Background">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource AccentTintBrush}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PART_TextVisual" Storyboard.TargetProperty="Foreground">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource AccentBrush}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PART_TextVisual" Storyboard.TargetProperty="FontWeight">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="SemiBold" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <ObjectAnimationUsingKeyFrames Storyboard.TargetName="PART_IconVisual" Storyboard.TargetProperty="Foreground">
+                                                <DiscreteObjectKeyFrame KeyTime="0" Value="{ThemeResource AccentBrush}" />
+                                            </ObjectAnimationUsingKeyFrames>
+                                            <DoubleAnimation Storyboard.TargetName="PART_SelectionVisual" Storyboard.TargetProperty="Opacity" To="1" Duration="0" />
+                                        </Storyboard>
+                                    </VisualState>
+                                </VisualStateGroup>
+                                <VisualStateGroup x:Name="DisabledStates">
+                                    <VisualState x:Name="Enabled" />
+                                    <VisualState x:Name="Disabled">
+                                        <VisualState.Setters>
+                                            <Setter Target="PART_TextVisual.Opacity" Value="0.4" />
+                                            <Setter Target="PART_IconVisual.Opacity" Value="0.4" />
+                                        </VisualState.Setters>
+                                    </VisualState>
+                                </VisualStateGroup>
+                            </VisualStateManager.VisualStateGroups>
+                            <StackPanel Grid.Column="0" Orientation="Horizontal" Margin="{TemplateBinding Padding}" Spacing="8" VerticalAlignment="Center">
+                                <ContentPresenter x:Name="PART_IconVisual" Content="{TemplateBinding Icon}" Foreground="{TemplateBinding Foreground}" />
+                                <TextBlock x:Name="PART_TextVisual" Text="{TemplateBinding Text}" FontWeight="{TemplateBinding FontWeight}" FontSize="{TemplateBinding FontSize}" Foreground="{TemplateBinding Foreground}" VerticalAlignment="Center" />
+                            </StackPanel>
+                            <Rectangle x:Name="PART_SelectionVisual" Grid.Row="1" Height="3" RadiusX="1.5" RadiusY="1.5" Fill="{ThemeResource AccentBrush}" HorizontalAlignment="Stretch" VerticalAlignment="Bottom" Opacity="0" IsHitTestVisible="False" />
+                        </Grid>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </UserControl.Resources>
+
+    <Grid x:Name="PageRoot" Padding="{StaticResource PagePadding}" RowSpacing="{StaticResource SpacingM}" SizeChanged="PageRoot_SizeChanged">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="Auto" />
+            <RowDefinition Height="*" MinHeight="320" />
+        </Grid.RowDefinitions>
+
+        <!-- ═══ 1. En-tête : état de protection + statistiques ═══ -->
+        <Grid x:Name="HeaderGrid" Grid.Row="0" ColumnSpacing="{StaticResource SpacingL}" RowSpacing="{StaticResource SpacingM}">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition x:Name="StatsColumn" Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition x:Name="StatsRow" Height="Auto" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Column="0" Width="48" Height="48" CornerRadius="12" VerticalAlignment="Center"
+                    Background="{ThemeResource AccentTintBrush}">
+                <FontIcon Glyph="&#xEA18;" FontSize="24" Foreground="{ThemeResource AccentBrush}" />
+            </Border>
+
+            <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="{StaticResource SpacingXXS}">
+                <TextBlock x:Name="TitleText" Style="{StaticResource PageTitleStyle}" />
+                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                    <TextBlock x:Name="BadgeText" Style="{StaticResource BodyStrongTextBlockStyle}" VerticalAlignment="Center" />
+                    <TextBlock Text="·" Style="{StaticResource MutedCaptionStyle}" VerticalAlignment="Center" />
+                    <TextBlock x:Name="LastScanText" Style="{StaticResource MutedCaptionStyle}" VerticalAlignment="Center" />
+                </StackPanel>
+            </StackPanel>
+
+            <StackPanel x:Name="StatsPanel" Grid.Column="2" Orientation="Horizontal" Spacing="{StaticResource SpacingS}" VerticalAlignment="Center">
+                <Border Style="{StaticResource AppCardStyle}" MinWidth="104">
+                    <StackPanel Spacing="{StaticResource SpacingXXS}">
+                        <TextBlock x:Name="FilesScannedValue" Style="{StaticResource StatValueStyle}" />
+                        <TextBlock x:Name="FilesScannedLabel" Style="{StaticResource MutedCaptionStyle}" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource AppCardStyle}" MinWidth="104">
+                    <StackPanel Spacing="{StaticResource SpacingXXS}">
+                        <TextBlock x:Name="ThreatsFoundValue" Style="{StaticResource StatValueStyle}" />
+                        <TextBlock x:Name="ThreatsFoundLabel" Style="{StaticResource MutedCaptionStyle}" />
+                    </StackPanel>
+                </Border>
+                <Border Style="{StaticResource AppCardStyle}" MinWidth="104">
+                    <StackPanel Spacing="{StaticResource SpacingXXS}">
+                        <TextBlock x:Name="QuarantineCountValue" Style="{StaticResource StatValueStyle}" />
+                        <TextBlock x:Name="QuarantineCountLabel" Style="{StaticResource MutedCaptionStyle}" />
+                    </StackPanel>
+                </Border>
+            </StackPanel>
+        </Grid>
+
+        <!-- ═══ 2. Zone d'action : lanceurs d'analyse (repos) OU progression (analyse en cours) ═══ -->
+        <StackPanel x:Name="ScanHubPanel" Grid.Row="1" Spacing="{StaticResource SpacingS}">
+            <Grid x:Name="ScanTilesGrid" ColumnSpacing="{StaticResource SpacingS}" RowSpacing="{StaticResource SpacingS}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+
+                <Button x:Name="QuickScanButton" Grid.Column="0" Click="QuickScan_Click" Style="{StaticResource TileAccentButtonStyle}">
+                    <Grid ColumnSpacing="{StaticResource SpacingM}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE945;" FontSize="20" VerticalAlignment="Top" Margin="0,2,0,0" />
+                        <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingXXS}">
+                            <TextBlock x:Name="QuickScanTitle" Style="{StaticResource TileTitleStyle}" />
+                            <TextBlock x:Name="QuickScanSub" Style="{StaticResource TileAccentSubtitleStyle}" />
+                        </StackPanel>
+                    </Grid>
+                </Button>
+
+                <Button x:Name="FullScanButton" Grid.Column="1" Click="FullScan_Click" Style="{StaticResource TileButtonStyle}">
+                    <Grid ColumnSpacing="{StaticResource SpacingM}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xEDA2;" FontSize="20" Foreground="{ThemeResource AccentBrush}" VerticalAlignment="Top" Margin="0,2,0,0" />
+                        <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingXXS}">
+                            <TextBlock x:Name="FullScanTitle" Style="{StaticResource TileTitleStyle}" />
+                            <TextBlock x:Name="FullScanSub" Style="{StaticResource TileSubtitleStyle}" />
+                        </StackPanel>
+                    </Grid>
+                </Button>
+
+                <Button x:Name="FolderScanButton" Grid.Column="2" Click="BrowseFolder_Click" Style="{StaticResource TileButtonStyle}">
+                    <Grid ColumnSpacing="{StaticResource SpacingM}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE8B7;" FontSize="20" Foreground="{ThemeResource AccentBrush}" VerticalAlignment="Top" Margin="0,2,0,0" />
+                        <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingXXS}">
+                            <TextBlock x:Name="FolderScanTitle" Style="{StaticResource TileTitleStyle}" />
+                            <TextBlock x:Name="FolderScanSub" Style="{StaticResource TileSubtitleStyle}" />
+                        </StackPanel>
+                    </Grid>
+                </Button>
+
+                <Button x:Name="FileScanButton" Grid.Column="3" Click="BrowseFile_Click" Style="{StaticResource TileButtonStyle}">
+                    <Grid ColumnSpacing="{StaticResource SpacingM}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <FontIcon Glyph="&#xE8A5;" FontSize="20" Foreground="{ThemeResource AccentBrush}" VerticalAlignment="Top" Margin="0,2,0,0" />
+                        <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingXXS}">
+                            <TextBlock x:Name="FileScanTitle" Style="{StaticResource TileTitleStyle}" />
+                            <TextBlock x:Name="FileScanSub" Style="{StaticResource TileSubtitleStyle}" />
+                        </StackPanel>
+                    </Grid>
+                </Button>
+            </Grid>
+
+            <!-- Cibles récentes : puces horizontales, masquées s'il n'y en a aucune -->
+            <Grid x:Name="RecentRow" ColumnSpacing="{StaticResource SpacingS}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="Auto" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXS}" VerticalAlignment="Center">
+                    <FontIcon Glyph="&#xE81C;" FontSize="12" Foreground="{ThemeResource TextFillColorSecondaryBrush}" />
+                    <TextBlock x:Name="RecentLabel" Style="{StaticResource MutedCaptionStyle}" />
+                </StackPanel>
+                <ScrollViewer Grid.Column="1" HorizontalScrollBarVisibility="Auto" HorizontalScrollMode="Enabled"
+                              VerticalScrollBarVisibility="Disabled" VerticalScrollMode="Disabled">
+                    <ItemsControl x:Name="RecentList">
+                        <ItemsControl.ItemsPanel>
+                            <ItemsPanelTemplate>
+                                <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingXS}" />
+                            </ItemsPanelTemplate>
+                        </ItemsControl.ItemsPanel>
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="core:RecentScanTarget">
+                                <Button Style="{StaticResource ChipButtonStyle}" Click="RecentTarget_Click" Tag="{Binding}"
+                                        ToolTipService.ToolTip="{x:Bind ListLabel}">
+                                    <TextBlock Text="{x:Bind ListLabel}" TextTrimming="CharacterEllipsis" Style="{StaticResource CaptionTextBlockStyle}" />
+                                </Button>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </ScrollViewer>
+            </Grid>
+        </StackPanel>
+
+        <Border x:Name="ScanProgressPanel" Grid.Row="1" Style="{StaticResource AppAccentCardStyle}" Visibility="Collapsed">
+            <Grid ColumnSpacing="{StaticResource SpacingL}">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="*" />
+                    <ColumnDefinition Width="Auto" />
+                </Grid.ColumnDefinitions>
+                <StackPanel Spacing="{StaticResource SpacingS}">
+                    <Grid ColumnSpacing="{StaticResource SpacingS}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <ProgressRing IsActive="True" Width="16" Height="16" VerticalAlignment="Center" />
+                        <TextBlock x:Name="ScanProgressTitle" Grid.Column="1" Style="{StaticResource SectionTitleStyle}" VerticalAlignment="Center" />
+                    </Grid>
+                    <ProgressBar x:Name="ScanProgressBar" Maximum="100" />
+                    <TextBlock x:Name="ScanProgressDetail" Style="{StaticResource BodyTextBlockStyle}" TextWrapping="Wrap" />
+                    <TextBlock x:Name="CurrentItemText" Style="{StaticResource MutedCaptionStyle}" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap" />
+                    <TextBlock x:Name="StatusText" Style="{StaticResource MutedCaptionStyle}" TextWrapping="WrapWholeWords" />
+                </StackPanel>
+                <Button x:Name="StopScanButton" Grid.Column="1" Click="StopScan_Click" VerticalAlignment="Top">
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                        <FontIcon Glyph="&#xE71A;" FontSize="14" />
+                        <TextBlock x:Name="StopScanText" />
+                    </StackPanel>
+                </Button>
+            </Grid>
+        </Border>
+
+        <!-- ═══ 3. Navigation de section ═══ -->
+        <SelectorBar x:Name="MainTabs" Grid.Row="2">
+            <SelectorBarItem x:Name="ScanTab" Style="{StaticResource AntivirusSectionTabStyle}">
+                <SelectorBarItem.Icon>
+                    <FontIcon Glyph="&#xE9D9;" />
+                </SelectorBarItem.Icon>
+            </SelectorBarItem>
+            <SelectorBarItem x:Name="QuarantineTab" Style="{StaticResource AntivirusSectionTabStyle}">
+                <SelectorBarItem.Icon>
+                    <FontIcon Glyph="&#xE72E;" />
+                </SelectorBarItem.Icon>
+            </SelectorBarItem>
+            <SelectorBarItem x:Name="SignaturesTab" Style="{StaticResource AntivirusSectionTabStyle}">
+                <SelectorBarItem.Icon>
+                    <FontIcon Glyph="&#xE895;" />
+                </SelectorBarItem.Icon>
+            </SelectorBarItem>
+        </SelectorBar>
+
+        <!-- ═══ 4. Contenu de section ═══ -->
+        <Grid Grid.Row="3">
+
+            <!-- Résultats d'analyse -->
+            <Grid x:Name="ScanPanel" RowSpacing="{StaticResource SpacingS}">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                </Grid.RowDefinitions>
+                <Grid ColumnSpacing="{StaticResource SpacingS}" MinHeight="32">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <TextBlock x:Name="ThreatsHeaderText" Style="{StaticResource SectionTitleStyle}" VerticalAlignment="Center" />
+                    <Button x:Name="QuarantineAllButton" Grid.Column="1" Click="QuarantineAll_Click"
+                            Style="{StaticResource AccentButtonStyle}" Visibility="Collapsed">
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                            <FontIcon Glyph="&#xE72E;" FontSize="14" />
+                            <TextBlock x:Name="QuarantineAllText" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+
+                <Border x:Name="ThreatsAreaRoot" Grid.Row="1" Style="{StaticResource AppCardStyle}" Padding="4">
+                    <Grid>
+                        <ListView x:Name="ThreatsList" SelectionMode="None"
+                                  ScrollViewer.VerticalScrollBarVisibility="Auto"
+                                  ScrollViewer.HorizontalScrollMode="Disabled">
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="models:ThreatDisplayItem">
+                                    <Grid ColumnSpacing="{StaticResource SpacingM}" Padding="8,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <Border Grid.Column="0" Style="{StaticResource RiskPillStyle}"
+                                                svc:ThemeBrush.BackgroundKey="{x:Bind RiskBrushKey}">
+                                            <TextBlock Text="{x:Bind RiskSeverity}" Style="{StaticResource RiskPillTextStyle}" />
+                                        </Border>
+                                        <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingXXS}" VerticalAlignment="Center">
+                                            <TextBlock Text="{x:Bind VirusName}" Style="{StaticResource BodyStrongTextBlockStyle}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{x:Bind FilePath}" Style="{StaticResource MutedCaptionStyle}" TextTrimming="CharacterEllipsis"
+                                                       ToolTipService.ToolTip="{x:Bind FilePath}" />
+                                        </StackPanel>
+                                        <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="{StaticResource SpacingXXS}" VerticalAlignment="Center">
+                                            <Button Style="{StaticResource RowIconButtonStyle}" Click="Reputation_Click" Tag="{x:Bind FilePath}"
+                                                    svc:LocalizedTip.Key="Av_Tooltip_Reputation">
+                                                <FontIcon Glyph="&#xE774;" FontSize="14" />
+                                            </Button>
+                                            <Button Style="{StaticResource RowIconButtonStyle}" Click="IgnoreThreat_Click" Tag="{x:Bind FilePath}"
+                                                    svc:LocalizedTip.Key="Av_IgnoreBtn">
+                                                <FontIcon Glyph="&#xED1A;" FontSize="14" />
+                                            </Button>
+                                            <Button Style="{StaticResource RowIconButtonStyle}" Click="QuarantineThreat_Click" Tag="{x:Bind FilePath}"
+                                                    svc:LocalizedTip.Key="Av_QuarantineBtn">
+                                                <FontIcon Glyph="&#xE72E;" FontSize="14" Foreground="{ThemeResource AccentBrush}" />
+                                            </Button>
+                                            <Button Style="{StaticResource RowIconButtonStyle}" Click="DeleteThreat_Click" Tag="{x:Bind FilePath}"
+                                                    svc:LocalizedTip.Key="Av_DeleteBtn">
+                                                <FontIcon Glyph="&#xE74D;" FontSize="14" Foreground="{ThemeResource DangerRed}" />
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+
+                        <StackPanel x:Name="EmptyThreatsState" VerticalAlignment="Center" HorizontalAlignment="Center"
+                                    Spacing="{StaticResource SpacingS}" Visibility="Collapsed" Padding="24">
+                            <Border Width="56" Height="56" CornerRadius="28" HorizontalAlignment="Center" Background="{ThemeResource AccentTintBrush}">
+                                <FontIcon Glyph="&#xE73E;" FontSize="24" Foreground="{ThemeResource SuccessGreen}" />
+                            </Border>
+                            <TextBlock x:Name="EmptyThreatsTitle" Style="{StaticResource SectionTitleStyle}" HorizontalAlignment="Center" />
+                            <TextBlock x:Name="EmptyThreatsSubtitle" Style="{StaticResource PageSubtitleStyle}" HorizontalAlignment="Center" TextAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+            </Grid>
+
+            <!-- Quarantaine -->
+            <Grid x:Name="QuarantinePanel" RowSpacing="{StaticResource SpacingS}" Visibility="Collapsed">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+                <Border Style="{StaticResource AppCardStyle}" Padding="4">
+                    <Grid>
+                        <ListView x:Name="QuarantineList" SelectionMode="None">
+                            <ListView.ItemTemplate>
+                                <DataTemplate x:DataType="core:QuarantineEntry">
+                                    <Grid ColumnSpacing="{StaticResource SpacingM}" Padding="8,8">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <FontIcon Glyph="&#xE72E;" FontSize="16" Foreground="{ThemeResource WarningBrush}" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingXXS}" VerticalAlignment="Center">
+                                            <TextBlock Text="{x:Bind VirusName}" Style="{StaticResource BodyStrongTextBlockStyle}" TextTrimming="CharacterEllipsis" />
+                                            <TextBlock Text="{x:Bind OriginalPath}" Style="{StaticResource MutedCaptionStyle}" TextTrimming="CharacterEllipsis"
+                                                       ToolTipService.ToolTip="{x:Bind OriginalPath}" />
+                                        </StackPanel>
+                                        <TextBlock Grid.Column="2" Text="{x:Bind SizeDisplay}" Style="{StaticResource MutedCaptionStyle}" VerticalAlignment="Center" />
+                                        <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="{StaticResource SpacingXXS}" VerticalAlignment="Center">
+                                            <Button Style="{StaticResource RowIconButtonStyle}" Click="RestoreQuarantine_Click" Tag="{x:Bind Id}"
+                                                    svc:LocalizedTip.Key="Av_Restore">
+                                                <FontIcon Glyph="&#xE7A7;" FontSize="14" />
+                                            </Button>
+                                            <Button Style="{StaticResource RowIconButtonStyle}" Click="DeleteQuarantine_Click" Tag="{x:Bind Id}"
+                                                    svc:LocalizedTip.Key="Av_Delete">
+                                                <FontIcon Glyph="&#xE74D;" FontSize="14" Foreground="{ThemeResource DangerRed}" />
+                                            </Button>
+                                        </StackPanel>
+                                    </Grid>
+                                </DataTemplate>
+                            </ListView.ItemTemplate>
+                        </ListView>
+
+                        <StackPanel x:Name="EmptyQuarantineState" VerticalAlignment="Center" HorizontalAlignment="Center"
+                                    Spacing="{StaticResource SpacingS}" Visibility="Collapsed" Padding="24">
+                            <Border Width="56" Height="56" CornerRadius="28" HorizontalAlignment="Center" Background="{ThemeResource AccentTintBrush}">
+                                <FontIcon Glyph="&#xE72E;" FontSize="24" Foreground="{ThemeResource AccentBrush}" />
+                            </Border>
+                            <TextBlock x:Name="EmptyQuarantineTitle" Style="{StaticResource SectionTitleStyle}" HorizontalAlignment="Center" />
+                            <TextBlock x:Name="EmptyQuarantineSubtitle" Style="{StaticResource PageSubtitleStyle}" HorizontalAlignment="Center" TextAlignment="Center" />
+                        </StackPanel>
+                    </Grid>
+                </Border>
+                <Grid Grid.Row="1" ColumnSpacing="{StaticResource SpacingS}">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <Button x:Name="LoadMoreQuarantineButton" Click="LoadMoreQuarantine_Click" />
+                    <TextBlock x:Name="QuarantinePagingText" Grid.Column="1" VerticalAlignment="Center" Style="{StaticResource MutedCaptionStyle}" />
+                    <Button x:Name="PurgeQuarantineButton" Grid.Column="2" Click="PurgeQuarantine_Click">
+                        <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                            <FontIcon Glyph="&#xE74D;" FontSize="14" Foreground="{ThemeResource DangerRed}" />
+                            <TextBlock x:Name="PurgeQuarantineText" />
+                        </StackPanel>
+                    </Button>
+                </Grid>
+            </Grid>
+
+            <!-- Signatures -->
+            <ScrollViewer x:Name="SignaturesPanel" Visibility="Collapsed" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                <StackPanel Spacing="{StaticResource SpacingM}">
+                    <Grid x:Name="SignatureCardsGrid" ColumnSpacing="{StaticResource SpacingS}" RowSpacing="{StaticResource SpacingS}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="*" />
+                        </Grid.ColumnDefinitions>
+                        <Border Grid.Column="0" Style="{StaticResource AppCardStyle}">
+                            <Grid ColumnSpacing="{StaticResource SpacingM}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource MetricIconBadgeStyle}" Background="{ThemeResource AccentTintBrush}" VerticalAlignment="Top">
+                                    <FontIcon Glyph="&#xEA18;" FontSize="14" Foreground="{ThemeResource AccentBrush}" />
+                                </Border>
+                                <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingXXS}">
+                                    <TextBlock Text="ClamAV" Style="{StaticResource SectionTitleStyle}" />
+                                    <TextBlock x:Name="ClamVersionText" Style="{StaticResource BodyTextBlockStyle}" TextWrapping="Wrap" />
+                                    <TextBlock x:Name="ClamUpdateText" Style="{StaticResource MutedCaptionStyle}" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                        <Border Grid.Column="1" Style="{StaticResource AppCardStyle}">
+                            <Grid ColumnSpacing="{StaticResource SpacingM}">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="Auto" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Style="{StaticResource MetricIconBadgeStyle}" Background="{ThemeResource AccentTintBrush}" VerticalAlignment="Top">
+                                    <FontIcon Glyph="&#xE943;" FontSize="14" Foreground="{ThemeResource AccentBrush}" />
+                                </Border>
+                                <StackPanel Grid.Column="1" Spacing="{StaticResource SpacingXXS}">
+                                    <TextBlock Text="YARA" Style="{StaticResource SectionTitleStyle}" />
+                                    <TextBlock x:Name="YaraVersionText" Style="{StaticResource BodyTextBlockStyle}" TextWrapping="Wrap" />
+                                    <TextBlock x:Name="YaraUpdateText" Style="{StaticResource MutedCaptionStyle}" TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+                    </Grid>
+
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                        <Button x:Name="UpdateSignaturesButton" Click="UpdateSignatures_Click" Style="{StaticResource AccentButtonStyle}">
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                                <FontIcon Glyph="&#xE895;" FontSize="14" />
+                                <TextBlock x:Name="UpdateSignaturesText" />
+                            </StackPanel>
+                        </Button>
+                        <Button x:Name="StopUpdateButton" Click="StopUpdate_Click" Visibility="Collapsed">
+                            <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                                <FontIcon Glyph="&#xE71A;" FontSize="14" />
+                                <TextBlock x:Name="StopUpdateText" />
+                            </StackPanel>
+                        </Button>
+                    </StackPanel>
+
+                    <ProgressBar x:Name="SigUpdateProgress" IsIndeterminate="True" Visibility="Collapsed" />
+
+                    <Border Style="{StaticResource LogConsoleBorderStyle}">
+                        <ScrollViewer x:Name="SignatureLogScroll" MinHeight="120" MaxHeight="260" VerticalScrollBarVisibility="Auto">
+                            <TextBlock x:Name="SignatureLogText" Style="{StaticResource LogMonospaceStyle}" IsTextSelectionEnabled="True" />
+                        </ScrollViewer>
+                    </Border>
+                </StackPanel>
+            </ScrollViewer>
+        </Grid>
+
+        <!-- Initialisation du moteur -->
+        <Grid
+            x:Name="InitOverlay"
+            Grid.RowSpan="4"
+            Margin="-32,-20,-32,-16"
+            Background="{ThemeResource AppBackgroundBrush}"
+            Opacity="0.92"
+            Visibility="Collapsed">
+            <Border Style="{StaticResource AppCardStyle}" HorizontalAlignment="Center" VerticalAlignment="Center" MinWidth="320" Padding="24">
+                <StackPanel Spacing="{StaticResource SpacingM}">
+                    <ProgressRing IsActive="True" Width="32" Height="32" HorizontalAlignment="Center" />
+                    <TextBlock x:Name="InitText" Style="{StaticResource BodyTextBlockStyle}" HorizontalAlignment="Center" />
+                    <TextBlock x:Name="InitErrorText" Foreground="{ThemeResource DangerRed}" TextWrapping="Wrap" MaxWidth="400" HorizontalAlignment="Center" Style="{StaticResource BodyTextBlockStyle}" />
+                </StackPanel>
+            </Border>
+        </Grid>
+    </Grid>
+</UserControl>

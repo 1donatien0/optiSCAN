@@ -85,6 +85,28 @@ public sealed class ScanLogManagerTests : IDisposable
     }
 
     [Fact]
+    public void GetHistoryPage_returns_slice_newest_first()
+    {
+        for (int i = 0; i < 5; i++)
+        {
+            _manager.SaveScanResult(new ScanResult
+            {
+                SessionId = Guid.NewGuid(),
+                StartedAt = DateTime.Now.AddMinutes(-i),
+                Type = ScanType.QuickScan,
+                TargetPath = $@"C:\t{i}",
+                Status = ScanStatus.Completed,
+                FilesScanned = 1,
+            });
+        }
+
+        var page = _manager.GetHistoryPage(offset: 1, limit: 2);
+        Assert.Equal(5, page.TotalCount);
+        Assert.Equal(2, page.Items.Count);
+        Assert.True(page.Items[0].StartedAt >= page.Items[1].StartedAt);
+    }
+
+    [Fact]
     public void SaveScanResult_trims_50_oldest_when_reaching_100_then_grows_again()
     {
         for (int i = 0; i < 100; i++)
@@ -144,7 +166,7 @@ public sealed class ScanLogManagerTests : IDisposable
 
     [Fact]
     [SupportedOSPlatform("windows")]
-    public void History_persisted_as_encrypted_dat_not_plaintext_json()
+    public void History_persisted_in_sqlite_with_encrypted_payload()
     {
         _manager.SaveScanResult(new ScanResult
         {
@@ -152,13 +174,16 @@ public sealed class ScanLogManagerTests : IDisposable
             Threats = { ThreatInfo.FromClamAv(@"C:\secret\malware.exe", "Evil.Trojan", 512) }
         });
 
-        var datPath = Path.Combine(_logDir, "scan_history.dat");
+        var dbPath = Path.Combine(_logDir, "scan_logs.db");
         var jsonPath = Path.Combine(_logDir, "scan_history.json");
 
-        Assert.True(File.Exists(datPath), "scan_history.dat devrait exister");
+        Assert.True(File.Exists(dbPath), "scan_logs.db devrait exister");
         Assert.False(File.Exists(jsonPath), "scan_history.json ne doit plus etre cree");
 
-        var raw = File.ReadAllText(datPath);
+        string raw;
+        using (var fs = new FileStream(dbPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+        using (var reader = new StreamReader(fs))
+            raw = reader.ReadToEnd();
         Assert.DoesNotContain(@"C:\secret", raw, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("Evil.Trojan", raw, StringComparison.OrdinalIgnoreCase);
     }

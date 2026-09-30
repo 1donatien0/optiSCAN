@@ -1,0 +1,12 @@
+[
+  {
+    "Name": "optiSCAN (WinUI x64)",
+    "Projects": [
+      {
+        "Path": "optiSCAN.WinUI\\optiSCAN.WinUI.csproj",
+        "Action": "Start",
+        "DebugTarget": "optiSCAN (Unpackaged)"
+      }
+    ]
+  }
+]

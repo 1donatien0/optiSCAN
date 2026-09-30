@@ -2,9 +2,9 @@
 param(
     [string]$OutputDir = "sbom",
     [string[]]$Projects = @(
-        "optiSCAN/optiSCAN.csproj",
+        "optiSCAN.WinUI/optiSCAN.WinUI.csproj",
         "optiSCAN.Service/optiSCAN.Service.csproj",
-        "optiSCAN.Platform/optiSCAN.Platform.csproj"
+        "optiSCAN.IPC/optiSCAN.IPC.csproj"
     )
 )
 

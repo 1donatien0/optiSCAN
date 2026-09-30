@@ -1,0 +1,12 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Library</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <RootNamespace>optiSCAN.IPC</RootNamespace>
+    <AssemblyName>optiSCAN.IPC</AssemblyName>
+  </PropertyGroup>
+
+</Project>

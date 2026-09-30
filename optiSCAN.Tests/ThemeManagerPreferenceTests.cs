@@ -1,4 +1,3 @@
-using optiSCAN;
 using optiSCAN.Services;
 
 namespace optiSCAN.Tests;
@@ -15,7 +14,7 @@ public sealed class ThemeManagerPreferenceTests
     {
         var prefs = new UserPreferences { SyncWindowsTheme = syncWindows, DarkTheme = storedDark };
 
-        bool migrated = ThemeManager.TryMigrateToWindowsThemeSync(prefs, windowsDark);
+        bool migrated = ThemePreferenceMigration.TryMigrateToWindowsThemeSync(prefs, windowsDark);
 
         Assert.Equal(expectedMigrate, migrated);
         if (expectedMigrate)

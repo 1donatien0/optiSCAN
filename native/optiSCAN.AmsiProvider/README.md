@@ -1,9 +1,9 @@
-# optiSCAN AMSI Provider (v8)
+# optiSCAN AMSI Provider (v1.0)
 
 Fournisseur AMSI natif (`optiSCAN.AmsiProvider.dll`) qui transmet les buffers script
-à `optiSCAN.exe --service-host` via le pipe `\\.\pipe\optiSCAN_Protection_v8`.
+à `optiSCAN.exe --service-host` via le pipe `\\.\pipe\optiSCAN_Protection_v1`.
 
-## Build (Visual Studio 2022)
+## Build (Visual Studio 2022 ou plus récent)
 
 1. Ouvrir `native\optiSCAN.AmsiProvider\optiSCAN.AmsiProvider.vcxproj`
 2. Configuration **Release | x64**

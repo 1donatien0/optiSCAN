@@ -1,0 +1,187 @@
+<UserControl
+    x:Class="optiSCAN.WinUI.Views.OptionsPage"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <ScrollViewer Style="{StaticResource PageScrollViewerStyle}">
+
+        <StackPanel Style="{StaticResource PageContentPanelStyle}" MaxWidth="900">
+            <TextBlock x:Name="PageTitle" Style="{StaticResource PageTitleStyle}" />
+
+            <!-- Cohabitation Windows Defender (visible uniquement si Defender est actif) -->
+
+            <Border x:Name="DefenderPanel" Style="{StaticResource AppCardStyle}" Visibility="Collapsed">
+                <StackPanel Spacing="{StaticResource SpacingS}">
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                        <FontIcon Glyph="&#xE83D;" FontSize="18" Foreground="{ThemeResource AccentBrush}" VerticalAlignment="Center" />
+                        <TextBlock x:Name="DefenderTitle" Style="{StaticResource SectionTitleStyle}" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <TextBlock x:Name="DefenderModeText" TextWrapping="WrapWholeWords" />
+                    <TextBlock x:Name="DefenderExclusionsText" Style="{StaticResource MutedCaptionStyle}" TextWrapping="WrapWholeWords" />
+                    <Button x:Name="DefenderRefreshButton" Click="DefenderRefresh_Click" HorizontalAlignment="Left" />
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource AppCardStyle}">
+                <!-- Liste de cases : écart XS (comme Tweaks) ; le titre garde 12 px au-dessus du groupe -->
+                <StackPanel Spacing="{StaticResource SpacingXS}">
+                    <TextBlock x:Name="ProtectionTitle" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,8" />
+                    <CheckBox x:Name="ChkRealtime" Tag="RealtimeProtection" Checked="Option_Changed" Unchecked="Option_Changed" />
+                    <CheckBox x:Name="ChkProcessMonitor" Tag="ProcessMonitor" Checked="Option_Changed" Unchecked="Option_Changed" />
+                    <CheckBox x:Name="ChkTamper" Tag="TamperProtection" Checked="Option_Changed" Unchecked="Option_Changed" />
+                    <StackPanel x:Name="PlatformPanel" Spacing="{StaticResource SpacingXS}">
+                        <CheckBox x:Name="ChkPlatform" Tag="PlatformProtection" Checked="Option_Changed" Unchecked="Option_Changed" />
+                        <TextBlock x:Name="PlatformSubText" Style="{StaticResource MutedCaptionStyle}" TextWrapping="WrapWholeWords" Margin="28,0,0,0" />
+                    </StackPanel>
+                    <CheckBox x:Name="ChkRemovable" Tag="RemovableDriveScan" Checked="Option_Changed" Unchecked="Option_Changed" />
+                    <CheckBox x:Name="ChkRemovableDetailed" Tag="RemovableDriveDetailed" Checked="Option_Changed" Unchecked="Option_Changed" />
+                    <CheckBox x:Name="ChkIncludeRemovableFullScan" Tag="IncludeRemovableFullScan" Checked="Option_Changed" Unchecked="Option_Changed" />
+                    <CheckBox x:Name="ChkAutoQuarantine" Tag="AutoQuarantine" Checked="Option_Changed" Unchecked="Option_Changed" />
+                    <CheckBox x:Name="ChkBackupBeforeQuarantine" Tag="BackupBeforeQuarantine" Checked="Option_Changed" Unchecked="Option_Changed" />
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource AppCardStyle}">
+                <StackPanel Spacing="{StaticResource SpacingXS}">
+                    <TextBlock x:Name="UpdatesTitle" Style="{StaticResource SectionTitleStyle}" Margin="0,0,0,8" />
+                    <CheckBox x:Name="ChkAutoUpdate" Tag="AutoUpdate" Checked="Option_Changed" Unchecked="Option_Changed" />
+                    <CheckBox x:Name="ChkAggressive" Tag="AggressiveSignatures" Checked="Option_Changed" Unchecked="Option_Changed" />
+                    <CheckBox x:Name="ChkUseClamd" Tag="UseClamd" Checked="Option_Changed" Unchecked="Option_Changed" />
+                    <CheckBox x:Name="ChkNotifications" Tag="Notifications" Checked="Option_Changed" Unchecked="Option_Changed" />
+                    <CheckBox x:Name="ChkAutoStart" Tag="AutoStart" Checked="Option_Changed" Unchecked="Option_Changed" />
+                    <CheckBox x:Name="ChkGameMode" Tag="GameMode" Checked="Option_Changed" Unchecked="Option_Changed" />
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingM}" Margin="0,8,0,0">
+                        <TextBlock x:Name="FavoriteScanLabel" Style="{StaticResource BodyTextBlockStyle}" VerticalAlignment="Center" />
+                        <ComboBox x:Name="FavoriteScanCombo" Width="220"
+                                  DropDownOpened="FavoriteScanCombo_DropDownOpened"
+                                  DropDownClosed="FavoriteScanCombo_DropDownClosed" />
+                    </StackPanel>
+                    <TextBlock x:Name="FavoriteScanHint" Style="{StaticResource MutedCaptionStyle}" />
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource AppCardStyle}">
+                <StackPanel Spacing="{StaticResource SpacingM}">
+                    <TextBlock x:Name="AppearanceTitle" Style="{StaticResource SectionTitleStyle}" />
+                    <StackPanel Spacing="{StaticResource SpacingXS}">
+                        <CheckBox x:Name="ChkAlternateTheme" Tag="AlternateTheme" Checked="Option_Changed" Unchecked="Option_Changed" />
+                        <TextBlock x:Name="AlternateThemeTitle" Style="{StaticResource BodyTextBlockStyle}" Margin="28,0,0,0" />
+                        <TextBlock x:Name="AlternateThemeSub" Style="{StaticResource MutedCaptionStyle}" TextWrapping="WrapWholeWords" Margin="28,0,0,0" />
+                    </StackPanel>
+                    <StackPanel Spacing="{StaticResource SpacingXS}">
+                        <CheckBox x:Name="ChkHighContrast" Tag="HighContrast" Checked="Option_Changed" Unchecked="Option_Changed" />
+                        <TextBlock x:Name="HighContrastTitle" Style="{StaticResource BodyTextBlockStyle}" Margin="28,0,0,0" />
+                        <TextBlock x:Name="HighContrastSub" Style="{StaticResource MutedCaptionStyle}" TextWrapping="WrapWholeWords" Margin="28,0,0,0" />
+                    </StackPanel>
+                    <StackPanel Spacing="{StaticResource SpacingXS}">
+                        <TextBlock x:Name="ThemePresetLabel" Style="{StaticResource BodyTextBlockStyle}" />
+                        <ComboBox x:Name="ThemePresetCombo" SelectionChanged="ThemePresetCombo_SelectionChanged" HorizontalAlignment="Stretch" />
+                    </StackPanel>
+                    <StackPanel Spacing="{StaticResource SpacingXS}">
+                        <TextBlock x:Name="ThemeAccentLabel" Style="{StaticResource BodyTextBlockStyle}" />
+                        <TextBox x:Name="ThemeAccentBox" PlaceholderText="#534AB7" LostFocus="ThemeAccentBox_LostFocus" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingM}">
+                        <TextBlock x:Name="LanguageLabel" Style="{StaticResource BodyTextBlockStyle}" VerticalAlignment="Center" />
+                        <ComboBox x:Name="LanguageCombo" Width="200"
+                                  DropDownOpened="LanguageCombo_DropDownOpened"
+                                  DropDownClosed="LanguageCombo_DropDownClosed">
+                            <ComboBoxItem Content="Français" Tag="fr-FR" />
+                            <ComboBoxItem Content="English" Tag="en-US" />
+                        </ComboBox>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource AppCardStyle}">
+                <StackPanel Spacing="{StaticResource SpacingM}">
+                    <TextBlock x:Name="AdvancedTitle" Style="{StaticResource SectionTitleStyle}" />
+                    <StackPanel Spacing="{StaticResource SpacingXS}">
+                        <TextBlock x:Name="VirusTotalLabel" Style="{StaticResource BodyTextBlockStyle}" />
+                        <PasswordBox x:Name="PwdVirusTotal" PasswordChanged="PwdVirusTotal_Changed" Width="360" HorizontalAlignment="Left" />
+                        <TextBlock x:Name="VirusTotalSub" Style="{StaticResource MutedCaptionStyle}" TextWrapping="WrapWholeWords" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingM}">
+                        <TextBlock x:Name="CleanThresholdLabel" Style="{StaticResource BodyTextBlockStyle}" VerticalAlignment="Center" />
+                        <TextBox x:Name="TxtCleanThreshold" Tag="CleanThreshold" Width="72"
+                                 BeforeTextChanging="NumericOnly_BeforeTextChanging"
+                                 LostFocus="ThresholdBox_LostFocus" />
+                        <TextBlock x:Name="CleanThresholdUnit" Style="{StaticResource MutedCaptionStyle}" VerticalAlignment="Center" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingM}">
+                        <TextBlock x:Name="SigThresholdLabel" Style="{StaticResource BodyTextBlockStyle}" VerticalAlignment="Center" />
+                        <TextBox x:Name="TxtSigThreshold" Tag="SigThreshold" Width="72"
+                                 BeforeTextChanging="NumericOnly_BeforeTextChanging"
+                                 LostFocus="ThresholdBox_LostFocus" />
+                        <TextBlock x:Name="SigThresholdUnit" Style="{StaticResource MutedCaptionStyle}" VerticalAlignment="Center" />
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource AppCardStyle}">
+                <StackPanel Spacing="{StaticResource SpacingM}">
+                    <TextBlock x:Name="ExclusionsTitle" Style="{StaticResource SectionTitleStyle}" />
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                        <TextBox x:Name="NewExclusionBox" Width="360" />
+                        <Button x:Name="AddExclusionButton" Click="AddExclusion_Click" Style="{StaticResource AccentButtonStyle}" />
+                        <Button x:Name="BrowseExclusionButton" Click="BrowseExclusion_Click" />
+                    </StackPanel>
+                    <ListView x:Name="ExclusionsList" MinHeight="120" SelectionMode="None">
+                        <ListView.ItemTemplate>
+                            <DataTemplate>
+                                <Grid ColumnSpacing="{StaticResource SpacingS}" Padding="4,2">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="Auto" />
+                                    </Grid.ColumnDefinitions>
+                                    <TextBlock Grid.Column="0" Text="{Binding}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                                    <Button Grid.Column="1" Loaded="RemoveExclusionButton_Loaded" Click="RemoveExclusion_Click" Tag="{Binding}" />
+                                </Grid>
+                            </DataTemplate>
+                        </ListView.ItemTemplate>
+                    </ListView>
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource AppCardStyle}">
+                <StackPanel Spacing="{StaticResource SpacingM}">
+                    <TextBlock x:Name="AppUpdateTitle" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock x:Name="AppUpdateHint" Style="{StaticResource MutedCaptionStyle}" TextWrapping="WrapWholeWords" />
+                    <StackPanel Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                        <Button x:Name="CheckAppUpdateButton" Click="CheckAppUpdate_Click" />
+                        <Button x:Name="OpenSourceForgeButton" Click="OpenSourceForge_Click" />
+                        <Button x:Name="PrivacyPolicyButton" Click="PrivacyPolicy_Click" />
+                        <Button x:Name="LicenseButton" Click="License_Click" />
+                    </StackPanel>
+                    <TextBlock x:Name="LegalHintText" Style="{StaticResource MutedCaptionStyle}" TextWrapping="WrapWholeWords" />
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource AppCardStyle}">
+                <StackPanel Spacing="{StaticResource SpacingM}">
+                    <TextBlock x:Name="DiagnosticsTitle" Style="{StaticResource SectionTitleStyle}" />
+                    <TextBlock x:Name="LogsHint" Style="{StaticResource MutedCaptionStyle}" TextWrapping="WrapWholeWords" />
+                    <StackPanel Spacing="{StaticResource SpacingXS}">
+                        <TextBlock x:Name="LogsPathLabel" Style="{StaticResource BodyStrongTextBlockStyle}" />
+                        <TextBlock x:Name="LogsPathText" Style="{StaticResource MutedCaptionStyle}" TextWrapping="WrapWholeWords" IsTextSelectionEnabled="True" />
+                    </StackPanel>
+                    <Button x:Name="OpenLogsFolderButton" Click="OpenLogsFolder_Click" HorizontalAlignment="Left" />
+                </StackPanel>
+            </Border>
+
+            <Border Style="{StaticResource AppCardStyle}">
+                <StackPanel Spacing="{StaticResource SpacingM}">
+                    <TextBlock x:Name="ScheduleTitle" Style="{StaticResource SectionTitleStyle}" />
+                    <CheckBox x:Name="ChkScheduled" Tag="ScheduledScan" Checked="Option_Changed" Unchecked="Option_Changed" />
+                    <StackPanel x:Name="ScheduleTimePanel" Orientation="Horizontal" Spacing="{StaticResource SpacingS}">
+                        <ComboBox x:Name="ScheduleHour" Width="88" SelectionChanged="ScheduleTime_SelectionChanged" />
+                        <TextBlock Text=":" VerticalAlignment="Center" Style="{StaticResource BodyTextBlockStyle}" />
+                        <ComboBox x:Name="ScheduleMinute" Width="88" SelectionChanged="ScheduleTime_SelectionChanged" />
+                    </StackPanel>
+                    <TextBlock x:Name="ScheduleStatusText" Style="{StaticResource MutedCaptionStyle}" TextWrapping="Wrap" />
+                    <Button x:Name="RunScheduleNowButton" Click="RunScheduleNow_Click" HorizontalAlignment="Left" />
+                </StackPanel>
+            </Border>
+        </StackPanel>
+    </ScrollViewer>
+</UserControl>

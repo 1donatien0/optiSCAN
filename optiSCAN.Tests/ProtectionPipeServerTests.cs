@@ -1,5 +1,5 @@
 using optiSCAN.Models;
-using optiSCAN.Platform;
+using optiSCAN.IPC;
 using optiSCAN.Services;
 
 namespace optiSCAN.Tests;
@@ -149,6 +149,39 @@ public sealed class ProtectionPipeServerTests
     {
       await server.StopAsync();
       server.Dispose();
+    }
+  }
+
+  [Fact]
+  public async Task ScanPath_rate_limit_returns_error_when_exceeded()
+  {
+    var pipeName = "optiSCAN_Test_" + Guid.NewGuid().ToString("N");
+    var dir = Path.Combine(Path.GetTempPath(), "optiscan_ipc_" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(dir);
+    var file = Path.Combine(dir, "clean.txt");
+    await File.WriteAllTextAsync(file, "hello");
+
+    var orch = new ScanOrchestrator(new FakeClam(), new FakeYara());
+    var limiter = new IpcScanRateLimiter(maxPerMinute: 1, maxConcurrent: 1);
+    var server = new ProtectionPipeServer(orch, pipeName, scanRateLimiter: limiter);
+    server.Start();
+
+    try
+    {
+      await Task.Delay(200);
+      using var client = new ProtectionPipeClient(pipeName, TimeSpan.FromSeconds(10));
+      var first = await client.ScanPathAsync(file);
+      var second = await client.ScanPathAsync(file);
+
+      Assert.True(first.Ok);
+      Assert.False(second.Ok);
+      Assert.Contains("débit", second.Message ?? "", StringComparison.OrdinalIgnoreCase);
+    }
+    finally
+    {
+      await server.StopAsync();
+      server.Dispose();
+      try { Directory.Delete(dir, recursive: true); } catch { }
     }
   }
 
