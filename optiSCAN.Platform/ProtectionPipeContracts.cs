@@ -2,14 +2,21 @@ using System.Text.Json.Serialization;
 
 namespace optiSCAN.Platform;
 
+/// <summary>Noms de pipes utilisés par les clients et le serveur. Voir <see cref="ProtectionIdentifiers"/>.</summary>
 public static class ProtectionPipeNames
 {
-    public const string Protection = "optiSCAN_Protection_v9";
-    public const string Amsi = "optiSCAN_Amsi_v9";
+    public const string Protection = ProtectionIdentifiers.PipeName;
 }
 
 public sealed class ProtectionPipeRequest
 {
+    /// <summary>
+    /// Version du protocole IPC parlée par le client (<see cref="ProtectionIdentifiers.ProtocolVersion"/>).
+    /// Absente = client historique, traité comme la version 1.
+    /// </summary>
+    [JsonPropertyName("proto")]
+    public int? ProtocolVersion { get; set; }
+
     [JsonPropertyName("op")]
     public string Operation { get; set; } = string.Empty;
 
@@ -29,6 +36,10 @@ public sealed class ProtectionPipeRequest
 
 public sealed class ProtectionPipeResponse
 {
+    /// <summary>Version du protocole IPC parlée par le serveur.</summary>
+    [JsonPropertyName("proto")]
+    public int ProtocolVersion { get; set; } = ProtectionIdentifiers.ProtocolVersion;
+
     [JsonPropertyName("ok")]
     public bool Ok { get; set; }
 

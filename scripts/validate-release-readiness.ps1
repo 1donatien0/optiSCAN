@@ -43,7 +43,7 @@ try {
             if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
         }
         else {
-            Write-Warning "Dossier publish absent - lancer dotnet publish ou .\scripts\prepare-release-v9.ps1"
+            Write-Warning "Dossier publish absent - lancer dotnet publish ou .\scripts\prepare-release-v3.ps1"
         }
     }
 

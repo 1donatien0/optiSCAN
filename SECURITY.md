@@ -4,7 +4,8 @@
 
 | Version | Supported |
 |---------|-----------|
-| 9.x (`main`, `dev`) | Yes |
+| 3.0 (`main`, `dev`) | Yes |
+| WinUI, même date que la 3.0 (`win`) | Yes |
 
 ## Reporting a vulnerability
 
@@ -21,8 +22,8 @@ If you discover a security issue in optiSCAN, please report it privately:
 - **Quarantine**: AES-256-GCM encryption, HMAC-signed manifest, DPAPI-protected master key; path traversal checks on restore.
 - **Sensitive paths**: restore and IPC scan refuse System32, Windows, ProgramFiles, ProgramData, Startup.
 - **IPC pipe**: ACL (SYSTEM / Administrators / authenticated users); `shutdown` requires a token under `%ProgramData%\optiSCAN\`; scan refuses sensitive paths; buffer size capped for AMSI/IPC.
-- **AMSI (v9, optional)**: native `optiSCAN.AmsiProvider.dll` may be **shipped but inactive** — it is inert on disk until the platform protection service registers it under `HKLM\SOFTWARE\Microsoft\AMSI\Providers` (admin). With **platform protection disabled** or **Defender complement mode**, the DLL is not registered and is not loaded by Windows. When enabled, the provider forwards script buffers to `optiSCAN.Service` / `--service-host` via the protection pipe. With Windows Defender active, Microsoft’s AMSI provider typically takes priority in host processes.
-- **Minifilter (v9, optional)**: kernel driver is optional and unsigned in current builds; not required for ClamAV/YARA scanning. Do not enable platform mode without a signed driver.
+- **AMSI (v3.0, optional)**: native `optiSCAN.AmsiProvider.dll` may be **shipped but inactive** — it is inert on disk until the platform protection service registers it under `HKLM\SOFTWARE\Microsoft\AMSI\Providers` (admin). With **platform protection disabled** or **Defender complement mode**, the DLL is not registered and is not loaded by Windows. When enabled, the provider forwards script buffers to `optiSCAN.Service` / `--service-host` via the protection pipe. With Windows Defender active, Microsoft’s AMSI provider typically takes priority in host processes.
+- **Minifilter (v3.0, optional)**: kernel driver is optional and unsigned in current builds; not required for ClamAV/YARA scanning. Do not enable platform mode without a signed driver.
 - **Secrets**: user preferences (VirusTotal key) stored via DPAPI `SecureStore`; no credentials in the repository.
 - **CI**: Release builds treat warnings as errors; CodeQL (C# and native AMSI); Dependabot; dependency review on PRs (high severity fails); gitleaks; SBOM CycloneDX artifact on `main` publish.
 
@@ -35,7 +36,7 @@ optiSCAN is a **desktop antivirus for Windows**. It assumes:
 - DPAPI `CurrentUser` protects local data from other users, not from same-session malware.
 - Running **two real-time engines** (Defender + optiSCAN RTP) increases disk I/O and false-positive risk; complement mode is the default when Defender is detected.
 
-## Component states (v9)
+## Component states (v3.0)
 
 | Component | Present on disk | Active |
 |-----------|-----------------|--------|

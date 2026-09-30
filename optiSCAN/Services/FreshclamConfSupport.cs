@@ -103,7 +103,7 @@ namespace optiSCAN.Services
                 "ConnectTimeout 30",
                 // 0 = pas de timeout de lecture (le process a déjà un plafond optiSCAN).
                 "ReceiveTimeout 0",
-                // clamd v9 charge déjà la base : retester en RAM fait souvent échouer la MAJ.
+                // clamd v3 charge déjà la base : retester en RAM fait souvent échouer la MAJ.
                 "TestDatabases no",
             });
 

@@ -76,6 +76,7 @@ public sealed class ProtectionPipeClient : IDisposable
         linked.CancelAfter(_timeout);
         await pipe.ConnectAsync(linked.Token).ConfigureAwait(false);
 
+        request.ProtocolVersion ??= ProtectionIdentifiers.ProtocolVersion;
         var payload = JsonSerializer.Serialize(request, JsonOptions);
         var bytes = Encoding.UTF8.GetBytes(payload);
         await pipe.WriteAsync(bytes, linked.Token).ConfigureAwait(false);

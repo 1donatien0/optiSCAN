@@ -26,3 +26,8 @@ dotnet_diagnostic.CA1864.severity = none
 dotnet_diagnostic.CA1869.severity = none
 dotnet_diagnostic.CA2016.severity = none
 dotnet_diagnostic.CA2101.severity = none
+
+# Tests xUnit : les classes [CollectionDefinition] se terminent par « Collection » par
+# convention xUnit ; CA1711 (suffixes réservés) ne s'applique pas au projet de tests.
+[optiSCAN.Tests/**.cs]
+dotnet_diagnostic.CA1711.severity = none

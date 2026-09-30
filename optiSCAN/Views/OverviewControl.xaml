@@ -64,6 +64,27 @@
                             <GradientStop Color="#00000000" Offset="1"/>
                         </RadialGradientBrush>
                     </Ellipse.Fill>
+                    <Ellipse.RenderTransformOrigin>0.5,0.5</Ellipse.RenderTransformOrigin>
+                    <Ellipse.RenderTransform>
+                        <ScaleTransform x:Name="haloOuterScale" ScaleX="1" ScaleY="1"/>
+                    </Ellipse.RenderTransform>
+                    <Ellipse.Triggers>
+                        <EventTrigger RoutedEvent="Loaded">
+                            <BeginStoryboard>
+                                <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                    <DoubleAnimation Storyboard.TargetName="haloOuterScale"
+                                                     Storyboard.TargetProperty="ScaleX"
+                                                     From="1" To="1.22" Duration="0:0:3"/>
+                                    <DoubleAnimation Storyboard.TargetName="haloOuterScale"
+                                                     Storyboard.TargetProperty="ScaleY"
+                                                     From="1" To="1.22" Duration="0:0:3"/>
+                                    <DoubleAnimation Storyboard.TargetName="shieldHaloOuter"
+                                                     Storyboard.TargetProperty="Opacity"
+                                                     From="0.15" To="0.04" Duration="0:0:3"/>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                    </Ellipse.Triggers>
                 </Ellipse>
 
                 <!-- Lueur violette interne — fusionne le teal du PNG avec la palette UI -->
@@ -85,7 +106,26 @@
                        Source="/optiSCAN;component/optiSCAN_hero.png"
                        Width="190" Height="190"
                        HorizontalAlignment="Center" VerticalAlignment="Center"
-                       RenderOptions.BitmapScalingMode="HighQuality">
+                       RenderOptions.BitmapScalingMode="HighQuality"
+                       Effect="{DynamicResource HeroShieldPulseGlow}">
+                    <Image.RenderTransformOrigin>0.5,0.5</Image.RenderTransformOrigin>
+                    <Image.RenderTransform>
+                        <ScaleTransform x:Name="shieldPulseScale" ScaleX="1" ScaleY="1"/>
+                    </Image.RenderTransform>
+                    <Image.Triggers>
+                        <EventTrigger RoutedEvent="Loaded">
+                            <BeginStoryboard>
+                                <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                    <DoubleAnimation Storyboard.TargetName="shieldPulseScale"
+                                                     Storyboard.TargetProperty="ScaleX"
+                                                     From="1" To="1.06" Duration="0:0:2.5"/>
+                                    <DoubleAnimation Storyboard.TargetName="shieldPulseScale"
+                                                     Storyboard.TargetProperty="ScaleY"
+                                                     From="1" To="1.06" Duration="0:0:2.5"/>
+                                </Storyboard>
+                            </BeginStoryboard>
+                        </EventTrigger>
+                    </Image.Triggers>
                 </Image>
             </Grid>
 

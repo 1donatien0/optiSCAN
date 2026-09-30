@@ -290,9 +290,8 @@ namespace optiSCAN.Views
                     return;
                 }
 
-                var message = string.Format(
-                    LocalizationService.CurrentCulture,
-                    LocalizationService.GetString("Posture_SharesConfirm"),
+                var message = LocalizationService.Format(
+                    "Posture_SharesConfirm",
                     string.Join(Environment.NewLine, names.Select(n => "  • " + n)));
                 var title = LocalizationService.GetString("Posture_SharesConfirmTitle");
                 var owner = Window.GetWindow(this);
