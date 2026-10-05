@@ -34,7 +34,7 @@ try {
     if ($WithPublishCheck) {
         Write-Host ""
         Write-Host "[ Publish runtime deps ]" -ForegroundColor Cyan
-        $pub = Join-Path $repo 'optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64'
+        $pub = Join-Path $repo 'optiSCAN\bin\Release\net10.0-windows10.0.17763.0\publish\win-x64'
         if (-not (Test-Path (Join-Path $pub 'optiSCAN.exe'))) {
             $pub = Join-Path $repo 'publish\win-x64'
         }

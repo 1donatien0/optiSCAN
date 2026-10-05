@@ -72,16 +72,17 @@ namespace optiSCAN.Services
             var yaraDir = Path.Combine(baseDir, "yara");
             var yaraExe = Path.Combine(yaraDir, $"yara{yaraArch}.exe");
             var yaracExe = Path.Combine(yaraDir, $"yarac{yaraArch}.exe");
-            var rulesDir = Path.Combine(baseDir, "rules");
-            int yarCount = 0;
-            try
+            var rulesDir = YaraRulesLocation.WritableDirectory;
+            var yarCount = CountYarFiles(rulesDir);
+            if (yarCount == 0)
             {
-                if (Directory.Exists(rulesDir))
-                    yarCount = Directory.GetFiles(rulesDir, "*.yar", SearchOption.TopDirectoryOnly).Length;
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Warn("RuntimeDependencies", $"Énumération rules : {rulesDir}", ex);
+                var installed = YaraRulesLocation.InstallDirectory;
+                var installedCount = CountYarFiles(installed);
+                if (installedCount > 0)
+                {
+                    rulesDir = installed;
+                    yarCount = installedCount;
+                }
             }
 
             var yaraBinOk = File.Exists(yaraExe);
@@ -124,6 +125,21 @@ namespace optiSCAN.Services
                     },
                 },
             };
+        }
+
+        private static int CountYarFiles(string rulesDir)
+        {
+            try
+            {
+                if (Directory.Exists(rulesDir))
+                    return Directory.GetFiles(rulesDir, "*.yar", SearchOption.TopDirectoryOnly).Length;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("RuntimeDependencies", $"Énumération rules : {rulesDir}", ex);
+            }
+
+            return 0;
         }
 
         /// <summary>Journalise un avertissement si des dépendances manquent (appel au démarrage UI).</summary>

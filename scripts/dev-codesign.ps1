@@ -43,15 +43,15 @@
 
 .EXAMPLE
     # 3. Signature des binaires
-    .\scripts\dev-codesign.ps1 -Path "optiSCAN\bin\Release\net8.0-windows10.0.17763.0\win-x64\publish\optiSCAN.exe"
+    .\scripts\dev-codesign.ps1 -Path "optiSCAN\bin\Release\net10.0-windows10.0.17763.0\win-x64\publish\optiSCAN.exe"
 
 .EXAMPLE
     # 4. Signature du setup Inno
-    .\scripts\dev-codesign.ps1 -Path "installer\output\optiSCAN_Setup_v3.0.0.exe"
+    .\scripts\dev-codesign.ps1 -Path "installer\output\optiSCAN_Setup_v3.1.0.exe"
 
 .NOTES
     Cout : 0 EUR. Prerequis : Windows SDK (signtool.exe), inclus avec Visual Studio.
-    Voir ROADMAP_GRATUIT.md - Chantier 1.
+    Voir docs/SIGNATURE_PROCEDURE.md.
 #>
 
 [CmdletBinding(DefaultParameterSetName = 'Sign')]
@@ -224,7 +224,7 @@ Usage :
   .\scripts\dev-codesign.ps1 -Path <fichiers>        # 3. signer
   .\scripts\dev-codesign.ps1 -ShowThumbprint         # thumbprint pour la CI
 
-Cout total : 0 EUR. Voir ROADMAP_GRATUIT.md - Chantier 1.
+Cout total : 0 EUR. Voir docs/SIGNATURE_PROCEDURE.md.
 "@
     return
 }

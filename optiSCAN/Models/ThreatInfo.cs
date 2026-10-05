@@ -29,7 +29,12 @@ namespace optiSCAN.Models
         /// <summary>Moteur qui a détecté la menace : "ClamAV", "YARA" ou "ClamAV+YARA".</summary>
         public string DetectedBy { get; set; } = "ClamAV";
 
-        /// <summary>ID stable entre sessions (hash SHA-256 déterministe, pas GetHashCode()).</summary>
+        /// <summary>
+        /// Identifiant d'une <b>détection</b> : SHA-256 déterministe de (chemin, menace, horodatage),
+        /// donc stable quand la détection est rechargée depuis l'historique, mais différent pour
+        /// une nouvelle détection du même fichier. Pour reconnaître un même fichier d'une session
+        /// à l'autre, comparer <see cref="FilePath"/> et <see cref="VirusName"/>.
+        /// </summary>
         public string Id
         {
             get

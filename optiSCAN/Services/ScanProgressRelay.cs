@@ -19,13 +19,19 @@ namespace optiSCAN.Services
         private int _prevYara;
         private int _parallelActivity;
 
+        // ClamAV et YARA rapportent leur progression depuis des threads différents.
+        private readonly object _gate = new();
+
         public ScanProgressRelay(int filesBaseline = 0)
         {
             _baseline = Math.Max(0, filesBaseline);
             _filesHigh = _baseline;
         }
 
-        public int FilesScannedHigh => _filesHigh;
+        public int FilesScannedHigh
+        {
+            get { lock (_gate) { return _filesHigh; } }
+        }
 
         public IProgress<ScanProgress>? ToParent(IProgress<ScanProgress>? parent)
         {
@@ -36,6 +42,12 @@ namespace optiSCAN.Services
         }
 
         internal ScanProgress Normalize(ScanProgress p)
+        {
+            lock (_gate)
+                return NormalizeLocked(p);
+        }
+
+        private ScanProgress NormalizeLocked(ScanProgress p)
         {
             UpdateEngineHighs(p);
 

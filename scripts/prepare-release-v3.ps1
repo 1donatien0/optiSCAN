@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-    Chaîne complète de publication v3.0 (dépôt -> installateur testé).
+    Chaîne de préparation des releases v3.x (dépôt -> installateur testé).
 
 .EXAMPLE
     .\scripts\prepare-release-v3.ps1
@@ -22,7 +22,7 @@ $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
 Set-Location $root
 
-$tfm = 'net8.0-windows10.0.17763.0'
+$tfm = 'net10.0-windows10.0.17763.0'
 $pubDir = if ($SelfContained) {
     Join-Path $root 'publish\win-x64'
 } else {
@@ -46,7 +46,8 @@ if (-not $SkipClean) {
 }
 
 if (-not $SkipFetch) {
-    $fetchArgs = @()
+    # Une release exige la vérification GPG de l'archive ClamAV.
+    $fetchArgs = @('-RequireSignature')
     if (-not $SkipFreshclam) { $fetchArgs += '-RunFreshclam' }
     Invoke-Step 'Dependances ClamAV + YARA' {
         & (Join-Path $root 'scripts\fetch-runtime-deps.ps1') @fetchArgs
@@ -63,15 +64,15 @@ Invoke-Step 'dotnet publish' {
     $csproj = Join-Path $root 'optiSCAN\optiSCAN.csproj'
     $svc = Join-Path $root 'optiSCAN.Service\optiSCAN.Service.csproj'
     if ($SelfContained) {
-        dotnet publish $csproj -c Release -r win-x64 --self-contained true `
+        dotnet publish $csproj -p:OptiscanShipping=true -c Release -r win-x64 --self-contained true `
             -p:PublishSingleFile=false -o $pubDir
-        dotnet publish $svc -c Release -r win-x64 --self-contained true `
+        dotnet publish $svc -p:OptiscanShipping=true -c Release -r win-x64 --self-contained true `
             -p:PublishSingleFile=false -o $pubDir
     } else {
-        dotnet publish $csproj -c Release /p:PublishProfile=FolderProfile
-        dotnet publish $svc -c Release -r win-x64 --self-contained false `
-            -o (Join-Path $root "optiSCAN.Service\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64")
-        Copy-Item (Join-Path $root "optiSCAN.Service\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\optiSCAN.Service.exe") `
+        dotnet publish $csproj -p:OptiscanShipping=true -c Release /p:PublishProfile=FolderProfile
+        dotnet publish $svc -p:OptiscanShipping=true -c Release -r win-x64 --self-contained false `
+            -o (Join-Path $root "optiSCAN.Service\bin\Release\net10.0-windows10.0.17763.0\publish\win-x64")
+        Copy-Item (Join-Path $root "optiSCAN.Service\bin\Release\net10.0-windows10.0.17763.0\publish\win-x64\optiSCAN.Service.exe") `
             (Join-Path $pubDir 'optiSCAN.Service.exe') -ErrorAction SilentlyContinue
     }
 }
@@ -96,6 +97,9 @@ if (-not $SkipInstaller) {
     }
 }
 
-Write-Host "`n=== Publication v3 prete ===" -ForegroundColor Green
+[xml]$propsXml = Get-Content -LiteralPath (Join-Path $root 'Directory.Build.props')
+$appVersion = ($propsXml.Project.PropertyGroup.Version | Select-Object -First 1).'#text'
+$appRelease = if ($appVersion -match '^(\d+)\.(\d+)') { "v$($Matches[1]).$($Matches[2])" } else { 'v3' }
+Write-Host "`n=== Preparation $appRelease ===" -ForegroundColor Green
 Write-Host "  Publish : $pubDir"
-Write-Host "  Setup   : installer\output\optiSCAN_Setup_v3.0.0.exe"
+Write-Host "  Setup   : installer\output\optiSCAN_Setup_v$appVersion.exe"

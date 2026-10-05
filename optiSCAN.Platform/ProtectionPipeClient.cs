@@ -48,6 +48,26 @@ public sealed class ProtectionPipeClient : IDisposable
     public Task<ProtectionPipeResponse> GetStatusAsync(CancellationToken ct = default) =>
         SendAsync(new ProtectionPipeRequest { Operation = ProtectionPipeOperations.GetStatus }, ct);
 
+    public Task<ProtectionPipeResponse> GetServiceQuarantineSummaryAsync(CancellationToken ct = default) =>
+        SendAsync(new ProtectionPipeRequest { Operation = ProtectionPipeOperations.QuarantineSummary }, ct);
+
+    public Task<ProtectionPipeResponse> ListServiceQuarantineAsync(CancellationToken ct = default) =>
+        SendAsync(new ProtectionPipeRequest { Operation = ProtectionPipeOperations.QuarantineList }, ct);
+
+    public Task<ProtectionPipeResponse> RestoreServiceQuarantineAsync(string id, string? destinationFolder = null, CancellationToken ct = default) =>
+        SendAsync(new ProtectionPipeRequest
+        {
+            Operation = ProtectionPipeOperations.QuarantineRestore,
+            QuarantineId = id,
+            DestinationFolder = destinationFolder,
+        }, ct);
+
+    public Task<ProtectionPipeResponse> DeleteServiceQuarantineAsync(string id, CancellationToken ct = default) =>
+        SendAsync(new ProtectionPipeRequest { Operation = ProtectionPipeOperations.QuarantineDelete, QuarantineId = id }, ct);
+
+    public Task<ProtectionPipeResponse> PurgeServiceQuarantineAsync(CancellationToken ct = default) =>
+        SendAsync(new ProtectionPipeRequest { Operation = ProtectionPipeOperations.QuarantinePurge }, ct);
+
     public async Task RequestShutdownAsync(CancellationToken ct = default)
     {
         if (!ProtectionPipeShutdownToken.TryRead(out var token))
@@ -70,11 +90,14 @@ public sealed class ProtectionPipeClient : IDisposable
             ".",
             _pipeName,
             PipeDirection.InOut,
-            PipeOptions.Asynchronous);
+            PipeOptions.Asynchronous,
+            System.Security.Principal.TokenImpersonationLevel.Impersonation);
 
         using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
         linked.CancelAfter(_timeout);
         await pipe.ConnectAsync(linked.Token).ConfigureAwait(false);
+        if (!PipeServerTrust.IsTrusted(pipe.SafePipeHandle))
+            return ProtectionPipeResponse.Error("Serveur IPC non reconnu");
 
         request.ProtocolVersion ??= ProtectionIdentifiers.ProtocolVersion;
         var payload = JsonSerializer.Serialize(request, JsonOptions);
@@ -87,6 +110,10 @@ public sealed class ProtectionPipeClient : IDisposable
             ?? ProtectionPipeResponse.Error("Réponse IPC invalide");
     }
 
+    /// <summary>
+    /// Rien à libérer : chaque requête ouvre son propre pipe et le ferme
+    /// (<c>await using</c> dans <see cref="SendAsync"/>).
+    /// </summary>
     public void Dispose()
     {
     }

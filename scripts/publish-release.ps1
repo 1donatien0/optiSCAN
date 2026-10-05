@@ -52,7 +52,7 @@ param(
 $ErrorActionPreference = 'Stop'
 $repo = Split-Path -Parent $PSScriptRoot
 $proj = Join-Path $repo 'optiSCAN\optiSCAN.csproj'
-$tfm  = 'net8.0-windows10.0.17763.0'
+$tfm  = 'net10.0-windows10.0.17763.0'
 $publishDir = Join-Path $repo "optiSCAN\bin\$Configuration\$tfm\publish\$Runtime"
 
 function Write-Step($m) { Write-Host "`n=== $m ===" -ForegroundColor Cyan }
@@ -76,7 +76,7 @@ if (Test-Path $publishDir) { Remove-Item -Recurse -Force $publishDir }
 # 4) Publier
 Write-Step "dotnet publish ($Configuration / $Runtime / self-contained=$($SelfContained.IsPresent))"
 $sc = if ($SelfContained) { 'true' } else { 'false' }
-dotnet publish $proj -c $Configuration -r $Runtime --self-contained $sc -p:CleanPublishArtifactsBeforePublish=true
+dotnet publish $proj -p:OptiscanShipping=true -c $Configuration -r $Runtime --self-contained $sc -p:CleanPublishArtifactsBeforePublish=true
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish a échoué (code $LASTEXITCODE)." }
 
 $exe = Join-Path $publishDir 'optiSCAN.exe'
@@ -110,7 +110,7 @@ if (-not $SkipInstaller) {
         # évite que l'installeur reparte sur un numéro figé après un bump.
         [xml]$propsXml = Get-Content -LiteralPath (Join-Path $repo 'Directory.Build.props')
         $appVersion = ($propsXml.Project.PropertyGroup.Version | Select-Object -First 1).'#text'
-        if ([string]::IsNullOrWhiteSpace($appVersion)) { $appVersion = '3.0.0' }
+        if ([string]::IsNullOrWhiteSpace($appVersion)) { $appVersion = '3.1.0' }
         $isccArgs = @((Join-Path $repo 'installer\setup.iss'), "/DAppVersion=$appVersion")
         if ($EmbedOfflineSignatures) { $isccArgs += '/DEmbedOfflineSignatures' }
         else {

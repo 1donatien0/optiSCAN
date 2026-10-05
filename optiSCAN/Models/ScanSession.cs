@@ -73,7 +73,11 @@ namespace optiSCAN.Models
         /// <summary>Badge d'état localisé selon la culture UI active.</summary>
         [JsonIgnore]
         public string ThreatsBadge =>
-            ThreatsFound == 0
+            string.Equals(StatusDisplay, nameof(ScanStatus.Error), StringComparison.OrdinalIgnoreCase)
+                ? LocalizationService.GetString("Badge_Error")
+                : string.Equals(StatusDisplay, nameof(ScanStatus.Cancelled), StringComparison.OrdinalIgnoreCase)
+                    ? LocalizationService.GetString("Badge_Cancelled")
+                    : ThreatsFound == 0
                 ? LocalizationService.GetString("Badge_Clean")
                 : LocalizationService.Format("Badge_Threats", ThreatsFound,
                     ThreatsFound > 1 ? "s" : "");

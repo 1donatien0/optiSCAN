@@ -2,7 +2,7 @@
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
-    <TargetFramework>net8.0-windows10.0.17763.0</TargetFramework>
+    <TargetFramework>net10.0-windows10.0.17763.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWPF>true</UseWPF>
@@ -13,10 +13,17 @@
     <AssemblyName>optiSCAN</AssemblyName>
     <RootNamespace>optiSCAN</RootNamespace>
     <Company>optiSCAN</Company>
-    <Product>optiSCAN v3.0 — ClamAV Edition</Product>
+    <Product>optiSCAN v3.1 — ClamAV Edition</Product>
     <Copyright>Copyright 2026 Dona By</Copyright>
     <!-- Icône embarquée dans l'exécutable (barre des tâches, Explorateur, installateur) -->
     <ApplicationIcon>optiSCAN.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <!-- Points d'entrée réservés aux tests (faux clamd des tests d'isolation) : compilés pour
+       le build et les tests, jamais dans un binaire publié. dotnet publish définit
+       _IsPublishing ; les scripts de publication passent aussi OptiscanShipping=true. -->
+  <PropertyGroup Condition="'$(_IsPublishing)' != 'true' And '$(OptiscanShipping)' != 'true'">
+    <DefineConstants>$(DefineConstants);OPTISCAN_TEST_HOOKS</DefineConstants>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -120,8 +127,8 @@
     Exclusion des fichiers .conf de la copie :
     FreshclamUpdater génère freshclam.conf à l'exécution sous
     %LocalAppData%\optiSCAN\clamav\. Un .conf copié depuis le dépôt
-    embarquerait des chemins de la machine de dev (DatabaseDirectory =
-    D:\Projets\...) invalides chez l'utilisateur et ferait échouer freshclam.
+    embarquerait des chemins propres à la machine de développement, invalides
+    chez l'utilisateur, et ferait échouer freshclam.
   -->
   <ItemGroup Condition="'$(RuntimeIdentifier)' == 'win-x64' Or '$(PlatformTarget)' == 'x64'">
     <Content Include="clamav\x64\**\*" Exclude="clamav\x64\**\*.conf">
@@ -156,9 +163,9 @@
     <PackageReference Include="QuestPDF" Version="2024.12.2" />
 
     <PackageReference Include="Microsoft.Toolkit.Uwp.Notifications" Version="7.1.3" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.1" />
-    <PackageReference Include="System.Management" Version="8.0.0" />
-    <PackageReference Include="System.ServiceProcess.ServiceController" Version="8.0.1" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.12" />
+    <PackageReference Include="System.Management" Version="10.0.12" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.12" />
   </ItemGroup>
 
   <ItemGroup>

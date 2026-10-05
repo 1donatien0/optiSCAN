@@ -16,7 +16,7 @@ param(
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
-$tfm = 'net8.0-windows10.0.17763.0'
+$tfm = 'net10.0-windows10.0.17763.0'
 $binDir = Join-Path $root "optiSCAN\bin\$Configuration\$tfm"
 $objDir = Join-Path $root "optiSCAN\obj\$Configuration\$tfm"
 $publishRoot = Join-Path $binDir 'publish'

@@ -1,5 +1,7 @@
 using System.IO;
+using System.Security.Principal;
 using System.Text;
+using optiSCAN.Platform;
 
 namespace optiSCAN.Services
 {
@@ -8,22 +10,33 @@ namespace optiSCAN.Services
     {
         public const int DefaultTcpPort = 3310;
 
-        public static string GetConfPath() =>
-            Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "optiSCAN", "clamd", "clamd.conf");
+        public static string GetConfPath() => Path.Combine(RuntimeDirectory(), "clamd.conf");
 
-        public static string GetPidPath() =>
-            Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "optiSCAN", "clamd", "clamd.pid");
+        public static string GetPidPath() => Path.Combine(RuntimeDirectory(), "clamd.pid");
 
-        public static string GetLogPath() =>
-            Path.Combine(
-                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-                "optiSCAN", "clamd", "clamd.log");
+        public static string GetLogPath() => Path.Combine(RuntimeDirectory(), "clamd.log");
 
-        public static void EnsureConf(string databaseDir, IEnumerable<string>? excludePatterns = null)
+        public static string GetPortPath() => Path.Combine(RuntimeDirectory(), "clamd.port");
+
+        public static string GetPipePath() => Path.Combine(RuntimeDirectory(), "clamd.pipe");
+
+        private static string RuntimeDirectory()
+        {
+            if (IsSystemProcess() && OptiScanProgramData.EnsureTrusted())
+                return Path.Combine(OptiScanProgramData.DirectoryPath, "clamd");
+
+            return Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "optiSCAN", "clamd");
+        }
+
+        private static bool IsSystemProcess()
+        {
+            using var identity = WindowsIdentity.GetCurrent();
+            return identity.IsSystem;
+        }
+
+        public static void EnsureConf(string databaseDir, int tcpPort, IEnumerable<string>? excludePatterns = null)
         {
             var confPath = GetConfPath();
             var dir = Path.GetDirectoryName(confPath)!;
@@ -39,7 +52,7 @@ namespace optiSCAN.Services
             sb.AppendLine("LogFile " + log);
             sb.AppendLine("PidFile " + pid);
             sb.AppendLine("DatabaseDirectory " + db);
-            sb.AppendLine("TCPSocket " + DefaultTcpPort);
+            sb.AppendLine("TCPSocket " + tcpPort);
             sb.AppendLine("TCPAddr 127.0.0.1");
             sb.AppendLine("Foreground yes");
             sb.AppendLine("StreamMaxLength 100M");
@@ -53,6 +66,7 @@ namespace optiSCAN.Services
             }
 
             File.WriteAllText(confPath, sb.ToString(), new UTF8Encoding(encoderShouldEmitUTF8Identifier: false));
+            File.WriteAllText(GetPortPath(), tcpPort.ToString(System.Globalization.CultureInfo.InvariantCulture));
         }
     }
 }

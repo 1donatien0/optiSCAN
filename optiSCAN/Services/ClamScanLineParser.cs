@@ -20,6 +20,14 @@ namespace optiSCAN.Services
         private static readonly Regex StatsRegex =
             new(@"^([\w\s]+):\s+([\d.]+)", RegexOptions.Compiled);
 
+        internal static bool IsErrorLine(string line)
+        {
+            var trimmed = line.Trim();
+            return trimmed.EndsWith(" ERROR", StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith("ERROR:", StringComparison.OrdinalIgnoreCase)
+                || trimmed.StartsWith("ERROR ", StringComparison.OrdinalIgnoreCase);
+        }
+
         public static void ProcessLine(
             string line,
             ScanResult result,
@@ -120,7 +128,10 @@ namespace optiSCAN.Services
             switch (key)
             {
                 case "scanned files":
-                    result.FilesScanned = int.Parse(raw, CultureInfo.InvariantCulture);
+                    // Valeur hors plage (sortie inattendue) : ignorée plutôt qu'une exception
+                    // qui interromprait la lecture de la sortie de clamscan.
+                    if (int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var scanned))
+                        result.FilesScanned = scanned;
                     break;
                 case "data scanned":
                     // clamscan affiche « Data scanned: X.XX MB »

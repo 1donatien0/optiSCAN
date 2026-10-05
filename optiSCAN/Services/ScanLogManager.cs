@@ -49,6 +49,7 @@ namespace optiSCAN.Services
         private List<CleanSession> _cleanHistory;
         private ActivityLogService? _activityLog;
         private readonly object _saveGate = new();
+        private static readonly object TextLogGate = new();
 
         public ScanLogManager(string? logDir = null)
         {
@@ -92,7 +93,15 @@ namespace optiSCAN.Services
         /// <summary>
         /// Retourne l'historique complet (plus récent en premier).
         /// </summary>
-        public IReadOnlyList<ScanSession> GetHistory() => _history.AsReadOnly();
+        /// <remarks>
+        /// Copie de la liste ; les sessions sont partagées, mais leurs listes de menaces ne sont
+        /// jamais modifiées sur place (copie à l'écriture sous verrou) : elles peuvent être
+        /// parcourues sans verrou.
+        /// </remarks>
+        public IReadOnlyList<ScanSession> GetHistory()
+        {
+            lock (_saveGate) { return _history.ToArray(); }
+        }
 
         /// <summary>
         /// Retire une menace traitée d'une session persistée (quarantaine, suppression, exclusion).
@@ -102,18 +111,24 @@ namespace optiSCAN.Services
             if (sessionId == Guid.Empty || string.IsNullOrWhiteSpace(filePath))
                 return false;
 
-            var session = _history.FirstOrDefault(s => s.SessionId == sessionId);
-            if (session == null)
-                return false;
+            lock (_saveGate)
+            {
+                var session = _history.FirstOrDefault(s => s.SessionId == sessionId);
+                if (session == null)
+                    return false;
 
-            var removed = session.Threats.RemoveAll(t =>
-                string.Equals(t.FilePath, filePath, StringComparison.OrdinalIgnoreCase));
-            if (removed == 0)
-                return false;
+                // Copie à l'écriture : GetHistory rend les mêmes sessions, et un lecteur peut
+                // parcourir session.Threats sans verrou. La liste publiée n'est jamais modifiée.
+                var kept = session.Threats.Where(t =>
+                    !string.Equals(t.FilePath, filePath, StringComparison.OrdinalIgnoreCase)).ToList();
+                if (kept.Count == session.Threats.Count)
+                    return false;
 
-            session.ThreatsFound = session.Threats.Count;
-            PersistHistory();
-            return true;
+                session.Threats = kept;
+                session.ThreatsFound = kept.Count;
+                PersistHistory();
+                return true;
+            }
         }
 
         /// <summary>
@@ -128,18 +143,24 @@ namespace optiSCAN.Services
             if (paths.Count == 0)
                 return 0;
 
-            int removed = 0;
-            foreach (var session in _history)
+            lock (_saveGate)
             {
-                int n = session.Threats.RemoveAll(t => paths.Contains(t.FilePath));
-                if (n == 0) continue;
-                session.ThreatsFound = session.Threats.Count;
-                removed += n;
-            }
+                int removed = 0;
+                foreach (var session in _history)
+                {
+                    // Copie à l'écriture (voir TryRemoveThreatFromSession).
+                    var kept = session.Threats.Where(t => !paths.Contains(t.FilePath)).ToList();
+                    int n = session.Threats.Count - kept.Count;
+                    if (n == 0) continue;
+                    session.Threats = kept;
+                    session.ThreatsFound = kept.Count;
+                    removed += n;
+                }
 
-            if (removed > 0)
-                PersistHistory();
-            return removed;
+                if (removed > 0)
+                    PersistHistory();
+                return removed;
+            }
         }
 
         // ── Historique des nettoyages système (vue Historique → Nettoyages) ───────
@@ -147,22 +168,31 @@ namespace optiSCAN.Services
         /// <summary>Enregistre un nettoyage terminé (plus récent en tête ; rotation 100 → 50).</summary>
         public void SaveCleanSession(CleanSession session)
         {
-            _cleanHistory.Insert(0, session);
-            TrimNewestFirstList(_cleanHistory);
-            PersistCleanHistory();
+            lock (_saveGate)
+            {
+                _cleanHistory.Insert(0, session);
+                TrimNewestFirstList(_cleanHistory);
+                PersistCleanHistory();
+            }
             _activityLog?.RecordCleanCompleted(session);
             WriteToLog($"Nettoyage système — {session.BytesDisplay} libéré(s) — {session.TargetsSummary}");
         }
 
-        public IReadOnlyList<CleanSession> GetCleanHistory() => _cleanHistory.AsReadOnly();
+        public IReadOnlyList<CleanSession> GetCleanHistory()
+        {
+            lock (_saveGate) { return _cleanHistory.ToArray(); }
+        }
 
         /// <summary>
         /// Efface tout l'historique.
         /// </summary>
         public void ClearHistory()
         {
-            _history.Clear();
-            PersistHistory();
+            lock (_saveGate)
+            {
+                _history.Clear();
+                PersistHistory();
+            }
             WriteToLog("Historique effacé par l'utilisateur.");
         }
 
@@ -190,7 +220,26 @@ namespace optiSCAN.Services
             {
                 EnsureDirectory(_logDir);
                 var line = $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss}] {message}";
-                File.AppendAllText(_textLogPath, line + Environment.NewLine, Encoding.UTF8);
+                var bytes = new UTF8Encoding(encoderShouldEmitUTF8Identifier: false).GetBytes(line + Environment.NewLine);
+                // Écritures sérialisées dans ce processus ; partage en écriture et nouvel essai
+                // si un autre processus (service, tâche planifiée) écrit au même moment :
+                // une ligne d'audit n'est plus perdue sur une simple collision.
+                lock (TextLogGate)
+                {
+                    for (var attempt = 0; ; attempt++)
+                    {
+                        try
+                        {
+                            using var fs = new FileStream(_textLogPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+                            fs.Write(bytes, 0, bytes.Length);
+                            break;
+                        }
+                        catch (IOException) when (attempt < 4)
+                        {
+                            Thread.Sleep(15 * (attempt + 1));
+                        }
+                    }
+                }
             }
             catch (Exception ex)
             {

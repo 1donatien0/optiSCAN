@@ -147,9 +147,11 @@ namespace optiSCAN.Services
             {
                 if (!File.Exists(_freshclamExe))
                 {
-                    result.Success = true;
+                    // Moteur de mise à jour absent : ce n'est pas « à jour », les signatures
+                    // vieillissent. L'échec est signalé comme tel.
+                    result.Success = false;
                     result.Message = LocalizationService.GetString("Freshclam_ExeNotFound");
-                    result.AlreadyUpToDate = true;
+                    result.AlreadyUpToDate = false;
                     SurSortieFreshclam(LocalizationService.GetString("Freshclam_ExeNotFoundLog"));
                     return result;
                 }
@@ -625,9 +627,7 @@ namespace optiSCAN.Services
             try
             {
                 var p = Path.Combine(_effectiveCvdCertsDir, "clamav.crt");
-                return Directory.Exists(_effectiveCvdCertsDir)
-                       && File.Exists(p)
-                       && new FileInfo(p).Length >= 256;
+                return Directory.Exists(_effectiveCvdCertsDir) && IsPinnedRootCert(p);
             }
             catch
             {
@@ -646,14 +646,14 @@ namespace optiSCAN.Services
                 {
                     Directory.CreateDirectory(dir);
                     var dest = Path.Combine(dir, "clamav.crt");
-                    if (File.Exists(dest) && new FileInfo(dest).Length >= 256)
+                    if (IsPinnedRootCert(dest))
                         return true;
-                    if (File.Exists(bundled))
+                    if (IsPinnedRootCert(bundled))
                     {
                         File.Copy(bundled, dest, overwrite: true);
                         SurSortieFreshclam(LocalizationService.Format("Freshclam_LogCvdCert", dest));
                     }
-                    return File.Exists(dest) && new FileInfo(dest).Length >= 256;
+                    return IsPinnedRootCert(dest);
                 }
                 catch (Exception ex)
                 {
@@ -673,7 +673,7 @@ namespace optiSCAN.Services
                 await TryDownloadClamAvRootCertAsync(fallback, ct).ConfigureAwait(false);
 
             var fbCert = Path.Combine(fallback, "clamav.crt");
-            if (File.Exists(fbCert) && new FileInfo(fbCert).Length >= 256)
+            if (IsPinnedRootCert(fbCert))
             {
                 _effectiveCvdCertsDir = fallback;
                 if (!string.Equals(_effectiveCvdCertsDir, _certsDir, StringComparison.OrdinalIgnoreCase))
@@ -684,6 +684,32 @@ namespace optiSCAN.Services
             SurSortieFreshclam(UiLogText.Warn(LocalizationService.GetString("Freshclam_LogCvdCertMissing")));
         }
 
+        /// <summary>
+        /// SHA-256 du certificat racine de signature des CVD (<c>certs/clamav.crt</c>, introduit
+        /// par ClamAV 1.5.0, tag <c>clamav-1.5.0</c>). C'est l'ancre de confiance de la chaîne de
+        /// signature : il est vérifié à chaque usage, qu'il vienne de l'installation ou du réseau.
+        /// </summary>
+        internal const string ClamAvRootCertSha256 = "60200E4B4B1B1B7257BB4550487AEB142034341F3300A8526E77A3134A940E9D";
+
+        internal static bool IsPinnedRootCert(string path)
+        {
+            try
+            {
+                if (!File.Exists(path) || new FileInfo(path).Length > 64 * 1024)
+                    return false;
+                return IsPinnedRootCert(File.ReadAllBytes(path));
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        internal static bool IsPinnedRootCert(byte[] content) =>
+            System.Security.Cryptography.CryptographicOperations.FixedTimeEquals(
+                System.Security.Cryptography.SHA256.HashData(content),
+                Convert.FromHexString(ClamAvRootCertSha256));
+
         private static async Task TryDownloadClamAvRootCertAsync(string destDir, CancellationToken ct)
         {
             try
@@ -692,7 +718,11 @@ namespace optiSCAN.Services
                 using var http = new HttpClient { Timeout = TimeSpan.FromSeconds(25) };
                 http.DefaultRequestHeaders.TryAddWithoutValidation("User-Agent", ProductVersionInfo.HttpUserAgent);
                 var bytes = await http.GetByteArrayAsync(ClamAvRootCertUri, ct).ConfigureAwait(false);
-                if (bytes.Length < 256) return;
+                if (!IsPinnedRootCert(bytes))
+                {
+                    AppLogger.Warn("FreshclamUpdater", "Certificat racine ClamAV téléchargé refusé : empreinte inattendue");
+                    return;
+                }
                 var path = Path.Combine(destDir, "clamav.crt");
                 await File.WriteAllBytesAsync(path, bytes, ct).ConfigureAwait(false);
             }

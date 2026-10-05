@@ -9,9 +9,29 @@ namespace optiSCAN.Services
     internal static class ScanThreatMerger
     {
         /// <summary>
-        /// Fusionne deux résultats moteur. Statistiques : un seul compteur de fichiers/octets
-        /// (<see cref="ScanResult.FilesScanned"/> = max des moteurs, octets = ClamAV).
+        /// Fusionne les résultats des moteurs. Les compteurs de fichiers prennent le maximum
+        /// et les octets viennent de ClamAV. Toute erreur moteur rend le résultat incomplet :
+        /// il ne peut pas être présenté comme propre, même si l'autre moteur n'a rien détecté.
         /// </summary>
+        internal static (ScanStatus Status, string? Message) CombineEngineStatus(params ScanResult[] results)
+        {
+            if (results.Any(r => r.Status == ScanStatus.Cancelled))
+                return (ScanStatus.Cancelled, null);
+
+            var errors = results
+                .Where(r => r.Status == ScanStatus.Error || r.HasCoverageGaps)
+                .Select(r => string.IsNullOrWhiteSpace(r.ErrorMessage) ? "moteur de scan en erreur" : r.ErrorMessage.Trim())
+                .Distinct(StringComparer.Ordinal)
+                .ToList();
+            return errors.Count > 0
+                ? (ScanStatus.Error, "Scan incomplet : " + string.Join("; ", errors))
+                : (ScanStatus.Completed, null);
+        }
+
+        /// <summary>Erreur sans aucun fichier lu ni menace : le moteur n'a rien analysé.</summary>
+        internal static bool IsTotalFailure(ScanResult result) =>
+            result.Status == ScanStatus.Error && result.FilesScanned == 0 && result.Threats.Count == 0;
+
         public static ScanResult Merge(
             ScanType type,
             string target,
@@ -28,10 +48,9 @@ namespace optiSCAN.Services
                 FilesScanned = Math.Max(clamResult.FilesScanned, yaraResult.FilesScanned),
                 FilesSkipped = clamResult.FilesSkipped,
                 TotalBytesScanned = clamResult.TotalBytesScanned,
-                Status = (clamResult.Status == ScanStatus.Cancelled || yaraResult.Status == ScanStatus.Cancelled)
-                    ? ScanStatus.Cancelled
-                    : ScanStatus.Completed
+                HasCoverageGaps = clamResult.HasCoverageGaps || yaraResult.HasCoverageGaps,
             };
+            (merged.Status, merged.ErrorMessage) = CombineEngineStatus(clamResult, yaraResult);
 
             var excl = (exclusions ?? new DefaultExclusionSettingsAccessor()).Current;
             var clamByPath = AggregateThreatsByPath(

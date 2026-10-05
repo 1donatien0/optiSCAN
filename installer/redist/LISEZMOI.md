@@ -1,17 +1,8 @@
-# Runtime .NET embarqué (optionnel)
+# Runtime .NET — mode de publication
 
-Pour un installeur **autonome hors-ligne** (+~56 Mo), placer ici le runtime
-téléchargé depuis https://dotnet.microsoft.com/download/dotnet/8.0 :
+L'installateur courant ne copie ni n'installe de runtime placé dans ce dossier.
 
-```
-installer\redist\windowsdesktop-runtime-win-x64.exe
-```
+- **Publication recommandée** : le profil `FolderProfile` est self-contained et inclut .NET dans le publish ; aucun runtime séparé n'est nécessaire sur le poste cible.
+- **Publication framework-dependent** : le .NET 10 Desktop Runtime doit déjà être installé sur le poste cible. L'installeur ne le télécharge pas et n'installe pas de redist.
 
-(fichier officiel `windowsdesktop-runtime-8.0.x-win-x64.exe`, renommé sans numéro de version)
-
-- **Présent** → embarqué dans le setup, installé localement si .NET 8 manque.
-- **Absent** → le setup télécharge le runtime (lien officiel `aka.ms/dotnet/8.0/...`) seulement s'il manque sur la machine.
-
-Ne pas committer l'exe dans Git (`installer/redist/*.exe` est déjà dans `.gitignore`).
-
-Détails chaîne de release : [docs/GUIDE_DISTRIBUTION.md](../../docs/GUIDE_DISTRIBUTION.md) §3.
+Pour intégrer un redist à une future version de l'installateur, il faudra reconnecter son inclusion et son exécution dans `installer/setup.iss`, puis valider ce parcours sur Windows.
