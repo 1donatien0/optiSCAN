@@ -53,7 +53,7 @@ namespace optiSCAN.Services
                 psi.ArgumentList.Add("/RL");
                 psi.ArgumentList.Add("LIMITED");
                 psi.ArgumentList.Add("/TR");
-                psi.ArgumentList.Add($"{_exePath} --watchdog --quiet");
+                psi.ArgumentList.Add($"\"{_exePath}\" --watchdog --quiet");
 
                 using var proc = Process.Start(psi);
                 proc?.WaitForExit(15_000);
@@ -110,7 +110,7 @@ namespace optiSCAN.Services
                 return;
             }
 
-            const string mutexName = "Global\\optiSCAN_UniqueInstance";
+            const string mutexName = AppInstanceGate.MutexName;
             try
             {
                 using var existing = Mutex.OpenExisting(mutexName);

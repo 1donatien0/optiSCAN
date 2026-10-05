@@ -52,7 +52,7 @@ public sealed class ProtectionPipeServerTests
       using var client = new ProtectionPipeClient(pipeName, TimeSpan.FromSeconds(10));
       var response = await client.ScanPathAsync(file);
 
-      Assert.True(response.Ok);
+      Assert.True(response.Ok, response.Message);
       Assert.True(response.Clean);
     }
     finally
@@ -171,7 +171,7 @@ public sealed class ProtectionPipeServerTests
       await Task.Delay(200);
       using var client = new ProtectionPipeClient(pipeName, TimeSpan.FromSeconds(10));
       var first = await client.ScanPathAsync(file);
-      Assert.True(first.Ok);
+      Assert.True(first.Ok, first.Message);
 
       var second = await client.ScanPathAsync(file);
       Assert.False(second.Ok);
@@ -227,6 +227,121 @@ public sealed class ProtectionPipeServerTests
 
       Assert.False(response.Ok);
       Assert.Contains("Protocole", response.Message ?? "", StringComparison.OrdinalIgnoreCase);
+    }
+    finally
+    {
+      await server.StopAsync();
+      server.Dispose();
+    }
+  }
+
+  [Fact]
+  public async Task SetPolicy_requires_an_elevated_administrator()
+  {
+    var pipeName = "optiSCAN_Test_" + Guid.NewGuid().ToString("N");
+    var policyFile = Path.Combine(Path.GetTempPath(), "optiscan_policy_" + Guid.NewGuid().ToString("N") + ".json");
+    HostPolicyStore.FilePathOverride = policyFile;
+    var server = new ProtectionPipeServer(new ScanOrchestrator(new FakeClam(), new FakeYara()), pipeName);
+    server.Start();
+
+    try
+    {
+      await Task.Delay(200);
+      using var client = new ProtectionPipeClient(pipeName, TimeSpan.FromSeconds(10));
+      var response = await client.SendAsync(new ProtectionPipeRequest
+      {
+        Operation = ProtectionPipeOperations.SetPolicy,
+        RealTimeEnabled = false,
+        ProcessMonitorEnabled = false,
+        AutoQuarantineEnabled = true,
+        SignatureAutoUpdateEnabled = false,
+        RemovableDriveScanEnabled = false,
+      });
+
+      if (NamedPipeClientAccess.CurrentProcessIsElevatedAdministrator())
+        Assert.NotEqual("Non autorisé", response.Message);
+      else
+      {
+        Assert.False(response.Ok);
+        Assert.Equal("Non autorisé", response.Message);
+        Assert.False(File.Exists(policyFile));
+      }
+    }
+    finally
+    {
+      HostPolicyStore.FilePathOverride = null;
+      await server.StopAsync();
+      server.Dispose();
+      try { File.Delete(policyFile); } catch { /* déjà absent */ }
+    }
+  }
+
+  [Fact]
+  public async Task Service_quarantine_summary_is_open_but_listing_requires_elevation()
+  {
+    var pipeName = "optiSCAN_Test_" + Guid.NewGuid().ToString("N");
+    var root = Path.Combine(Path.GetTempPath(), "optiscan_ipc_q_" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(root);
+    var sample = Path.Combine(root, "detected.bin");
+    await File.WriteAllBytesAsync(sample, new byte[] { 1, 2, 3 });
+    var quarantine = new QuarantineManager(Path.Combine(root, "q"));
+    Assert.True(quarantine.Quarantine(new ThreatInfo { FilePath = sample, VirusName = "Ipc.Test", FileSize = 3 }));
+
+    var server = new ProtectionPipeServer(
+      new ScanOrchestrator(new FakeClam(), new FakeYara()), pipeName, serviceQuarantine: quarantine);
+    server.Start();
+
+    try
+    {
+      await Task.Delay(200);
+      using var client = new ProtectionPipeClient(pipeName, TimeSpan.FromSeconds(10));
+
+      var summary = await client.GetServiceQuarantineSummaryAsync();
+      Assert.True(summary.Ok, summary.Message);
+      Assert.Equal(1, summary.Count);
+      Assert.Null(summary.Entries);
+
+      var list = await client.ListServiceQuarantineAsync();
+      if (!NamedPipeClientAccess.CurrentProcessIsElevatedAdministrator())
+      {
+        Assert.False(list.Ok);
+        Assert.Equal("Non autorisé", list.Message);
+        Assert.False((await client.PurgeServiceQuarantineAsync()).Ok);
+        Assert.Single(quarantine.GetEntries());
+        return;
+      }
+
+      var item = Assert.Single(list.Entries!);
+      Assert.Equal(sample, item.OriginalPath);
+
+      // Restauration : fichier créé sous le jeton du client, contenu écrit par le service.
+      var restored = await client.RestoreServiceQuarantineAsync(item.Id);
+      Assert.True(restored.Ok, restored.Message);
+      Assert.Equal(new byte[] { 1, 2, 3 }, await File.ReadAllBytesAsync(sample));
+      Assert.Empty(quarantine.GetEntries());
+    }
+    finally
+    {
+      await server.StopAsync();
+      server.Dispose();
+      try { Directory.Delete(root, recursive: true); } catch { /* best effort */ }
+    }
+  }
+
+  [Fact]
+  public async Task Service_quarantine_operations_report_unavailable_without_a_store()
+  {
+    var pipeName = "optiSCAN_Test_" + Guid.NewGuid().ToString("N");
+    var server = new ProtectionPipeServer(new ScanOrchestrator(new FakeClam(), new FakeYara()), pipeName);
+    server.Start();
+
+    try
+    {
+      await Task.Delay(200);
+      using var client = new ProtectionPipeClient(pipeName, TimeSpan.FromSeconds(10));
+      var summary = await client.GetServiceQuarantineSummaryAsync();
+      Assert.False(summary.Ok);
+      Assert.Equal("Quarantaine du service indisponible", summary.Message);
     }
     finally
     {

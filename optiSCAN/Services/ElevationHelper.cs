@@ -67,7 +67,11 @@ namespace optiSCAN.Services
                 };
                 foreach (var r in roots)
                 {
-                    if (!string.IsNullOrEmpty(r) && full.StartsWith(r, StringComparison.OrdinalIgnoreCase))
+                    if (string.IsNullOrEmpty(r)) continue;
+                    // Frontière de dossier : « C:\WindowsApps » n'est pas sous « C:\Windows ».
+                    var root = r.TrimEnd(System.IO.Path.DirectorySeparatorChar);
+                    if (full.Equals(root, StringComparison.OrdinalIgnoreCase)
+                        || full.StartsWith(root + System.IO.Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
                         return true;
                 }
                 return false;

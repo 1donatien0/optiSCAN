@@ -101,7 +101,7 @@ public sealed class RealTimeProtectionTests
         "ScanFileAsync",
         System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic);
     Assert.NotNull(method);
-    await (Task)method!.Invoke(rtp, [filePath, changeType])!;
+    await (Task)method!.Invoke(rtp, [Path.GetDirectoryName(filePath), filePath, changeType])!;
   }
 
   private sealed class ThreatClamBackend : IClamAvOrchestratorBackend

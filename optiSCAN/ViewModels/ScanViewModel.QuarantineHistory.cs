@@ -91,6 +91,9 @@ namespace optiSCAN.ViewModels
                     QuarantineEntries.Add(e);
                 NotifyQuarantinePaging();
             });
+
+            if (reset)
+                RefreshServiceQuarantineSummary();
         }
 
         private void LoadMoreQuarantinePage() => LoadQuarantine(reset: false);

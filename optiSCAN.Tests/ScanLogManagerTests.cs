@@ -212,8 +212,8 @@ public sealed class ScanLogManagerTests : IDisposable
         Assert.Equal(@"C:\Users\Bob\Documents", history[0].TargetPath);
         Assert.Equal(@"C:\Users\Bob\Documents\bad.doc", history[0].Threats[0].FilePath);
 
-        Assert.False(File.Exists(jsonPath), "scan_history.json devrait etre renomme en .legacy");
-        Assert.True(File.Exists(jsonPath + ".legacy"), "scan_history.json.legacy devrait exister");
+        Assert.False(File.Exists(jsonPath), "scan_history.json en clair doit etre supprime apres migration");
+        Assert.False(File.Exists(jsonPath + ".legacy"), "aucune copie en clair ne doit subsister");
         Assert.True(File.Exists(Path.Combine(_logDir, "scan_history.dat")));
     }
 }

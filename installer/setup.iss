@@ -1,14 +1,14 @@
 ; =============================================================================
 ; optiSCAN — Installateur Windows (Inno Setup)
 ; =============================================================================
-; AppRelease = nom vM.m (v3.0) · AppVersion = semver / Directory.Build.props
+; AppRelease = nom vM.m (v3.1) · AppVersion = semver / Directory.Build.props
 
 #define AppName        "optiSCAN"
 #ifndef AppVersion
-#define AppVersion     "3.0.0"
+#define AppVersion     "3.1.0"
 #endif
 #ifndef AppRelease
-#define AppRelease     "v3.0"
+#define AppRelease     "v3.1"
 #endif
 #define AppPublisher   "Dona By"
 #define AppURL         "https://sourceforge.net/projects/optiscan/"
@@ -24,10 +24,10 @@
 ; Le .csproj supprime win-x64 / win-x86 / publish avant chaque publish (cible CleanStalePublishOutput).
 ; CI : /DAppPublishSource=..\publish\win-x64\*
 #ifndef AppPublishSource
-#if FileExists(AddBackslash(SourcePath) + "..\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\optiSCAN.exe")
-  #define AppPublishSource "..\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\*"
-#elif FileExists(AddBackslash(SourcePath) + "..\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\optiSCAN.exe")
-  #define AppPublishSource "..\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\*"
+#if FileExists(AddBackslash(SourcePath) + "..\optiSCAN\bin\Release\net10.0-windows10.0.17763.0\publish\win-x64\optiSCAN.exe")
+  #define AppPublishSource "..\optiSCAN\bin\Release\net10.0-windows10.0.17763.0\publish\win-x64\*"
+#elif FileExists(AddBackslash(SourcePath) + "..\optiSCAN\bin\Release\net10.0-windows10.0.17763.0\publish\optiSCAN.exe")
+  #define AppPublishSource "..\optiSCAN\bin\Release\net10.0-windows10.0.17763.0\publish\*"
 #else
   #expr Error("optiSCAN.exe introuvable. Ouvrez optiSCAN.csproj puis menu Build > Publish (Release), ou en ligne de commande : dotnet publish -c Release -r win-x64")
 #endif
@@ -68,7 +68,11 @@ ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 ; Même AppId que les versions 1 et 2 : installation par-dessus, même dossier.
 UsePreviousAppDir=yes
-DisableDirPage=auto
+; Le service SYSTEM et l'hôte de protection s'exécutent depuis {app} : ce dossier doit être
+; réservé aux administrateurs. Seul Program Files le garantit (un dossier créé à la racine d'un
+; volume hérite d'un droit de modification pour les utilisateurs authentifiés). Le choix du
+; dossier est donc fermé, et PrepareToInstall refuse aussi un /DIR= ou un ancien dossier.
+DisableDirPage=yes
 DisableProgramGroupPage=auto
 ; Pas d'AppMutex ici : il bloquerait l'assistant tant qu'une version
 ; déjà lancée tient Global\optiSCAN_UniqueInstance. StopRunningOptiScan la ferme.
@@ -85,12 +89,16 @@ VersionInfoCopyright=Copyright 2026 Dona By
 ; ── SIGNATURE DE CODE (Authenticode / EV) ───────────────────────────────────
 ; Sans signature : SmartScreen affiche « éditeur inconnu » et de nombreux
 ; antivirus bloquent l'installeur. Pour signer l'installeur (et le désinstalleur) :
-;   1. Tools > Configure Sign Tools… dans l'IDE Inno, créer un outil nommé "signtool" :
-;      signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /a $f
-;   2. Décommenter les deux lignes ci-dessous.
-; (Laisser commenté tant qu'aucun certificat n'est configuré, sinon ISCC échoue.)
-;SignTool=signtool $f
-;SignedUninstaller=yes
+;   - CI : secrets CODESIGN_PFX (base64) et CODESIGN_PASSWORD ; le job publish
+;     appelle build-release-setup.ps1 -SignPfxPath, qui passe /DSignInstaller et
+;     /Ssigntool=… à ISCC.
+;   - Local : .\installer\build-release-setup.ps1 -SignPfxPath cert.pfx
+;     (mot de passe dans $env:CODESIGN_PASSWORD).
+; Sans certificat, SignInstaller n'est pas défini et la compilation reste possible.
+#ifdef SignInstaller
+SignTool=signtool
+SignedUninstaller=yes
+#endif
 
 ; Langue de l'installateur = langue de l'application (UiCulture en Registre).
 ShowLanguageDialog=auto
@@ -105,7 +113,7 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon";   Description: "Créer une icône sur le Bureau";                              GroupDescription: "Icônes supplémentaires"
 Name: "startupicon";   Description: "Lancer optiSCAN au démarrage de Windows";                   GroupDescription: "Options avancées"; Flags: unchecked
 Name: "autoUpdateSig"; Description: "Activer les mises à jour auto des signatures (recommandé)"; GroupDescription: "Moteurs ClamAV + YARA"; Flags: checkedonce
-Name: "platformservice"; Description: "Installer le service Windows de protection système (RTP/AMSI/IPC — avancé)"; GroupDescription: "Protection avancée (optionnel)"; Flags: unchecked
+Name: "platformservice"; Description: "Installer le service Windows de protection système (temps réel et IPC — avancé)"; GroupDescription: "Protection avancée (optionnel)"; Flags: unchecked
 
 [Files]
 ; ── Application principale ───────────────────────────────────────────────────
@@ -132,34 +140,21 @@ Source: "..\optiSCAN\clamav\certs\clamav.crt"; DestDir: "{app}\clamav\x64\certs"
 #ifdef EmbedClamAvDatabase
 Source: "..\optiSCAN\clamav\database\*"; DestDir: "{app}\clamav\database"; Excludes: "*.log"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
 #endif
-; ── YARA : binaire toujours embarqué ; règles .yar optionnelles ───────────────
-; Par défaut : règles NON embarquées — YARA-Forge / MAJ signatures au 1er lancement.
-; Offline : /DEmbedYaraRules ou /DEmbedOfflineSignatures
-#ifdef EmbedYaraRules
+; ── YARA : binaire et règles locales. YARA-Forge les complète dans le dossier inscriptible.
 Source: "..\optiSCAN\rules\*"; DestDir: "{app}\rules"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
-#endif
 Source: "..\optiSCAN\yara\*"; DestDir: "{app}\yara"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
 ; ── Service Windows (pour tâche platformservice opt-in) ───────────────────────
 ; Chemin dédié : AppPublishSource finit par \* et ne peut pas servir de préfixe fichier.
-Source: "..\optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\optiSCAN.Service.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
-Source: "..\optiSCAN.Service\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\optiSCAN.Service.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\optiSCAN\bin\Release\net10.0-windows10.0.17763.0\publish\win-x64\optiSCAN.Service.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+Source: "..\optiSCAN.Service\bin\Release\net10.0-windows10.0.17763.0\publish\win-x64\optiSCAN.Service.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
 ; Script exclusions Defender : copié pour usage manuel / depuis l'app — PAS exécuté
 ; automatiquement à l'install (évite le marqueur heuristique « tamper » post-v2).
 Source: "..\scripts\add-defender-exclusions.ps1"; DestDir: "{app}\scripts"; Flags: ignoreversion
-; AMSI / minifiltre — comme v2 : livrés s'ils existent sur la machine de build
-; (skipifsourcedoesntexist). Sans signature Authenticode/EV ils restent inopérants
-; sous Windows x64, mais disponibles pour tests / builds signés ultérieurs.
-Source: "..\native\optiSCAN.AmsiProvider\x64\Release\optiSCAN.AmsiProvider.dll"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
-Source: "..\native\optiSCAN.Minifilter\x64\optiSCAN.Minifilter.sys"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
-; ── Runtime .NET 8 Desktop embarqué (OPTIONNEL, ~56 Mo) ──────────────────────
-; Placer windowsdesktop-runtime-8.0.x-win-x64.exe renommé en
-; installer\redist\windowsdesktop-runtime-win-x64.exe pour un installeur
-; autonome (hors-ligne). Absent → l'installeur télécharge le runtime si besoin.
-#define DotNetRedist "redist\windowsdesktop-runtime-win-x64.exe"
-#if FileExists(AddBackslash(SourcePath) + DotNetRedist)
-  #define HasDotNetRedist
-Source: "{#DotNetRedist}"; DestDir: "{tmp}"; DestName: "windowsdesktop-runtime-8.0.exe"; Flags: dontcopy
-#endif
+; AMSI / minifiltre : non livrés. Les prototypes sous native/ ne sont pas compilés,
+; copiés, enregistrés ou chargés par l'installeur.
+[Dirs]
+; Propriétaire administrateur : un utilisateur ne peut pas préparer une jonction avant le service.
+Name: "{commonappdata}\optiSCAN"; Permissions: admins-full system-full
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
@@ -167,11 +162,7 @@ Name: "{group}\Désinstaller {#AppName}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 Name: "{userstartup}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: startupicon
 
-[Registry]
-; Menu contextuel Explorateur : enregistré en [Code] selon la langue de l'installateur (HKCU\Software\Classes).
-Root: HKCU; Subkey: "Software\optiSCAN"; ValueName: "AutoUpdateSignatures"; ValueType: dword; ValueData: "1"; Tasks: autoUpdateSig
-Root: HKCU; Subkey: "Software\optiSCAN"; ValueName: "Version"; ValueType: string; ValueData: "{#AppVersion}"; Flags: uninsdeletekey
-; UiCulture est réécrit à chaque install / mise à jour (fr-FR ou en-US selon la langue Inno).
+; HKCU est écrit dans CurStepChanged via ExecAsOriginalUser, pas dans le profil de l'administrateur élevé.
 
 [Run]
 Filename: "{app}\{#AppExeName}"; Description: "Lancer {#AppName} maintenant"; Flags: nowait postinstall skipifsilent runascurrentuser
@@ -197,11 +188,8 @@ Type: files; Name: "{app}\clamav\x86\freshclam.conf.broken.bak"
 Type: files; Name: "{app}\clamav\x64\clamd.conf"
 Type: files; Name: "{app}\clamav\x86\clamd.conf"
 
-; --- freshclam.conf utilisateur potentiellement cassé (ancienne version) ---
-; On ne touche PAS à la base de signatures (250 Mo) ni à la quarantaine.
-Type: files; Name: "{localappdata}\optiSCAN\clamav\freshclam.conf"
-Type: files; Name: "{localappdata}\optiSCAN\clamav\freshclam.conf.v1.bak"
-Type: files; Name: "{localappdata}\optiSCAN\clamav\freshclam.conf.broken.bak"
+; freshclam.conf utilisateur : nettoyé après copie, dans le profil d'origine
+; (pas celui de l'administrateur qui a élevé l'installation).
 
 ; --- Verrous orphelins éventuels d'un freshclam précédent crashé ---
 Type: files; Name: "{app}\clamav\database\freshclam.pid"
@@ -258,15 +246,62 @@ begin
   if not FileExists(ExpandConstant('{app}\optiSCAN.Service.exe')) then
   begin
     if ActiveLanguage = 'english' then
-      MsgBox('The system protection service (optiSCAN.Service.exe) was not included in this build. Real-time protection (RTP/AMSI/IPC) will be unavailable.', mbInformation, MB_OK)
+      MsgBox('The system protection service (optiSCAN.Service.exe) was not included in this build. Real-time protection will be unavailable.', mbInformation, MB_OK)
     else
-      MsgBox('Le service de protection système (optiSCAN.Service.exe) n''est pas inclus dans cette version. La protection temps réel (RTP/AMSI/IPC) sera indisponible.', mbInformation, MB_OK);
+      MsgBox('Le service de protection système (optiSCAN.Service.exe) n''est pas inclus dans cette version. La protection temps réel sera indisponible.', mbInformation, MB_OK);
     Exit;
   end;
 
-  Exec('sc.exe', 'create {#ProtectionServiceName} binPath= "\"' + ExpandConstant('{app}\optiSCAN.Service.exe') + '\"" start= auto DisplayName= "{#ProtectionServiceDisplayName}"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  Exec('sc.exe', 'description {#ProtectionServiceName} "{#ProtectionServiceDescription}"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  Exec('sc.exe', 'start {#ProtectionServiceName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  if not Exec('sc.exe', 'create {#ProtectionServiceName} binPath= "\"' + ExpandConstant('{app}\optiSCAN.Service.exe') + '\"" start= auto DisplayName= "{#ProtectionServiceDisplayName}"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
+     or (ResultCode <> 0) then
+  begin
+    Log(Format('sc create a échoué (code %d)', [ResultCode]));
+    if ActiveLanguage = 'english' then
+      SuppressibleMsgBox(Format('The protection service could not be registered (sc.exe code %d). Real-time protection will be unavailable.', [ResultCode]), mbError, MB_OK, IDOK)
+    else
+      SuppressibleMsgBox(Format('Le service de protection n''a pas pu être enregistré (code sc.exe %d). La protection temps réel sera indisponible.', [ResultCode]), mbError, MB_OK, IDOK);
+    Exit;
+  end;
+
+  if not Exec('sc.exe', 'description {#ProtectionServiceName} "{#ProtectionServiceDescription}"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
+     or (ResultCode <> 0) then
+    Log(Format('sc description a échoué (code %d)', [ResultCode]));
+
+  // 1056 : service déjà démarré.
+  if not Exec('sc.exe', 'start {#ProtectionServiceName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
+     or ((ResultCode <> 0) and (ResultCode <> 1056)) then
+  begin
+    Log(Format('sc start a échoué (code %d)', [ResultCode]));
+    if ActiveLanguage = 'english' then
+      SuppressibleMsgBox(Format('The protection service is registered but did not start (sc.exe code %d). See the Application event log.', [ResultCode]), mbInformation, MB_OK, IDOK)
+    else
+      SuppressibleMsgBox(Format('Le service de protection est enregistré mais n''a pas démarré (code sc.exe %d). Voir le journal Application.', [ResultCode]), mbInformation, MB_OK, IDOK);
+  end;
+end;
+
+// Le service et l'hôte SYSTEM s'exécutent depuis {app} : refuser tout dossier hors de
+// Program Files (paramètre /DIR=, ou dossier d'une installation antérieure).
+function InstallDirIsUnderProgramFiles(): Boolean;
+var
+  Dir, ProgramFiles: string;
+begin
+  Dir := Lowercase(AddBackslash(WizardDirValue()));
+  ProgramFiles := Lowercase(AddBackslash(ExpandConstant('{autopf}')));
+  Result := (Pos(ProgramFiles, Dir) = 1) and (Length(Dir) > Length(ProgramFiles));
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+begin
+  Result := '';
+  if not InstallDirIsUnderProgramFiles() then
+  begin
+    if ActiveLanguage = 'english' then
+      Result := 'optiSCAN must be installed under ' + ExpandConstant('{autopf}') + ': its system service runs from the installation folder, '
+        + 'which must be writable by administrators only. Uninstall the copy located in ' + WizardDirValue() + ', then run this installer again.'
+    else
+      Result := 'optiSCAN doit être installé sous ' + ExpandConstant('{autopf}') + ' : son service système s''exécute depuis le dossier d''installation, '
+        + 'qui doit être modifiable par les seuls administrateurs. Désinstallez la copie située dans ' + WizardDirValue() + ', puis relancez cet installateur.';
+  end;
 end;
 
 procedure StopRunningOptiScan();
@@ -289,142 +324,6 @@ function InitializeSetup(): Boolean;
 begin
   StopRunningOptiScan();
   Result := True;
-end;
-
-function IsDotNet8Installed(): Boolean;
-var
-  Arch: string;
-begin
-  Result := False;
-
-  if IsWin64 then
-    Arch := 'x64'
-  else
-    Arch := 'x86';
-
-  if RegKeyExists(HKLM, 'SOFTWARE\dotnet\Setup\InstalledVersions\' + Arch + '\sharedfx\Microsoft.WindowsDesktop.App') then
-  begin
-    Result := True;
-    Exit;
-  end;
-
-  if RegKeyExists(HKLM, 'SOFTWARE\dotnet\Setup\InstalledVersions\' + Arch + '\sharedhost') then
-  begin
-    Result := True;
-    Exit;
-  end;
-
-  if IsWin64 then
-    Result := DirExists(ExpandConstant('{pf64}\dotnet\shared\Microsoft.WindowsDesktop.App'))
-  else
-    Result := DirExists(ExpandConstant('{pf}\dotnet\shared\Microsoft.WindowsDesktop.App'));
-end;
-
-// ── .NET 8 Desktop Runtime : auto-installation (plus de blocage) ─────────────
-// Si le runtime manque, il est téléchargé (lien « latest » officiel Microsoft)
-// puis installé silencieusement avant la copie des fichiers. L'ancien
-// comportement (blocage + redirection navigateur) ne reste qu'en secours
-// si le téléchargement échoue (machine hors-ligne).
-var
-  DotNetDownloadPage: TDownloadWizardPage;
-
-function DotNetRuntimeUrl(): string;
-begin
-  if IsWin64 then
-    Result := 'https://aka.ms/dotnet/8.0/windowsdesktop-runtime-win-x64.exe'
-  else
-    Result := 'https://aka.ms/dotnet/8.0/windowsdesktop-runtime-win-x86.exe';
-end;
-
-function OnDotNetDownloadProgress(const Url, FileName: string; const Progress, ProgressMax: Int64): Boolean;
-begin
-  Result := True; // ne pas annuler
-end;
-
-procedure InitializeWizard();
-begin
-  if ActiveLanguage = 'english' then
-    DotNetDownloadPage := CreateDownloadPage(
-      'Installing .NET 8 Desktop Runtime',
-      'optiSCAN requires the .NET 8 Desktop Runtime. It is being downloaded and installed automatically — no action needed.',
-      @OnDotNetDownloadProgress)
-  else
-    DotNetDownloadPage := CreateDownloadPage(
-      'Installation de .NET 8 Desktop Runtime',
-      'optiSCAN nécessite .NET 8 Desktop Runtime. Téléchargement et installation automatiques en cours — aucune action requise.',
-      @OnDotNetDownloadProgress);
-end;
-
-function RunDotNetRuntimeInstaller(): Boolean;
-var
-  ResultCode: Integer;
-begin
-  Result := False;
-  if not Exec(ExpandConstant('{tmp}\windowsdesktop-runtime-8.0.exe'),
-              '/install /quiet /norestart', '', SW_SHOW,
-              ewWaitUntilTerminated, ResultCode) then
-    Exit;
-  // 0 = OK · 3010 = OK, redémarrage requis · 1638 = version déjà présente
-  Result := (ResultCode = 0) or (ResultCode = 3010) or (ResultCode = 1638);
-end;
-
-procedure OfferDotNetDownloadPage();
-var
-  ResultCode: Integer;
-begin
-  if ActiveLanguage = 'english' then
-  begin
-    if MsgBox(
-      'The .NET 8 Desktop Runtime could not be installed automatically' + #13#10 +
-      '(no Internet connection or download error).' + #13#10 + #13#10 +
-      'Would you like to open the download page to install it manually?',
-      mbConfirmation, MB_YESNO) = IDYES then
-      ShellExec('open', 'https://dotnet.microsoft.com/en-us/download/dotnet/8.0', '', '', SW_SHOW, ewNoWait, ResultCode);
-  end
-  else
-  if MsgBox(
-    'Le runtime .NET 8 Desktop n''a pas pu être installé automatiquement' + #13#10 +
-    '(pas de connexion Internet ou erreur de téléchargement).' + #13#10 + #13#10 +
-    'Voulez-vous ouvrir la page de téléchargement pour l''installer manuellement ?',
-    mbConfirmation, MB_YESNO) = IDYES then
-    ShellExec('open', 'https://dotnet.microsoft.com/en-us/download/dotnet/8.0', '', '', SW_SHOW, ewNoWait, ResultCode);
-end;
-
-function NextButtonClick(CurPageID: Integer): Boolean;
-begin
-  Result := True;
-  if (CurPageID = wpReady) and (not IsDotNet8Installed()) then
-  begin
-#ifdef HasDotNetRedist
-    // Runtime embarqué dans l'installeur : extraction + installation locale,
-    // aucun téléchargement (fonctionne hors-ligne).
-    ExtractTemporaryFile('windowsdesktop-runtime-8.0.exe');
-    if not RunDotNetRuntimeInstaller() then
-    begin
-      OfferDotNetDownloadPage();
-      Result := False; // rester sur la page « Prêt à installer »
-    end;
-#else
-    DotNetDownloadPage.Clear;
-    DotNetDownloadPage.Add(DotNetRuntimeUrl(), 'windowsdesktop-runtime-8.0.exe', '');
-    DotNetDownloadPage.Show;
-    try
-      try
-        DotNetDownloadPage.Download;
-        if not RunDotNetRuntimeInstaller() then
-        begin
-          OfferDotNetDownloadPage();
-          Result := False; // rester sur la page « Prêt à installer »
-        end;
-      except
-        OfferDotNetDownloadPage();
-        Result := False;
-      end;
-    finally
-      DotNetDownloadPage.Hide;
-    end;
-#endif
-  end;
 end;
 
 procedure RemoveExplorerShellMenu(const Root: Integer; const ParentKey, MenuKey: string);
@@ -467,6 +366,7 @@ begin
   UnregisterExplorerContextMenus();
   RegDeleteKeyIncludingSubkeys(HKCU, 'Software\optiSCAN');
 
+  Exec(ExpandConstant('{app}\{#AppExeName}'), '--remove-defender-exclusions --quiet', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Exec('schtasks.exe', '/Delete /TN "optiSCAN_DailyScan" /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Exec('schtasks.exe', '/Delete /TN "optiSCAN_Watchdog" /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 
@@ -476,13 +376,25 @@ begin
   if RegKeyExists(HKLM, 'SOFTWARE\Microsoft\AMSI\Providers\{A8F4E2B1-9C3D-4E5F-8A7B-1C2D3E4F5A6B}') then
     RegDeleteKeyIncludingSubkeys(HKLM, 'SOFTWARE\Microsoft\AMSI\Providers\{A8F4E2B1-9C3D-4E5F-8A7B-1C2D3E4F5A6B}');
 
+  // Marqueurs machine (nettoyage des exclusions 3.0.0, essais historique Defender).
+  if RegKeyExists(HKLM, 'SOFTWARE\optiSCAN') then
+    RegDeleteKeyIncludingSubkeys(HKLM, 'SOFTWARE\optiSCAN');
+
+  // Données machine, dont la quarantaine du service (ProgramData\optiSCAN\Quarantine) :
+  // sa clé est protégée au nom de SYSTEM, elle n'est plus lisible une fois le service retiré.
   if DirExists(ExpandConstant('{commonappdata}\optiSCAN')) then
     DelTree(ExpandConstant('{commonappdata}\optiSCAN'), True, True, True);
+
+  // Données du service dans le profil SYSTEM : journaux, réglages, et quarantaine des
+  // versions 3.0.x si aucun démarrage du service ne l'a déplacée vers ProgramData.
+  if DirExists(ExpandConstant('{sys}\config\systemprofile\AppData\Local\optiSCAN')) then
+    DelTree(ExpandConstant('{sys}\config\systemprofile\AppData\Local\optiSCAN'), True, True, True);
 end;
 
 function InitializeUninstall(): Boolean;
 begin
-  UnregisterOptiScanSystemArtifacts();
+  { Ne rien démonter ici : Annuler doit laisser le produit intact.
+    Le retrait a lieu dans CurUninstallStepChanged(usUninstall). }
   Result := True;
 end;
 
@@ -542,17 +454,30 @@ end;
 // (avec un freshclam.conf cassé en LocalAppData), on propose de wiper le
 // dossier de conf pour repartir sur des bases saines. La quarantaine et
 // l'historique sont conservés.
+procedure WriteOriginalUserReg(const Args: string);
+var
+  ResultCode: Integer;
+begin
+  ExecAsOriginalUser('reg.exe', Args, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+end;
+
 procedure WriteInstallerUiCulture();
+var
+  Culture: string;
 begin
   if ActiveLanguage = 'english' then
-    RegWriteStringValue(HKCU, 'Software\optiSCAN', 'UiCulture', 'en-US')
+    Culture := 'en-US'
   else
-    RegWriteStringValue(HKCU, 'Software\optiSCAN', 'UiCulture', 'fr-FR');
+    Culture := 'fr-FR';
+  WriteOriginalUserReg('add "HKCU\Software\optiSCAN" /v UiCulture /t REG_SZ /d "' + Culture + '" /f');
+  WriteOriginalUserReg('add "HKCU\Software\optiSCAN" /v Version /t REG_SZ /d "{#AppVersion}" /f');
+  if WizardIsTaskSelected('autoUpdateSig') then
+    WriteOriginalUserReg('add "HKCU\Software\optiSCAN" /v AutoUpdateSignatures /t REG_DWORD /d 1 /f');
 end;
 
 procedure RegisterExplorerContextMenu();
 var
-  MenuKey, MenuLabel, ExePath, Cmd: string;
+  MenuKey, MenuLabel, ExePath: string;
 begin
   if ActiveLanguage = 'english' then
     MenuLabel := 'Scan with optiSCAN'
@@ -561,67 +486,52 @@ begin
 
   MenuKey := 'optiSCAN.Scan';
   ExePath := ExpandConstant('{app}\{#AppExeName}');
-  Cmd := '"' + ExePath + '" --scan "%1"';
 
   UnregisterExplorerContextMenus();
 
-  RegWriteStringValue(HKCU, 'Software\Classes\*\shell\' + MenuKey, '', MenuLabel);
-  RegWriteStringValue(HKCU, 'Software\Classes\*\shell\' + MenuKey, 'Icon', ExePath + ',0');
-  RegWriteStringValue(HKCU, 'Software\Classes\*\shell\' + MenuKey + '\command', '', Cmd);
+  WriteOriginalUserReg('add "HKCU\Software\Classes\*\shell\' + MenuKey + '" /ve /d "' + MenuLabel + '" /f');
+  WriteOriginalUserReg('add "HKCU\Software\Classes\*\shell\' + MenuKey + '" /v Icon /d "' + ExePath + ',0" /f');
+  WriteOriginalUserReg('add "HKCU\Software\Classes\*\shell\' + MenuKey + '\command" /ve /d "\"' + ExePath + '\" --scan \"%1\"" /f');
 
-  RegWriteStringValue(HKCU, 'Software\Classes\Directory\shell\' + MenuKey, '', MenuLabel);
-  RegWriteStringValue(HKCU, 'Software\Classes\Directory\shell\' + MenuKey, 'Icon', ExePath + ',0');
-  RegWriteStringValue(HKCU, 'Software\Classes\Directory\shell\' + MenuKey + '\command', '', Cmd);
+  WriteOriginalUserReg('add "HKCU\Software\Classes\Directory\shell\' + MenuKey + '" /ve /d "' + MenuLabel + '" /f');
+  WriteOriginalUserReg('add "HKCU\Software\Classes\Directory\shell\' + MenuKey + '" /v Icon /d "' + ExePath + ',0" /f');
+  WriteOriginalUserReg('add "HKCU\Software\Classes\Directory\shell\' + MenuKey + '\command" /ve /d "\"' + ExePath + '\" --scan \"%1\"" /f');
 end;
 
 // Exclusions Defender : volontairement NON appelées ici (profil allégé v2).
 // Le script reste dans {app}\scripts pour un opt-in depuis l'application.
 
-procedure CurStepChanged(CurStep: TSetupStep);
+procedure ResetOriginalUserFreshclamConf();
 var
-  ConfPath: string;
-  Content: AnsiString;
-  ShouldReset: Boolean;
+  ResultCode: Integer;
+begin
+  ExecAsOriginalUser('powershell.exe',
+    '-NoProfile -NonInteractive -Command "& { $p = Join-Path $env:LOCALAPPDATA ''optiSCAN\clamav\freshclam.conf''; if (Test-Path -LiteralPath $p) { $b = [IO.File]::ReadAllBytes($p); $t = [Text.Encoding]::UTF8.GetString($b); $bom = ($b.Length -ge 3 -and $b[0] -eq 239 -and $b[1] -eq 187 -and $b[2] -eq 191); if ($bom -or $t.Contains(''CVDCertsDirectory'')) { Remove-Item -LiteralPath $p -Force } } }"',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+end;
+
+procedure CleanupLegacyDefenderExclusions();
+var
+  ResultCode: Integer;
+begin
+  Exec(ExpandConstant('{app}\{#AppExeName}'), '--cleanup-legacy-defender-exclusions --quiet', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
 begin
   if CurStep = ssPostInstall then
   begin
     WriteInstallerUiCulture();
     RegisterExplorerContextMenu();
+    ResetOriginalUserFreshclamConf();
+    // Mise à jour depuis 3.0.0 : retirer les exclusions Defender par simple nom
+    // et sur AppData\Local\optiSCAN, que l'ancienne version posait.
+    CleanupLegacyDefenderExclusions();
     // Installation neuve : la case « protection avancée » reste décochée.
     if WizardIsTaskSelected('platformservice') then
       InstallCurrentProtectionService();
   end;
 
   if CurStep = ssInstall then
-  begin
-    // Au cas où l'utilisateur a relancé optiSCAN pendant l'assistant.
     StopRunningOptiScan();
-
-    ConfPath := ExpandConstant('{localappdata}\optiSCAN\clamav\freshclam.conf');
-    if FileExists(ConfPath) then
-    begin
-      ShouldReset := False;
-
-      // Détection automatique d'un conf cassé : contient CVDCertsDirectory
-      // (directive qui faisait crasher freshclam dans les anciennes versions).
-      if LoadStringFromFile(ConfPath, Content) then
-      begin
-        if Pos('CVDCertsDirectory', Content) > 0 then
-          ShouldReset := True;
-        // Détection BOM UTF-8 : si les 3 premiers octets sont EF BB BF,
-        // c'est aussi un conf cassé qui fera échouer freshclam.
-        if (Length(Content) >= 3) and (Ord(Content[1]) = $EF)
-           and (Ord(Content[2]) = $BB) and (Ord(Content[3]) = $BF) then
-          ShouldReset := True;
-      end;
-
-      if ShouldReset then
-      begin
-        DeleteFile(ConfPath);
-        // Best effort : pas de message à l'utilisateur, c'est silencieux.
-        // Le code optiSCAN regénérera un conf propre au premier clic
-        // "Mettre à jour".
-      end;
-    end;
-  end;
 end;

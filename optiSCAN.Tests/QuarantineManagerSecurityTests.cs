@@ -157,6 +157,46 @@ public sealed class QuarantineManagerSecurityTests
     }
 
     [Fact]
+    public void LoadManifest_rejects_unsigned_v1_and_never_resigns_it()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "optiscan_ut_unsigned_v1_" + Guid.NewGuid().ToString("N"));
+        var qDir = Path.Combine(root, "q");
+        Directory.CreateDirectory(qDir);
+
+        try
+        {
+            var doc = new QuarantineDocument
+            {
+                Version = 1,
+                Hmac = string.Empty,
+                Entries =
+                [
+                    new QuarantineEntry
+                    {
+                        Id = "0123456789abcdef0123456789abcdef",
+                        OriginalPath = @"C:\Users\test\Documents\victim.docx",
+                        QuarantinePath = Path.Combine(qDir, "planted.quar"),
+                        VirusName = "Fake",
+                        QuarantinedAt = DateTime.UtcNow,
+                    }
+                ]
+            };
+            var manifest = Path.Combine(qDir, "manifest.json");
+            File.WriteAllText(manifest, JsonSerializer.Serialize(doc));
+
+            var qm = new QuarantineManager(qDir);
+            Assert.Empty(qm.GetEntries());
+
+            // Rechargé : toujours vide, l'entrée injectée n'a pas été signée au passage.
+            Assert.Empty(new QuarantineManager(qDir).GetEntries());
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { /* best effort */ }
+        }
+    }
+
+    [Fact]
     public void IsResolvedPathUnderDirectory_allows_file_inside_folder()
     {
         var root = Path.Combine(Path.GetTempPath(), "optiscan_ut_scope_" + Guid.NewGuid().ToString("N"));

@@ -230,9 +230,7 @@ namespace optiSCAN.Views
                         // Nécessite l'arrêt du service Windows Update → script
                         // administrateur (une invite UAC), taille mesurée avant.
                         long before = MeasureDir(WindowsUpdateCachePath());
-                        bool ok = SystemTweaksService.RunElevatedBatch(
-                            SystemTweaksService.ElevatedWindowsUpdateCacheCommands(),
-                            waitForExit: true);
+                        bool ok = SystemTweaksService.RunElevatedKnown("wu-cache", waitForExit: true);
                         if (ok)
                         {
                             long after = MeasureDir(WindowsUpdateCachePath());

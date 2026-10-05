@@ -4,17 +4,18 @@ using System.Globalization;
 using System.IO;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
-using System.Text;
+using System.Security.Principal;
 
 namespace optiSCAN.Services
 {
     /// <summary>
-    /// Tweaks système du panneau Optimiser (port C# de l'utilitaire OptiWin —
-    /// GUI/OptiWin-GUI.ps1) : performance, confidentialité, interface,
+    /// Tweaks système du panneau Optimiser (port C# de l'ancien utilitaire
+    /// PowerShell OptiWin) : performance, confidentialité, interface,
     /// maintenance. L'application tourne en asInvoker : les actions HKCU sont
-    /// appliquées directement, les actions nécessitant l'admin (HKLM, services,
-    /// DISM, cache Windows Update) sont regroupées dans UN script cmd exécuté
-    /// avec une seule invite UAC (<see cref="RunElevatedBatch"/>).
+    /// appliquées directement ; les actions qui exigent l'admin (HKLM, services,
+    /// DISM, cache Windows Update) sont exécutées par une instance relancée avec
+    /// une seule invite UAC (<c>--apply-tweaks</c>, identifiants en liste blanche),
+    /// qui appelle les outils système directement (<see cref="ElevatedCommand"/>).
     /// </summary>
     [SupportedOSPlatform("windows")]
     public static class SystemTweaksService
@@ -23,9 +24,9 @@ namespace optiSCAN.Services
         private const string HighPerformancePlanGuid = "8c5e7fda-e8bf-4a96-9a85-a6e23a8c635c";
 
         /// <summary>
-        /// Tâche unique (SYSTEM, au démarrage) qui vide l'historique Defender
-        /// puis se supprime. Les fichiers sont verrouillés tant que le service
-        /// tourne : le nettoyage n'a lieu qu'après reboot.
+        /// Nom de la tâche de démarrage (SYSTEM) que les versions antérieures créaient pour
+        /// vider l'historique Defender. Fonction retirée : ce nom ne sert qu'au nettoyage
+        /// (<see cref="RemoveDefenderHistoryTask"/>).
         /// </summary>
         public const string ClearDefenderHistoryTaskName = "optiSCAN-ClearDefenderHistory";
 
@@ -252,74 +253,309 @@ namespace optiSCAN.Services
 
         // ── Actions nécessitant l'élévation (regroupées, une seule invite UAC) ─
 
-        /// <summary>Ligne cmd : télémétrie au minimum + service DiagTrack désactivé.</summary>
-        public static IEnumerable<string> ElevatedTelemetryCommands()
-        {
-            yield return @"reg add ""HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection"" /v AllowTelemetry /t REG_DWORD /d 0 /f";
-            yield return "sc stop DiagTrack";
-            yield return "sc config DiagTrack start= disabled";
-        }
-
-        /// <summary>Lignes cmd : vidage du cache Windows Update.</summary>
-        public static IEnumerable<string> ElevatedWindowsUpdateCacheCommands()
-        {
-            yield return "net stop wuauserv";
-            yield return @"del /f /s /q ""%SystemRoot%\SoftwareDistribution\Download\*.*""";
-            yield return @"for /d %%d in (""%SystemRoot%\SoftwareDistribution\Download\*"") do rd /s /q ""%%d""";
-            yield return "net start wuauserv";
-        }
-
-        /// <summary>Ligne cmd : nettoyage des composants Windows (DISM — lent).</summary>
-        public static IEnumerable<string> ElevatedDismCleanupCommands()
-        {
-            yield return "Dism.exe /Online /Cleanup-Image /StartComponentCleanup";
-        }
-
         /// <summary>
-        /// Script cmd optiSCAN exécuté une fois au démarrage (compte SYSTEM) :
-        /// historique des détections, quarantaine Defender, base d'accès
-        /// contrôlé aux dossiers. Se supprime ensuite avec la tâche planifiée.
-        /// Chemins Windows standard — pas de script tiers embarqué.
+        /// Outil système et arguments d'une étape élevée. Les outils sont appelés directement,
+        /// par leur chemin dans System32 et avec <see cref="ProcessStartInfo.ArgumentList"/> :
+        /// jamais par <c>cmd /c</c>, dont l'analyse des guillemets ne suit pas l'échappement
+        /// <c>\"</c> que produit ArgumentList.
         /// </summary>
-        public static string BuildClearDefenderHistoryHelperBatch()
+        public sealed record ElevatedCommand(string Tool, IReadOnlyList<string> Arguments, IReadOnlyCollection<int> AcceptedExitCodes)
         {
-            return string.Join(Environment.NewLine, new[]
+            public ElevatedCommand(string tool, params string[] arguments)
+                : this(tool, arguments, new[] { 0 })
             {
-                "@echo off",
-                "rem optiSCAN — nettoyage ponctuel de l'historique Windows Defender",
-                @"set ""WD=%ProgramData%\Microsoft\Windows Defender""",
-                @"if exist ""%WD%\Scans\History\Service"" rd /s /q ""%WD%\Scans\History\Service""",
-                @"if exist ""%WD%\Quarantine"" rd /s /q ""%WD%\Quarantine""",
-                @"del /f /q ""%WD%\Scans\mpenginedb.db*"" >nul 2>&1",
-                $@"schtasks /delete /f /tn ""{ClearDefenderHistoryTaskName}"" >nul 2>&1",
-                @"del /f /q ""%~f0"" >nul 2>&1",
-            });
+            }
+
+            public string FilePath => Path.Combine(Environment.SystemDirectory, Tool);
+
+            public override string ToString() => Tool + " " + string.Join(' ', Arguments);
         }
 
-        /// <summary>
-        /// Copie le script d'aide vers ProgramData\optiSCAN et enregistre une
-        /// tâche de démarrage unique (schtasks), même modèle que DISM / télémétrie.
-        /// </summary>
-        public static IEnumerable<string> ElevatedClearDefenderHistoryCommands()
-        {
-            var helperSource = Path.Combine(
-                Path.GetTempPath(),
-                $"optiscan_wdh_{Guid.NewGuid():N}.cmd");
-            File.WriteAllText(helperSource, BuildClearDefenderHistoryHelperBatch(), new UTF8Encoding(false));
+        // Codes de sortie de sc.exe sans conséquence pour le but recherché.
+        private const int ServiceDoesNotExist = 1060;
+        private const int ServiceAlreadyRunning = 1056;
+        private const int ServiceNotActive = 1062;
 
-            var helperDest = Path.Combine(
+        // Dism.exe : opération réussie, redémarrage requis.
+        private const int RebootRequired = 3010;
+
+        /// <summary>Télémétrie au minimum et service DiagTrack désactivé.</summary>
+        public static IEnumerable<ElevatedCommand> ElevatedTelemetryCommands()
+        {
+            yield return new ElevatedCommand(
+                "reg.exe",
+                "add", @"HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection",
+                "/v", "AllowTelemetry", "/t", "REG_DWORD", "/d", "0", "/f");
+            yield return new ElevatedCommand(
+                "sc.exe", new[] { "stop", "DiagTrack" }, new[] { 0, ServiceNotActive, ServiceDoesNotExist });
+            yield return new ElevatedCommand(
+                "sc.exe", new[] { "config", "DiagTrack", "start=", "disabled" }, new[] { 0, ServiceDoesNotExist });
+        }
+
+        /// <summary>Nettoyage des composants Windows (DISM, lent).</summary>
+        public static IEnumerable<ElevatedCommand> ElevatedDismCleanupCommands()
+        {
+            yield return new ElevatedCommand(
+                "Dism.exe", new[] { "/Online", "/Cleanup-Image", "/StartComponentCleanup" }, new[] { 0, RebootRequired });
+        }
+
+        /// <summary>Arrêt de Windows Update avant le vidage de son cache.</summary>
+        internal static ElevatedCommand StopWindowsUpdateCommand { get; } =
+            new("sc.exe", new[] { "stop", "wuauserv" }, new[] { 0, ServiceNotActive });
+
+        /// <summary>Redémarrage de Windows Update après le vidage de son cache.</summary>
+        internal static ElevatedCommand StartWindowsUpdateCommand { get; } =
+            new("sc.exe", new[] { "start", "wuauserv" }, new[] { 0, ServiceAlreadyRunning });
+
+        /// <summary>
+        /// Retire la tâche de démarrage SYSTEM « vider l'historique Defender » et le script
+        /// qu'une version antérieure a pu laisser. Cette fonction a été supprimée : effacer
+        /// l'historique d'un autre antivirus détruit une trace utile et n'a pas sa place ici.
+        /// </summary>
+        public static void RemoveDefenderHistoryTask()
+        {
+            var script = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData),
                 "optiSCAN",
                 "clear-wd-history.cmd");
-            var destDir = Path.GetDirectoryName(helperDest) ?? @"C:\ProgramData\optiSCAN";
-
-            return new[]
+            try
             {
-                $"if not exist \"{destDir}\" mkdir \"{destDir}\"",
-                $"copy /y \"{helperSource}\" \"{helperDest}\"",
-                $"del /f /q \"{helperSource}\"",
-                $"schtasks /Create /TN \"{ClearDefenderHistoryTaskName}\" /SC ONSTART /RU SYSTEM /RL HIGHEST /F /TR \"{helperDest}\"",
-            };
+                if (File.Exists(script) && (File.GetAttributes(script) & FileAttributes.ReparsePoint) == 0)
+                    File.Delete(script);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("SystemTweaks", "Suppression du script Defender refusée", ex);
+            }
+
+            try
+            {
+                // Sans effet si la tâche n'existe pas.
+                RunCaptured("schtasks.exe", "/Delete /F /TN \"" + ClearDefenderHistoryTaskName + "\"");
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("SystemTweaks", "Tâche historique Defender : " + ex.Message);
+            }
+
+            try
+            {
+                using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\optiSCAN", writable: true);
+                key?.DeleteValue("DefenderHistoryAttempts", throwOnMissingValue: false);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("SystemTweaks", "Compteur historique Defender : " + ex.Message);
+            }
+        }
+
+        private static string RunCaptured(string tool, string arguments)
+        {
+            using var process = Process.Start(new ProcessStartInfo
+            {
+                FileName = Path.Combine(Environment.SystemDirectory, tool),
+                Arguments = arguments,
+                UseShellExecute = false,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                CreateNoWindow = true,
+            });
+            if (process == null)
+                return string.Empty;
+            var stdout = process.StandardOutput.ReadToEndAsync();
+            var stderr = process.StandardError.ReadToEndAsync();
+            if (!process.WaitForExit(4000))
+            {
+                try { process.Kill(entireProcessTree: true); } catch { /* déjà terminé */ }
+            }
+
+            return stdout.GetAwaiter().GetResult() + stderr.GetAwaiter().GetResult();
+        }
+
+        /// <summary>Identifiants acceptés après <c>--apply-tweaks</c> (liste blanche).</summary>
+        internal static readonly IReadOnlySet<string> KnownElevatedTweakIds =
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "telemetry", "dism", "wu-cache" };
+
+        public static bool ExecuteTweakIds(IReadOnlyCollection<string> ids)
+        {
+            var wanted = new HashSet<string>(ids, StringComparer.OrdinalIgnoreCase);
+            foreach (var unknown in wanted.Where(id => !KnownElevatedTweakIds.Contains(id)))
+                AppLogger.Warn("SystemTweaksService", "Action élevée inconnue ou retirée, ignorée : " + unknown);
+
+            var ok = true;
+            if (wanted.Contains("telemetry"))
+                ok &= RunAll(ElevatedTelemetryCommands());
+            if (wanted.Contains("dism"))
+                ok &= RunAll(ElevatedDismCleanupCommands());
+            if (wanted.Contains("wu-cache"))
+                ok &= ClearWindowsUpdateCache();
+
+            return ok;
+        }
+
+        private static bool RunAll(IEnumerable<ElevatedCommand> commands)
+        {
+            var ok = true;
+            foreach (var command in commands)
+            {
+                if (!RunElevatedCommand(command))
+                    ok = false;
+            }
+
+            return ok;
+        }
+
+        /// <summary>
+        /// Arrête Windows Update, vide <c>%SystemRoot%\SoftwareDistribution\Download</c> en C#
+        /// (un lien trouvé dans le dossier est supprimé lui-même, jamais suivi), puis redémarre
+        /// le service, même si le vidage a échoué.
+        /// </summary>
+        private static bool ClearWindowsUpdateCache()
+        {
+            if (!RunElevatedCommand(StopWindowsUpdateCommand))
+                return false;
+
+            var cleared = ClearDirectoryContents(Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.Windows),
+                "SoftwareDistribution",
+                "Download"));
+            var restarted = RunElevatedCommand(StartWindowsUpdateCommand);
+            return cleared && restarted;
+        }
+
+        /// <summary>Vide un dossier sans traverser les jonctions ni les liens qu'il contient.</summary>
+        internal static bool ClearDirectoryContents(string directory)
+        {
+            try
+            {
+                var info = new DirectoryInfo(directory);
+                if (!info.Exists)
+                    return true;
+                if ((info.Attributes & FileAttributes.ReparsePoint) != 0)
+                {
+                    AppLogger.Warn("SystemTweaksService", "Cache Windows Update : le dossier est un lien, non vidé");
+                    return false;
+                }
+
+                var ok = true;
+                foreach (var entry in info.EnumerateFileSystemInfos())
+                {
+                    try
+                    {
+                        if (entry is DirectoryInfo child)
+                        {
+                            // Directory.Delete supprime une jonction sans la suivre ; un vrai
+                            // dossier est supprimé avec son contenu, liens internes compris.
+                            if ((child.Attributes & FileAttributes.ReparsePoint) != 0)
+                                child.Delete();
+                            else
+                                child.Delete(recursive: true);
+                        }
+                        else
+                        {
+                            entry.Attributes = FileAttributes.Normal;
+                            entry.Delete();
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        ok = false;
+                        AppLogger.Debug("SystemTweaksService", "Cache Windows Update, élément conservé : " + ex.Message);
+                    }
+                }
+
+                return ok;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("SystemTweaksService", "Cache Windows Update", ex);
+                return false;
+            }
+        }
+
+        public static bool RunElevatedKnown(string id, bool waitForExit) =>
+            RelaunchTweaks(new[] { id }, waitForExit);
+
+        private static bool RelaunchTweaks(IReadOnlyList<string> ids, bool waitForExit)
+        {
+            if (ids.Count == 0)
+                return true;
+            if (ElevationHelper.IsRunningElevated())
+                return ExecuteTweakIds(ids);
+
+            try
+            {
+                var exe = Environment.ProcessPath;
+                if (string.IsNullOrWhiteSpace(exe))
+                    return false;
+
+                var psi = new ProcessStartInfo
+                {
+                    FileName = exe,
+                    UseShellExecute = true,
+                    Verb = "runas",
+                    Arguments = "--apply-tweaks " + string.Join(',', ids) + " --quiet",
+                    WindowStyle = ProcessWindowStyle.Minimized,
+                };
+                var process = Process.Start(psi);
+                if (process == null)
+                    return false;
+                if (waitForExit)
+                    process.WaitForExit();
+                return !waitForExit || process.ExitCode == 0;
+            }
+            catch (System.ComponentModel.Win32Exception wex) when (wex.NativeErrorCode == 1223)
+            {
+                AppLogger.Info("SystemTweaksService", "Élévation refusée par l'utilisateur");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("SystemTweaksService", "RelaunchTweaks", ex);
+                return false;
+            }
+        }
+
+        public static bool RunElevatedTweaks(bool telemetry, bool dism, bool waitForExit)
+        {
+            var ids = new List<string>();
+            if (telemetry) ids.Add("telemetry");
+            if (dism) ids.Add("dism");
+            return RelaunchTweaks(ids, waitForExit);
+        }
+
+        private static bool RunElevatedCommand(ElevatedCommand command)
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = command.FilePath,
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                };
+                foreach (var argument in command.Arguments)
+                    psi.ArgumentList.Add(argument);
+                using var process = Process.Start(psi);
+                if (process == null)
+                    return false;
+                if (!process.WaitForExit(TimeSpan.FromMinutes(30)))
+                {
+                    try { process.Kill(entireProcessTree: true); } catch { /* déjà terminé */ }
+                    AppLogger.Warn("SystemTweaksService", "Délai dépassé : " + command);
+                    return false;
+                }
+
+                if (command.AcceptedExitCodes.Contains(process.ExitCode))
+                    return true;
+                AppLogger.Warn("SystemTweaksService", $"Échec ({process.ExitCode}) : {command}");
+                return false;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("SystemTweaksService", "Commande admin : " + command, ex);
+                return false;
+            }
         }
 
         /// <summary>Demande un redémarrage Windows (<c>shutdown /r</c>).</summary>
@@ -345,74 +581,6 @@ namespace optiSCAN.Services
                 AppLogger.Warn("SystemTweaksService", "shutdown /r", ex);
                 return false;
             }
-        }
-
-        /// <summary>
-        /// Écrit les commandes dans un script .cmd temporaire et l'exécute en
-        /// administrateur (une seule invite UAC pour tout le lot). Fenêtre
-        /// console visible pour la transparence (utile pour DISM).
-        /// Renvoie false si l'utilisateur refuse l'invite UAC ou en cas d'erreur.
-        /// </summary>
-        public static bool RunElevatedBatch(IEnumerable<string> commandLines, bool waitForExit)
-        {
-            try
-            {
-                var sb = new StringBuilder();
-                sb.AppendLine("@echo off");
-                sb.AppendLine("chcp 65001 >nul");
-                sb.AppendLine("echo optiSCAN - actions administrateur en cours...");
-                foreach (var line in commandLines)
-                {
-                    sb.AppendLine($"echo [optiSCAN] {EscapeForEcho(line)}");
-                    sb.AppendLine(line);
-                }
-                sb.AppendLine("echo.");
-                sb.AppendLine("echo Termine.");
-
-                var scriptPath = Path.Combine(
-                    Path.GetTempPath(),
-                    $"optiscan_admin_{Guid.NewGuid():N}.cmd");
-                File.WriteAllText(scriptPath, sb.ToString(), new UTF8Encoding(false));
-
-                var psi = new ProcessStartInfo
-                {
-                    FileName = "cmd.exe",
-                    Arguments = $"/c \"\"{scriptPath}\"\"",
-                    UseShellExecute = true,   // requis pour Verb=runas
-                    Verb = "runas",           // invite UAC
-                    WindowStyle = ProcessWindowStyle.Minimized,
-                };
-
-                var p = Process.Start(psi);
-                if (p == null)
-                    return false;
-                if (waitForExit)
-                    p.WaitForExit();
-                return true;
-            }
-            catch (System.ComponentModel.Win32Exception wex)
-                when (wex.NativeErrorCode == 1223) // ERROR_CANCELLED : UAC refusé
-            {
-                AppLogger.Info("SystemTweaksService", "Élévation refusée par l'utilisateur");
-                return false;
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Error("SystemTweaksService", "RunElevatedBatch", ex);
-                return false;
-            }
-        }
-
-        private static string EscapeForEcho(string line)
-        {
-            // Neutralise les métacaractères cmd pour l'affichage via echo.
-            return line
-                .Replace("^", "^^")
-                .Replace("&", "^&")
-                .Replace("<", "^<")
-                .Replace(">", "^>")
-                .Replace("|", "^|")
-                .Replace("%", "%%");
         }
 
         /// <summary>Ouvre les paramètres Windows Update.</summary>

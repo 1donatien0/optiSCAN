@@ -176,20 +176,18 @@ namespace optiSCAN.Views
                         _ => (Brush)FindResource("TextDark"),
                     };
 
-                    var row = new StackPanel
-                    {
-                        Orientation = System.Windows.Controls.Orientation.Horizontal,
-                        Margin = new Thickness(0, 0, 0, 4),
-                    };
-                    row.Children.Add(new TextBlock
+                    var row = new Grid { Margin = new Thickness(0, 0, 0, 4) };
+                    row.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
+                    row.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(1, GridUnitType.Star) });
+                    var dot = new TextBlock
                     {
                         Text = "●",
                         Foreground = brush,
                         FontSize = (double)FindResource("FontSize.Micro"),
                         Margin = new Thickness(0, 0, 6, 0),
-                        VerticalAlignment = VerticalAlignment.Center,
-                    });
-                    row.Children.Add(new TextBlock
+                        VerticalAlignment = VerticalAlignment.Top,
+                    };
+                    var label = new TextBlock
                     {
                         Text = LocalizationService.GetString(item.LabelKey),
                         TextWrapping = TextWrapping.Wrap,
@@ -197,7 +195,10 @@ namespace optiSCAN.Views
                         LineHeight = 14,
                         Foreground = (Brush)FindResource("TextDark"),
                         VerticalAlignment = VerticalAlignment.Center,
-                    });
+                    };
+                    Grid.SetColumn(label, 1);
+                    row.Children.Add(dot);
+                    row.Children.Add(label);
                     platformStatusPanel.Children.Add(row);
                 }
             });
@@ -434,39 +435,30 @@ namespace optiSCAN.Views
                 border.MouseLeftButtonUp -= RecHygieneSigUpdate_Click;
                 text.Inlines.Add(new Run(line));
             }
-            Brush? bg = null, fg = null, ifg = null;
+            // Même surface que les encarts au-dessus : la sévérité reste sur l'icône.
+            if (border.TryFindResource("SurfaceBg") is Brush surface)
+                border.Background = surface;
+            if (text.TryFindResource("TextDark") is Brush textBrush)
+                text.Foreground = textBrush;
+
+            Brush? ifg = null;
             PackIconKind kind = PackIconKind.InformationOutline;
             switch (severity)
             {
                 case 0:
+                case 2:
                     kind = PackIconKind.CheckCircle;
-                    bg = border.TryFindResource("SuccessBg") as Brush;
-                    fg = text.TryFindResource("SuccessGreen") as Brush;
                     ifg = icon?.TryFindResource("SuccessGreen") as Brush;
                     break;
                 case 1:
                     kind = PackIconKind.Alert;
-                    bg = border.TryFindResource("AlertBg") as Brush;
-                    fg = text.TryFindResource("AlertGold") as Brush;
                     ifg = icon?.TryFindResource("AlertGoldLight") as Brush;
                     break;
-                case 2:
-                    // Tout va bien, activite normale -> vert
-                    kind = PackIconKind.CheckCircle;
-                    bg = border.TryFindResource("SuccessBg") as Brush;
-                    fg = text.TryFindResource("SuccessGreen") as Brush;
-                    ifg = icon?.TryFindResource("SuccessGreen") as Brush;
-                    break;
                 default:
-                    // Severity 3 = conseil preventif (info) -> bleu neutre
                     kind = PackIconKind.InformationOutline;
-                    bg = border.TryFindResource("InfoBg") as Brush ?? border.TryFindResource("SurfaceBg") as Brush;
-                    fg = text.TryFindResource("TextAccent") as Brush ?? text.TryFindResource("TextMedium") as Brush;
                     ifg = icon?.TryFindResource("TextAccent") as Brush;
                     break;
             }
-            if (bg != null) border.Background = bg;
-            if (fg != null) text.Foreground = fg;
             if (icon != null)
             {
                 icon.Kind = kind;

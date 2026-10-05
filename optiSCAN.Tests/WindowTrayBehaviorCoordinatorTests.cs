@@ -25,7 +25,9 @@ public sealed class WindowTrayBehaviorCoordinatorTests
         Assert.True(cancelled);
         Assert.True(e.Cancel);
         Assert.True(hidden);
-        Assert.Equal(OptiscanStrings.UiMessages.ProtectionReducedTray, status);
+        Assert.True(
+            status is "optiSCAN minimized to the system tray" or "optiSCAN réduit dans la barre système",
+            status);
     }
 
     [Fact]

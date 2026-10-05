@@ -60,6 +60,8 @@ public sealed class ProtectionServiceHostTests
 
         public void ApplyPreferencesOnStartup() => ApplyCount++;
 
+        public void ApplyHostPreferences() => ApplyCount++;
+
         public void Shutdown() => ShutdownCount++;
     }
 

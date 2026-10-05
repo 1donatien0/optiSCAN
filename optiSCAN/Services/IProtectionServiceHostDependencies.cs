@@ -17,5 +17,8 @@ public interface IProtectionServiceHostDependencies : IServiceHostThreatContext
 
     void ApplyPreferencesOnStartup();
 
+    /// <summary>Démarrage de l'hôte SYSTEM : pas de relance du service ni d'un second processus.</summary>
+    void ApplyHostPreferences();
+
     void Shutdown();
 }

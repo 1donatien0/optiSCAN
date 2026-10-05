@@ -16,7 +16,7 @@ namespace optiSCAN.Services
             ResolveDistinctRoots,
             LazyThreadSafetyMode.ExecutionAndPublication);
 
-        /// <summary>%LOCALAPPDATA%\optiSCAN — signatures ClamAV, quarantaine, logs, staging MAJ.</summary>
+        /// <summary>%LOCALAPPDATA%\optiSCAN (seuls certains sous-dossiers sont protégés, voir <see cref="LocalAppDataProtectedSubfolders"/>).</summary>
         public static string GetLocalAppDataRoot()
         {
             return Path.GetFullPath(Path.Combine(
@@ -24,7 +24,7 @@ namespace optiSCAN.Services
                 "optiSCAN"));
         }
 
-        /// <summary>Racines protégées (installation + données applicatives).</summary>
+        /// <summary>Racines protégées (installation et sous-dossiers de données applicatives).</summary>
         public static IReadOnlyList<string> GetProtectedRoots() => CachedRoots.Value;
 
         public static bool IsUnderProtectedPath(string? path)
@@ -85,17 +85,64 @@ namespace optiSCAN.Services
             }
         }
 
+        /// <summary>
+        /// Sous-dossiers de %LOCALAPPDATA%\optiSCAN qui contiennent des signatures, des règles ou
+        /// des copies chiffrées de menaces. Le reste de ce dossier, inscriptible par toute la
+        /// session, est analysé : l'exclure entier en ferait une cachette pour un malware.
+        /// </summary>
+        internal static readonly string[] LocalAppDataProtectedSubfolders =
+        {
+            "clamav",
+            "clamd",
+            "rules",
+            "Quarantine",
+            "SafetyBackups",
+        };
+
+        /// <summary>
+        /// Sous-dossiers d'une installation non réservée aux administrateurs qui restent exclus
+        /// (moteurs, bases et règles, qui déclencheraient des auto-détections).
+        /// </summary>
+        internal static readonly string[] InstallDataSubfolders = { "clamav", "rules", "yara" };
+
         private static IReadOnlyList<string> ResolveDistinctRoots()
         {
             var roots = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var install in ResolveInstallRoots())
+                AddInstallRoot(roots, install);
 
-            TryAddRoot(roots, AppInstallPaths.GetInstallRootUncached());
-            TryAddRoot(roots, GetLocalAppDataRoot());
-
-            TryAddProgramFilesInstall(roots);
-            TryAddFromInnoUninstallRegistry(roots);
+            var local = GetLocalAppDataRoot();
+            foreach (var sub in LocalAppDataProtectedSubfolders)
+                TryAddRoot(roots, Path.Combine(local, sub));
 
             return roots.OrderBy(r => r, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        /// <summary>Dossiers d'installation connus : celui du processus, Program Files, registre Inno.</summary>
+        internal static IReadOnlyList<string> ResolveInstallRoots()
+        {
+            var installs = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            TryAddRoot(installs, AppInstallPaths.GetInstallRootUncached());
+            TryAddProgramFilesInstall(installs);
+            TryAddFromInnoUninstallRegistry(installs);
+            return installs.ToList();
+        }
+
+        /// <summary>
+        /// Une installation réservée aux administrateurs est exclue entière. Ailleurs (build de
+        /// développement, copie portable, dossier choisi hors Program Files), seuls ses moteurs,
+        /// bases et règles le sont : un binaire déposé à côté reste analysé.
+        /// </summary>
+        private static void AddInstallRoot(HashSet<string> roots, string install)
+        {
+            if (optiSCAN.Platform.InstallLocationTrust.IsAdminOnlyInstall(install, out _))
+            {
+                roots.Add(install);
+                return;
+            }
+
+            foreach (var sub in InstallDataSubfolders)
+                TryAddRoot(roots, Path.Combine(install, sub));
         }
 
         private static void TryAddProgramFilesInstall(HashSet<string> roots)

@@ -62,16 +62,18 @@ public sealed class ScanOrchestratorTests
     [Fact]
     public async Task ScanFolderAsync_under_install_root_skips_engines()
     {
-        var installRoot = AppInstallPaths.GetInstallRoot();
+        // Les règles du dossier d'installation sont toujours protégées (le dossier entier ne
+        // l'est que s'il est réservé aux administrateurs).
+        var rulesRoot = Path.Combine(AppInstallPaths.GetInstallRoot(), "rules");
         var clam = new FakeClamBackend();
         var yara = new FakeYaraBackend();
         var orch = new ScanOrchestrator(clam, yara);
 
-        var result = await orch.ScanFolderAsync(installRoot);
+        var result = await orch.ScanFolderAsync(rulesRoot);
 
         Assert.Equal(ScanStatus.Completed, result.Status);
         Assert.Equal(ScanType.Folder, result.Type);
-        Assert.Equal(installRoot, result.TargetPath);
+        Assert.Equal(rulesRoot, result.TargetPath);
         Assert.Equal(1, result.FilesSkipped);
         Assert.Empty(result.Threats);
         Assert.Equal(0, clam.ScanFolderCalls);

@@ -112,6 +112,7 @@ namespace optiSCAN.Services
         {
             _exclusionSettings.Current.RealTimeEnabled = enabled;
             _exclusionSettings.Current.Save();
+            HostPolicyStore.PushToService(_userPreferences, _exclusionSettings);
 
             if (_userPreferences.Current.UsePlatformProtectionService
                 && PlatformProtectionBootstrap.IsRemoteProtectionActive())
@@ -157,6 +158,7 @@ namespace optiSCAN.Services
                 {
                     RealTimeProtection.Stop();
                     ProcessStartMonitor.Stop();
+                    HostPolicyStore.PushToService(_userPreferences, _exclusionSettings);
                 }
             }
             else
@@ -179,6 +181,7 @@ namespace optiSCAN.Services
         {
             _userPreferences.Current.RemovableDriveScanEnabled = enabled;
             _userPreferences.Current.Save();
+            HostPolicyStore.PushToService(_userPreferences, _exclusionSettings);
             if (enabled) RemovableDriveScan.Start();
             else RemovableDriveScan.Stop();
             RequestProtectionStateRefresh();
@@ -189,6 +192,7 @@ namespace optiSCAN.Services
         {
             _exclusionSettings.Current.AutoQuarantineEnabled = enabled;
             _exclusionSettings.Current.Save();
+            HostPolicyStore.PushToService(_userPreferences, _exclusionSettings);
         }
 
         public DefenderCoexistenceStatus GetDefenderCoexistenceStatus() =>
@@ -203,6 +207,7 @@ namespace optiSCAN.Services
             SignatureUpdatePolicy.ApplyAutoUpdateTimers(FreshclamUpdater, RulesUpdater, enabled, _userPreferences);
             _userPreferences.Current.SignatureAutoUpdateEnabled = enabled;
             _userPreferences.Current.Save();
+            HostPolicyStore.PushToService(_userPreferences, _exclusionSettings);
             RequestProtectionStateRefresh();
         }
 
@@ -211,6 +216,7 @@ namespace optiSCAN.Services
         {
             _userPreferences.Current.ProcessMonitorEnabled = enabled;
             _userPreferences.Current.Save();
+            HostPolicyStore.PushToService(_userPreferences, _exclusionSettings);
             if (enabled && _exclusionSettings.Current.RealTimeEnabled)
                 ProcessStartMonitor.Start();
             else
@@ -244,6 +250,66 @@ namespace optiSCAN.Services
         }
 
         public void RequestQuickScan() => _uiEventBus.RequestQuickScan();
+
+        /// <summary>Préférences de l'hôte lancé par le service Windows, sans se relancer lui-même.</summary>
+        public void ApplyHostPreferences()
+        {
+            HostPolicyStore.Changed -= OnHostPolicyChanged;
+            HostPolicyStore.Changed += OnHostPolicyChanged;
+            // Reprise du dossier (et purge de ce qui y a été déposé) avant toute lecture.
+            if (!optiSCAN.Platform.OptiScanProgramData.EnsureTrusted())
+                throw new InvalidOperationException("Le dossier ProgramData d'optiSCAN n'a pas pu être sécurisé.");
+            if (HostPolicyStore.TryRead(out var policy))
+                CopyHostPolicy(policy);
+
+            DefenderCoexistenceService.EnsureFirstLaunchExclusionSettings(_exclusionSettings, _userPreferences);
+            ApplySignatureAutoUpdate(_userPreferences.Current.SignatureAutoUpdateEnabled);
+            SignatureUpdatePolicy.NotifyAndScheduleStartupRefresh(this, _userPreferences);
+
+            if (_exclusionSettings.Current.RealTimeEnabled)
+            {
+                RealTimeProtection.Start();
+                if (_userPreferences.Current.ProcessMonitorEnabled)
+                    ProcessStartMonitor.Start();
+            }
+            else
+            {
+                RealTimeProtection.Stop();
+                ProcessStartMonitor.Stop();
+            }
+
+            ApplyRemovableDriveAndEnginePrefs();
+        }
+
+        private void OnHostPolicyChanged(HostPolicy policy)
+        {
+            CopyHostPolicy(policy);
+            if (_exclusionSettings.Current.RealTimeEnabled)
+            {
+                RealTimeProtection.Start();
+                if (_userPreferences.Current.ProcessMonitorEnabled)
+                    ProcessStartMonitor.Start();
+                else
+                    ProcessStartMonitor.Stop();
+            }
+            else
+            {
+                RealTimeProtection.Stop();
+                ProcessStartMonitor.Stop();
+            }
+
+            ApplySignatureAutoUpdate(_userPreferences.Current.SignatureAutoUpdateEnabled);
+            ApplyRemovableDriveAndEnginePrefs();
+        }
+
+        private void CopyHostPolicy(HostPolicy policy)
+        {
+            _exclusionSettings.Current.RealTimeEnabled = policy.RealTimeEnabled;
+            _exclusionSettings.Current.AutoQuarantineEnabled = policy.AutoQuarantineEnabled;
+            _userPreferences.Current.ProcessMonitorEnabled = policy.ProcessMonitorEnabled;
+            _userPreferences.Current.SignatureAutoUpdateEnabled = policy.SignatureAutoUpdateEnabled;
+            _userPreferences.Current.RemovableDriveScanEnabled = policy.RemovableDriveScanEnabled;
+        }
 
         /// <summary>Restaure RTP et MAJ auto selon les préférences persistées (appel au démarrage UI).</summary>
         public void ApplyPreferencesOnStartup()

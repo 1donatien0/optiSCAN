@@ -21,7 +21,6 @@ namespace optiSCAN.Services
     [SupportedOSPlatform("windows")]
     public static class SecureStore
     {
-        private const string HmacInfo = "optiSCAN-securestore-hmac";
 
         private static string HmacKeyPath => Path.Combine(
             Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
@@ -52,26 +51,9 @@ namespace optiSCAN.Services
                         if (dpapiKey != null && TryVerifyHmac(envelope, dpapiKey))
                             return JsonSerializer.Deserialize<T>(envelope.Json);
 
-                        var legacyKey = DeriveLegacyHmacKey();
-                        try
-                        {
-                            if (TryVerifyHmac(envelope, legacyKey))
-                            {
-                                var migrated = JsonSerializer.Deserialize<T>(envelope.Json);
-                                if (migrated != null)
-                                {
-                                    Save(path, migrated);
-                                    AppLogger.Info("SecureStore",
-                                        $"Clé HMAC migrée (DPAPI) pour {Path.GetFileName(path)}");
-                                }
-                                return migrated;
-                            }
-                        }
-                        finally
-                        {
-                            CryptographicOperations.ZeroMemory(legacyKey);
-                        }
-
+                        // L'ancienne clé HMAC se déduisait d'informations publiques (nom du
+                        // compte, profil) : n'importe qui pouvait signer un fichier « valide ».
+                        // Elle n'est plus acceptée, même pour une migration.
                         AppLogger.Fatal("SecureStore",
                             $"HMAC invalide pour {Path.GetFileName(path)} — refus de chargement");
                         return null;
@@ -83,15 +65,9 @@ namespace optiSCAN.Services
                     }
                 }
 
-                // Enveloppe legacy sans HMAC (pre-v2) — re-sauvegarde signée une fois.
-                var unsigned = JsonSerializer.Deserialize<T>(envelope.Json);
-                if (unsigned != null)
-                {
-                    Save(path, unsigned);
-                    AppLogger.Info("SecureStore",
-                        $"Migration enveloppe non signée → HMAC : {Path.GetFileName(path)}");
-                }
-                return unsigned;
+                AppLogger.Fatal("SecureStore",
+                    $"Enveloppe sans HMAC refusée pour {Path.GetFileName(path)}");
+                return null;
             }
             catch (CryptographicException ex)
             {
@@ -108,7 +84,10 @@ namespace optiSCAN.Services
         /// <summary>
         /// Sauvegarde un objet T dans un fichier sécurisé (DPAPI + HMAC).
         /// </summary>
-        public static void Save<T>(string path, T value) where T : class
+        public static void Save<T>(string path, T value) where T : class => TrySave(path, value);
+
+        /// <summary>Comme <see cref="Save{T}"/>, mais rend faux si l'écriture a échoué.</summary>
+        public static bool TrySave<T>(string path, T value) where T : class
         {
             try
             {
@@ -133,17 +112,20 @@ namespace optiSCAN.Services
                 var encrypted = ProtectedData.Protect(envelopeBytes, optionalEntropy: null, DataProtectionScope.CurrentUser);
 
                 AtomicFile.WriteAllBytes(path, encrypted);
+                return true;
             }
             catch (Exception ex)
             {
                 AppLogger.Error("SecureStore", $"Save {Path.GetFileName(path)}", ex);
+                return false;
             }
         }
 
         /// <summary>
         /// Tente de migrer un fichier JSON en clair (legacy) vers le format
-        /// sécurisé. Retourne l'objet désérialisé si réussite, null sinon.
-        /// Le fichier en clair est renommé en .legacy à la fin.
+        /// sécurisé. Retourne l'objet désérialisé si la lecture a réussi, null sinon.
+        /// Le fichier en clair n'est supprimé que si la version sécurisée a été écrite
+        /// <b>et relue</b> ; sinon il reste en place et la migration sera retentée.
         /// </summary>
         public static T? MigrateFromPlaintext<T>(string plaintextPath, string securePath) where T : class
         {
@@ -154,9 +136,24 @@ namespace optiSCAN.Services
                 var obj = JsonSerializer.Deserialize<T>(json);
                 if (obj == null) return null;
 
-                Save(securePath, obj);
+                // Une panne d'écriture (disque plein, DPAPI indisponible) ne doit pas faire perdre
+                // les données : sans copie sécurisée relisible, le fichier en clair est conservé.
+                if (!TrySave(securePath, obj) || Load<T>(securePath) == null)
+                {
+                    AppLogger.Warn("SecureStore",
+                        $"Migration {Path.GetFileName(plaintextPath)} non confirmée : fichier en clair conservé, nouvel essai au prochain démarrage");
+                    return obj;
+                }
 
-                try { File.Move(plaintextPath, plaintextPath + ".legacy", overwrite: true); }
+                // Le fichier en clair est supprimé (et non plus conservé en « .legacy ») :
+                // ses données sensibles ne doivent pas rester lisibles à côté de la version chiffrée.
+                try
+                {
+                    File.Delete(plaintextPath);
+                    var oldLegacy = plaintextPath + ".legacy";
+                    if (File.Exists(oldLegacy))
+                        File.Delete(oldLegacy);
+                }
                 catch (Exception ex) { AppLogger.Warn("SecureStore", $"Migration cleanup {plaintextPath}", ex); }
 
                 AppLogger.Info("SecureStore", $"Migration {Path.GetFileName(plaintextPath)} → format sécurisé");
@@ -184,17 +181,6 @@ namespace optiSCAN.Services
             {
                 return false;
             }
-        }
-
-        /// <summary>Ancienne dérivation — conservée uniquement pour migration S2.</summary>
-        private static byte[] DeriveLegacyHmacKey()
-        {
-            var identity =
-                HmacInfo + "|" +
-                Environment.GetFolderPath(Environment.SpecialFolder.UserProfile) + "|" +
-                Environment.UserDomainName + "|" +
-                Environment.UserName;
-            return SHA256.HashData(Encoding.UTF8.GetBytes(identity));
         }
 
         private static byte[]? TryLoadDpapiHmacKey()

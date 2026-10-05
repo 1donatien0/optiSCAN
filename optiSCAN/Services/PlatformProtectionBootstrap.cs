@@ -98,10 +98,7 @@ public static class PlatformProtectionBootstrap
         if (IsRemoteProtectionActive())
             return;
 
-        if (TryStartWindowsService())
-            return;
-
-        TryLaunchServiceHostProcess();
+        TryStartWindowsService();
     }
 
     public static bool TryInstallWindowsService()
@@ -118,9 +115,26 @@ public static class PlatformProtectionBootstrap
             if (IsServiceInstalled())
                 return true;
 
+            // Un service SYSTEM sur un binaire qu'un utilisateur peut remplacer serait une
+            // élévation de privilèges persistante (build de développement, copie portable,
+            // installation hors Program Files).
+            if (!InstallLocationTrust.IsCurrentInstallTrusted(out var reason))
+            {
+                AppLogger.Warn("PlatformProtection",
+                    "Service non enregistré : le dossier d'installation n'est pas réservé aux administrateurs (" + reason + ")");
+                return false;
+            }
+
             var binPath = $"\"{serviceExe}\"";
-            RunSc($"create {ServiceName} binPath= {binPath} start= auto DisplayName= \"{ServiceDisplayName}\"");
-            RunSc($"description {ServiceName} \"{ProtectionIdentifiers.ServiceDescription}\"");
+            var created = RunSc($"create {ServiceName} binPath= {binPath} start= auto DisplayName= \"{ServiceDisplayName}\"");
+            if (created != 0 || !IsServiceInstalled())
+            {
+                AppLogger.Warn("PlatformProtection", $"Création du service refusée (sc.exe code {created})");
+                return false;
+            }
+            var described = RunSc($"description {ServiceName} \"{ProtectionIdentifiers.ServiceDescription}\"");
+            if (described != 0)
+                AppLogger.Debug("PlatformProtection", $"Description du service non appliquée (sc.exe code {described})");
             AppLogger.Info("PlatformProtection", "Service Windows enregistré");
             return true;
         }
@@ -139,7 +153,10 @@ public static class PlatformProtectionBootstrap
             if (!IsServiceInstalled())
                 return false;
 
-            RunSc($"start {ServiceName}");
+            var started = RunSc($"start {ServiceName}");
+            // 1056 = ERROR_SERVICE_ALREADY_RUNNING : pas une erreur.
+            if (started != 0 && started != 1056)
+                AppLogger.Warn("PlatformProtection", $"Démarrage du service refusé (sc.exe code {started})");
             for (var i = 0; i < 10; i++)
             {
                 if (IsRemoteProtectionActive(useCache: false))
@@ -233,7 +250,8 @@ public static class PlatformProtectionBootstrap
         }
     }
 
-    private static void RunSc(string arguments)
+    /// <summary>Lance sc.exe et rend son code de sortie (-1 : non lancé ou délai dépassé).</summary>
+    private static int RunSc(string arguments)
     {
         using var proc = Process.Start(new ProcessStartInfo
         {
@@ -242,6 +260,13 @@ public static class PlatformProtectionBootstrap
             UseShellExecute = false,
             CreateNoWindow = true,
         });
-        proc?.WaitForExit(30_000);
+        if (proc == null)
+            return -1;
+        if (!proc.WaitForExit(30_000))
+        {
+            try { proc.Kill(); } catch { /* déjà terminé */ }
+            return -1;
+        }
+        return proc.ExitCode;
     }
 }

@@ -45,7 +45,9 @@ namespace optiSCAN.Services
             if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                 Directory.CreateDirectory(dir);
 
-            var tmp = path + ".tmp";
+            // Nom temporaire unique : deux écritures concurrentes du même fichier ne partagent
+            // pas le même .tmp (l'une effacerait ou renommerait celui de l'autre).
+            var tmp = path + "." + Guid.NewGuid().ToString("N") + ".tmp";
             var bak = path + ".bak";
 
             // 1. Écriture dans le fichier temporaire (jamais directement dans la cible).

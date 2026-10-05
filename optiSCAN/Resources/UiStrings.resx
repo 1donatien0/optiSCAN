@@ -100,6 +100,7 @@
   <data name="ScanSummary_Threats" xml:space="preserve"><value>Attention : {0} menace(s) sur {1:N0} fichier(s)</value></data>
   <data name="ScanSummary_Cancelled" xml:space="preserve"><value>Analyse interrompue ({0:N0} fichier(s) parcourus)</value></data>
   <data name="ScanSummary_Error" xml:space="preserve"><value>Erreur : {0}</value></data>
+  <data name="ScanSummary_ThreatsIncomplete" xml:space="preserve"><value>{0} menace(s) détectée(s) sur {1:N0} fichier(s), mais le scan est incomplet : {2}</value></data>
   <data name="ScanSummary_Unknown" xml:space="preserve"><value>État inconnu</value></data>
   <data name="Recent_QuickScan" xml:space="preserve"><value>Analyse rapide</value></data>
   <data name="Recent_FullScan" xml:space="preserve"><value>Analyse complète</value></data>
@@ -382,12 +383,6 @@
   <data name="Twk_SearchIcon" xml:space="preserve"><value>Recherche réduite à une icône</value></data>
   <data name="Twk_ThisPC" xml:space="preserve"><value>Explorateur ouvre « Ce PC »</value></data>
   <data name="Twk_Dism" xml:space="preserve"><value>Nettoyage des composants Windows — DISM, lent (admin)</value></data>
-  <data name="Twk_DefenderHistory" xml:space="preserve"><value>Vider l'historique et la quarantaine Windows Defender — redémarrage requis (admin)</value></data>
-  <data name="Twk_DefenderHistoryWarn" xml:space="preserve"><value>Cette action supprime, au prochain démarrage, l'historique de protection de Windows Defender : détections, éléments en quarantaine et accès contrôlé aux dossiers. Les fichiers mis en quarantaine par Defender seront définitivement perdus. L'opération n'est exécutée qu'une seule fois.</value></data>
-  <data name="Twk_DefenderHistoryRestartBody" xml:space="preserve"><value>Un redémarrage est nécessaire pour vider l'historique Windows Defender : les fichiers restent verrouillés tant que le service est actif. Redémarrer maintenant ?</value></data>
-  <data name="Twk_LogDefenderHistoryPending" xml:space="preserve"><value>Historique Windows Defender : nettoyage programmé au prochain démarrage.</value></data>
-  <data name="Twk_LogRestarting" xml:space="preserve"><value>Redémarrage de Windows…</value></data>
-  <data name="Twk_LogRestartLater" xml:space="preserve"><value>Redémarrez Windows plus tard pour appliquer le nettoyage de l'historique Defender.</value></data>
   <data name="Twk_Apply" xml:space="preserve"><value>Appliquer les tweaks</value></data>
   <data name="Twk_ElevNote" xml:space="preserve"><value>Les actions marquées (admin) sont regroupées dans une seule invite UAC.</value></data>
   <data name="Twk_LogTitle" xml:space="preserve"><value>Journal des tweaks</value></data>
@@ -450,17 +445,17 @@
   <data name="Repair_Quarantined" xml:space="preserve"><value>Fichier mis en quarantaine.</value></data>
   <data name="Repair_QuarantineFailed" xml:space="preserve"><value>Échec de la quarantaine.</value></data>
   <data name="Platform_StatusTitle" xml:space="preserve"><value>Protection système</value></data>
-  <data name="Platform_IpcActive" xml:space="preserve"><value>Service IPC / moteur distant actif</value></data>
-  <data name="Platform_IpcInactive" xml:space="preserve"><value>Service IPC injoignable (repli RTP locale possible)</value></data>
-  <data name="Platform_IpcDisabled" xml:space="preserve"><value>Service Windows désactivé (RTP dans l'application)</value></data>
-  <data name="Platform_AmsiDllMissing" xml:space="preserve"><value>AMSI : DLL optiSCAN.AmsiProvider.dll absente</value></data>
-  <data name="Platform_AmsiNotRegistered" xml:space="preserve"><value>AMSI : fournisseur non enregistré (admin requis)</value></data>
-  <data name="Platform_AmsiRegistered" xml:space="preserve"><value>AMSI : fournisseur enregistré</value></data>
-  <data name="Platform_AmsiPresentInactive" xml:space="preserve"><value>AMSI : DLL présente, désactivée (protection plateforme off)</value></data>
-  <data name="Platform_DefenderMayOverride" xml:space="preserve"><value>Defender actif — peut prendre la priorité AMSI sur les scripts</value></data>
-  <data name="Platform_MinifilterLoaded" xml:space="preserve"><value>Minifilter noyau chargé</value></data>
-  <data name="Platform_MinifilterNotLoaded" xml:space="preserve"><value>Minifilter présent mais non chargé (test signing / admin)</value></data>
-  <data name="Platform_MinifilterAbsent" xml:space="preserve"><value>Minifilter noyau absent (stub — PE non interceptés)</value></data>
+  <data name="Platform_IpcActive" xml:space="preserve"><value>Protection en arrière-plan active</value></data>
+  <data name="Platform_IpcInactive" xml:space="preserve"><value>Protection en arrière-plan injoignable — l'application peut prendre le relais</value></data>
+  <data name="Platform_IpcDisabled" xml:space="preserve"><value>Protection en arrière-plan désactivée — elle reste dans l'application</value></data>
+  <data name="Platform_AmsiDllMissing" xml:space="preserve"><value>Les scripts ne sont pas analysés : un composant est manquant</value></data>
+  <data name="Platform_AmsiNotRegistered" xml:space="preserve"><value>Les scripts ne sont pas analysés : droits administrateur requis</value></data>
+  <data name="Platform_AmsiRegistered" xml:space="preserve"><value>Les scripts sont analysés</value></data>
+  <data name="Platform_AmsiPresentInactive" xml:space="preserve"><value>Analyse des scripts désactivée</value></data>
+  <data name="Platform_DefenderMayOverride" xml:space="preserve"><value>Windows Defender peut analyser les scripts à la place d'optiSCAN</value></data>
+  <data name="Platform_MinifilterLoaded" xml:space="preserve"><value>Les programmes sont contrôlés dès leur ouverture</value></data>
+  <data name="Platform_MinifilterNotLoaded" xml:space="preserve"><value>Contrôle à l'ouverture installé, mais pas démarré</value></data>
+  <data name="Platform_MinifilterAbsent" xml:space="preserve"><value>Les programmes ne sont pas contrôlés à l'ouverture</value></data>
   <data name="Opt_BackupBeforeQuarantine" xml:space="preserve"><value>Copie de sécurité avant quarantaine</value></data>
   <data name="Opt_BackupBeforeQuarantineSub" xml:space="preserve"><value>Conserve une copie locale (32 Mo max.) dans %LocalAppData%\optiSCAN\SafetyBackups.</value></data>
   <data name="Opt_AggressiveSignatures" xml:space="preserve"><value>Mises à jour signatures renforcées</value></data>
@@ -620,6 +615,9 @@ Les supprimer ? Les fichiers ne sont pas effacés, seul le partage est retiré. 
   <data name="Hist_InfoFiles" xml:space="preserve"><value>{0} fichiers</value></data>
   <data name="Hist_InfoThreats" xml:space="preserve"><value>{0} menace(s)</value></data>
   <data name="Hist_InfoClean" xml:space="preserve"><value>Aucune menace</value></data>
+  <data name="Hist_InfoIncomplete" xml:space="preserve"><value>Scan incomplet — résultat non garanti</value></data>
+  <data name="Hist_InfoThreatsIncomplete" xml:space="preserve"><value>{0} menace(s) — scan incomplet</value></data>
+  <data name="Hist_InfoCancelled" xml:space="preserve"><value>Scan interrompu — résultat non garanti</value></data>
   <data name="Hist_TooltipQuarantineAll" xml:space="preserve"><value>Met en quarantaine toutes les menaces listées pour cette session.</value></data>
   <data name="Hist_DismissThreat" xml:space="preserve"><value>Retirer</value></data>
   <data name="Hist_TooltipDismiss" xml:space="preserve"><value>Retire cette menace de l'historique (fichier absent ou lecteur débranché).</value></data>
@@ -865,4 +863,29 @@ Les supprimer ? Les fichiers ne sont pas effacés, seul le partage est retiré. 
   <data name="Export_Pdf_Footer" xml:space="preserve"><value>optiSCAN {0} ({1}) — Rapport généré le {2} — Page </value></data>
   <data name="Export_Pdf_ThreatLegacySingle" xml:space="preserve"><value>Menace détectée (détail non conservé dans l'historique)</value></data>
   <data name="Export_Pdf_ThreatLegacyMulti" xml:space="preserve"><value>Menace {0}/{1} (détail non conservé)</value></data>
+  <data name="SvcQ_Banner" xml:space="preserve"><value>Quarantaine du service : {0:N0} élément(s), {1}. Conservation : {2} jours.</value></data>
+  <data name="SvcQ_Manage" xml:space="preserve"><value>Gérer (administrateur)…</value></data>
+  <data name="SvcQ_Title" xml:space="preserve"><value>optiSCAN — quarantaine du service</value></data>
+  <data name="SvcQ_Intro" xml:space="preserve"><value>Fichiers isolés par la protection du service (tous les comptes de ce PC). Ils sont supprimés automatiquement au bout de {0} jours. Une restauration crée le fichier avec vos droits d'administrateur et n'écrase jamais un fichier existant.</value></data>
+  <data name="SvcQ_Restore" xml:space="preserve"><value>Restaurer</value></data>
+  <data name="SvcQ_RestoreTo" xml:space="preserve"><value>Restaurer vers…</value></data>
+  <data name="SvcQ_Delete" xml:space="preserve"><value>Supprimer</value></data>
+  <data name="SvcQ_Purge" xml:space="preserve"><value>Tout supprimer</value></data>
+  <data name="SvcQ_Refresh" xml:space="preserve"><value>Actualiser</value></data>
+  <data name="SvcQ_Close" xml:space="preserve"><value>Fermer</value></data>
+  <data name="SvcQ_ColDate" xml:space="preserve"><value>Date</value></data>
+  <data name="SvcQ_ColFile" xml:space="preserve"><value>Fichier d'origine</value></data>
+  <data name="SvcQ_ColThreat" xml:space="preserve"><value>Menace</value></data>
+  <data name="SvcQ_ColSize" xml:space="preserve"><value>Taille</value></data>
+  <data name="SvcQ_Status" xml:space="preserve"><value>{0:N0} élément(s), {1}.</value></data>
+  <data name="SvcQ_StatusTruncated" xml:space="preserve"><value>{0:N0} affichés sur {1:N0} (les plus récents).</value></data>
+  <data name="SvcQ_ConfirmRestore" xml:space="preserve"><value>Restaurer « {0} » ?
+
+Ce fichier a été détecté comme « {1} ». Ne le restaurez que si vous êtes certain qu'il est sain : la protection en temps réel peut le détecter de nouveau.</value></data>
+  <data name="SvcQ_ConfirmDelete" xml:space="preserve"><value>Supprimer définitivement {0} de la quarantaine du service ?</value></data>
+  <data name="SvcQ_ConfirmPurge" xml:space="preserve"><value>Supprimer définitivement les {0:N0} élément(s) de la quarantaine du service ?</value></data>
+  <data name="SvcQ_Restored" xml:space="preserve"><value>Restauré : {0}</value></data>
+  <data name="SvcQ_Error" xml:space="preserve"><value>Opération refusée par le service : {0}</value></data>
+  <data name="SvcQ_Unreachable" xml:space="preserve"><value>Le service de protection optiSCAN ne répond pas.</value></data>
+  <data name="SvcQ_ElevationRefused" xml:space="preserve"><value>Élévation refusée : la quarantaine du service n'a pas été ouverte.</value></data>
 </root>
