@@ -12,10 +12,14 @@ $ErrorActionPreference = "Stop"
 New-Item -ItemType Directory -Force -Path $OutputDir | Out-Null
 
 $toolName = "CycloneDX"
-$installed = dotnet tool list -g 2>$null | Select-String -Pattern $toolName -Quiet
+# Version épinglée : un outil de la chaîne de build ne change pas sans revue.
+$toolVersion = "6.2.0"
+$installed = dotnet tool list -g 2>$null | Select-String -Pattern "cyclonedx\s+$([regex]::Escape($toolVersion))" -Quiet
 if (-not $installed) {
-    Write-Host "Installing global tool $toolName..."
-    dotnet tool install --global $toolName
+    Write-Host "Installing global tool $toolName $toolVersion..."
+    dotnet tool uninstall --global $toolName 2>$null | Out-Null
+    dotnet tool install --global $toolName --version $toolVersion
+    if ($LASTEXITCODE -ne 0) { throw "Installation de $toolName $toolVersion impossible." }
 }
 
 foreach ($proj in $Projects) {

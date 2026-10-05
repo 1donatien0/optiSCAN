@@ -184,7 +184,7 @@ namespace optiSCAN.Services
                 if (existing.Count == 0)
                     throw new InvalidOperationException("Aucun fichier accessible dans la liste de scan.");
 
-                File.WriteAllLines(listPath, existing, System.Text.Encoding.UTF8);
+                File.WriteAllLines(listPath, existing, new System.Text.UTF8Encoding(encoderShouldEmitUTF8Identifier: false)); // Sans BOM : sinon le premier chemin de la liste est invalide pour clamscan.
                 BuildFileListScanArgs(args, listPath);
                 return listPath;
             });
@@ -238,21 +238,34 @@ namespace optiSCAN.Services
                 proc.ErrorDataReceived += (_, e) =>
                 {
                     if (!string.IsNullOrWhiteSpace(e.Data))
-                        AppLogger.Warn("ClamAV", $"stderr: {e.Data}");
+                        AppLogger.Warn("ClamAV", $"stderr: {PathRedaction.RedactPath(e.Data)}");
                 };
 
                 proc.Start();
                 proc.BeginOutputReadLine();
                 proc.BeginErrorReadLine();
 
-                await WaitForProcessAsync(proc, ct);
+                // Un fichier seul a un délai : un clamscan bloqué (archive piégée) est arrêté et le
+                // résultat marqué en erreur, au lieu d'attendre indéfiniment. Les scans de dossier
+                // ou de volume, longs par nature, restent bornés par l'annulation de l'utilisateur.
+                using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                if (type == ScanType.File)
+                    deadline.CancelAfter(SingleFileScanTimeout);
+                await WaitForProcessAsync(proc, deadline.Token);
 
                 try { proc.WaitForExit(); } catch { /* déjà terminé */ }
 
                 result.FinishedAt = DateTime.Now;
-                result.Status = ct.IsCancellationRequested
-                    ? ScanStatus.Cancelled
-                    : ScanStatus.Completed;
+                var timedOut = deadline.IsCancellationRequested && !ct.IsCancellationRequested;
+                var exitCode = proc.HasExited ? proc.ExitCode : -1;
+                result.Status = ClassifyExit(exitCode, result.Threats.Count, ct.IsCancellationRequested, out var exitError);
+                if (exitError != null)
+                    result.ErrorMessage = exitError;
+                if (timedOut)
+                {
+                    result.Status = ScanStatus.Error;
+                    result.ErrorMessage = "clamscan : délai dépassé";
+                }
 
                 if (ct.IsCancellationRequested && !proc.HasExited)
                     proc.Kill(entireProcessTree: true);
@@ -379,6 +392,9 @@ namespace optiSCAN.Services
             return psi;
         }
 
+        /// <summary>Délai maximal de clamscan sur un fichier seul.</summary>
+        internal static readonly TimeSpan SingleFileScanTimeout = TimeSpan.FromMinutes(10);
+
         private static async Task WaitForProcessAsync(Process proc, CancellationToken ct)
         {
             var tcs = new TaskCompletionSource<bool>();
@@ -406,7 +422,17 @@ namespace optiSCAN.Services
             proc.Start();
             var stdoutTask = proc.StandardOutput.ReadToEndAsync();
             var stderrTask = proc.StandardError.ReadToEndAsync();
-            await proc.WaitForExitAsync();
+            using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+            try
+            {
+                await proc.WaitForExitAsync(deadline.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                try { proc.Kill(entireProcessTree: true); }
+                catch (Exception ex) { AppLogger.Debug("ClamAvEngine", "Arrêt de " + Path.GetFileName(exe) + " : " + ex.Message); }
+                return (string.Empty, "délai dépassé");
+            }
             return (await stdoutTask, await stderrTask);
         }
 
@@ -416,6 +442,27 @@ namespace optiSCAN.Services
                 throw new InvalidOperationException(
                     $"clamscan.exe introuvable dans : {_clamavDir}\n" +
                     "Placez les binaires ClamAV dans 'clamav/x64/' ou 'clamav/x86/'.");
+        }
+
+        /// <summary>
+        /// 0 = rien trouvé, 1 = menace lue, 2 = erreur. Une menace déjà extraite reste visible.
+        /// </summary>
+        internal static ScanStatus ClassifyExit(int exitCode, int threatCount, bool cancelled, out string? error)
+        {
+            error = null;
+            if (cancelled)
+                return ScanStatus.Cancelled;
+            if (exitCode == 0)
+                return ScanStatus.Completed;
+            if (exitCode == 1 && threatCount > 0)
+                return ScanStatus.Completed;
+            if (exitCode == 1)
+            {
+                error = "clamscan a signalé une menace qui n'a pas été lue";
+                return ScanStatus.Error;
+            }
+            error = "clamscan s'est terminé avec le code " + exitCode;
+            return ScanStatus.Error;
         }
 
         // GetQuickScanTargets retiré : la source unique est désormais

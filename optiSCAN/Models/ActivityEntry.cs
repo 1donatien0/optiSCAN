@@ -24,7 +24,12 @@ namespace optiSCAN.Models
         public bool HasThreats { get; init; }
         /// <summary>Menaces encore actionnables dans la session (liste non vide).</summary>
         public bool HasPendingThreats { get; init; }
-        public bool IsClean => Kind == ActivityKind.Scan && !HasThreats;
+        public bool IsIncomplete => Kind == ActivityKind.Scan
+            && ScanSession?.StatusDisplay is { } status
+            && (string.Equals(status, nameof(ScanStatus.Error), StringComparison.OrdinalIgnoreCase)
+                || string.Equals(status, nameof(ScanStatus.Cancelled), StringComparison.OrdinalIgnoreCase));
+        public bool IsClean => Kind == ActivityKind.Scan && !HasThreats && !IsIncomplete
+            && !string.Equals(ScanSession?.StatusDisplay, nameof(ScanStatus.Cancelled), StringComparison.OrdinalIgnoreCase);
         public string DurationDisplay => DetailDisplay;
         public ScanSession? ScanSession { get; init; }
         public CleanSession? CleanSession { get; init; }
@@ -137,9 +142,16 @@ namespace optiSCAN.Models
 
         public static ActivityEntry FromScan(ScanSession session, Guid eventId = default)
         {
-            string result = session.ThreatsFound > 0
-                ? LocalizationService.Format("Hist_InfoThreats", session.ThreatsFound)
-                : LocalizationService.GetString("Hist_InfoClean");
+            var incomplete = string.Equals(session.StatusDisplay, nameof(ScanStatus.Error), StringComparison.OrdinalIgnoreCase);
+            string result = incomplete
+                ? session.ThreatsFound > 0
+                    ? LocalizationService.Format("Hist_InfoThreatsIncomplete", session.ThreatsFound)
+                    : LocalizationService.GetString("Hist_InfoIncomplete")
+                : string.Equals(session.StatusDisplay, nameof(ScanStatus.Cancelled), StringComparison.OrdinalIgnoreCase)
+                    ? LocalizationService.GetString("Hist_InfoCancelled")
+                : session.ThreatsFound > 0
+                    ? LocalizationService.Format("Hist_InfoThreats", session.ThreatsFound)
+                    : LocalizationService.GetString("Hist_InfoClean");
 
             var pending = session.Threats.Count > 0;
 
@@ -183,6 +195,7 @@ namespace optiSCAN.Models
             ActivityKind.Quarantine when EventKind == ActivityEventKind.ThreatRestored => "BackupRestore",
             ActivityKind.Quarantine when EventKind == ActivityEventKind.QuarantineDeleted => "TrashCanOutline",
             ActivityKind.Quarantine => "ShieldLock",
+            _ when IsIncomplete => "AlertCircleOutline",
             _ when HasThreats => "ShieldAlert",
             _ => "ShieldCheck",
         };
@@ -193,6 +206,7 @@ namespace optiSCAN.Models
             ActivityKind.Quarantine when EventKind == ActivityEventKind.ThreatRestored => "SuccessGreen",
             ActivityKind.Quarantine when EventKind == ActivityEventKind.QuarantineDeleted => "DangerRed",
             ActivityKind.Quarantine => "WarningOrange",
+            _ when IsIncomplete => "WarningOrange",
             _ when HasThreats => "DangerRed",
             _ => "SuccessGreen",
         };

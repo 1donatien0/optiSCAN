@@ -32,6 +32,8 @@ namespace optiSCAN.Services
             int denom = targets.Count;
             int idx = 0;
             int filesBaseline = 0;
+            var failedTargets = new List<string>();
+            var scannedTargets = 0;
 
             foreach (var target in targets)
             {
@@ -52,12 +54,33 @@ namespace optiSCAN.Services
                 }
 
                 var relay = new ScanProgressRelay(filesBaseline);
-                var sub = await scanOneAsync(target, relay.ToParent(progress), ct).ConfigureAwait(false);
+                ScanResult sub;
+                try
+                {
+                    sub = await scanOneAsync(target, relay.ToParent(progress), ct).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException) when (ct.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    // Une cible en échec ne doit pas interrompre les autres : elle est signalée
+                    // et le scan global sera marqué incomplet.
+                    AppLogger.Warn("MultiTargetScan", $"Cible en échec : {PathRedaction.RedactPath(target)}", ex);
+                    sub = new ScanResult { Status = ScanStatus.Error, ErrorMessage = ex.Message, TargetPath = target };
+                }
+                scannedTargets++;
+                if (sub.Status == ScanStatus.Error)
+                    failedTargets.Add(target + (string.IsNullOrEmpty(sub.ErrorMessage) ? string.Empty : " (" + sub.ErrorMessage + ")"));
+                else if (!string.IsNullOrEmpty(sub.ErrorMessage))
+                    failedTargets.Add(target + " (" + sub.ErrorMessage + ")");
 
                 filesBaseline = Math.Max(filesBaseline, Math.Max(relay.FilesScannedHigh, sub.FilesScanned));
                 merged.FilesScanned = filesBaseline;
                 merged.FilesSkipped += sub.FilesSkipped;
                 merged.TotalBytesScanned += sub.TotalBytesScanned;
+                merged.HasCoverageGaps |= sub.HasCoverageGaps;
                 foreach (var t in sub.Threats)
                     ScanThreatMerger.AddOrMergeThreat(merged.Threats, t);
 
@@ -75,7 +98,20 @@ namespace optiSCAN.Services
             }
 
             merged.FinishedAt = DateTime.Now;
-            merged.Status = ct.IsCancellationRequested ? ScanStatus.Cancelled : ScanStatus.Completed;
+            // Une zone illisible rend la couverture globale incomplète, même si les autres
+            // zones ont été analysées. Si aucune zone n'a pu être analysée, le motif le précise.
+            var allFailed = (scannedTargets > 0
+                && failedTargets.Count == scannedTargets
+                && merged.FilesScanned == 0
+                && merged.Threats.Count == 0)
+                || (scannedTargets == 0 && targets.Count > 0);
+            merged.Status = ct.IsCancellationRequested
+                ? ScanStatus.Cancelled
+                : failedTargets.Count > 0 || allFailed ? ScanStatus.Error : ScanStatus.Completed;
+            if (failedTargets.Count > 0)
+                merged.ErrorMessage = (allFailed ? "Aucune zone analysée : " : "Scan partiel : ") + string.Join("; ", failedTargets);
+            else if (allFailed)
+                merged.ErrorMessage = "Aucune zone n'a pu être analysée.";
             return merged;
         }
 

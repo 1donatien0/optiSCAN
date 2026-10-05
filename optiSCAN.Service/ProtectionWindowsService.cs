@@ -24,6 +24,18 @@ public sealed class ProtectionWindowsService : BackgroundService
             return;
         }
 
+        // L'hôte tourne en SYSTEM : un dossier modifiable par un utilisateur lui donnerait
+        // une exécution SYSTEM en remplaçant optiSCAN.exe. Refus tant que le dossier n'est pas
+        // réservé aux administrateurs (installation sous Program Files).
+        if (!InstallLocationTrust.IsCurrentInstallTrusted(out var reason))
+        {
+            WriteEvent(
+                "Hôte non démarré : le dossier d'installation n'est pas réservé aux administrateurs ("
+                + reason + "). Réinstaller optiSCAN sous Program Files.",
+                EventLogEntryType.Error);
+            return;
+        }
+
         while (!stoppingToken.IsCancellationRequested)
         {
             if (_hostProcess is { HasExited: false })

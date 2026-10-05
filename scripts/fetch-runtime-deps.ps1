@@ -4,6 +4,13 @@
 
 .PARAMETER Force
     Re-télécharge même si les exécutables sont déjà présents.
+    Sans -Force, un moteur est quand même remplacé quand son marqueur .pinned-version
+    ne correspond plus à la version et à l'empreinte de runtime-versions.json.
+
+.PARAMETER RequireSignature
+    Exige la vérification GPG de l'archive ClamAV (signature Talos, clé scripts/keys/cisco-talos.gpg,
+    empreinte clamavSigningKeyFingerprint). Sans ce commutateur, la signature est vérifiée si gpg
+    est disponible, et seul le SHA-256 épinglé fait foi sinon (avec un avertissement).
 
 .PARAMETER RunFreshclam
     Lance freshclam vers optiSCAN/clamav/database (long, ~200+ Mo).
@@ -18,6 +25,7 @@
 [CmdletBinding()]
 param(
     [switch] $Force,
+    [switch] $RequireSignature,
     [switch] $RunFreshclam,
     [int] $FreshclamTimeoutMinutes = 45
 )
@@ -34,14 +42,93 @@ $yaraDir = Join-Path $root 'optiSCAN\yara'
 $cacheDir = Join-Path $root 'artifacts\deps-cache'
 New-Item -ItemType Directory -Force -Path $clamX64, $clamDb, $yaraDir, $cacheDir | Out-Null
 
+function Assert-PinnedSha256([string] $Path, $Expected, [string] $Label, [switch] $Keep) {
+    $pinned = [string] $Expected
+    if ([string]::IsNullOrWhiteSpace($pinned)) {
+        throw "$Label : empreinte SHA-256 absente de runtime-versions.json"
+    }
+    $actual = (Get-FileHash -Algorithm SHA256 -Path $Path).Hash
+    if ($actual -ne $pinned.ToUpperInvariant()) {
+        # Un téléchargement corrompu est effacé ; un fichier du dépôt (-Keep) est laissé pour examen.
+        if (-not $Keep) { Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue }
+        throw "$Label : empreinte SHA-256 incorrecte ($actual)"
+    }
+}
+
+# Marqueur écrit après une extraction vérifiée : sans lui, des binaires plus anciens
+# déjà présents (ex. ClamAV 1.4.5) seraient gardés malgré un nouvel épinglage.
+$pinMarkerName = '.pinned-version'
+$clamPin = "clamav $($versions.clamavVersion) $(([string]$versions.clamavWinX64Sha256).ToUpperInvariant())"
+$yaraPin = "yara $($versions.yaraVersion) $(([string]$versions.yaraWin64Sha256).ToUpperInvariant())"
+
+function Test-PinMarker([string] $dir, [string] $expected) {
+    $marker = Join-Path $dir $pinMarkerName
+    if (-not (Test-Path -LiteralPath $marker)) { return $false }
+    return ((Get-Content -LiteralPath $marker -Raw).Trim() -eq $expected)
+}
+
+function Write-PinMarker([string] $dir, [string] $value) {
+    $utf8NoBom = New-Object System.Text.UTF8Encoding $false
+    [System.IO.File]::WriteAllText((Join-Path $dir $pinMarkerName), $value + "`n", $utf8NoBom)
+}
+
+function Find-Gpg {
+    $cmd = Get-Command gpg -ErrorAction SilentlyContinue
+    if ($cmd) { return $cmd.Source }
+    # Git for Windows (présent sur les runners GitHub) embarque gpg.
+    foreach ($candidate in @(
+            (Join-Path $env:ProgramFiles 'Git\usr\bin\gpg.exe'),
+            (Join-Path $env:ProgramFiles 'GnuPG\bin\gpg.exe'),
+            (Join-Path ${env:ProgramFiles(x86)} 'GnuPG\bin\gpg.exe'))) {
+        if ($candidate -and (Test-Path -LiteralPath $candidate)) { return $candidate }
+    }
+    return $null
+}
+
+# Vérifie la signature détachée Talos de l'archive ClamAV avec la clé versionnée dans le dépôt,
+# dans un trousseau temporaire, et contrôle l'empreinte de la clé primaire qui a signé.
+function Assert-TalosSignature([string] $ZipPath, [string] $ZipUrl) {
+    $expected = ([string] $versions.clamavSigningKeyFingerprint).Replace(' ', '').ToUpperInvariant()
+    if ([string]::IsNullOrWhiteSpace($expected)) { throw "clamavSigningKeyFingerprint absent de runtime-versions.json" }
+    $gpg = Find-Gpg
+    if (-not $gpg) {
+        if ($RequireSignature) { throw "gpg introuvable : vérification de signature ClamAV impossible (-RequireSignature)" }
+        Write-Warning "  gpg introuvable : signature ClamAV non vérifiée, seul le SHA-256 épinglé fait foi."
+        return
+    }
+    $keyFile = Join-Path $PSScriptRoot 'keys\cisco-talos.gpg'
+    if (-not (Test-Path -LiteralPath $keyFile)) { throw "Clé Talos introuvable : $keyFile" }
+    $sigPath = "$ZipPath.sig"
+    Invoke-WebRequest -Uri "$ZipUrl.sig" -OutFile $sigPath -UseBasicParsing
+    $gnupgHome = Join-Path $cacheDir ("gnupg-" + [Guid]::NewGuid().ToString('n'))
+    New-Item -ItemType Directory -Force -Path $gnupgHome | Out-Null
+    try {
+        & $gpg --homedir $gnupgHome --batch --quiet --import $keyFile 2>$null | Out-Null
+        $status = & $gpg --homedir $gnupgHome --batch --status-fd 1 --verify $sigPath $ZipPath 2>$null
+        # StartsWith, pas -like : « [GNUPG:] » serait lu comme une classe de caractères.
+        $valid = $status | Where-Object { ([string] $_).StartsWith('[GNUPG:] VALIDSIG ') } | Select-Object -First 1
+        if (-not $valid) { throw "Signature ClamAV invalide ($ZipPath)" }
+        $primary = ($valid -split ' ')[-1].ToUpperInvariant()
+        if ($primary -ne $expected) { throw "Signature ClamAV par une clé inattendue ($primary)" }
+        Write-Host "  OK signature Talos ($primary)" -ForegroundColor Green
+    } finally {
+        Remove-Item -LiteralPath $gnupgHome -Recurse -Force -ErrorAction SilentlyContinue
+        Remove-Item -LiteralPath $sigPath -Force -ErrorAction SilentlyContinue
+    }
+}
+
 function Test-ClamReady {
-    @('clamscan.exe', 'freshclam.exe', 'clamd.exe', 'libclamav.dll', 'libfreshclam.dll') |
+    $missing = @('clamscan.exe', 'freshclam.exe', 'clamd.exe', 'libclamav.dll', 'libfreshclam.dll') |
         ForEach-Object { Test-Path (Join-Path $clamX64 $_) } | Where-Object { $_ -eq $false } | Measure-Object |
         Select-Object -ExpandProperty Count
+    if ($missing -gt 0) { return $missing }
+    if (-not (Test-PinMarker $clamX64 $clamPin)) { return 1 }
+    return 0
 }
 
 function Test-YaraReady {
-    (Test-Path (Join-Path $yaraDir 'yara64.exe')) -and (Test-Path (Join-Path $yaraDir 'yara32.exe'))
+    (Test-Path (Join-Path $yaraDir 'yara64.exe')) -and (Test-Path (Join-Path $yaraDir 'yara32.exe')) -and
+        (Test-PinMarker $yaraDir $yaraPin)
 }
 
 function Expand-ZipToTemp([string] $zipPath) {
@@ -93,6 +180,8 @@ function Install-ClamCertsLayout {
     if (-not (Test-Path -LiteralPath $crt)) {
         throw "Certificat ClamAV introuvable : $crt (requis pour freshclam / verification CVD)"
     }
+    # Ancre de confiance de la signature des CVD : empreinte épinglée (tag clamav-1.5.0).
+    Assert-PinnedSha256 $crt $versions.clamavRootCertSha256 'Certificat racine ClamAV' -Keep
     # freshclam 1.4 Windows cherche aussi clamav\x64\certs par defaut (erreur CI sinon).
     $x64Certs = Join-Path $clamX64 'certs'
     New-Item -ItemType Directory -Force -Path $x64Certs | Out-Null
@@ -145,10 +234,18 @@ if ($Force -or (Test-ClamReady) -gt 0) {
         Write-Host "  Telechargement $($versions.clamavWinX64Url) ..."
         Invoke-WebRequest -Uri $versions.clamavWinX64Url -OutFile $zipPath -UseBasicParsing
     }
+    Assert-PinnedSha256 $zipPath $versions.clamavWinX64Sha256 'ClamAV'
+    Assert-TalosSignature $zipPath $versions.clamavWinX64Url
     $temp = Expand-ZipToTemp $zipPath
     try {
+        # Les .exe/.dll d'une version précédente sont retirés : une DLL disparue de la
+        # nouvelle archive ne doit pas rester chargée à côté des nouveaux binaires.
+        Get-ChildItem -LiteralPath $clamX64 -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Extension -in '.exe', '.dll' -or $_.Name -eq $pinMarkerName } |
+            Remove-Item -Force
         # freshclam/clamscan dynamiquement liés : libclamav, libfreshclam, OpenSSL, libcurl, etc.
         Copy-ClamAvRuntime $temp $clamX64
+        Write-PinMarker $clamX64 $clamPin
     } finally {
         Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
     }
@@ -164,19 +261,27 @@ if ((Test-Path (Join-Path $clamX64 'clamscan.exe')) -and (Test-Path (Join-Path $
 # --- YARA ---
 if ($Force -or -not (Test-YaraReady)) {
     Write-Host "`n[ YARA $($versions.yaraVersion) win64 ]" -ForegroundColor Cyan
-    $zipName = "yara-$($versions.yaraVersion)-2306-win64.zip"
+    $zipName = [IO.Path]::GetFileName(([Uri]$versions.yaraWin64Url).AbsolutePath)
     $zipPath = Join-Path $cacheDir $zipName
     if (-not (Test-Path $zipPath) -or $Force) {
         Write-Host "  Telechargement $($versions.yaraWin64Url) ..."
         Invoke-WebRequest -Uri $versions.yaraWin64Url -OutFile $zipPath -UseBasicParsing
     }
+    Assert-PinnedSha256 $zipPath $versions.yaraWin64Sha256 'YARA'
     $temp = Expand-ZipToTemp $zipPath
     try {
-        Copy-IfExists $temp $yaraDir @('yara64.exe', 'yara32.exe', 'yarac64.exe', 'yarac32.exe')
-        if (-not (Test-Path (Join-Path $yaraDir 'yara32.exe')) -and (Test-Path (Join-Path $yaraDir 'yara64.exe'))) {
-            Copy-Item (Join-Path $yaraDir 'yara64.exe') (Join-Path $yaraDir 'yara32.exe') -Force
-            Write-Host "  OK yara32.exe (copie de yara64 pour verify)" -ForegroundColor Yellow
+        # Les binaires d'une version précédente (yarac32.exe, etc.) sont retirés avant copie.
+        Get-ChildItem -LiteralPath $yaraDir -File -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match '^yarac?(32|64)\.exe$' -or $_.Name -eq $pinMarkerName } |
+            Remove-Item -Force
+        Copy-IfExists $temp $yaraDir @('yara64.exe', 'yarac64.exe')
+        if (-not (Test-Path (Join-Path $yaraDir 'yara64.exe'))) {
+            throw "Binaire YARA manquant dans l'archive : yara64.exe"
         }
+        # L'archive officielle ne contient que la version 64 bits : yara32.exe en est une copie.
+        Copy-Item (Join-Path $yaraDir 'yara64.exe') (Join-Path $yaraDir 'yara32.exe') -Force
+        Write-Host "  OK yara32.exe (copie de yara64 pour verify)" -ForegroundColor Yellow
+        Write-PinMarker $yaraDir $yaraPin
     } finally {
         Remove-Item -LiteralPath $temp -Recurse -Force -ErrorAction SilentlyContinue
     }
@@ -244,7 +349,7 @@ if (-not $rules -or $rules.Count -eq 0) {
 }
 
 Write-Host "`nVerification projet (avant publish)..." -ForegroundColor Cyan
-$pubDefault = Join-Path $root 'optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64'
+$pubDefault = Join-Path $root 'optiSCAN\bin\Release\net10.0-windows10.0.17763.0\publish\win-x64'
 if (Test-Path (Join-Path $pubDefault 'optiSCAN.exe')) {
     & (Join-Path $PSScriptRoot 'verify-runtime-deps.ps1') -PublishDir $pubDefault
 } else {

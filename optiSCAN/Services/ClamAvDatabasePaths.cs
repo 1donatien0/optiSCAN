@@ -1,4 +1,6 @@
 using System.IO;
+using System.Security.Principal;
+using optiSCAN.Platform;
 
 namespace optiSCAN.Services
 {
@@ -82,6 +84,14 @@ namespace optiSCAN.Services
         public static string ResolveWritableDatabaseDir(string clamavBinDir)
         {
             var preferred = ResolvePreferredDatabaseDir(clamavBinDir);
+
+            if (IsSystemProcess() && OptiScanProgramData.EnsureTrusted())
+            {
+                var systemDb = Path.Combine(OptiScanProgramData.DirectoryPath, "clamav", "database");
+                Directory.CreateDirectory(systemDb);
+                TrySeedSignatureFiles(preferred, systemDb);
+                return systemDb;
+            }
 
             if (!IsUnderProgramFilesOrProgramFilesX86(preferred)
                 && IsUsableWritableDatabaseRoot(preferred))
@@ -179,6 +189,12 @@ namespace optiSCAN.Services
             {
                 AppLogger.Warn("ClamAvDatabasePaths", "TrySeedSignatureFiles", ex);
             }
+        }
+
+        private static bool IsSystemProcess()
+        {
+            using var identity = WindowsIdentity.GetCurrent();
+            return identity.IsSystem;
         }
     }
 }

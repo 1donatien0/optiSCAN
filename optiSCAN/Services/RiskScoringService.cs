@@ -10,41 +10,46 @@ namespace optiSCAN.Services
     /// </summary>
     public static class RiskScoringService
     {
-        private static readonly Dictionary<string, RiskLevel> KeywordRiskMap = new(StringComparer.OrdinalIgnoreCase)
+        // Tous les mots-clés sont évalués et le niveau le plus élevé l'emporte : le résultat ne
+        // dépend plus de l'ordre d'énumération d'un dictionnaire (« worm » contre « worm.win32 »).
+        private static readonly (string Key, RiskLevel Level)[] KeywordRiskMap =
         {
-            { "ransom",          RiskLevel.Critical },
-            { "ransomware",      RiskLevel.Critical },
-            { "locky",           RiskLevel.Critical },
-            { "wannacry",        RiskLevel.Critical },
-            { "notpetya",        RiskLevel.Critical },
-            { "rootkit",         RiskLevel.Critical },
-            { "bootkit",         RiskLevel.Critical },
-            { "backdoor",        RiskLevel.Critical },
-            { "trojan.ransom",   RiskLevel.Critical },
-            { "malware.ransom",  RiskLevel.Critical },
-            { "worm.win32",      RiskLevel.Critical },
+            ("ransom", RiskLevel.Critical),
+            ("ransomware", RiskLevel.Critical),
+            ("locky", RiskLevel.Critical),
+            ("wannacry", RiskLevel.Critical),
+            ("notpetya", RiskLevel.Critical),
+            ("rootkit", RiskLevel.Critical),
+            ("bootkit", RiskLevel.Critical),
+            ("backdoor", RiskLevel.Critical),
+            ("trojan.ransom", RiskLevel.Critical),
+            ("malware.ransom", RiskLevel.Critical),
+            ("worm.win32", RiskLevel.Critical),
 
-            { "trojan",          RiskLevel.Major },
-            { "worm",            RiskLevel.Major },
-            { "spy",             RiskLevel.Major },
-            { "spyware",         RiskLevel.Major },
-            { "keylog",          RiskLevel.Major },
-            { "keylogger",       RiskLevel.Major },
-            { "downloader",      RiskLevel.Major },
-            { "dropper",         RiskLevel.Major },
-            { "infostealer",     RiskLevel.Major },
-            { "banker",          RiskLevel.Major },
+            ("trojan", RiskLevel.Major),
+            ("worm", RiskLevel.Major),
+            ("spy", RiskLevel.Major),
+            ("spyware", RiskLevel.Major),
+            ("keylog", RiskLevel.Major),
+            ("keylogger", RiskLevel.Major),
+            ("downloader", RiskLevel.Major),
+            ("dropper", RiskLevel.Major),
+            ("infostealer", RiskLevel.Major),
+            ("banker", RiskLevel.Major),
+            ("malware", RiskLevel.Major),
+            ("exploit", RiskLevel.Major),
+            ("miner", RiskLevel.Major),
 
-            { "adware",          RiskLevel.Minor },
-            { "pup",             RiskLevel.Minor },
-            { "pua",             RiskLevel.Minor },
-            { "hacktool",        RiskLevel.Minor },
-            { "riskware",        RiskLevel.Minor },
-            { "potentially",     RiskLevel.Minor },
-            { "unsafe",          RiskLevel.Minor },
+            ("adware", RiskLevel.Minor),
+            ("pup", RiskLevel.Minor),
+            ("pua", RiskLevel.Minor),
+            ("hacktool", RiskLevel.Minor),
+            ("riskware", RiskLevel.Minor),
+            ("potentially", RiskLevel.Minor),
+            ("unsafe", RiskLevel.Minor),
 
-            { "suspicious",      RiskLevel.Informational },
-            { "detected",        RiskLevel.Informational },
+            ("suspicious", RiskLevel.Informational),
+            ("detected", RiskLevel.Informational),
         };
 
         private static readonly HashSet<string> HighRiskExtensions = new(
@@ -60,7 +65,7 @@ namespace optiSCAN.Services
             var score = 0;
             var reasons = new List<string>();
 
-            var (level, reason) = AnalyzeVirusName(threat.VirusName);
+            var (level, reason) = AnalyzeVirusName(threat.VirusName, threat.DetectedBy);
             score += GetScore(level);
             reasons.Add(reason);
 
@@ -76,15 +81,12 @@ namespace optiSCAN.Services
                 reasons.Add(LocalizationService.GetString("Risk_Reason_Corroborated"));
             }
 
+            // Pas de pénalité pour les gros fichiers : un installeur piégé ou un malware
+            // gonflé pour échapper aux analyses n'est pas moins dangereux.
             if (threat.FileSize > 0 && threat.FileSize < 1024 * 1024)
             {
                 score += 10;
                 reasons.Add(LocalizationService.GetString("Risk_Reason_SmallPayload"));
-            }
-            else if (threat.FileSize > 50 * 1024 * 1024)
-            {
-                score -= 10;
-                reasons.Add(LocalizationService.GetString("Risk_Reason_LargeFile"));
             }
 
             var finalLevel = GetRiskLevelFromScore(score);
@@ -123,40 +125,54 @@ namespace optiSCAN.Services
 
         public static string GetSeverityLevel(ThreatInfo threat)
         {
-            var (level, _) = AnalyzeVirusName(threat.VirusName);
+            var (level, _) = AnalyzeVirusName(threat.VirusName, threat.DetectedBy);
             return GetSeverityString(level);
         }
 
         private static string NormalizeForMatch(string s)
             => s.Replace('_', ' ').Replace('.', ' ');
 
-        private static (RiskLevel, string) AnalyzeVirusName(string virusName)
+        private static (RiskLevel, string) AnalyzeVirusName(string virusName, string? detectedBy)
         {
             if (string.IsNullOrEmpty(virusName))
                 return (RiskLevel.Informational, LocalizationService.GetString("Risk_Reason_UnknownName"));
 
             var normalizedName = NormalizeForMatch(virusName);
+            (string Key, RiskLevel Level, bool Normalized)? best = null;
 
-            foreach (var kvp in KeywordRiskMap)
+            foreach (var (key, keyLevel) in KeywordRiskMap)
             {
-                if (virusName.Contains(kvp.Key, StringComparison.OrdinalIgnoreCase))
-                    return (kvp.Value, LocalizationService.Format("Risk_Reason_Keyword", kvp.Key));
-
-                var normalizedKey = NormalizeForMatch(kvp.Key);
-                if (normalizedName.Contains(normalizedKey, StringComparison.OrdinalIgnoreCase))
-                    return (kvp.Value, LocalizationService.Format("Risk_Reason_KeywordNormalized", kvp.Key));
+                var direct = virusName.Contains(key, StringComparison.OrdinalIgnoreCase);
+                if (!direct && !normalizedName.Contains(NormalizeForMatch(key), StringComparison.OrdinalIgnoreCase))
+                    continue;
+                if (best is null
+                    || keyLevel > best.Value.Level
+                    || (keyLevel == best.Value.Level && key.Length > best.Value.Key.Length))
+                    best = (key, keyLevel, !direct);
             }
 
-            return (RiskLevel.Minor, LocalizationService.GetString("Risk_Reason_GenericThreat"));
+            if (best is { } hit)
+                return (hit.Level, LocalizationService.Format(
+                    hit.Normalized ? "Risk_Reason_KeywordNormalized" : "Risk_Reason_Keyword", hit.Key));
+
+            // Nom non reconnu : une signature ClamAV désigne un échantillon identifié (Majeur) ;
+            // une règle YARA seule est souvent heuristique (Mineur).
+            var engineDetected = !string.IsNullOrEmpty(detectedBy)
+                && detectedBy.Contains("ClamAV", StringComparison.OrdinalIgnoreCase);
+            return (engineDetected ? RiskLevel.Major : RiskLevel.Minor,
+                LocalizationService.GetString("Risk_Reason_GenericThreat"));
         }
 
         private static RiskLevel AnalyzeFilePath(string filePath)
         {
             var ext = Path.GetExtension(filePath);
 
+            // Fichier système : Majeur, pas Critique. Une détection y est souvent un faux positif
+            // sur un composant Windows, et le supprimer casserait le système ; la recommandation
+            // renvoie vers une réparation (SFC) plutôt qu'une suppression.
             if (filePath.Contains(@"\Windows\System32\", StringComparison.OrdinalIgnoreCase)
                 || filePath.Contains(@"\Windows\SysWOW64\", StringComparison.OrdinalIgnoreCase))
-                return RiskLevel.Critical;
+                return RiskLevel.Major;
 
             if (HighRiskExtensions.Contains(ext) || MacroExtensions.Contains(ext))
                 return RiskLevel.Major;

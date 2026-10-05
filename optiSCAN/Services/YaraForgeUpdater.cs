@@ -63,8 +63,7 @@ namespace optiSCAN.Services
 
         public YaraForgeUpdater(string? rulesDir = null)
         {
-            var baseDir = AppDomain.CurrentDomain.BaseDirectory;
-            _rulesDirectory = rulesDir ?? Path.Combine(baseDir, "rules");
+            _rulesDirectory = YaraRulesLocation.ResolveWritable(rulesDir);
             _compiledRulesPath = Path.Combine(_rulesDirectory, "_compiled.yarc");
             _rulesMetaPath = Path.Combine(_rulesDirectory, ".optiscan-yara-meta.txt");
             LoadPersistedMeta();
@@ -258,13 +257,28 @@ namespace optiSCAN.Services
                     return result;
                 }
 
+                // Release, asset, taille et SHA-256 doivent tous correspondre à l'allowlist locale.
+                if (!YaraForgePackageIntegrity.TryGetTrustedExpectedDigest(
+                        tagName, PackageName, packageAsset, out var expectedSize, out var expectedSha256)
+                    || !YaraForgePackageIntegrity.IsAllowedDownloadUrl(downloadUrl, tagName, PackageName))
+                {
+                    result.Success = false;
+                    result.Message = LocalizationService.GetString("YaraForge_IntegrityError");
+                    AppLogger.Warn("YaraForgeUpdater", "Asset YARA-Forge sans empreinte SHA-256 ou URL inattendue : refusé");
+                    return result;
+                }
+
                 // ── 3. Téléchargement ─────────────────────────────────────────
                 Report(progress, LocalizationService.GetString("YaraForge_Downloading"));
 
                 byte[] zipBytes;
                 try
                 {
-                    zipBytes = await _http.GetByteArrayAsync(downloadUrl, token);
+                    using var response = await _http.GetAsync(downloadUrl, HttpCompletionOption.ResponseHeadersRead, token);
+                    response.EnsureSuccessStatusCode();
+                    await using var body = await response.Content.ReadAsStreamAsync(token);
+                    zipBytes = await YaraForgePackageIntegrity.ReadBoundedAsync(
+                        body, YaraForgePackageIntegrity.MaxPackageBytes, token);
                 }
                 catch (Exception ex)
                 {
@@ -273,7 +287,6 @@ namespace optiSCAN.Services
                     return result;
                 }
 
-                YaraForgePackageIntegrity.TryGetExpectedDigest(packageAsset, out var expectedSize, out var expectedSha256);
                 if (!YaraForgePackageIntegrity.Validate(zipBytes, expectedSize, expectedSha256))
                 {
                     result.Success = false;
@@ -346,30 +359,37 @@ namespace optiSCAN.Services
             string compiledRulesPath,
             CancellationToken ct)
         {
+            // Extraction dans un dossier temporaire voisin : un paquet refusé (plafond, nom
+            // invalide) n'installe rien ; sinon les règles remplacent les anciennes une à une.
+            var staging = Path.Combine(
+                Path.GetDirectoryName(Path.GetFullPath(rulesDirectory).TrimEnd(Path.DirectorySeparatorChar)) ?? rulesDirectory,
+                "rules.staging-" + Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(staging);
             int installed = 0;
-            var n = 0;
-            using var ms = new MemoryStream(zipBytes, writable: false);
-            using var archive = new ZipArchive(ms, ZipArchiveMode.Read);
-
-            foreach (var entry in archive.Entries)
+            try
             {
-                if ((n++ & 0x3F) == 0)
-                    ct.ThrowIfCancellationRequested();
+                using (var ms = new MemoryStream(zipBytes, writable: false))
+                using (var archive = new ZipArchive(ms, ZipArchiveMode.Read))
+                    YaraForgePackageIntegrity.ExtractRules(archive, staging, ct);
 
-                if (!entry.Name.EndsWith(".yar", StringComparison.OrdinalIgnoreCase)
-                    || entry.Name.Length == 0)
-                    continue;
-
-                var dest = Path.Combine(rulesDirectory, entry.Name);
-                try
+                foreach (var file in Directory.EnumerateFiles(staging, "*.yar"))
                 {
-                    entry.ExtractToFile(dest, overwrite: true);
-                    installed++;
+                    var dest = Path.Combine(rulesDirectory, Path.GetFileName(file));
+                    try
+                    {
+                        File.Move(file, dest, overwrite: true);
+                        installed++;
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Warn("YaraForgeUpdater", $"Installation ignorée : {Path.GetFileName(file)}", ex);
+                    }
                 }
-                catch (Exception ex)
-                {
-                    AppLogger.Warn("YaraForgeUpdater", $"Extraction ignorée : {entry.Name}", ex);
-                }
+            }
+            finally
+            {
+                try { Directory.Delete(staging, recursive: true); }
+                catch (Exception ex) { AppLogger.Debug("YaraForgeUpdater", "Nettoyage du dossier temporaire : " + ex.Message); }
             }
 
             try

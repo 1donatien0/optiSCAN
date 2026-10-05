@@ -60,7 +60,7 @@ namespace optiSCAN.Services
             _yaraExe = Path.Combine(resolvedYaraDir, $"yara{arch}.exe");
             _yaracExe = Path.Combine(resolvedYaraDir, $"yarac{arch}.exe");
 
-            _rulesDirectory = rulesDir ?? Path.Combine(baseDir, "rules");
+            _rulesDirectory = YaraRulesLocation.ResolveWritable(rulesDir);
             _compiledRulesPath = Path.Combine(_rulesDirectory, "_compiled.yarc");
             _rulesCountCachePath = Path.Combine(_rulesDirectory, ".rules_count.cache");
             _compiledStampPath = Path.Combine(_rulesDirectory, "_compiled.stamp");
@@ -212,15 +212,31 @@ namespace optiSCAN.Services
             try
             {
                 process.Start();
-                // Lire stderr pour les erreurs de compilation
+                // Les deux flux sont drainés : un yarac qui remplit le tampon de sortie
+                // standard sans être lu resterait bloqué indéfiniment.
+                var outTask = process.StandardOutput.ReadToEndAsync();
                 var errTask = process.StandardError.ReadToEndAsync();
-                await process.WaitForExitAsync(ct);
+                using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                deadline.CancelAfter(CompileTimeout);
+                using (deadline.Token.Register(() => KillQuietly(process, "yarac")))
+                {
+                    try
+                    {
+                        await process.WaitForExitAsync(deadline.Token).ConfigureAwait(false);
+                    }
+                    catch (OperationCanceledException) when (!ct.IsCancellationRequested)
+                    {
+                        AppLogger.Warn("yarac", "Compilation arrêtée : délai dépassé");
+                        return false;
+                    }
+                }
                 try { process.WaitForExit(); }
                 catch { /* processus déjà terminé — drain buffer (cf. ClamAvEngine) */ }
-                var err = await errTask;
+                _ = await outTask.ConfigureAwait(false);
+                var err = await errTask.ConfigureAwait(false);
 
                 if (!string.IsNullOrWhiteSpace(err))
-                    AppLogger.Warn("yarac", err);
+                    AppLogger.Warn("yarac", PathRedaction.RedactPath(err));
 
                 var success = process.ExitCode == 0 && File.Exists(_compiledRulesPath);
                 if (success)
@@ -258,6 +274,7 @@ namespace optiSCAN.Services
             var matches = new List<YaraMatch>();
             if (!IsAvailable || !File.Exists(filePath)) return matches;
             if (_exclusions.Current.IsFileExcluded(filePath)) return matches;
+            var state = new YaraRunState();
 
             // Tenter compilation si pas encore fait
             if (!HasCompiled)
@@ -267,10 +284,9 @@ namespace optiSCAN.Services
             {
                 // Scan avec règles compilées : yara64.exe --compiled-rules rules.yarc fichier
                 // ArgumentList → guillemets/échappement sûr, pas de concaténation de chaîne.
-                var results = await RunYaraScanAsync(
+                await CollectAsync(matches, state, RunYaraScanAsync(
                     new[] { "--compiled-rules", _compiledRulesPath, filePath },
-                    filePath, ct);
-                matches.AddRange(results);
+                    filePath, ct));
             }
             else
             {
@@ -278,13 +294,12 @@ namespace optiSCAN.Services
                 foreach (var ruleFile in Directory.GetFiles(_rulesDirectory, "*.yar"))
                 {
                     if (ct.IsCancellationRequested) break;
-                    var results = await RunYaraScanAsync(
-                        new[] { ruleFile, filePath }, filePath, ct);
-                    matches.AddRange(results);
+                    await CollectAsync(matches, state, RunYaraScanAsync(
+                        new[] { ruleFile, filePath }, filePath, ct));
                 }
             }
 
-            return matches;
+            return state.Finish(matches);
         }
 
         /// <summary>
@@ -302,7 +317,8 @@ namespace optiSCAN.Services
             if (!HasCompiled)
                 await CompileRulesAsync(ct);
 
-            const int batchSize = 32;
+            var state = new YaraRunState();
+            const int batchSize = 256;
             for (var i = 0; i < files.Count; i += batchSize)
             {
                 if (ct.IsCancellationRequested) break;
@@ -319,25 +335,40 @@ namespace optiSCAN.Services
 
                 progress?.Report(LocalizationService.Format("Scan_Yara_Recursive", batch.Count.ToString()));
 
-                if (HasCompiled)
+                // yara n'accepte qu'une cible : plusieurs fichiers à la suite seraient lus
+                // comme des fichiers de règles (« can't accept multiple rules files » avec -C).
+                // --scan-list (YARA ≥ 4.1) lit la liste des cibles dans un fichier.
+                var listFile = Path.Combine(Path.GetTempPath(), "optiscan_yara_" + Guid.NewGuid().ToString("N") + ".txt");
+                try
                 {
-                    var args = new List<string> { "-N", "--compiled-rules", _compiledRulesPath };
-                    args.AddRange(batch);
-                    matches.AddRange(await RunYaraScanRecursiveAsync(args, ct, progress).ConfigureAwait(false));
-                }
-                else
-                {
-                    foreach (var ruleFile in Directory.GetFiles(_rulesDirectory, "*.yar"))
+                    await File.WriteAllLinesAsync(listFile, batch, new UTF8Encoding(false), ct).ConfigureAwait(false);
+                    if (HasCompiled)
                     {
-                        if (ct.IsCancellationRequested) break;
-                        var args = new List<string> { "-N", ruleFile };
-                        args.AddRange(batch);
-                        matches.AddRange(await RunYaraScanRecursiveAsync(args, ct, progress).ConfigureAwait(false));
+                        await CollectAsync(matches, state, RunYaraScanRecursiveAsync(
+                            new[] { "-N", "--compiled-rules", "--scan-list", _compiledRulesPath, listFile },
+                            ct,
+                            progress)).ConfigureAwait(false);
                     }
+                    else
+                    {
+                        foreach (var ruleFile in Directory.GetFiles(_rulesDirectory, "*.yar"))
+                        {
+                            if (ct.IsCancellationRequested) break;
+                            await CollectAsync(matches, state, RunYaraScanRecursiveAsync(
+                                new[] { "-N", "--scan-list", ruleFile, listFile },
+                                ct,
+                                progress)).ConfigureAwait(false);
+                        }
+                    }
+                }
+                finally
+                {
+                    try { File.Delete(listFile); }
+                    catch (Exception ex) { AppLogger.Debug("YaraEngine", "Liste temporaire : " + ex.Message); }
                 }
             }
 
-            return matches;
+            return state.Finish(matches);
         }
 
         /// <summary>Retourne true si au moins une règle YARA matche le fichier.</summary>
@@ -381,16 +412,18 @@ namespace optiSCAN.Services
             {
                 // Sans règles compilées : scan séquentiel par règle, encore N fois
                 // moins de lancements qu'un processus par fichier.
+                var state = new YaraRunState();
                 foreach (var ruleFile in Directory.GetFiles(_rulesDirectory, "*.yar"))
                 {
                     if (ct.IsCancellationRequested) break;
                     progress?.Report(LocalizationService.Format("Scan_Yara_Rule", Path.GetFileNameWithoutExtension(ruleFile)));
-                    var sub = await RunYaraScanAsync(
+                    // Récursif : la sortie porte le chemin de chaque fichier (« Règle chemin »).
+                    await CollectAsync(matches, state, RunYaraScanRecursiveAsync(
                         new[] { "-N", "--recursive", ruleFile, folderPath },
-                        folderPath, ct);
-                    matches.AddRange(sub);
+                        ct,
+                        progress)).ConfigureAwait(false);
                 }
-                return matches;
+                return state.Finish(matches);
             }
 
             progress?.Report(LocalizationService.Format("Scan_Yara_Recursive", Path.GetFileName(folderPath)));
@@ -463,12 +496,13 @@ namespace optiSCAN.Services
                 if (cap.Truncated)
                 {
                     AppLogger.Warn("YaraEngine",
-                        "Sortie stdout YARA tronquée (limite mémoire) — certains matchs peuvent manquer.");
+                        "Sortie stdout YARA tronquée (limite mémoire) — scan signalé incomplet.");
                 }
 
                 var stderrContent = stderrLines.ToString().Trim();
                 if (!string.IsNullOrEmpty(stderrContent))
-                    AppLogger.Warn("YARA/stderr (récursif)", stderrContent);
+                    AppLogger.Warn("YARA/stderr (récursif)", PathRedaction.RedactPath(stderrContent));
+
 
                 foreach (var line in cap.Builder.ToString()
                     .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
@@ -488,16 +522,93 @@ namespace optiSCAN.Services
                         && !_exclusions.Current.IsFileExcluded(matchedPath))
                         matches.Add(new YaraMatch { RuleName = ruleName, FilePath = matchedPath });
                 }
+
+                // Après l'analyse : un code non nul ne doit pas faire perdre les correspondances lues.
+                ThrowIfYaraFailed(process, ct, matches, cap.Truncated);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (IOException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
+                // yara introuvable, refus de lancement... : rien n'a été analysé, ce n'est pas « propre ».
                 AppLogger.Error("YARA", "Scan récursif", ex);
+                throw new YaraScanIncompleteException("YARA n'a pas pu analyser : " + ex.Message, matches);
             }
 
             return matches;
         }
 
         // ── Helpers ──────────────────────────────────────────────────────────────
+
+        /// <summary>
+        /// YARA rend 0 quand le scan est allé au bout, même sans correspondance.
+        /// Un autre code signifie que le fichier n'a pas été analysé.
+        /// </summary>
+        /// <summary>Délai maximal d'un yara sur un seul fichier.</summary>
+        internal static readonly TimeSpan SingleFileScanTimeout = TimeSpan.FromMinutes(5);
+
+        /// <summary>Délai maximal de compilation des règles par yarac.</summary>
+        internal static readonly TimeSpan CompileTimeout = TimeSpan.FromMinutes(10);
+
+        private static void KillQuietly(Process process, string label)
+        {
+            try
+            {
+                if (!process.HasExited)
+                    process.Kill(entireProcessTree: true);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("YaraEngine", $"Arrêt de {label}", ex);
+            }
+        }
+
+        private static void ThrowIfYaraFailed(Process process, CancellationToken ct, List<YaraMatch> matches, bool outputTruncated = false)
+        {
+            if (ct.IsCancellationRequested)
+                return;
+            if (process.HasExited && process.ExitCode != 0)
+                throw new YaraScanIncompleteException("YARA s'est terminé avec le code " + process.ExitCode + ".", matches);
+            // Sortie plafonnée : des correspondances au-delà sont perdues, le résultat ne
+            // peut pas être déclaré « propre ».
+            if (outputTruncated)
+                throw new YaraScanIncompleteException("Sortie YARA tronquée : des correspondances peuvent manquer.", matches);
+        }
+
+        /// <summary>
+        /// Exécute un lancement YARA et cumule ses correspondances, même s'il échoue :
+        /// l'échec est mémorisé dans <paramref name="state"/> et relevé à la fin.
+        /// </summary>
+        private static async Task CollectAsync(List<YaraMatch> matches, YaraRunState state, Task<List<YaraMatch>> run)
+        {
+            try
+            {
+                matches.AddRange(await run.ConfigureAwait(false));
+            }
+            catch (YaraScanIncompleteException ex)
+            {
+                matches.AddRange(ex.PartialMatches);
+                state.Incomplete ??= ex.Message;
+            }
+        }
+
+        private sealed class YaraRunState
+        {
+            public string? Incomplete { get; set; }
+
+            public List<YaraMatch> Finish(List<YaraMatch> matches)
+            {
+                if (Incomplete != null)
+                    throw new YaraScanIncompleteException(Incomplete, matches);
+                return matches;
+            }
+        }
 
         private async Task<List<YaraMatch>> RunYaraScanAsync(
             IEnumerable<string> args, string filePath, CancellationToken ct)
@@ -534,20 +645,20 @@ namespace optiSCAN.Services
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
 
-                using (ct.Register(() =>
+                // Délai par fichier : un yara bloqué (fichier piégé, règle coûteuse) est arrêté
+                // et le scan signalé incomplet, au lieu d'attendre indéfiniment.
+                using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
+                deadline.CancelAfter(SingleFileScanTimeout);
+                using (deadline.Token.Register(() => KillQuietly(process, "yara")))
                 {
                     try
                     {
-                        if (!process.HasExited)
-                            process.Kill(entireProcessTree: true);
+                        await process.WaitForExitAsync(deadline.Token).ConfigureAwait(false);
                     }
-                    catch (Exception ex)
+                    catch (OperationCanceledException) when (!ct.IsCancellationRequested)
                     {
-                        AppLogger.Warn("YaraEngine", "Annulation — arrêt yara", ex);
+                        throw new YaraScanIncompleteException("YARA : délai dépassé.", matches);
                     }
-                }))
-                {
-                    await process.WaitForExitAsync(ct).ConfigureAwait(false);
                 }
 
                 // Drain final synchrone : garantit la réception des dernières
@@ -558,13 +669,14 @@ namespace optiSCAN.Services
                 if (cap.Truncated)
                 {
                     AppLogger.Warn("YaraEngine",
-                        "Sortie stdout YARA tronquée (limite mémoire) — certains matchs peuvent manquer.");
+                        "Sortie stdout YARA tronquée (limite mémoire) — scan signalé incomplet.");
                 }
 
                 // Log les erreurs/avertissements YARA capturés depuis stderr
                 var stderrContent = stderrLines.ToString().Trim();
                 if (!string.IsNullOrEmpty(stderrContent))
-                    AppLogger.Warn("YARA/stderr", stderrContent);
+                    AppLogger.Warn("YARA/stderr", PathRedaction.RedactPath(stderrContent));
+
 
                 // Format sortie YARA : "RuleName FilePath"
                 foreach (var line in cap.Builder.ToString()
@@ -581,10 +693,21 @@ namespace optiSCAN.Services
                             matches.Add(new YaraMatch { RuleName = ruleName, FilePath = filePath });
                     }
                 }
+
+                ThrowIfYaraFailed(process, ct, matches, cap.Truncated);
+            }
+            catch (OperationCanceledException)
+            {
+                throw;
+            }
+            catch (IOException)
+            {
+                throw;
             }
             catch (Exception ex)
             {
                 AppLogger.Error("YARA", "Scan", ex);
+                throw new YaraScanIncompleteException("YARA n'a pas pu analyser : " + ex.Message, matches);
             }
 
             return matches;
@@ -630,5 +753,20 @@ namespace optiSCAN.Services
     {
         public string RuleName { get; set; } = string.Empty;
         public string FilePath { get; set; } = string.Empty;
+    }
+
+    /// <summary>
+    /// YARA s'est arrêté avec un code d'erreur. Les correspondances lues avant l'arrêt
+    /// sont jointes : ce sont des détections réelles, le scan est seulement incomplet.
+    /// </summary>
+    public sealed class YaraScanIncompleteException : IOException
+    {
+        public YaraScanIncompleteException(string message, List<YaraMatch> partialMatches)
+            : base(message)
+        {
+            PartialMatches = partialMatches;
+        }
+
+        public List<YaraMatch> PartialMatches { get; }
     }
 }

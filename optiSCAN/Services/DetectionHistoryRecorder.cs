@@ -27,9 +27,6 @@ namespace optiSCAN.Services
                 result.FinishedAt ??= now;
                 if (result.StartedAt == default)
                     result.StartedAt = now;
-                if (result.Status != ScanStatus.Completed)
-                    result.Status = ScanStatus.Completed;
-
                 logger.SaveScanResult(result);
                 uiEvents?.RequestScanHistoryViewsRefresh();
                 return true;

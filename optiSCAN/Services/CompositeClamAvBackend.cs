@@ -39,9 +39,12 @@ namespace optiSCAN.Services
             {
                 try
                 {
-                    return await _clamd.ScanFileAsync(filePath, progress, ct).ConfigureAwait(false);
+                    var result = await _clamd.ScanFileAsync(filePath, progress, ct).ConfigureAwait(false);
+                    if (result.Status != Models.ScanStatus.Error)
+                        return result;
+                    AppLogger.Warn("CompositeClamAv", "clamd fichier en erreur — repli clamscan");
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     AppLogger.Warn("CompositeClamAv", "clamd fichier — repli clamscan", ex);
                 }
@@ -60,9 +63,12 @@ namespace optiSCAN.Services
             {
                 try
                 {
-                    return await _clamd.ScanFolderAsync(folderPath, progress, ct).ConfigureAwait(false);
+                    var result = await _clamd.ScanFolderAsync(folderPath, progress, ct).ConfigureAwait(false);
+                    if (result.Status != Models.ScanStatus.Error || result.HasCoverageGaps)
+                        return await CompleteWithClamscanAsync(result, folderPath, ct).ConfigureAwait(false);
+                    AppLogger.Warn("CompositeClamAv", "clamd dossier en erreur — repli clamscan");
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (ex is not OperationCanceledException)
                 {
                     AppLogger.Warn("CompositeClamAv", "clamd dossier — repli clamscan", ex);
                 }
@@ -70,6 +76,43 @@ namespace optiSCAN.Services
 
             ClamdEngine.LastMode = "clamscan";
             return await _clamscan.ScanFolderAsync(folderPath, progress, ct).ConfigureAwait(false);
+        }
+
+        /// <summary>
+        /// Les fichiers que clamd n'a pas lus repassent par clamscan : un dossier n'est
+        /// « terminé » que si chaque fichier a été vu par un moteur ClamAV.
+        /// </summary>
+        internal async Task<Models.ScanResult> CompleteWithClamscanAsync(
+            Models.ScanResult result,
+            string targetPath,
+            CancellationToken ct)
+        {
+            if (result.UnscannedFiles.Count == 0 || result.Status == Models.ScanStatus.Cancelled)
+                return result;
+
+            var pending = result.UnscannedFiles.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            result.UnscannedFiles.Clear();
+            AppLogger.Info("CompositeClamAv", $"{pending.Count} fichier(s) repris par clamscan");
+
+            var rest = await _clamscan.ScanFileListAsync(pending, targetPath, null, ct).ConfigureAwait(false);
+            foreach (var threat in rest.Threats)
+                result.Threats.Add(threat);
+            result.FilesScanned += rest.FilesScanned;
+            result.FilesSkipped += rest.FilesSkipped;
+            result.HasCoverageGaps |= rest.HasCoverageGaps;
+            result.FinishedAt = DateTime.Now;
+            if (rest.Status == Models.ScanStatus.Cancelled)
+                result.Status = Models.ScanStatus.Cancelled;
+            else if (rest.Status == Models.ScanStatus.Error)
+            {
+                result.Status = Models.ScanStatus.Error;
+                var fallbackError = rest.ErrorMessage ?? "Repli clamscan en erreur";
+                result.ErrorMessage = string.IsNullOrWhiteSpace(result.ErrorMessage)
+                    ? fallbackError
+                    : result.ErrorMessage + "; " + fallbackError;
+            }
+
+            return result;
         }
 
         public Task<Models.ScanResult> ScanFileListAsync(

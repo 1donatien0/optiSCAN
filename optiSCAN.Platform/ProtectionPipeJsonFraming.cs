@@ -5,14 +5,19 @@ namespace optiSCAN.Platform;
 
 public static class ProtectionPipeJsonFraming
 {
-    public static async Task<string> ReadJsonPayloadAsync(Stream stream, CancellationToken ct, int maxBytes = 1024 * 1024)
+    /// <summary>Taille maximale d'un message JSON sur le pipe.</summary>
+    public const int DefaultMaxBytes = 1024 * 1024;
+
+    public static async Task<string> ReadJsonPayloadAsync(Stream stream, CancellationToken ct, int maxBytes = DefaultMaxBytes)
     {
         using var ms = new MemoryStream();
         var buf = new byte[8192];
 
         while (ms.Length < maxBytes)
         {
-            var read = await stream.ReadAsync(buf, ct).ConfigureAwait(false);
+            using var idle = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            idle.CancelAfter(TimeSpan.FromSeconds(5));
+            var read = await stream.ReadAsync(buf, idle.Token).ConfigureAwait(false);
             if (read <= 0)
                 break;
 

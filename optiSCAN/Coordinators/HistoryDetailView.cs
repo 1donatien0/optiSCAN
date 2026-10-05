@@ -1,5 +1,7 @@
 using System.Windows;
 using System.Windows.Controls;
+// WinForms (.NET 10) expose aussi un type DataGrid : la grille est celle de WPF.
+using DataGrid = System.Windows.Controls.DataGrid;
 
 namespace optiSCAN.Coordinators;
 

@@ -34,8 +34,12 @@ namespace optiSCAN.Models
         /// <summary>Nombre de menaces trouvées — calculé depuis <see cref="Threats"/>.</summary>
         public int ThreatsFound => Threats.Count;
 
-        /// <summary>Nombre de fichiers ignorés (exclusions ou dossier d'installation).</summary>
+        /// <summary>Nombre d'éléments ignorés, exclus ou non analysés.</summary>
         public int FilesSkipped { get; set; }
+
+        /// <summary>Vrai si au moins une partie de la cible n'a pas pu être analysée.</summary>
+        [System.Text.Json.Serialization.JsonIgnore]
+        public bool HasCoverageGaps { get; set; }
 
         /// <summary>Volume total scanné en octets (remontés par clamscan).</summary>
         public long TotalBytesScanned { get; set; }
@@ -50,6 +54,13 @@ namespace optiSCAN.Models
 
         /// <summary>Message d'erreur en cas d'état <see cref="ScanStatus.Error"/>.</summary>
         public string? ErrorMessage { get; set; }
+
+        /// <summary>
+        /// Fichiers qu'un moteur n'a pas pu lire. Le moteur suivant (repli clamscan)
+        /// les reprend ; non persisté dans l'historique.
+        /// </summary>
+        [System.Text.Json.Serialization.JsonIgnore]
+        public List<string> UnscannedFiles { get; } = new();
 
         // ── Propriétés calculées ────────────────────────────────────────────────
 

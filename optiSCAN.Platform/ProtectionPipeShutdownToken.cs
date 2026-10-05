@@ -29,8 +29,14 @@ public static class ProtectionPipeShutdownToken
 
     public static void Persist(string token)
     {
+        if (OperatingSystem.IsWindows() && !OptiScanProgramData.EnsureTrusted())
+            return;
         var dir = Path.GetDirectoryName(TokenFilePath)!;
-        Directory.CreateDirectory(dir);
+
+        var attributes = File.Exists(TokenFilePath) ? File.GetAttributes(TokenFilePath) : (FileAttributes)0;
+        if ((attributes & FileAttributes.ReparsePoint) != 0)
+            return;
+
         File.WriteAllText(TokenFilePath, token, Encoding.UTF8);
         if (OperatingSystem.IsWindows())
             TryRestrictTokenFileAcl(TokenFilePath);

@@ -1,7 +1,15 @@
 {
-  "clamavVersion": "1.4.5",
-  "clamavWinX64Url": "https://www.clamav.net/downloads/production/clamav-1.4.5.win.x64.zip",
-  "clamavWinX86Url": "https://www.clamav.net/downloads/production/clamav-1.4.5.win.win32.zip",
-  "yaraVersion": "4.5.2",
-  "yaraWin64Url": "https://github.com/VirusTotal/yara/releases/download/v4.5.2/yara-4.5.2-2306-win64.zip"
+  "clamavVersion": "1.4.6",
+  "clamavWinX64Url": "https://www.clamav.net/downloads/production/clamav-1.4.6.win.x64.zip",
+  "clamavWinX86Url": "https://www.clamav.net/downloads/production/clamav-1.4.6.win.win32.zip",
+  "clamavWinX64Sha256": "57B6FD1D60CD87BAFE800F97407ECDEF0576D36B3900B8B7ABCFBBABE88295FD",
+  "clamavWinX86Sha256": "AE0FF986504180B0966170FD058E1C337849174A015B2F7958479A04CDEE5F00",
+  "clamavSigningKeyFingerprint": "5BADCA2665EF59DCF8A23D8B707F0DB480836771",
+  "clamavSigningKeyFile": "scripts/keys/cisco-talos.gpg",
+  "clamavRootCertSha256": "60200E4B4B1B1B7257BB4550487AEB142034341F3300A8526E77A3134A940E9D",
+  "yaraVersion": "4.5.5",
+  "yaraWin64Url": "https://github.com/VirusTotal/yara/releases/download/v4.5.5/yara-4.5.5-2368-win64.zip",
+  "yaraWin64Sha256": "352396C8A3D9B31B157A4820ABD3B9347FC934A2314CDDA8A4F566A5570163E4",
+  "yaraLatestSourceVersion": "4.5.8",
+  "verifiedOn": "2026-10-04"
 }
