@@ -46,12 +46,26 @@ public sealed class CompositeClamAvBackendTests
         Assert.Equal("clamscan", ClamdEngine.LastMode);
     }
 
+    [Fact]
+    public async Task ScanFolderAsync_falls_back_when_clamd_returns_error()
+    {
+        var clamd = new ErrorStatusBackend();
+        var clamscan = new TrackingBackend("clamscan");
+        var composite = new CompositeClamAvBackend(_ => Task.FromResult(true), clamd, clamscan);
+
+        await composite.ScanFolderAsync(@"C:\temp");
+
+        Assert.Equal(1, clamscan.FolderCalls);
+        Assert.Equal("clamscan", ClamdEngine.LastMode);
+    }
+
     private sealed class TrackingBackend : IClamAvOrchestratorBackend
     {
         private readonly string _label;
 
         public TrackingBackend(string label) => _label = label;
         public int FileCalls { get; private set; }
+        public int FolderCalls { get; private set; }
 
         public bool IsClamAvInstalled() => true;
 
@@ -63,7 +77,11 @@ public sealed class CompositeClamAvBackendTests
         }
 
         public Task<ScanResult> ScanFolderAsync(string folderPath, IProgress<ScanProgress>? progress = null, CancellationToken ct = default)
-            => Task.FromResult(new ScanResult { Type = ScanType.Folder, TargetPath = folderPath, Status = ScanStatus.Completed });
+        {
+            FolderCalls++;
+            ClamdEngine.LastMode = _label;
+            return Task.FromResult(new ScanResult { Type = ScanType.Folder, TargetPath = folderPath, Status = ScanStatus.Completed });
+        }
 
         public Task<ScanResult> ScanFileListAsync(
             IReadOnlyList<string> files,
@@ -74,6 +92,17 @@ public sealed class CompositeClamAvBackendTests
             ClamdEngine.LastMode = _label;
             return Task.FromResult(new ScanResult { Type = ScanType.Folder, TargetPath = targetPath, Status = ScanStatus.Completed, FilesScanned = files.Count });
         }
+    }
+
+    private sealed class ErrorStatusBackend : IClamAvOrchestratorBackend
+    {
+        public bool IsClamAvInstalled() => true;
+        public Task<ScanResult> ScanFileAsync(string filePath, IProgress<ScanProgress>? progress = null, CancellationToken ct = default)
+            => Task.FromResult(new ScanResult { Status = ScanStatus.Error, TargetPath = filePath });
+        public Task<ScanResult> ScanFolderAsync(string folderPath, IProgress<ScanProgress>? progress = null, CancellationToken ct = default)
+            => Task.FromResult(new ScanResult { Status = ScanStatus.Error, TargetPath = folderPath });
+        public Task<ScanResult> ScanFileListAsync(IReadOnlyList<string> files, string targetPath, IProgress<ScanProgress>? progress = null, CancellationToken ct = default)
+            => Task.FromResult(new ScanResult { Status = ScanStatus.Error, TargetPath = targetPath });
     }
 
     private sealed class ThrowingBackend : IClamAvOrchestratorBackend

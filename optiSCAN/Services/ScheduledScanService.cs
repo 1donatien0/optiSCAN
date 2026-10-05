@@ -47,8 +47,8 @@ namespace optiSCAN.Services
                 psi.ArgumentList.Add("/TN");
                 psi.ArgumentList.Add(TaskName);
                 psi.ArgumentList.Add("/TR");
-                // Ne pas entourer manuellement de guillemets : ArgumentList échappe correctement pour schtasks.
-                psi.ArgumentList.Add($"{_exePath} --fullscan --quiet");
+                // schtasks coupe /TR au premier espace : le chemin doit porter ses propres guillemets.
+                psi.ArgumentList.Add($"\"{_exePath}\" --fullscan --quiet");
                 psi.ArgumentList.Add("/SC");
                 psi.ArgumentList.Add("DAILY");
                 psi.ArgumentList.Add("/ST");

@@ -27,7 +27,7 @@ namespace optiSCAN.Services
 
         private ManagementEventWatcher? _watcher;
         private bool _enabled;
-        private bool _disposed;
+        private volatile bool _disposed;
 
         public event EventHandler<ThreatInfo>? ThreatDetected;
 
@@ -119,7 +119,7 @@ namespace optiSCAN.Services
                 var pid = Convert.ToInt32(target["ProcessId"]);
                 var paths = ResolvePathsToScan(processName, pid, target["CommandLine"]?.ToString());
                 foreach (var path in paths)
-                    _ = HandlePathAsync(path);
+                    Track(HandlePathAsync(path, pid));
             }
             catch (Exception ex)
             {
@@ -137,22 +137,32 @@ namespace optiSCAN.Services
 
             if (RiskyFileExtensions.IsScriptHostProcess(processName) && !string.IsNullOrWhiteSpace(commandLine))
             {
-                foreach (Match match in QuotedPathRegex.Matches(commandLine))
+                foreach (var candidate in ExtractCommandLineCandidates(commandLine))
                 {
-                    var candidate = match.Groups[1].Value;
                     if (File.Exists(candidate) && RiskyFileExtensions.IsRisky(candidate))
                         results.Add(candidate);
-                }
-
-                foreach (var token in commandLine.Split(' ', StringSplitOptions.RemoveEmptyEntries))
-                {
-                    var trimmed = token.Trim('"', '\'');
-                    if (File.Exists(trimmed) && RiskyFileExtensions.IsRisky(trimmed))
-                        results.Add(trimmed);
                 }
             }
 
             return results.Distinct(StringComparer.OrdinalIgnoreCase);
+        }
+
+        /// <summary>
+        /// Chemins candidats dans la ligne de commande d'un hôte de scripts : chemins entre
+        /// guillemets (avec espaces) et jetons séparés par des espaces. Sans accès disque.
+        /// </summary>
+        internal static IReadOnlyList<string> ExtractCommandLineCandidates(string commandLine)
+        {
+            var candidates = new List<string>();
+            foreach (Match match in QuotedPathRegex.Matches(commandLine))
+                candidates.Add(match.Groups[1].Value);
+            foreach (var token in commandLine.Split(' ', StringSplitOptions.RemoveEmptyEntries))
+            {
+                var trimmed = token.Trim('"', '\'');
+                if (trimmed.Length > 0)
+                    candidates.Add(trimmed);
+            }
+            return candidates.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
 
         private static string? TryGetExecutablePath(int processId)
@@ -172,31 +182,111 @@ namespace optiSCAN.Services
             return null;
         }
 
-        private async Task HandlePathAsync(string filePath)
+        private static readonly TimeSpan DedupWindow = TimeSpan.FromSeconds(45);
+        private const long MaxProcessImageScanBytes = 256L * 1024 * 1024;
+
+        /// <summary>Au-delà, les entrées expirées sont purgées (le service tourne des semaines).</summary>
+        internal const int RecentScansPruneThreshold = 512;
+
+        /// <summary>
+        /// Plafond absolu : même si toutes les entrées sont récentes (rafale de lancements), le
+        /// dictionnaire ne dépasse pas cette taille. Les plus anciennes sont alors retirées ;
+        /// au pire, un fichier évincé est réanalysé à son prochain lancement.
+        /// </summary>
+        internal const int MaxRecentScans = 2048;
+
+        /// <summary>Retire les entrées expirées, puis les plus anciennes au-delà de <see cref="MaxRecentScans"/>.</summary>
+        internal void PruneRecentScans(DateTime nowUtc)
         {
+            if (_recentScans.Count < RecentScansPruneThreshold)
+                return;
+            foreach (var kvp in _recentScans)
+            {
+                if (nowUtc - kvp.Value >= DedupWindow)
+                    _recentScans.TryRemove(kvp.Key, out _);
+            }
+
+            if (_recentScans.Count <= MaxRecentScans)
+                return;
+            // Rafale : on redescend à la moitié du plafond en gardant les plus récentes.
+            var excess = _recentScans.Count - MaxRecentScans / 2;
+            foreach (var kvp in _recentScans.ToArray().OrderBy(k => k.Value).Take(excess))
+                _recentScans.TryRemove(kvp.Key, out _);
+        }
+
+        internal int RecentScansCount => _recentScans.Count;
+
+        internal void RecordRecentScanForTest(string path, DateTime whenUtc) => _recentScans[path] = whenUtc;
+
+        // Tâches lancées par les événements WMI, attendues par Dispose avant de libérer le
+        // sémaphore : sinon une tâche en cours appelait Release() sur un objet libéré.
+        private readonly ConcurrentDictionary<Task, byte> _inflight = new();
+        private readonly CancellationTokenSource _lifetime = new();
+
+        private void Track(Task task)
+        {
+            _inflight.TryAdd(task, 0);
+            _ = task.ContinueWith(t => _inflight.TryRemove(t, out _), TaskScheduler.Default);
+        }
+
+        internal int InflightCount => _inflight.Count;
+
+        private async Task HandlePathAsync(string filePath, int processId)
+        {
+            if (_disposed)
+                return;
+            var lifetime = _lifetime.Token;
             var now = DateTime.UtcNow;
-            if (_recentScans.TryGetValue(filePath, out var last) && (now - last) < TimeSpan.FromSeconds(45))
+            if (_recentScans.TryGetValue(filePath, out var last) && (now - last) < DedupWindow)
                 return;
             _recentScans[filePath] = now;
+            PruneRecentScans(now);
 
-            await Task.Delay(400).ConfigureAwait(false);
-            if (!File.Exists(filePath) || _exclusions.Current.IsFileExcluded(filePath))
-                return;
-
-            await _scanSemaphore.WaitAsync().ConfigureAwait(false);
             try
             {
-                var result = await _orchestrator.ScanFileAsync(filePath).ConfigureAwait(false);
+                await Task.Delay(400, lifetime).ConfigureAwait(false);
+                if (_exclusions.Current.IsFileExcluded(filePath))
+                    return;
+                await _scanSemaphore.WaitAsync(lifetime).ConfigureAwait(false);
+            }
+            catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException)
+            {
+                return; // arrêt en cours : rien n'a été réservé
+            }
+
+            try
+            {
+                ScanResult result;
+                string? analyzedSha256 = null;
+                using (var source = NamedPipeClientAccess.OpenForProcess(processId, filePath))
+                {
+                    if (source == null)
+                        return;
+                    if (source.Length > MaxProcessImageScanBytes)
+                    {
+                        AppLogger.Info("ProcessStartMonitor", "Fichier trop volumineux pour le scan depuis le processus : " + PathRedaction.RedactPath(filePath));
+                        return;
+                    }
+
+                    using var staged = ScanStaging.Stage(source, Path.GetFileName(filePath));
+                    analyzedSha256 = staged.Sha256;
+                    result = await _orchestrator.ScanFileAsync(staged.Path).ConfigureAwait(false);
+                    result.TargetPath = filePath;
+                    foreach (var threat in result.Threats)
+                    {
+                        threat.FilePath = filePath;
+                        if (source.CanSeek)
+                            threat.FileSize = source.Length;
+                    }
+                }
+
                 DetectionHistoryRecorder.Record(_logger, _uiEvents, result, filePath);
                 foreach (var threat in result.Threats)
                 {
                     _notifications.ShowThreatDetected(threat);
                     if (_exclusions.Current.AutoQuarantineEnabled)
                     {
-                        if (_prefs.Current.BackupBeforeQuarantine)
-                            ThreatRemediationService.TryCreateSafetyCopy(threat);
-
-                        if (_quarantineManager.Quarantine(threat, result.SessionId))
+                        if (_quarantineManager.Quarantine(threat, result.SessionId, analyzedSha256))
                             _notifications.ShowQuarantined(threat);
                     }
 
@@ -205,7 +295,7 @@ namespace optiSCAN.Services
             }
             catch (Exception ex)
             {
-                AppLogger.Warn("ProcessStartMonitor", $"Scan {filePath}", ex);
+                AppLogger.Warn("ProcessStartMonitor", $"Scan {PathRedaction.RedactPath(filePath)}", ex);
             }
             finally
             {
@@ -217,9 +307,27 @@ namespace optiSCAN.Services
         {
             if (_disposed)
                 return;
-            Stop();
-            _scanSemaphore.Dispose();
             _disposed = true;
+            Stop();
+
+            // Les tâches en attente abandonnent ; celles qui scannent vont jusqu'au bout et
+            // libèrent leur place. Le sémaphore n'est libéré qu'une fois toutes terminées.
+            _lifetime.Cancel();
+            var pending = _inflight.Keys.ToArray();
+            var drained = pending.Length == 0;
+            if (!drained)
+            {
+                try { drained = Task.WaitAll(pending, TimeSpan.FromSeconds(10)); }
+                catch (AggregateException) { drained = pending.All(t => t.IsCompleted); }
+            }
+
+            // _lifetime n'est pas libéré : une tâche lancée pendant l'arrêt peut encore lire son jeton.
+            if (drained)
+                _scanSemaphore.Dispose();
+            else
+            {
+                AppLogger.Warn("ProcessStartMonitor", "Arrêt : un scan est encore en cours, sémaphore laissé en place");
+            }
         }
     }
 }

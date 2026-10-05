@@ -39,17 +39,25 @@ public static class PlatformProtectionStatusService
 
     public static PlatformProtectionStatusReport Evaluate(IUserPreferencesAccessor? preferences = null)
     {
-        lock (ReportGate)
+        // Le cache sert au rafraîchissement de l'interface. Un accès explicite
+        // (test, ou préférences qui viennent de changer) ne doit pas le relire.
+        if (preferences == null)
         {
-            if (_cachedReport != null && (DateTime.UtcNow - _cachedReportAtUtc) < ReportCacheTtl)
-                return _cachedReport;
+            lock (ReportGate)
+            {
+                if (_cachedReport != null && (DateTime.UtcNow - _cachedReportAtUtc) < ReportCacheTtl)
+                    return _cachedReport;
+            }
         }
 
         var report = EvaluateCore(preferences);
-        lock (ReportGate)
+        if (preferences == null)
         {
-            _cachedReport = report;
-            _cachedReportAtUtc = DateTime.UtcNow;
+            lock (ReportGate)
+            {
+                _cachedReport = report;
+                _cachedReportAtUtc = DateTime.UtcNow;
+            }
         }
 
         return report;

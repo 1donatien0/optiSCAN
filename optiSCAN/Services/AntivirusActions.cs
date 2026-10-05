@@ -138,10 +138,10 @@ namespace optiSCAN.Services
 
                 if (File.Exists(filePath))
                 {
-                    var attrs = File.GetAttributes(filePath);
-                    if (attrs.HasFlag(FileAttributes.ReadOnly))
-                        File.SetAttributes(filePath, attrs & ~FileAttributes.ReadOnly);
-                    File.Delete(filePath);
+                    // Suppression par poignée : aucun dossier parent ne peut être une jonction
+                    // ou un lien, un lien à la place du fichier est refusé, et l'attribut lecture
+                    // seule est ignoré par la même poignée (pas de File.SetAttributes par chemin).
+                    SafePathDelete.Delete(filePath);
                     return Complete(true,
                         LocalizationService.Format("Av_Action_DeleteOk", Path.GetFileName(filePath)));
                 }

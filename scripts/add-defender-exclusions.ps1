@@ -89,19 +89,18 @@ if ([string]::IsNullOrWhiteSpace($InstallDir)) {
 
 $paths = @(
     $InstallDir
-    (Join-Path $env:LOCALAPPDATA 'optiSCAN')
 ) | ForEach-Object {
     try { (Resolve-Path -LiteralPath $_ -ErrorAction SilentlyContinue).Path } catch { $_ }
 } | Where-Object { $_ } | Select-Object -Unique
 
 $processes = @(
-    'optiSCAN.exe',
-    'optiSCAN.Service.exe',
-    'clamscan.exe',
-    'freshclam.exe',
-    'clamd.exe',
-    'yara64.exe'
-)
+    (Join-Path $InstallDir 'optiSCAN.exe'),
+    (Join-Path $InstallDir 'optiSCAN.Service.exe'),
+    (Join-Path $InstallDir 'clamav\x64\clamscan.exe'),
+    (Join-Path $InstallDir 'clamav\x64\freshclam.exe'),
+    (Join-Path $InstallDir 'clamav\x64\clamd.exe'),
+    (Join-Path $InstallDir 'yara\yara64.exe')
+) | Where-Object { Test-Path -LiteralPath $_ }
 
 $pref = Get-MpPreference
 $pathExisting = @($pref.ExclusionPath)
@@ -125,6 +124,18 @@ foreach ($proc in $processes) {
         $procExisting += $proc
         $added++
     }
+}
+
+# Exclusions par nom nu de la 3.0.0. Les noms des moteurs peuvent appartenir à une autre
+# installation (ClamAV, YARA) : ils ne sont retirés que si ceux d'optiSCAN l'étaient aussi.
+$procNow = @((Get-MpPreference).ExclusionProcess)
+$ours = @('optiSCAN.exe', 'optiSCAN.Service.exe') | Where-Object { $procNow -contains $_ }
+$legacyTargets = @($ours)
+if ($ours.Count -gt 0) {
+    $legacyTargets += @('clamscan.exe', 'freshclam.exe', 'clamd.exe', 'yara64.exe') | Where-Object { $procNow -contains $_ }
+}
+foreach ($name in $legacyTargets) {
+    try { Remove-MpPreference -ExclusionProcess $name -ErrorAction Stop } catch { }
 }
 
 if ($added -eq 0 -and -not $denied) {

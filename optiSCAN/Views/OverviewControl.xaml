@@ -334,11 +334,15 @@
                         <RowDefinition Height="Auto"/>
                         <RowDefinition Height="*"/>
                     </Grid.RowDefinitions>
-                    <StackPanel Grid.Row="0">
-                        <TextBlock Text="{loc:Loc Key=Overview_Recommendations}"
-                                   FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
-                                   Foreground="{DynamicResource TextDark}" Margin="0,0,0,10"/>
-
+                    <TextBlock Grid.Row="0"
+                               Text="{loc:Loc Key=Overview_Recommendations}"
+                               FontSize="{DynamicResource FontSize.Title}" FontWeight="SemiBold"
+                               Foreground="{DynamicResource TextDark}" Margin="0,0,0,10"/>
+                    <ScrollViewer Grid.Row="1"
+                                  VerticalScrollBarVisibility="Auto"
+                                  HorizontalScrollBarVisibility="Disabled"
+                                  Focusable="False">
+                    <StackPanel>
                         <Border Background="{DynamicResource SurfaceBg}"
                                 CornerRadius="8" Padding="10,8" Margin="0,0,0,8">
                             <StackPanel>
@@ -376,7 +380,7 @@
                             </StackPanel>
                         </Border>
 
-                        <Border x:Name="brRecHygiene" Background="{DynamicResource AlertBg}"
+                        <Border x:Name="brRecHygiene" Background="{DynamicResource SurfaceBg}"
                                 CornerRadius="8" Padding="10,8">
                             <Grid>
                                 <Grid.ColumnDefinitions>
@@ -384,14 +388,15 @@
                                     <ColumnDefinition Width="*"/>
                                 </Grid.ColumnDefinitions>
                                 <md:PackIcon x:Name="icRecHygiene" Grid.Column="0" Kind="Broom" Width="14" Height="14"
-                                             Foreground="{DynamicResource AlertGoldLight}"
+                                             Foreground="{DynamicResource TextMuted}"
                                              VerticalAlignment="Top" Margin="0,1,0,0"/>
                                 <TextBlock x:Name="txtRecHygiene" Grid.Column="1" Text="{loc:Loc Key=Overview_RecHygiene}"
-                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource AlertGold}"
+                                           FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextDark}"
                                            LineHeight="16" TextWrapping="Wrap" Margin="6,0,0,0"/>
                             </Grid>
                         </Border>
                     </StackPanel>
+                    </ScrollViewer>
                 </Grid>
             </Border>
 

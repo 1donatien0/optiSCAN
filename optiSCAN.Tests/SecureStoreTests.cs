@@ -1,3 +1,5 @@
+using System.Security.Cryptography;
+using System.Text;
 using optiSCAN.Services;
 
 namespace optiSCAN.Tests;
@@ -43,6 +45,24 @@ public sealed class SecureStoreTests
             if (bytes.Length > 4)
                 bytes[^1] ^= 0xFF;
             File.WriteAllBytes(path, bytes);
+
+            Assert.Null(SecureStore.Load<TestDto>(path));
+        }
+        finally
+        {
+            try { File.Delete(path); } catch { /* best effort */ }
+        }
+    }
+
+    [Fact]
+    public void Load_unsigned_envelope_returns_null()
+    {
+        var path = Path.Combine(Path.GetTempPath(), "optiscan_ut_unsigned_" + Guid.NewGuid().ToString("N") + ".dat");
+        try
+        {
+            var envelope = Encoding.UTF8.GetBytes("{\"Json\":\"{\\\"Value\\\":\\\"x\\\",\\\"N\\\":1}\"}");
+            var encrypted = ProtectedData.Protect(envelope, null, DataProtectionScope.CurrentUser);
+            File.WriteAllBytes(path, encrypted);
 
             Assert.Null(SecureStore.Load<TestDto>(path));
         }

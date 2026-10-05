@@ -191,6 +191,10 @@ namespace optiSCAN.Localization
             TimeSpan duration,
             string? errorMessage)
         {
+            if (status == ScanStatus.Error && threatsFound > 0)
+                return Format("ScanSummary_ThreatsIncomplete", threatsFound, filesScanned,
+                    errorMessage ?? GetString("Common_Unknown"));
+
             return status switch
             {
                 ScanStatus.Running => Format("ScanSummary_Running", filesScanned),

@@ -47,7 +47,7 @@ namespace optiSCAN.Services
 
     /// <summary>
     /// Mises à jour d'applications via winget (panneau Optimiser → Mises à jour).
-    /// Port C# de l'utilitaire OptiWin (GUI/OptiWin-GUI.ps1) : localisation de
+    /// Port C# de l'ancien utilitaire PowerShell OptiWin : localisation de
     /// winget.exe, parsing en colonnes de « winget upgrade », lancement des
     /// mises à niveau avec sortie streamée vers le journal de l'UI.
     /// Les mises à niveau demandent <c>--uninstall-previous</c> puis retirent

@@ -1,3 +1,4 @@
+using optiSCAN.Platform;
 using optiSCAN.Services;
 
 namespace optiSCAN.Tests;
@@ -5,27 +6,40 @@ namespace optiSCAN.Tests;
 public sealed class OptiscanProtectedPathsTests
 {
     [Fact]
-    public void LocalAppData_optiSCAN_tree_is_protected()
+    public void LocalAppData_optiSCAN_protects_only_signatures_rules_and_quarantine()
     {
         var root = OptiscanProtectedPaths.GetLocalAppDataRoot();
         var dbFile = Path.Combine(root, "clamav", "database", "daily.cvd");
+        var quarantine = Path.Combine(root, "Quarantine", "manifest.json");
         var updateStaging = Path.Combine(root, "Updates", "optiSCAN.exe");
 
-        Assert.True(OptiscanProtectedPaths.IsUnderProtectedPath(root));
         Assert.True(OptiscanProtectedPaths.IsUnderProtectedPath(dbFile));
-        Assert.True(OptiscanProtectedPaths.IsUnderProtectedPath(updateStaging));
-        Assert.True(OptiscanProtectedPaths.IsMandatoryExcludedFolder(root));
+        Assert.True(OptiscanProtectedPaths.IsUnderProtectedPath(quarantine));
+        Assert.True(OptiscanProtectedPaths.IsMandatoryExcludedFolder(Path.Combine(root, "clamav")));
+        // Le reste du dossier, inscriptible par la session, est analysé.
+        Assert.False(OptiscanProtectedPaths.IsUnderProtectedPath(root));
+        Assert.False(OptiscanProtectedPaths.IsUnderProtectedPath(updateStaging));
+        Assert.False(OptiscanProtectedPaths.IsMandatoryExcludedFolder(root));
     }
 
     [Fact]
-    public void Process_install_directory_is_protected()
+    public void Process_install_directory_is_protected_when_admin_only_otherwise_only_its_engines()
     {
-        var root = AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+        var root = Path.GetFullPath(AppContext.BaseDirectory.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
         var exe = Path.Combine(root, "optiSCAN.exe");
+        var rule = Path.Combine(root, "rules", "test.yar");
 
-        Assert.True(OptiscanProtectedPaths.IsUnderProtectedPath(exe));
-        Assert.Contains(OptiscanProtectedPaths.GetProtectedRoots(),
-            r => string.Equals(r, Path.GetFullPath(root), StringComparison.OrdinalIgnoreCase));
+        Assert.True(OptiscanProtectedPaths.IsUnderProtectedPath(rule));
+        if (InstallLocationTrust.IsAdminOnlyInstall(root, out _))
+        {
+            Assert.True(OptiscanProtectedPaths.IsUnderProtectedPath(exe));
+            Assert.Contains(OptiscanProtectedPaths.GetProtectedRoots(),
+                r => string.Equals(r, root, StringComparison.OrdinalIgnoreCase));
+        }
+        else
+        {
+            Assert.False(OptiscanProtectedPaths.IsUnderProtectedPath(exe));
+        }
     }
 
     [Fact]
@@ -40,7 +54,7 @@ public sealed class OptiscanProtectedPathsTests
     public void Mandatory_folder_cannot_be_removed_from_exclusions()
     {
         var settings = new ExclusionSettings();
-        var protectedRoot = OptiscanProtectedPaths.GetLocalAppDataRoot();
+        var protectedRoot = Path.Combine(OptiscanProtectedPaths.GetLocalAppDataRoot(), "clamav");
         settings.ExcludedFolders.Add(protectedRoot);
 
         Assert.False(settings.RemoveFolder(protectedRoot));

@@ -100,13 +100,13 @@ namespace optiSCAN.Services
             // Pad puis tronquer à 20 colonnes (PadRight seul casse sur composants courts).
             var comp = component.Length > 20 ? component[..20] : component;
             sb.Append(" | ").Append(comp.PadRight(20));
-            sb.Append(" | ").Append(message);
+            sb.Append(" | ").Append(PathRedaction.RedactPath(message));
             if (ex != null)
             {
                 sb.Append(" | EXC=").Append(ex.GetType().Name);
-                sb.Append(": ").Append(ex.Message);
+                sb.Append(": ").Append(PathRedaction.RedactPath(ex.Message));
                 if (level >= Level.Error)
-                    sb.Append(Environment.NewLine).Append("  ").Append(ex.StackTrace);
+                    sb.Append(Environment.NewLine).Append("  ").Append(PathRedaction.RedactPath(ex.StackTrace));
             }
             return sb.ToString();
         }

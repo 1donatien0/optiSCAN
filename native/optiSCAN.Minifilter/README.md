@@ -1,31 +1,9 @@
-# optiSCAN Minifilter (version 3 — stub)
+# Prototype minifilter — non livré
 
-Driver noyau `optiSCAN.Minifilter.sys` pour interception des accès fichiers **avant** exécution.
+Le dossier `native/optiSCAN.Minifilter` contient un squelette de pilote et des fichiers de conception. Il ne fait pas partie de la candidate v3.1 : il n'est pas construit par la CI, copié au publish ou livré dans l'installeur.
 
-## État (version 3)
+`PlatformRegistration.TryLoadMinifilter()` est volontairement un no-op qui journalise que le pilote n'est pas signé et n'est pas chargé. Le nettoyage du produit peut tenter de décharger une ancienne instance, mais aucune installation du pilote n'est effectuée.
 
-Le dépôt fournit :
+Les fichiers `filter.c`, `.inf` et le pont C# ne constituent pas un filtre prêt à l'emploi. **Ne pas copier de `.sys` dans `System32\drivers` et ne pas le charger avec `fltmc`** : ces étapes de l'ancienne documentation ne sont pas prises en charge et ne permettent pas d'activer une protection avant exécution.
 
-- `filter.c` — squelette `DriverEntry` / `FltRegisterFilter` (compilation avec `OPTISCAN_MINIFILTER_BUILD`)
-- `optiSCAN.Minifilter.inf` — métadonnées d'installation
-- `MinifilterUserBridge.cs` — pont user-mode côté C#
-- Documentation WDK pour compilation hors CI
-
-## Prérequis production
-
-- Windows Driver Kit (WDK) 10
-- Certificat **EV** pour signature du driver (Microsoft attestation)
-- Mode test (`bcdedit /set testsigning on`) pour développement uniquement
-
-## Installation (dev / test signing)
-
-```powershell
-copy native\optiSCAN.Minifilter\x64\optiSCAN.Minifilter.sys %SystemRoot%\System32\drivers\
-fltmc load optiSCANMinifilter
-```
-
-Le service `optiSCAN.Service` tente le chargement via `PlatformRegistration.TryLoadMinifilter()`.
-
-## Interface
-
-Port de communication : `\optiSCANMinifilter` (à implémenter dans le driver complet).
+Une éventuelle reprise exige un pilote complet, une revue de sécurité, une validation WDK/Windows et sa chaîne de signature Microsoft avant toute intégration au produit. Voir aussi [`SECURITY.md`](../../SECURITY.md).

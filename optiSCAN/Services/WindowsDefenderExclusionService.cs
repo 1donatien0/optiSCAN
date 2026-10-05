@@ -1,3 +1,4 @@
+using optiSCAN.Platform;
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.Versioning;
@@ -13,20 +14,40 @@ namespace optiSCAN.Services
     [SupportedOSPlatform("windows")]
     internal static class WindowsDefenderExclusionService
     {
-        private static readonly string[] ProcessExclusions =
+        /// <summary>Noms nus propres à optiSCAN (exclusions de la 3.0.0).</summary>
+        private static readonly string[] LegacyOwnProcessNames =
         {
             "optiSCAN.exe",
             "optiSCAN.Service.exe",
+        };
+
+        /// <summary>
+        /// Noms nus des moteurs ajoutés par la 3.0.0. Une autre installation de ClamAV ou de YARA
+        /// a pu les exclure elle aussi : ils ne sont retirés que si les noms d'optiSCAN
+        /// l'étaient également.
+        /// </summary>
+        private static readonly string[] LegacyEngineProcessNames =
+        {
             "clamscan.exe",
             "freshclam.exe",
             "clamd.exe",
             "yara64.exe",
         };
 
+        private static string[] LegacyProcessNames => LegacyOwnProcessNames.Concat(LegacyEngineProcessNames).ToArray();
+
         private static int _ensureInFlight;
 
         /// <summary>Dernier résultat connu (Options / onboarding).</summary>
-        internal static DefenderExclusionResult? LastExclusionResult { get; private set; }
+        private static DefenderExclusionResult? _lastExclusionResult;
+        private static readonly object LastResultGate = new();
+
+        /// <summary>Dernier résultat (écrit par un thread de fond, lu par l'interface).</summary>
+        internal static DefenderExclusionResult? LastExclusionResult
+        {
+            get { lock (LastResultGate) { return _lastExclusionResult; } }
+            private set { lock (LastResultGate) { _lastExclusionResult = value; } }
+        }
 
         /// <summary>Opt-in — Options / bouton « Réappliquer les exclusions » (pas au démarrage).</summary>
         public static void EnsureOptiscanExclusionsAsync()
@@ -65,13 +86,14 @@ namespace optiSCAN.Services
                 return DefenderExclusionResult.Unavailable("Windows Defender introuvable");
 
             var paths = CollectExclusionPaths();
-            if (paths.Count == 0 && ProcessExclusions.Length == 0)
-                return DefenderExclusionResult.AlreadyConfigured();
+            var processes = CollectProcessExclusionPaths();
 
             var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
             {
                 paths,
-                processes = ProcessExclusions,
+                processes,
+                own = LegacyOwnProcessNames,
+                engine = LegacyEngineProcessNames,
             })));
 
             const string script = """
@@ -125,6 +147,16 @@ namespace optiSCAN.Services
                         $failures += "PROC:$proc"
                     }
                 }
+                # Noms nus de la 3.0.0 : ceux d'optiSCAN sont retirés ; ceux des moteurs
+                # (clamscan.exe...) peuvent appartenir à une autre installation, ils ne sont
+                # retirés que si les noms d'optiSCAN étaient aussi présents (lot de la 3.0.0).
+                $procNow = @((Get-MpPreference).ExclusionProcess)
+                $ours = @($data.own | Where-Object { $procNow -contains [string]$_ })
+                $legacyTargets = @($ours)
+                if ($ours.Count -gt 0) { $legacyTargets += @($data.engine | Where-Object { $procNow -contains [string]$_ }) }
+                foreach ($name in $legacyTargets) {
+                    try { Remove-MpPreference -ExclusionProcess ([string]$name) -ErrorAction Stop } catch { }
+                }
                 if ($failures.Count -gt 0) {
                     Write-Output ('PARTIAL:' + ($failures -join ';') + ';ADDED=' + $added)
                     exit 4
@@ -141,6 +173,7 @@ namespace optiSCAN.Services
 
         internal static IReadOnlyList<string> CollectExclusionPaths()
         {
+            var local = OptiscanProtectedPaths.GetLocalAppDataRoot();
             var paths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             foreach (var root in OptiscanProtectedPaths.GetProtectedRoots())
             {
@@ -148,7 +181,13 @@ namespace optiSCAN.Services
                     continue;
                 try
                 {
-                    paths.Add(Path.GetFullPath(root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)));
+                    var full = Path.GetFullPath(root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                    if (IsUnderRoot(full, local))
+                        continue;
+                    // Jamais d'exclusion Defender sur un dossier qu'un utilisateur peut modifier.
+                    if (!InstallLocationTrust.IsAdminOnlyInstall(full, out _))
+                        continue;
+                    paths.Add(full);
                 }
                 catch
                 {
@@ -157,6 +196,145 @@ namespace optiSCAN.Services
             }
 
             return paths.OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
+        /// <summary>Chemins complets des binaires, jamais un simple nom d'image.</summary>
+        internal static IReadOnlyList<string> CollectProcessExclusionPaths(bool requireTrustedInstall = true)
+        {
+            // Hors d'un dossier réservé aux administrateurs, un binaire remplacé hériterait de
+            // l'exclusion : aucune exclusion de processus dans ce cas. Le retrait, lui, vise
+            // toujours ces chemins, pour nettoyer ce qu'une version antérieure a pu ajouter.
+            if (requireTrustedInstall && !InstallLocationTrust.IsCurrentInstallTrusted(out _))
+                return Array.Empty<string>();
+
+            var root = AppContext.BaseDirectory;
+            string[] relative =
+            {
+                "optiSCAN.exe",
+                "optiSCAN.Service.exe",
+                Path.Combine("clamav", "x64", "clamscan.exe"),
+                Path.Combine("clamav", "x64", "freshclam.exe"),
+                Path.Combine("clamav", "x64", "clamd.exe"),
+                Path.Combine("yara", "yara64.exe"),
+            };
+
+            var list = new List<string>();
+            foreach (var name in relative)
+            {
+                var path = Path.GetFullPath(Path.Combine(root, name));
+                if (File.Exists(path))
+                    list.Add(path);
+            }
+
+            return list;
+        }
+
+        internal static IReadOnlyList<string> LegacyBareProcessNames => LegacyProcessNames;
+
+        private static bool IsUnderRoot(string full, string root)
+        {
+            var normRoot = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+            return string.Equals(full, normRoot, StringComparison.OrdinalIgnoreCase)
+                || full.StartsWith(normRoot + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase)
+                || full.StartsWith(normRoot + Path.AltDirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
+        }
+
+        public static DefenderExclusionResult RemoveOptiscanExclusions()
+        {
+            if (!OperatingSystem.IsWindows())
+                return DefenderExclusionResult.NotApplicable();
+
+            // Retrait large : tout ce qu'une version antérieure a pu exclure, y compris un dossier
+            // d'installation que l'on n'exclurait plus aujourd'hui.
+            var paths = CollectExclusionPaths()
+                .Concat(OptiscanProtectedPaths.ResolveInstallRoots())
+                .Append(OptiscanProtectedPaths.GetLocalAppDataRoot())
+                .Distinct(StringComparer.OrdinalIgnoreCase);
+            var processes = CollectProcessExclusionPaths(requireTrustedInstall: false);
+            var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
+            {
+                paths,
+                processes,
+                own = LegacyOwnProcessNames,
+                engine = LegacyEngineProcessNames,
+            })));
+
+            const string script = """
+                $ErrorActionPreference = 'Continue'
+                $payload = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__PAYLOAD__'))
+                $data = $payload | ConvertFrom-Json
+                $removed = 0
+                foreach ($p in $data.paths) {
+                    try { Remove-MpPreference -ExclusionPath ([string]$p) -ErrorAction Stop; $removed++ } catch { }
+                }
+                foreach ($proc in $data.processes) {
+                    try { Remove-MpPreference -ExclusionProcess ([string]$proc) -ErrorAction Stop; $removed++ } catch { }
+                }
+                # Noms nus de la 3.0.0 : ceux d'optiSCAN sont retirés ; ceux des moteurs
+                # (clamscan.exe...) peuvent appartenir à une autre installation, ils ne sont
+                # retirés que si les noms d'optiSCAN étaient aussi présents (lot de la 3.0.0).
+                $procNow = @((Get-MpPreference).ExclusionProcess)
+                $ours = @($data.own | Where-Object { $procNow -contains [string]$_ })
+                $legacyTargets = @($ours)
+                if ($ours.Count -gt 0) { $legacyTargets += @($data.engine | Where-Object { $procNow -contains [string]$_ }) }
+                foreach ($name in $legacyTargets) {
+                    try { Remove-MpPreference -ExclusionProcess ([string]$name) -ErrorAction Stop; $removed++ } catch { }
+                }
+                Write-Output ('OK:' + $removed)
+                exit 0
+                """;
+
+            var run = RunPowerShell(script.Replace("__PAYLOAD__", payload, StringComparison.Ordinal));
+            return ParseResult(run.ExitCode, run.Output);
+        }
+
+        /// <summary>
+        /// Exclusions laissées par optiSCAN 3.0.0 : processus par simple nom (valables pour
+        /// n'importe quel exécutable du même nom) et dossiers <c>AppData\Local\optiSCAN</c>
+        /// de tous les profils. Appelé par l'installeur à chaque mise à jour.
+        /// </summary>
+        public static DefenderExclusionResult RemoveLegacyExclusions()
+        {
+            if (!OperatingSystem.IsWindows())
+                return DefenderExclusionResult.NotApplicable();
+            if (!IsWindowsDefenderPresent())
+                return DefenderExclusionResult.Unavailable("Windows Defender introuvable");
+
+            var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
+            {
+                own = LegacyOwnProcessNames,
+                engine = LegacyEngineProcessNames,
+            })));
+
+            const string script = """
+                $ErrorActionPreference = 'Continue'
+                $payload = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__PAYLOAD__'))
+                $data = $payload | ConvertFrom-Json
+                $pref = Get-MpPreference
+                $removed = 0
+                # Noms nus de la 3.0.0 : ceux d'optiSCAN sont retirés ; ceux des moteurs
+                # (clamscan.exe...) peuvent appartenir à une autre installation, ils ne sont
+                # retirés que si les noms d'optiSCAN étaient aussi présents (lot de la 3.0.0).
+                $procNow = @((Get-MpPreference).ExclusionProcess)
+                $ours = @($data.own | Where-Object { $procNow -contains [string]$_ })
+                $legacyTargets = @($ours)
+                if ($ours.Count -gt 0) { $legacyTargets += @($data.engine | Where-Object { $procNow -contains [string]$_ }) }
+                foreach ($name in $legacyTargets) {
+                    try { Remove-MpPreference -ExclusionProcess ([string]$name) -ErrorAction Stop; $removed++ } catch { }
+                }
+                foreach ($p in @($pref.ExclusionPath)) {
+                    if ([string]$p -match '\\AppData\\Local\\optiSCAN\\?$') {
+                        try { Remove-MpPreference -ExclusionPath ([string]$p) -ErrorAction Stop; $removed++ } catch { }
+                    }
+                }
+                Write-Output ('OK:' + $removed)
+                exit 0
+                """;
+
+            var run = RunPowerShell(script.Replace("__PAYLOAD__", payload, StringComparison.Ordinal));
+            var result = ParseResult(run.ExitCode, run.Output);
+            AppLogger.Info("DefenderExclusion", "Nettoyage des exclusions 3.0.0 : " + run.Output.Trim());
+            return result;
         }
 
         internal static bool IsWindowsDefenderPresent()
@@ -221,9 +399,19 @@ namespace optiSCAN.Services
             using var proc = Process.Start(psi)
                 ?? throw new InvalidOperationException("Impossible de lancer powershell.exe");
 
-            var stdout = proc.StandardOutput.ReadToEnd();
-            var stderr = proc.StandardError.ReadToEnd();
-            proc.WaitForExit(60_000);
+            // Lecture simultanée des deux flux (sinon blocage si stderr remplit son tampon
+            // pendant la lecture de stdout), et délai réel : PowerShell bloqué est arrêté.
+            var stdoutTask = proc.StandardOutput.ReadToEndAsync();
+            var stderrTask = proc.StandardError.ReadToEndAsync();
+            if (!proc.WaitForExit(60_000))
+            {
+                try { proc.Kill(entireProcessTree: true); }
+                catch (Exception ex) { AppLogger.Debug("DefenderExclusion", "Arrêt PowerShell : " + ex.Message); }
+                return (-1, "PowerShell : délai dépassé");
+            }
+            proc.WaitForExit();
+            var stdout = stdoutTask.GetAwaiter().GetResult();
+            var stderr = stderrTask.GetAwaiter().GetResult();
 
             var combined = string.IsNullOrWhiteSpace(stderr)
                 ? stdout

@@ -35,12 +35,12 @@ internal sealed class ServiceHostThreatHandler
             {
                 var repair = ThreatRepairService.TryRemediate(threat, _context.Quarantine, _prefs);
                 _context.Logger.WriteToLog(
-                    $"[ServiceHost] Remédiation {threat.FilePath}: {repair.Message}");
+                    $"[ServiceHost] Remédiation {PathRedaction.RedactPath(threat.FilePath)}: {repair.Message}");
             }
             else
             {
                 _context.Logger.WriteToLog(
-                    $"[ServiceHost] Menace {threat.VirusName} — {threat.FilePath}");
+                    $"[ServiceHost] Menace {threat.VirusName} — {PathRedaction.RedactPath(threat.FilePath)}");
             }
 
             _ = EnrichCloudAsync(threat);
@@ -60,7 +60,7 @@ internal sealed class ServiceHostThreatHandler
             if (!string.IsNullOrWhiteSpace(summary))
             {
                 _context.Logger.WriteToLog(
-                    $"[ServiceHost] Réputation cloud — {threat.FilePath}: {summary}");
+                    $"[ServiceHost] Réputation cloud — {PathRedaction.RedactPath(threat.FilePath)}: {summary}");
             }
         }
         catch (Exception ex)

@@ -47,12 +47,8 @@ public sealed class ClamScanLineParserTests
     [Fact]
     public void ProcessLine_OK_throttles_progress_after_500_files()
     {
-        var reports = new List<int>();
-        var progress = new Progress<ScanProgress>(p =>
-        {
-            if (p.Phase == ScanPhase.Scanning && p.FilesScanned > 0)
-                reports.Add(p.FilesScanned);
-        });
+        var progress = new SyncProgress();
+        var reports = progress.Reports;
 
         var result = new ScanResult();
         for (var i = 1; i <= 1000; i++)
@@ -63,5 +59,37 @@ public sealed class ClamScanLineParserTests
         Assert.Contains(500, reports);
         Assert.Contains(600, reports);
         Assert.Contains(1000, reports);
+    }
+
+    [Theory]
+    [InlineData(@"C:\a.txt: Access denied. ERROR", true)]
+    [InlineData("ERROR: Can't open file", true)]
+    [InlineData(@"C:\a.txt: OK", false)]
+    public void IsErrorLine_detects_clam_errors(string line, bool expected) =>
+        Assert.Equal(expected, ClamScanLineParser.IsErrorLine(line));
+
+    [Theory]
+    [InlineData(0, 0, false, ScanStatus.Completed)]
+    [InlineData(1, 1, false, ScanStatus.Completed)]
+    [InlineData(1, 0, false, ScanStatus.Error)]
+    [InlineData(2, 1, false, ScanStatus.Completed)]
+    [InlineData(2, 0, false, ScanStatus.Error)]
+    [InlineData(2, 0, true, ScanStatus.Cancelled)]
+    public void ClassifyExit_honors_clamscan_status(int exitCode, int threats, bool cancelled, ScanStatus expected)
+    {
+        var status = ClamAvEngine.ClassifyExit(exitCode, threats, cancelled, out _);
+        Assert.Equal(expected, status);
+    }
+
+    /// <summary>IProgress synchrone : Progress&lt;T&gt; poste le rappel sur un autre thread.</summary>
+    private sealed class SyncProgress : IProgress<ScanProgress>
+    {
+        public List<int> Reports { get; } = new();
+
+        public void Report(ScanProgress value)
+        {
+            if (value.Phase == ScanPhase.Scanning && value.FilesScanned > 0)
+                Reports.Add(value.FilesScanned);
+        }
     }
 }

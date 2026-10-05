@@ -100,6 +100,7 @@
   <data name="ScanSummary_Threats" xml:space="preserve"><value>Warning: {0} threat(s) found in {1:N0} file(s)</value></data>
   <data name="ScanSummary_Cancelled" xml:space="preserve"><value>Scan stopped ({0:N0} file(s) scanned)</value></data>
   <data name="ScanSummary_Error" xml:space="preserve"><value>Error: {0}</value></data>
+  <data name="ScanSummary_ThreatsIncomplete" xml:space="preserve"><value>{0} threat(s) found in {1:N0} file(s), but the scan is incomplete: {2}</value></data>
   <data name="ScanSummary_Unknown" xml:space="preserve"><value>Unknown status</value></data>
   <data name="Recent_QuickScan" xml:space="preserve"><value>Quick scan</value></data>
   <data name="Recent_FullScan" xml:space="preserve"><value>Full scan</value></data>
@@ -382,12 +383,6 @@
   <data name="Twk_SearchIcon" xml:space="preserve"><value>Search box as icon</value></data>
   <data name="Twk_ThisPC" xml:space="preserve"><value>Explorer opens "This PC"</value></data>
   <data name="Twk_Dism" xml:space="preserve"><value>Windows component cleanup — DISM, slow (admin)</value></data>
-  <data name="Twk_DefenderHistory" xml:space="preserve"><value>Clear Windows Defender history and quarantine — restart required (admin)</value></data>
-  <data name="Twk_DefenderHistoryWarn" xml:space="preserve"><value>This action deletes Windows Defender protection history at the next startup: detections, quarantined items, and controlled folder access. Files quarantined by Defender will be permanently lost. The operation runs only once.</value></data>
-  <data name="Twk_DefenderHistoryRestartBody" xml:space="preserve"><value>A restart is required to clear Windows Defender history: the files stay locked while the service is running. Restart now?</value></data>
-  <data name="Twk_LogDefenderHistoryPending" xml:space="preserve"><value>Windows Defender history: cleanup scheduled for the next startup.</value></data>
-  <data name="Twk_LogRestarting" xml:space="preserve"><value>Restarting Windows…</value></data>
-  <data name="Twk_LogRestartLater" xml:space="preserve"><value>Restart Windows later to apply the Defender history cleanup.</value></data>
   <data name="Twk_Apply" xml:space="preserve"><value>Apply tweaks</value></data>
   <data name="Twk_ElevNote" xml:space="preserve"><value>Actions marked (admin) share a single UAC prompt.</value></data>
   <data name="Twk_LogTitle" xml:space="preserve"><value>Tweaks log</value></data>
@@ -450,17 +445,17 @@
   <data name="Repair_Quarantined" xml:space="preserve"><value>File quarantined.</value></data>
   <data name="Repair_QuarantineFailed" xml:space="preserve"><value>Quarantine failed.</value></data>
   <data name="Platform_StatusTitle" xml:space="preserve"><value>System protection</value></data>
-  <data name="Platform_IpcActive" xml:space="preserve"><value>IPC service / remote engine active</value></data>
-  <data name="Platform_IpcInactive" xml:space="preserve"><value>IPC service unreachable (local RTP fallback possible)</value></data>
-  <data name="Platform_IpcDisabled" xml:space="preserve"><value>Windows service disabled (RTP in application)</value></data>
-  <data name="Platform_AmsiDllMissing" xml:space="preserve"><value>AMSI: optiSCAN.AmsiProvider.dll missing</value></data>
-  <data name="Platform_AmsiNotRegistered" xml:space="preserve"><value>AMSI: provider not registered (admin required)</value></data>
-  <data name="Platform_AmsiRegistered" xml:space="preserve"><value>AMSI: provider registered</value></data>
-  <data name="Platform_AmsiPresentInactive" xml:space="preserve"><value>AMSI: DLL present, inactive (platform protection off)</value></data>
-  <data name="Platform_DefenderMayOverride" xml:space="preserve"><value>Defender active — may take AMSI priority on scripts</value></data>
-  <data name="Platform_MinifilterLoaded" xml:space="preserve"><value>Kernel minifilter loaded</value></data>
-  <data name="Platform_MinifilterNotLoaded" xml:space="preserve"><value>Minifilter present but not loaded (test signing / admin)</value></data>
-  <data name="Platform_MinifilterAbsent" xml:space="preserve"><value>Kernel minifilter absent (stub — PE not intercepted)</value></data>
+  <data name="Platform_IpcActive" xml:space="preserve"><value>Background protection is running</value></data>
+  <data name="Platform_IpcInactive" xml:space="preserve"><value>Background protection is unreachable — the app can take over</value></data>
+  <data name="Platform_IpcDisabled" xml:space="preserve"><value>Background protection is off — it stays inside the app</value></data>
+  <data name="Platform_AmsiDllMissing" xml:space="preserve"><value>Scripts are not scanned: a component is missing</value></data>
+  <data name="Platform_AmsiNotRegistered" xml:space="preserve"><value>Scripts are not scanned: administrator rights required</value></data>
+  <data name="Platform_AmsiRegistered" xml:space="preserve"><value>Scripts are scanned</value></data>
+  <data name="Platform_AmsiPresentInactive" xml:space="preserve"><value>Script scanning is turned off</value></data>
+  <data name="Platform_DefenderMayOverride" xml:space="preserve"><value>Windows Defender may scan scripts instead of optiSCAN</value></data>
+  <data name="Platform_MinifilterLoaded" xml:space="preserve"><value>Programs are checked as soon as they open</value></data>
+  <data name="Platform_MinifilterNotLoaded" xml:space="preserve"><value>Open-time check is installed but not running</value></data>
+  <data name="Platform_MinifilterAbsent" xml:space="preserve"><value>Programs are not checked when they open</value></data>
   <data name="Opt_BackupBeforeQuarantine" xml:space="preserve"><value>Safety backup before quarantine</value></data>
   <data name="Opt_BackupBeforeQuarantineSub" xml:space="preserve"><value>Keeps a local copy (32 MB max.) in %LocalAppData%\optiSCAN\SafetyBackups.</value></data>
   <data name="Opt_AggressiveSignatures" xml:space="preserve"><value>Aggressive signature updates</value></data>
@@ -620,6 +615,9 @@ Remove them? Files are not deleted, only the share is removed. Other devices wil
   <data name="Hist_InfoFiles" xml:space="preserve"><value>{0} files</value></data>
   <data name="Hist_InfoThreats" xml:space="preserve"><value>{0} threat(s)</value></data>
   <data name="Hist_InfoClean" xml:space="preserve"><value>No threats</value></data>
+  <data name="Hist_InfoIncomplete" xml:space="preserve"><value>Incomplete scan — result not guaranteed</value></data>
+  <data name="Hist_InfoThreatsIncomplete" xml:space="preserve"><value>{0} threat(s) — scan incomplete</value></data>
+  <data name="Hist_InfoCancelled" xml:space="preserve"><value>Scan stopped — result not guaranteed</value></data>
   <data name="Hist_TooltipQuarantineAll" xml:space="preserve"><value>Quarantines every threat listed for this session.</value></data>
   <data name="Hist_DismissThreat" xml:space="preserve"><value>Remove</value></data>
   <data name="Hist_TooltipDismiss" xml:space="preserve"><value>Removes this threat from history (file missing or drive unplugged).</value></data>
@@ -865,4 +863,29 @@ Remove them? Files are not deleted, only the share is removed. Other devices wil
   <data name="Export_Pdf_Footer" xml:space="preserve"><value>optiSCAN {0} ({1}) — Report generated {2} — Page </value></data>
   <data name="Export_Pdf_ThreatLegacySingle" xml:space="preserve"><value>Threat detected (details not kept in history)</value></data>
   <data name="Export_Pdf_ThreatLegacyMulti" xml:space="preserve"><value>Threat {0}/{1} (details not kept)</value></data>
+  <data name="SvcQ_Banner" xml:space="preserve"><value>Service quarantine: {0:N0} item(s), {1}. Kept for {2} days.</value></data>
+  <data name="SvcQ_Manage" xml:space="preserve"><value>Manage (administrator)…</value></data>
+  <data name="SvcQ_Title" xml:space="preserve"><value>optiSCAN — service quarantine</value></data>
+  <data name="SvcQ_Intro" xml:space="preserve"><value>Files isolated by the service's protection (all accounts on this PC). They are deleted automatically after {0} days. Restoring creates the file with your administrator rights and never overwrites an existing file.</value></data>
+  <data name="SvcQ_Restore" xml:space="preserve"><value>Restore</value></data>
+  <data name="SvcQ_RestoreTo" xml:space="preserve"><value>Restore to…</value></data>
+  <data name="SvcQ_Delete" xml:space="preserve"><value>Delete</value></data>
+  <data name="SvcQ_Purge" xml:space="preserve"><value>Delete all</value></data>
+  <data name="SvcQ_Refresh" xml:space="preserve"><value>Refresh</value></data>
+  <data name="SvcQ_Close" xml:space="preserve"><value>Close</value></data>
+  <data name="SvcQ_ColDate" xml:space="preserve"><value>Date</value></data>
+  <data name="SvcQ_ColFile" xml:space="preserve"><value>Original file</value></data>
+  <data name="SvcQ_ColThreat" xml:space="preserve"><value>Threat</value></data>
+  <data name="SvcQ_ColSize" xml:space="preserve"><value>Size</value></data>
+  <data name="SvcQ_Status" xml:space="preserve"><value>{0:N0} item(s), {1}.</value></data>
+  <data name="SvcQ_StatusTruncated" xml:space="preserve"><value>{0:N0} of {1:N0} shown (most recent).</value></data>
+  <data name="SvcQ_ConfirmRestore" xml:space="preserve"><value>Restore "{0}"?
+
+This file was detected as "{1}". Only restore it if you are sure it is safe: real-time protection may detect it again.</value></data>
+  <data name="SvcQ_ConfirmDelete" xml:space="preserve"><value>Permanently delete {0} from the service quarantine?</value></data>
+  <data name="SvcQ_ConfirmPurge" xml:space="preserve"><value>Permanently delete the {0:N0} item(s) in the service quarantine?</value></data>
+  <data name="SvcQ_Restored" xml:space="preserve"><value>Restored: {0}</value></data>
+  <data name="SvcQ_Error" xml:space="preserve"><value>The service refused the operation: {0}</value></data>
+  <data name="SvcQ_Unreachable" xml:space="preserve"><value>The optiSCAN protection service is not responding.</value></data>
+  <data name="SvcQ_ElevationRefused" xml:space="preserve"><value>Elevation declined: the service quarantine was not opened.</value></data>
 </root>

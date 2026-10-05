@@ -563,9 +563,6 @@
                                             <CheckBox x:Name="chkTwkDism"
                                                       Content="{loc:Loc Key=Twk_Dism}" IsChecked="False"
                                                       Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
-                                            <CheckBox x:Name="chkTwkDefenderHistory"
-                                                      Content="{loc:Loc Key=Twk_DefenderHistory}" IsChecked="False"
-                                                      Margin="2,2" FontSize="{DynamicResource FontSize.Small}"/>
                                         </StackPanel>
                                     </Border>
                                 </StackPanel>

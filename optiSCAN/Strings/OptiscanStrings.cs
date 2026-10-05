@@ -28,7 +28,7 @@ namespace optiSCAN.Strings
             public const string OptiscanWebsite = "https://sourceforge.net/projects/optiscan/";
             public const string OptiscanSourceForge = "https://sourceforge.net/projects/optiscan/";
             public const string YaraForgeApiLatest = "https://api.github.com/repos/YARAHQ/yara-forge/releases/latest";
-            public const string ClamAvRootCertRaw = "https://raw.githubusercontent.com/Cisco-Talos/clamav/main/certs/clamav.crt";
+            public const string ClamAvRootCertRaw = "https://raw.githubusercontent.com/Cisco-Talos/clamav/clamav-1.5.0/certs/clamav.crt";
         }
 
         public static class Confirmations

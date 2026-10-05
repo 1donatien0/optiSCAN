@@ -193,6 +193,11 @@ namespace optiSCAN.Services
             return names;
         }
 
+        /// <summary>Nom de partage sans métacaractère de cmd.exe ni caractère de contrôle.</summary>
+        internal static bool IsCmdSafeShareName(string name) =>
+            !string.IsNullOrWhiteSpace(name)
+            && !name.Any(c => char.IsControl(c) || "\"&|<>^%!()".Contains(c));
+
         /// <summary>
         /// Supprime les partages exposés que l'utilisateur a confirmés (intersection avec l'état courant).
         /// Demande l'UAC si l'app n'est pas élevée. Bloquant : à appeler hors thread UI.
@@ -202,11 +207,17 @@ namespace optiSCAN.Services
         {
             ArgumentNullException.ThrowIfNull(confirmedNames);
             var current = ListExposedShareNames();
-            var names = current
+            // Les noms passent par cmd.exe (élevé) : un nom contenant un métacaractère de cmd
+            // ajouterait une commande. Ces partages-là ne sont pas traités ici.
+            var confirmed = current
                 .Where(n => confirmedNames.Contains(n, StringComparer.OrdinalIgnoreCase))
                 .ToList();
+            var names = confirmed.Where(IsCmdSafeShareName).ToList();
+            var refused = confirmed.Count - names.Count;
+            if (refused > 0)
+                AppLogger.Warn("SecurityPosture", $"{refused} partage(s) au nom non sûr pour cmd.exe : à supprimer manuellement");
             if (names.Count == 0)
-                return true;
+                return refused == 0;
 
             var script = string.Join(" & ", names.Select(n => $"net share \"{n}\" /delete"));
             var psi = new ProcessStartInfo
@@ -231,7 +242,7 @@ namespace optiSCAN.Services
                 }
                 if (proc.ExitCode != 0)
                     AppLogger.Warn("SecurityPosture", $"Suppression des partages : code retour {proc.ExitCode}");
-                return proc.ExitCode == 0;
+                return proc.ExitCode == 0 && refused == 0;
             }
             catch (System.ComponentModel.Win32Exception ex) when (ex.NativeErrorCode == 1223)
             {

@@ -1,6 +1,7 @@
 using optiSCAN.Localization;
 using optiSCAN.Models;
 using optiSCAN.Services;
+using System.Security.Principal;
 using System.Windows;
 using WinApplication = System.Windows.Application;
 
@@ -14,7 +15,20 @@ namespace optiSCAN
     public partial class App : WinApplication
     {
         private static Mutex? _instanceMutex;
-        private const string MutexName = "Global\\optiSCAN_UniqueInstance";
+        private const string MutexName = AppInstanceGate.MutexName;
+
+        private static bool IsServiceHostIdentity()
+        {
+            try
+            {
+                using var identity = WindowsIdentity.GetCurrent();
+                return identity.IsSystem;
+            }
+            catch
+            {
+                return false;
+            }
+        }
 
         /// <summary>Session garde : RTP active, fenêtre masquée (systray).</summary>
         public static bool GuardSession { get; private set; }
@@ -29,6 +43,33 @@ namespace optiSCAN
         /// </summary>
         protected override async void OnStartup(StartupEventArgs e)
         {
+            var earlyMode = HeadlessScanArguments.ParseMode(e.Args);
+            if (earlyMode == HeadlessScanArguments.Mode.ClamdStub)
+            {
+                ShutdownMode = ShutdownMode.OnExplicitShutdown;
+#if OPTISCAN_TEST_HOOKS
+                // Faux clamd des tests d'isolation : absent du binaire publié (dotnet publish).
+                if (string.Equals(Environment.GetEnvironmentVariable("OPTISCAN_CLAMD_STUB"), "1", StringComparison.Ordinal)
+                    && HeadlessScanArguments.TryParseClamdStub(e.Args, out var stubPort))
+                {
+                    try { ClamdLoopbackStub.Run(stubPort); }
+                    catch { /* processus arrêté */ }
+                }
+#endif
+                Environment.Exit(0);
+            }
+
+            if (earlyMode == HeadlessScanArguments.Mode.ClamdRelay)
+            {
+                ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                if (HeadlessScanArguments.TryParseClamdRelay(e.Args, out var relayPort, out var relayParent, out var relayFile))
+                {
+                    try { ClamdRelay.Run(relayPort, relayParent, relayFile); }
+                    catch { /* processus arrêté */ }
+                }
+                Environment.Exit(0);
+            }
+
             // Avant TOUT : capter les exceptions non gérées. Sans cela, une exception
             // au démarrage tue le process silencieusement (« l'app disparaît du
             // gestionnaire des tâches sans message »). Désormais elles sont
@@ -53,6 +94,13 @@ namespace optiSCAN
             // ScheduledScanService crée la tâche schtasks avec --fullscan --quiet ;
             // sans ce parsing, l'app se lançait simplement avec son UI.
             var headlessMode = HeadlessScanArguments.ParseMode(e.Args);
+
+            // Processus élevé (relance UAC, outil admin) : retirer une fois par version les
+            // exclusions Defender de la 3.0.0, même si la mise à jour n'est pas passée par l'installeur.
+            if (headlessMode is not (HeadlessScanArguments.Mode.CleanupLegacyDefenderExclusions
+                    or HeadlessScanArguments.Mode.RemoveDefenderExclusions))
+                DefenderLegacyCleanup.TryRunOnceInBackground();
+
             if (headlessMode == HeadlessScanArguments.Mode.Watchdog)
             {
                 ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -71,15 +119,96 @@ namespace optiSCAN
                 return;
             }
 
+            if (headlessMode == HeadlessScanArguments.Mode.RemoveDefenderExclusions)
+            {
+                ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                base.OnStartup(e);
+                WindowsDefenderExclusionService.RemoveOptiscanExclusions();
+                Shutdown();
+                return;
+            }
+
+            if (headlessMode == HeadlessScanArguments.Mode.CleanupLegacyDefenderExclusions)
+            {
+                // Lancé par l'installeur (élevé) : retire les exclusions des versions 3.0.0.
+                ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                base.OnStartup(e);
+                DefenderLegacyCleanup.RunAndMark();
+                Shutdown();
+                return;
+            }
+
+            if (headlessMode == HeadlessScanArguments.Mode.PushHostPolicy)
+            {
+                // Instance élevée lancée par l'interface pour un réglage qui réduit la protection.
+                ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                base.OnStartup(e);
+                HostPolicyStore.PushFromElevatedProcess(HeadlessScanArguments.GetPushHostPolicyArgument(e.Args));
+                Shutdown();
+                return;
+            }
+
+            if (headlessMode == HeadlessScanArguments.Mode.ServiceQuarantine)
+            {
+                // Instance élevée lancée par l'onglet Quarantaine : n'ouvre que l'administration
+                // de la quarantaine du service, hors instance unique (l'interface reste ouverte).
+                base.OnStartup(e);
+                if (!ElevationHelper.IsRunningElevated())
+                {
+                    AppLogger.Warn("App", "--service-quarantine refusé : processus non élevé");
+                    Shutdown();
+                    return;
+                }
+
+                // Pas de MainWindow.xaml (StartupUri) : seule cette fenêtre s'ouvre.
+                StartupUri = null;
+                ThemeManager.Initialize();
+                ShutdownMode = ShutdownMode.OnMainWindowClose;
+                var window = new Views.ServiceQuarantineWindow { WindowStartupLocation = WindowStartupLocation.CenterScreen };
+                MainWindow = window;
+                window.Show();
+                return;
+            }
+
+            if (headlessMode == HeadlessScanArguments.Mode.ClearDefenderHistory)
+            {
+                ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                base.OnStartup(e);
+                // Tâche laissée par une version antérieure : la fonction est retirée,
+                // la tâche se supprime au lieu de vider l'historique Defender.
+                SystemTweaksService.RemoveDefenderHistoryTask();
+                Shutdown();
+                return;
+            }
+
+            if (headlessMode == HeadlessScanArguments.Mode.ApplyTweaks)
+            {
+                ShutdownMode = ShutdownMode.OnExplicitShutdown;
+                base.OnStartup(e);
+                SystemTweaksService.ExecuteTweakIds(HeadlessScanArguments.ParseTweakIds(e.Args));
+                Shutdown();
+                return;
+            }
+
             if (headlessMode == HeadlessScanArguments.Mode.ServiceHost)
             {
-                bool createdService;
-                _instanceMutex = new Mutex(true, "Global\\optiSCAN_ServiceHost", out createdService);
-                if (!createdService)
+                if (!IsServiceHostIdentity())
                 {
-                    // Mutex non détenue : ne pas la libérer dans OnExit (ApplicationException).
-                    _instanceMutex.Close();
-                    _instanceMutex = null;
+                    AppLogger.Warn("App", "Refus de --service-host : réservé au service Windows");
+                    Shutdown();
+                    return;
+                }
+
+                if (!optiSCAN.Platform.InstallLocationTrust.IsCurrentInstallTrusted(out var installReason))
+                {
+                    AppLogger.Warn("App", "Hôte de service refusé : dossier d'installation modifiable par un utilisateur (" + installReason + ")");
+                    Shutdown();
+                    return;
+                }
+
+                if (!ServiceHostLock.TryAcquire())
+                {
+                    AppLogger.Warn("App", "Hôte de service refusé : verrou occupé ou ProgramData non fiable");
                     Shutdown();
                     return;
                 }

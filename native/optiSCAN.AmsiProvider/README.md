@@ -1,30 +1,9 @@
-# optiSCAN AMSI Provider
+# Prototype AMSI — non livré
 
-Fournisseur AMSI natif (`optiSCAN.AmsiProvider.dll`) qui transmet les buffers script
-à `optiSCAN.exe --service-host` via le pipe `\\.\pipe\optiSCAN_Protection`.
+`optiSCAN.AmsiProvider` est un prototype natif conservé dans le dépôt. Il ne fait pas partie de la candidate v3.1 : le projet n'est pas compilé par la CI, la DLL n'est pas copiée au publish/installeur et Windows ne charge pas le fournisseur.
 
-Le nom du pipe et la version du protocole IPC sont définis dans
-`protection_identifiers.h`, miroir de `optiSCAN.Platform/ProtectionIdentifiers.cs`
-(cohérence vérifiée par les tests unitaires). Ne pas y mettre de version produit.
+`PlatformRegistration.TryRegisterAmsiProvider()` est volontairement un no-op qui journalise que le fournisseur n'est pas signé et n'est pas chargé. `TryUnregisterAmsiProvider()` ne fait que nettoyer une éventuelle ancienne entrée AMSI laissée par une version antérieure.
 
-## Build (Visual Studio 2022)
+Le fichier `protection_identifiers.h` est le miroir des identifiants définis dans `optiSCAN.Platform/ProtectionIdentifiers.cs`. Les tests vérifient qu'ils restent synchronisés ; ce partage de constantes ne signifie pas que le prototype fonctionne.
 
-1. Ouvrir `native\optiSCAN.AmsiProvider\optiSCAN.AmsiProvider.vcxproj`
-2. Configuration **Release | x64**
-3. Copier la DLL vers le dossier publish à côté de `optiSCAN.exe`
-
-## Enregistrement
-
-Effectué par `PlatformRegistration.TryRegisterAmsiProvider()` au démarrage du
-service plateforme (`--service-host` / `optiSCAN.Service`), si la protection
-système est activée dans les Options (nécessite droits administrateur).
-
-Désactivé par `TryUnregisterAmsiProvider()` quand la protection plateforme est
-coupée : la DLL peut rester dans le dossier d'installation sans être chargée.
-
-Clé : `HKLM\SOFTWARE\Microsoft\AMSI\Providers\{A8F4E2B1-9C3D-4E5F-8A7B-1C2D3E4F5A6B}`
-
-## Limites
-
-- Coexistence avec Defender : un seul fournisseur AMSI « actif » par processus hôte selon la politique Windows.
-- Signature Authenticode recommandée pour la DLL en production.
+Ne pas copier ni enregistrer cette DLL pour une installation courante. Une éventuelle reprise exige une implémentation complète, une revue de sécurité, la chaîne de signature correspondante et une validation spécifique sous Windows avant toute intégration au produit.
