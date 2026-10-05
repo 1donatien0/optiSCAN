@@ -1,176 +1,59 @@
 # Procédure de signature de code — optiSCAN
 
-Guide pratique pour signer optiSCAN. Un antivirus complet a **quatre** artefacts à signer, dont un (le pilote noyau) qui passe obligatoirement par Microsoft.
+**État : 5 octobre 2026 — v3.1 candidate.** Cette procédure décrit la chaîne actuellement configurée. La signature Authenticode est facultative : sans certificat configuré, la publication continue et les artefacts optiSCAN restent non signés.
 
-> **Quand utiliser ce document ?**
-> - **Phase 1 (maintenant, sans pilote, produit gratuit)** : **aucune signature obligatoire**. ClamAV/YARA officiels sont déjà signés par leurs éditeurs. Signer `optiSCAN.exe` + l'installeur (§3) est **facultatif** — confort SmartScreen sur *votre* coquille, pas condition de fonctionnement des moteurs.
-> - **Phase 2 (~3 ans, activation de la couche plateforme)** : EV + pilote Microsoft (§2.1, §4) ; signature de la DLL AMSI si mode plateforme activé.
->
-> Vérifié en juin 2026. Les prix et portails évoluent — recouper avec les liens en bas.
+## Artefacts de la version courante
 
----
+Quand le secret de signature est configuré, la CI signe les binaires applicatifs publiés (`optiSCAN.exe`, DLL de l'application, service et plateforme), puis l'installeur Inno et son désinstalleur. Le PFX est importé temporairement dans le magasin utilisateur et `signtool` sélectionne le certificat par empreinte. Le mot de passe ne passe pas en argument de processus ; le PFX temporaire et la clé importée sont retirés à la fin du job.
 
-## 1. Ce qu'il faut signer
+Les moteurs ne suivent pas cette chaîne Authenticode : l'archive ClamAV est vérifiée par signature GPG Talos et SHA-256 ; le moteur YARA par SHA-256 épinglé. **AMSI et le minifiltre ne sont pas livrés** : leurs prototypes sous `native/` ne sont ni compilés par la CI, ni inclus dans le publish/installeur, ni enregistrés/chargés. Il ne faut pas suivre les anciennes étapes de signature et d'installation de ces prototypes pour une release v3.1.
 
-| Artefact | Type | Chaîne de signature |
-|---|---|---|
-| `optiSCAN.exe` | Exécutable WPF | Authenticode (ton certificat) |
-| Installeur `optiSCAN_Setup_*.exe` | Inno Setup | Authenticode (ton certificat) |
-| `optiSCAN.AmsiProvider.dll` | DLL user-mode (AMSI) | Authenticode (ton certificat) |
-| `optiSCAN.Minifilter.sys` | **Pilote noyau** | **Microsoft** (via Partner Center) après signature EV |
+## Signature dans GitHub Actions
 
-Les trois premiers se signent toi-même avec `signtool`. Le pilote **doit** être soumis à Microsoft.
+Dans les secrets du dépôt, configurer :
 
----
+| Secret | Valeur |
+|---|---|
+| `CODESIGN_PFX` | Contenu base64 du certificat PFX |
+| `CODESIGN_PASSWORD` | Mot de passe du PFX |
 
-## 2. Prérequis (à obtenir une fois)
+Le job `publish` de [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) appelle `scripts/codesign.ps1 -Prepare`. Si `CODESIGN_PFX` est absent, il saute les étapes de signature et poursuit le build. Sinon, le job signe les binaires de l'application, puis appelle `installer/build-release-setup.ps1 -SignPfxPath` pour l'installeur et le désinstalleur. L'étape de nettoyage retire le PFX temporaire.
 
-### 2.1 Certificat de signature de code **EV**
+Le timestamp RFC 3161 est demandé à `http://timestamp.digicert.com`. `scripts/codesign.ps1` vérifie ensuite la signature des fichiers signés.
 
-- **Pourquoi EV (et pas OV) ?** Parce que Microsoft **exige un certificat EV** pour soumettre un pilote à la signature d'attestation. Comme tu dois signer le pilote, prends directement de l'EV : il couvre aussi l'exe et l'installeur.
-- **Stockage matériel obligatoire** : depuis juin 2023 (CA/B Forum), la clé privée d'un certificat de signature doit vivre sur un **token matériel** (FIPS 140-2 niveau 2 / Common Criteria EAL4+) ou un **HSM cloud**. Tu ne peux pas l'exporter en `.pfx`.
-- **Fournisseurs / prix indicatifs (revendeurs, /an)** : Sectigo/Comodo ~280–330 $, DigiCert ~500–560 $. Le token USB + envoi est inclus (~130 $).
-- **Validité** : depuis le 24 février 2026, durée max **459 jours** pour les certificats publics de signature.
-- ⚠️ **À savoir (changement 2024)** : depuis mars 2024, l'EV **ne donne plus** de contournement SmartScreen instantané. EV et OV construisent désormais leur réputation SmartScreen de la même façon (volume de téléchargements). L'EV reste néanmoins **indispensable pour le pilote**.
+## Signature locale
 
-### 2.2 Compte Microsoft **Partner Center — Hardware**
-
-- Crée un compte sur le **Partner Center for Windows Hardware** (anciennement Hardware Dev Center).
-- **Associe ton certificat EV** au compte (l'enregistrement initial du compte se fait via une signature EV). Sans EV rattaché, tu ne peux pas soumettre de pilote.
-
----
-
-## 3. Signer les binaires user-mode (exe, DLL, installeur)
-
-Token EV branché, depuis un terminal développeur (où `signtool.exe` est dans le PATH — fourni par le Windows SDK).
+Prérequis : Windows, Windows SDK (`signtool.exe`), un PFX autorisé à signer les fichiers, et le publish Release win-x64. Fournir `CODESIGN_PASSWORD` dans l'environnement du processus PowerShell depuis un gestionnaire de secrets ; ne pas écrire le mot de passe dans la commande ou dans un fichier versionné.
 
 ```powershell
-# Horodatage OBLIGATOIRE (sinon la signature expire avec le certificat)
-$ts = "http://timestamp.digicert.com"   # ou celui de ton émetteur
+$publish = (Resolve-Path .\publish\win-x64).Path
+$files = @(
+    (Join-Path $publish 'optiSCAN.exe'),
+    (Join-Path $publish 'optiSCAN.dll'),
+    (Join-Path $publish 'optiSCAN.Service.exe'),
+    (Join-Path $publish 'optiSCAN.Service.dll'),
+    (Join-Path $publish 'optiSCAN.Platform.dll')
+)
 
-# Exe + DLL AMSI (after publish)
-signtool sign /fd SHA256 /tr $ts /td SHA256 /a `
-  "optiSCAN\bin\Release\net8.0-windows10.0.17763.0\publish\win-x64\optiSCAN.exe"
-
-signtool sign /fd SHA256 /tr $ts /td SHA256 /a `
-  "native\optiSCAN.AmsiProvider\x64\Release\optiSCAN.AmsiProvider.dll"
+pwsh -File scripts\codesign.ps1 -Sign -PfxPath .\cert.pfx -Files $files
+pwsh -File installer\build-release-setup.ps1 -SkipPublish `
+    -PublishDir $publish -SignPfxPath .\cert.pfx
 ```
 
-- `/a` sélectionne automatiquement le bon certificat ; sinon `/n "Nom du sujet"` ou `/sha1 <empreinte>`.
-- Avec certains tokens/HSM cloud, il faut passer par le KSP du fournisseur (option `/csp`/`/kc` ou outil maison — suis la doc de ton émetteur).
-- **L'installeur** se signe automatiquement si tu configures Inno (voir §5), ou manuellement après compilation :
-  ```powershell
-  signtool sign /fd SHA256 /tr $ts /td SHA256 /a "installer\output\optiSCAN_Setup_v3.0.0.exe"
-  ```
+`codesign.ps1` importe le certificat dans `CurrentUser\My`, le sélectionne par empreinte, signe les binaires listés, les vérifie, puis retire la clé importée. `build-release-setup.ps1 -SignPfxPath` applique la même méthode à l'installeur et au désinstalleur Inno. Sans certificat, lancer la chaîne de publication sans ces options.
 
-**Ordre important** : signe `optiSCAN.exe` et la DLL **avant** de compiler l'installeur, pour que l'installeur embarque des binaires déjà signés. Puis signe l'installeur lui-même.
+L'ancienne option `scripts/publish-release.ps1 -CertSubject` ne signe que `optiSCAN.exe` ; elle ne signe pas tous les binaires ni l'installeur. Utiliser la procédure ci-dessus pour une publication entièrement signée.
 
----
-
-## 4. Signer le pilote noyau (procédure Microsoft)
-
-Le `.sys` ne se charge pas sur Windows 10/11 x64 sans signature Microsoft. Voie recommandée : **Attestation Signing** (pas de tests HLK, plus rapide que WHQL).
-
-1. **Compiler** le pilote en Release x64 (`optiSCAN.Minifilter.sys`).
-2. **Créer un `.cab`** contenant : le `.sys`, le `.inf`, et le fichier de symboles `.pdb`.
-   - Via `MakeCab` + un fichier `.ddf`, ou l'outil de packaging du WDK.
-3. **Signer le `.cab` avec ton certificat EV** :
-   ```powershell
-   signtool sign /fd SHA256 /tr $ts /td SHA256 /a optiSCAN.Minifilter.cab
-   ```
-4. **Soumettre** sur le Partner Center hardware : nouveau « Driver submission » → **attestation signing** → téléverser le `.cab` signé (renseigner nom du produit / infos matériel demandées).
-5. **Microsoft re-signe** : il ajoute une signature embarquée SHA-2 Microsoft et génère un **catalogue (`.cat`) signé** par un certificat Microsoft SHA-2.
-6. **Télécharger** le paquet signé → tu distribues le **`.sys` re-signé + le `.cat`**.
-   - L'installeur doit installer le `.cat` à côté du `.sys` (ou installer le pilote via son `.inf` qui référence le catalogue).
-
-> Limites de l'attestation : Windows 10 Desktop et ultérieur. Pour une certification complète / autres éditions, passer par WHQL (tests HLK).
-
----
-
-## 5. Automatiser dans la build
-
-### Inno Setup (installeur)
-Dans `installer/setup.iss`, le scaffolding est déjà prêt. Configure un *Sign Tool* nommé `signtool` (IDE Inno → Tools → Configure Sign Tools…) :
-```
-signtool sign /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 /a $f
-```
-puis décommente dans `[Setup]` :
-```
-SignTool=signtool $f
-SignedUninstaller=yes
-```
-
-### Script de publication
-`scripts/publish-release.ps1` signe déjà l'exe si tu passes `-CertSubject` :
-```powershell
-pwsh -File scripts\publish-release.ps1 -CertSubject "Nom exact du sujet du certificat"
-```
-
-### `SIGN_CERT_SUBJECT` — local ou CI (optionnel, **0 €** sans certificat)
-
-Mécanisme unifié : le **nom du sujet** (`Subject`) du certificat dans le magasin Windows. Pas de secret supplémentaire, pas de frais GitHub.
-
-| Contexte | Configuration | Comportement |
-|----------|---------------|--------------|
-| **Local** | Certificat installé sur votre PC + paramètre `-CertSubject` | Signe après publish |
-| **CI `main`** | Secret repo `SIGN_CERT_SUBJECT` = même sujet | Signe si le **runner** a le certificat |
-| **Sans certificat** | Ne pas définir le secret / paramètre | Publish **non signé** (normal en bêta) |
-
-**Trouver le sujet du certificat** (PowerShell, après branchement du token ou import) :
-```powershell
-Get-ChildItem Cert:\CurrentUser\My, Cert:\LocalMachine\My |
-  Where-Object { $_.HasPrivateKey } |
-  Select-Object Subject, Thumbprint, NotAfter
-```
-
-**Signer en local** (après `dotnet publish` ou `publish-release.ps1`) :
-```powershell
-pwsh -File scripts\sign-publish-artifacts.ps1 -CertSubject "CN=Votre Société, O=..."
-```
-
-**CI GitHub** : *Settings → Secrets and variables → Actions → New repository secret*
-- Nom : `SIGN_CERT_SUBJECT`
-- Valeur : chaîne exacte telle qu’affichée dans `Subject` (souvent une partie suffit, ex. `Dona By`)
-
-> Les runners **GitHub-hosted** (`windows-latest`) n’ont **pas** votre certificat par défaut : l’étape CI s’exécute mais **ignore** la signature avec un avertissement. Pour signer en CI, utilisez un **runner self-hosted** Windows où le certificat (token USB branché ou cert importé) est visible par `signtool`.
-
-Chemins actuels (WinUI) :
-- `publish/win-x64/optiSCAN.exe`
-- `installer/output/optiSCAN_Setup_*.exe`
-
----
-
-## 6. Vérifier les signatures
+## Vérification manuelle
 
 ```powershell
-# User-mode
-signtool verify /v /pa "optiSCAN.exe"
-signtool verify /v /pa "installer\output\optiSCAN_Setup_v3.0.0.exe"
-
-# Pilote (catalogue)
-signtool verify /v /kp /c optiSCAN.Minifilter.cat optiSCAN.Minifilter.sys
+signtool verify /v /pa .\publish\win-x64\optiSCAN.exe
+signtool verify /v /pa .\installer\output\optiSCAN_Setup_v3.1.0.exe
 ```
-Un horodatage valide doit apparaître ; sans lui, tout casse à l'expiration du certificat.
 
----
+## Références de la chaîne
 
-## 7. Ordre récapitulatif d'une release signée
-
-1. `dotnet publish` (ou `scripts\publish-release.ps1`).
-2. Signer `optiSCAN.exe` + `optiSCAN.AmsiProvider.dll` (EV).
-3. Faire signer le pilote par Microsoft (Partner Center) → récupérer `.sys` + `.cat`.
-4. Placer pilote+catalogue signés à l'emplacement attendu par l'installeur.
-5. Compiler l'installeur Inno (signature auto si configurée).
-6. Signer l'installeur si non auto.
-7. `signtool verify` sur tout.
-8. Tester l'install sur poste vierge **et** sur poste avec Kaspersky/Defender.
-
----
-
-## Sources
-- [Attestation Sign Windows Drivers — Microsoft Learn](https://learn.microsoft.com/en-us/windows-hardware/drivers/dashboard/code-signing-attestation)
-- [Driver Code Signing Requirements — Microsoft Learn](https://learn.microsoft.com/en-us/windows-hardware/drivers/dashboard/code-signing-reqs)
-- [Partner Center for Windows Hardware — Microsoft Learn](https://learn.microsoft.com/en-us/windows-hardware/drivers/dashboard/)
-- [Code signing options for Windows app developers — Microsoft Learn](https://learn.microsoft.com/en-us/windows/apps/package-and-deploy/code-signing-options)
-- [EV Code Signing Certificates — SSL.com](https://www.ssl.com/products/software-integrity/code-signing/ev/)
-- [EV Code Signing : nouvelles exigences matérielles — e-verse](https://e-verse.com/learn/ev-code-signing-certificates-hardware-requirements/)
+- [`scripts/codesign.ps1`](../scripts/codesign.ps1) — signature des binaires applicatifs
+- [`installer/build-release-setup.ps1`](../installer/build-release-setup.ps1) — signature Inno
+- [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — publication et nettoyage du certificat
+- [`SECURITY.md`](../SECURITY.md) — posture et chaîne d'approvisionnement

@@ -1,6 +1,7 @@
-# Politique de confidentialité — optiSCAN v3.0
+# Politique de confidentialité — optiSCAN v3.1 (candidate)
 
-**Dernière mise à jour :** 8 juillet 2026  
+**Dernière mise à jour :** 5 octobre 2026
+
 **Éditeur :** Dona By — optiSCAN (édition ClamAV)
 
 Ce document décrit comment optiSCAN traite vos données. Il complète le contrat de licence ([LICENSE.txt](../LICENSE.txt)) et la note interne [CONFORMITE_RGPD.md](CONFORMITE_RGPD.md). Ce n'est pas un avis juridique.
@@ -17,15 +18,17 @@ optiSCAN est conçu pour fonctionner **localement sur votre ordinateur**. Par d�
 
 | Donnée | Emplacement | Durée |
 |--------|-------------|-------|
-| Historique des analyses | `%LOCALAPPDATA%\optiSCAN` | Jusqu'à suppression par vous |
-| Fichiers en quarantaine (chiffrés AES-GCM) | `%LOCALAPPDATA%\optiSCAN` | Idem |
-| Préférences et exclusions | `%LOCALAPPDATA%\optiSCAN` | Idem |
-| Journaux applicatifs | `%LOCALAPPDATA%\optiSCAN\Logs` | **30 jours** (rotation automatique) |
+| Historique, préférences et exclusions de l'interface | `%LOCALAPPDATA%\optiSCAN` de votre compte Windows | Jusqu'à suppression par vous ou désinstallation avec purge choisie |
+| Quarantaine de l'interface (AES-GCM) | `%LOCALAPPDATA%\optiSCAN\Quarantine` de votre compte Windows | Jusqu'à suppression/restauration ou purge choisie |
+| Journaux du processus interactif | `%LOCALAPPDATA%\optiSCAN\Logs` de votre compte Windows | Journaux applicatifs : rotation après **30 jours** |
+| État et staging du service | `%ProgramData%\optiSCAN` | Gérés par le service ; supprimés par l'installeur à la désinstallation |
+| Quarantaine du service avancé (AES-GCM) | `%ProgramData%\optiSCAN\Quarantine`, accessible à SYSTEM et aux administrateurs | Supprimée automatiquement après **90 jours**, ou plus tôt par un administrateur ; supprimée à la désinstallation |
+| Journaux du service avancé | `%LOCALAPPDATA%\optiSCAN` du compte **SYSTEM** (généralement sous `systemprofile`) | Supprimés à la désinstallation |
 
-- Les chemins de fichiers dans les journaux sont **caviardés** pour limiter l'exposition d'informations identifiables.
-- La quarantaine est chiffrée ; la clé est protégée par DPAPI (portée utilisateur Windows).
+- Les journaux ne sont **pas chiffrés**. Les chemins sous les profils Windows standard (`C:\Users\…`) sont masqués, y compris dans les messages et traces d'exception ; d'autres chemins personnalisés ou données de diagnostic peuvent rester lisibles.
+- Les quarantaines sont chiffrées ; les clés DPAPI sont propres à l'identité Windows qui exécute le processus. La quarantaine créée par SYSTEM ne se restaure donc pas depuis un compte ordinaire : l'onglet Quarantaine en montre le nombre et la taille, et le bouton « Gérer (administrateur) » ouvre, après confirmation UAC, la liste de ses éléments avec restauration et suppression.
 
-**Ces données ne quittent pas votre machine**, sauf si vous les exportez vous-même (rapports HTML/PDF) ou les copiez manuellement.
+Ces données restent sur votre machine, sauf si vous les exportez vous-même ou utilisez l'option VirusTotal décrite ci-dessous. L'activation du service avancé entraîne un traitement par SYSTEM, avec une quarantaine distincte réservée aux administrateurs et vidée de ses éléments de plus de 90 jours.
 
 ---
 
@@ -34,7 +37,7 @@ optiSCAN est conçu pour fonctionner **localement sur votre ordinateur**. Par d�
 ### 3.1 Mises à jour de signatures (par défaut)
 
 - **ClamAV** : téléchargement des bases antivirus depuis les serveurs officiels.
-- **Règles YARA** : téléchargement depuis GitHub (YARA-Forge).
+- **Règles YARA** : consultation de l'API et téléchargement depuis GitHub (YARA-Forge), limité à la release et à l'empreinte approuvées dans optiSCAN. Aucune donnée locale ni fichier n'est envoyé ; si l'asset `latest` ne correspond pas à la pin, les règles ne sont pas mises à jour.
 
 Aucune information personnelle identifiable n'est envoyée ; seuls des téléchargements de fichiers publics sont effectués.
 
@@ -63,7 +66,8 @@ Sans clé API, **aucune requête VirusTotal** n'est émise.
 
 Vous pouvez à tout moment :
 
-- Supprimer vos données locales en désinstallant optiSCAN (l'assistant propose la purge) ou en supprimant `%LOCALAPPDATA%\optiSCAN`.
+- Supprimer les données de l'interface en désinstallant optiSCAN avec la purge choisie ou en supprimant `%LOCALAPPDATA%\optiSCAN` de votre compte.
+- Les données machine sous `%ProgramData%\optiSCAN` sont retirées par l'installeur à la désinstallation. La quarantaine du service en fait partie. Les journaux du service dans le profil SYSTEM sont aussi supprimés par le désinstalleur.
 - Retirer votre clé VirusTotal pour stopper tout envoi de hash.
 - Désactiver les mises à jour automatiques dans les options.
 

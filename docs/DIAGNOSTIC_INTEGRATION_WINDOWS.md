@@ -2,6 +2,8 @@
 
 > Date : 2026-07-16 · **Mission :** alléger le profil d’installation **façon version 2** (friction basse), tout en **conservant les gains de la version 3** et les **deux moteurs ClamAV + YARA**. Ce n’est pas un alignement produit sur ClamWin.
 
+> **Mise à jour d'état — 5 octobre 2026 :** ce diagnostic décrit la décision de juillet, pas l'état courant. AMSI et le minifiltre sont absents du produit et de l'installeur ; la protection avancée optionnelle comprend RTP, surveillance de processus, scan USB et IPC. Pour l'état courant de sécurité, de distribution et des données SYSTEM, voir [l'audit 360](../AUDIT_optiSCAN_360.md#9-réserves-ouvertes-et-conditions-de-clôture) et le [guide de distribution](GUIDE_DISTRIBUTION.md).
+
 ---
 
 ## 1. Référence : setup de la version 2 (~86 Mo, non signé)
@@ -14,7 +16,7 @@ Ce qui a alourdi la friction après la version 2 :
 |------------|--------|
 | Exclusions Defender auto (`SW_HIDE`) à chaque install | Marqueur heuristique « tamper » |
 | Service plateforme souvent coché par défaut | `sc.exe create` systématique |
-| Livraison AMSI / `.sys` non signés | Pénalité AV, zéro bénéfice (DSE / AMSI refuse) |
+| Livraison AMSI / `.sys` envisagée dans les builds antérieurs | Pénalité AV potentielle sans bénéfice en l'absence d'implémentation et de signature |
 | Package ~134 Mo vs ~86 Mo | Plus d’abandons au téléchargement |
 
 ---
@@ -23,8 +25,8 @@ Ce qui a alourdi la friction après la version 2 :
 
 - **Deux moteurs** : ClamAV (clamd/clamscan + freshclam) **et** YARA (rules + binaire)
 - x64 only (`ArchitecturesAllowed=x64compatible`)
-- Auto-install / redist optionnel du **.NET 8 Desktop Runtime**
-- **Bases ClamAV et règles YARA non embarquées par défaut** — téléchargées après install via MAJ signatures (freshclam + YARA-Forge). Offline : `/DEmbedOfflineSignatures` (ou `/DEmbedClamAvDatabase` / `/DEmbedYaraRules`)
+- Publish autonome avec le profil de publication recommandé ; les autres scripts peuvent produire un publish framework-dependent
+- **Bases ClamAV et règles YARA non embarquées par défaut** — téléchargées après install via MAJ signatures (freshclam + asset YARA-Forge approuvé localement). Le téléchargement des règles échoue fermé si la release upstream `latest` ne correspond plus à la pin optiSCAN, jusqu'à publication d'une nouvelle empreinte approuvée. Offline : `/DEmbedOfflineSignatures` (ou `/DEmbedClamAvDatabase` / `/DEmbedYaraRules`)
 - Binaire **yara64.exe** toujours dans le setup (moteur) ; seuls les `.yar` sont optionnels
 - Exclusion des outils ClamAV développeur (~47 Mo)
 - Même `AppId` / URL SourceForge (réputation continue)
@@ -39,11 +41,11 @@ Défaut :
 1. Application + moteurs ClamAV/YARA (binaires) + MAJ signatures (recommandé) — CVD / `.yar` en post-install
 2. **Pas** de service plateforme (case décochée)
 3. **Pas** d’exécution auto des exclusions Defender
-4. AMSI / minifiltre : **livrés s’ils existent** (comme en version 2, `skipifsourcedoesntexist`) — inopérants sans signature
+4. AMSI / minifiltre : **absents** ; les prototypes ne sont pas compilés, livrés, enregistrés ou chargés
 
 Optionnel (utilisateur coche) :
 
-- Service Windows de protection (RTP/AMSI/IPC) si `optiSCAN.Service.exe` est présent
+- Service Windows de protection (RTP, surveillance de processus, scan USB et IPC) si l'utilisateur coche la tâche
 - Démarrage Windows, icône Bureau
 
 ---
@@ -54,18 +56,18 @@ Optionnel (utilisateur coche) :
 |-------|--------|
 | `platformservice` → `unchecked` | Fait |
 | Plus d’appel `RegisterDefenderExclusions` en post-install | Fait (script toujours copié pour opt-in app) |
-| AMSI / `.sys` si présents (comme en version 2) | Fait (`skipifsourcedoesntexist`) |
+| AMSI / `.sys` | Absents du produit et de l'installateur |
 | Bases ClamAV / règles YARA post-install (défaut) | Fait |
-| Auto-.NET / x64 | Conservé |
+| Publish .NET / x64 | Profil recommandé self-contained ; chemin framework-dependent exige le runtime sur la machine et n'est pas vérifié par l'installeur |
 
 ---
 
 ## 5. Suite
 
-- [x] Installeur : pas d’exclusions Defender auto ; service plateforme décoché ; AMSI/`.sys` comme en version 2
+- [x] Installeur : pas d’exclusions Defender auto ; service plateforme décoché ; AMSI/`.sys` absents
 - [x] App : plus d’`EnsureOptiscanExclusions` au démarrage / onboarding — opt-in Options uniquement
-- SignPath / Authenticode quand éligible
+- La chaîne Authenticode est désormais facultative dans la CI via les secrets PFX ; voir [`SIGNATURE_PROCEDURE.md`](SIGNATURE_PROCEDURE.md). Cette option ne change pas le profil d'installation allégé décrit ici.
 
 ---
 
-**Conclusion :** la mission est **optiSCAN version 3 allégée façon version 2** — double moteur, signatures en MAJ, AMSI/`.sys` livrés s’ils existent — pas un clone ClamWin.
+**Conclusion historique :** la mission reste un profil x64 allégé avec deux moteurs et des signatures récupérées après installation. L'ancien objectif de livraison conditionnelle AMSI/`.sys` a été abandonné ; ces composants ne font pas partie de la version courante.

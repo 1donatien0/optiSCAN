@@ -1,52 +1,64 @@
-# Security Policy
+# Politique de sécurité
 
-## Supported versions
+## Versions prises en charge
 
-| Version | Supported |
-|---------|-----------|
-| 3.0 (`main`, `dev`) | Yes |
-| WinUI, même date que la 3.0 (`win`) | Yes |
+| Version | Prise en charge |
+|---------|-----------------|
+| 3.1 candidate (`dev`) | Non publiée |
+| 3.0 (`main`) | Oui |
+| WinUI, même date que la 3.0 (`win`) | Oui |
 
-## Reporting a vulnerability
+## Signaler une vulnérabilité
 
-If you discover a security issue in optiSCAN, please report it privately:
+Si vous découvrez un problème de sécurité dans optiSCAN, signalez-le en privé :
 
-1. **Do not** open a public GitHub issue for exploitable vulnerabilities.
-2. Email the maintainer with: description, reproduction steps, impact, and affected version.
-3. Allow up to **14 business days** for an initial response.
+1. **N'ouvrez pas** d'issue GitHub publique pour une vulnérabilité exploitable.
+2. Écrivez au mainteneur en indiquant : description, étapes de reproduction, impact et version concernée.
+3. Comptez jusqu'à **14 jours ouvrés** pour une première réponse.
 
-## Security architecture (summary)
+## Architecture de sécurité (résumé)
 
-- **Self-scan exclusion**: install directory (Program Files / process base) and `%LocalAppData%\optiSCAN` (ClamAV DB, YARA rules, quarantine, update staging) are never scanned or auto-quarantined (`OptiscanProtectedPaths`); mandatory exclusion folders cannot be removed in Options.
-- **Windows Defender coexistence (recommended on consumer PCs)**: Defender keeps real-time protection; optiSCAN runs as a **complement** (manual/scheduled ClamAV + YARA scans). `WindowsDefenderExclusionService` can register install paths and engine processes in Defender exclusions **on demand** (Options → refresh exclusions). Tamper Protection may block registration — add exclusions manually in Windows Security if needed.
-- **Quarantine**: AES-256-GCM encryption, HMAC-signed manifest, DPAPI-protected master key; path traversal checks on restore.
-- **Sensitive paths**: restore and IPC scan refuse System32, Windows, ProgramFiles, ProgramData, Startup.
-- **IPC pipe**: ACL (SYSTEM / Administrators / authenticated users); `shutdown` requires a token under `%ProgramData%\optiSCAN\`; scan refuses sensitive paths; buffer size capped for AMSI/IPC.
-- **AMSI (v3.0, optional)**: native `optiSCAN.AmsiProvider.dll` may be **shipped but inactive** — it is inert on disk until the platform protection service registers it under `HKLM\SOFTWARE\Microsoft\AMSI\Providers` (admin). With **platform protection disabled** or **Defender complement mode**, the DLL is not registered and is not loaded by Windows. When enabled, the provider forwards script buffers to `optiSCAN.Service` / `--service-host` via the protection pipe. With Windows Defender active, Microsoft’s AMSI provider typically takes priority in host processes.
-- **Minifilter (v3.0, optional)**: kernel driver is optional and unsigned in current builds; not required for ClamAV/YARA scanning. Do not enable platform mode without a signed driver.
-- **Secrets**: user preferences (VirusTotal key) stored via DPAPI `SecureStore`; no credentials in the repository.
-- **CI**: Release builds treat warnings as errors; CodeQL (C# and native AMSI); Dependabot; dependency review on PRs (high severity fails); gitleaks; SBOM CycloneDX artifact on `main` publish.
+- **Exclusion de l'auto-analyse** : le dossier d'installation, s'il est réservé aux administrateurs (sinon ses seuls sous-dossiers `clamav`, `rules` et `yara`), et dans `%LocalAppData%\optiSCAN` les seuls sous-dossiers `clamav`, `clamd`, `rules`, `Quarantine` et `SafetyBackups` ne sont jamais analysés ni mis en quarantaine automatiquement par optiSCAN (`OptiscanProtectedPaths`) ; le reste de `%LocalAppData%\optiSCAN`, inscriptible par la session, est analysé, et ce dossier entier ne peut pas être exclu. Les dossiers d'exclusion obligatoires ne peuvent pas être retirés dans Options. La protection temps réel n'ignore que les copies d'analyse en cours (et les événements tardifs d'une copie supprimée), pas le dossier de copie lui-même.
+- **Dossier d'installation réservé aux administrateurs** : le service SYSTEM et l'hôte de protection s'exécutent depuis le dossier d'installation. L'installeur impose `Program Files` (choix du dossier fermé, `/DIR=` ou ancien dossier hors `Program Files` refusés). `InstallLocationTrust` vérifie le propriétaire et la DACL du dossier, de ses parents et des exécutables : hors d'un dossier modifiable par les seuls SYSTEM, Administrateurs et TrustedInstaller, optiSCAN refuse d'enregistrer le service, le service refuse de lancer l'hôte, l'hôte refuse de démarrer et aucune exclusion Defender n'est ajoutée.
+- **Coexistence avec Windows Defender (recommandée sur les PC grand public)** : Defender garde la protection temps réel ; optiSCAN fonctionne en **complément**. `WindowsDefenderExclusionService` enregistre, **uniquement à la demande** et seulement pour une installation réservée aux administrateurs, le dossier d'installation et les **chemins complets** des exécutables d'optiSCAN. optiSCAN n'efface pas l'historique de Defender : l'action qui le faisait a été retirée, et la tâche de démarrage qu'elle créait est supprimée à la mise à jour. Il n'exclut jamais un simple nom d'image (qui couvrirait tout processus portant ce nom), ni un dossier inscriptible par l'utilisateur comme `%LocalAppData%\optiSCAN`. Les exclusions laissées par la 3.0.0 sont retirées une fois par version par le premier processus optiSCAN qui en a les droits — installeur, service SYSTEM ou tout processus optiSCAN élevé —, de sorte qu'une mise à jour faite par simple copie de fichiers est aussi couverte. Toutes les exclusions d'optiSCAN sont retirées à la désinstallation.
+- **Quarantaine** : chiffrement AES-256-GCM, manifeste signé par HMAC, clé maîtresse protégée par DPAPI ; contrôle de traversée de chemin à la restauration. Un manifeste non signé est refusé quelle que soit la version qu'il déclare (il n'est jamais re-signé). L'ancien format XOR n'est lu que par la migration, et seulement si son contenu correspond au SHA-256 enregistré dans le manifeste signé. Les restaurations (interface et service) créent un **nouveau** fichier (`FILE_CREATE`, jamais d'écrasement : un nom déjà pris reçoit `_restored`) en parcourant le chemin sans traverser de jonction ni de lien, relisent le chemin final et suppriment le fichier par la même poignée s'il diffère du chemin demandé. L'action « Supprimer » appliquée à une menace utilise la même suppression par poignée (fichiers en lecture seule compris). L'original est supprimé en parcourant le chemin composant par composant (ouvertures relatives par `NtCreateFile`, `FILE_OPEN_REPARSE_POINT`) : une jonction ou un lien symbolique dans un dossier parent interrompt la suppression. Les points de réanalyse des fichiers cloud (OneDrive) restent traversables.
+- **Chemins sensibles** : la restauration et l'analyse IPC refusent System32, Windows, ProgramFiles, ProgramData et Démarrage.
+- **Pipe IPC** (`optiSCAN_Protection`) : indicateur de première instance, clients distants refusés, ACL (SYSTEM / Administrateurs / utilisateurs authentifiés se connectent, seul le propriétaire crée des instances). Les clients vérifient que le processus serveur est un binaire optiSCAN du dossier d'installation, qu'il s'exécute en session 0 **et qu'il est le processus du service optiSCAN ou l'hôte que ce service a lancé** (PID du service donné par le gestionnaire de services, PID parent et date de création de l'hôte) : la session 0 seule ne suffit pas, une tâche planifiée non interactive d'un utilisateur y tournant aussi. Un faux `optiSCAN.exe` qui occuperait le nom du pipe est donc refusé. Les réponses ont un délai d'écriture de 10 s. `scan_path` ouvre le fichier sous le jeton de l'appelant (`ImpersonateNamedPipeClient`), copie les octets de cette poignée dans un dossier de préparation réservé à SYSTEM, puis analyse la copie. `set_policy` : un compte standard peut seulement renforcer la protection ; la réduire ou modifier la quarantaine automatique exige SYSTEM ou un administrateur élevé. `shutdown` exige un jeton stocké sous `%ProgramData%\optiSCAN\`. Les requêtes ont un délai de lecture de 10 s ; chaque compte a des limites de connexions et d'analyses.
+- **`%ProgramData%\optiSCAN`** : repris par SYSTEM avec une DACL protégée. Au démarrage, jusqu'à 200 000 entrées sont parcourues sans suivre les points de réanalyse. Les propriétaires ou ACL d'autorisation étrangers sont repris et retirés ; seuls SYSTEM, les Administrateurs et le SID exact de l'AppContainer de clamd sont acceptés. Le nom du conteneur porte un suffixe aléatoire de 128 bits propre à chaque installation (`ClamdContainerName`, stocké en accès SYSTEM uniquement) : avec l'ancien nom fixe, n'importe quel processus pouvait créer le même profil, obtenir le même SID, joindre clamd et hériter de ses ACE. Les entrées dont la seule ACE étrangère appartient à l'ancien conteneur à nom fixe sont nettoyées, pas supprimées. Si l'arborescence ne peut pas être entièrement vérifiée, l'hôte du service échoue de façon fermée. `host-policy.json` exige que les ACL du dossier parent et du fichier passent les contrôles de confiance.
+- **Protection temps réel (SYSTEM)** : les chemins surveillés passant par une jonction ou un lien symbolique sont refusés. Avant chaque analyse, une poignée est ouverte sans suivre de lien final ; son chemin résolu doit rester sous le dossier surveillé. Cette poignée refuse tout nouveau partage en écriture ou en suppression pendant l'analyse, et **tout le contenu est copié depuis cette poignée** dans un dossier de préparation privé puis analysé là, quelle que soit la taille du fichier. La préparation vérifie l'espace disque disponible et préserve une réserve de 128 Mio ; si une copie complète est impossible, le résultat est une erreur avec lacune de couverture, et le chemin d'origine n'est jamais analysé en solution de repli. Renommer un dossier parent après le contrôle ne peut donc pas changer ce qui est analysé. La quarantaine automatique exige ensuite que le SHA-256 du fichier corresponde à la copie analysée ; la quarantaine chiffrée a sa propre limite de 256 Mio par fichier, si bien qu'une détection plus volumineuse est signalée mais ne peut pas être mise en quarantaine automatiquement. Une erreur de surveillance déclenche la recréation de l'observateur et un rattrapage par énumération ; un échec de reprise n'est écrit que dans les journaux et n'a pas d'indicateur d'état dédié dans l'interface. Les fichiers qui ne se stabilisent pas en 20 s sont ignorés pour cet événement.
+- **Surveillance des lancements de processus (SYSTEM)** : WMI identifie un exécutable ou un script sélectionné qui vient de démarrer ; le service l'ouvre alors avec le jeton du processus déclencheur et analyse une copie privée (256 Mio au maximum). La quarantaine automatique vérifie que le SHA-256 actuel du fichier correspond toujours à la copie analysée ; un contenu modifié est laissé en place.
+- **Délais d'analyse** : l'analyse d'un fichier est plafonnée à 10 minutes, celle d'un dossier ou d'un support amovible à 2 heures, l'analyse rapide à 4 heures et l'analyse complète à 12 heures. Le délai est transmis aux moteurs pour arrêter leurs processus enfants ; un dépassement est signalé comme une erreur avec couverture incomplète.
+- **Quarantaine** : les dossiers parents sont parcourus nom par nom sans traverser de jonction ; le fichier est ouvert une seule fois (lecture + suppression, partage en lecture seule), lu, puis supprimé par cette même poignée à sa fermeture. Si le manifeste de quarantaine ne peut pas être enregistré, la suppression est annulée et l'original reste en place.
+- **clamd** : s'exécute dans un AppContainer sans accès direct aux fichiers des utilisateurs, sur un port de boucle locale aléatoire joignable uniquement depuis le même conteneur. L'hôte transmet le contenu par `zINSTREAM`. Les fichiers que clamd ne peut pas lire sont repris par `clamscan.exe` ; les entrées inaccessibles, cloud hors ligne, ou volontairement exclues / points de réanalyse peuvent encore laisser l'analyse d'un dossier incomplète. Une analyse incomplète n'est jamais présentée comme saine.
+- **Hôte du service** : `optiSCAN.exe --service-host` refuse de s'exécuter hors SYSTEM ; un hôte unique est garanti par un fichier verrou dans le ProgramData protégé. Les détections de l'hôte du service ne sont pas envoyées dans l'historique de l'utilisateur interactif. La quarantaine du service se trouve dans `%ProgramData%\optiSCAN\Quarantine` (SYSTEM et Administrateurs uniquement, clé DPAPI de SYSTEM) ; elle y est déplacée depuis l'ancien emplacement du profil SYSTEM au premier démarrage. Tout client authentifié peut lire le nombre et la taille de ses éléments ; la liste (qui contient des chemins de tous les comptes), la restauration et la suppression exigent un administrateur élevé sur le pipe. Une restauration est écrite dans un fichier que le service crée **sous le jeton usurpé de l'administrateur**, jamais avec les droits SYSTEM, avec `CREATE_NEW` (pas d'écrasement) et un contrôle du chemin final qui supprime le fichier si une jonction l'a redirigé vers un dossier système. Les éléments de plus de 90 jours sont supprimés ; le désinstalleur supprime la quarantaine.
+- **Binaires livrés** : les points d'entrée réservés aux tests (faux clamd des tests d'isolation) sont exclus de la compilation à chaque `dotnet publish` ; la CI échoue s'ils apparaissent dans le `optiSCAN.dll` publié.
+- **AMSI / minifiltre** : **non livrés dans la v3.1.** Les prototypes natifs de `native/` ne sont ni compilés par la CI, ni empaquetés, ni jamais enregistrés ou chargés.
+- **Secrets** : les préférences utilisateur (clé VirusTotal) sont stockées via le `SecureStore` DPAPI ; aucun identifiant dans le dépôt. L'ancienne clé HMAC déterministe (dérivée de données publiques du compte) n'est plus acceptée ; les fichiers en clair sont supprimés après migration. Le matériel de signature de code ne provient que des secrets de la CI (`CODESIGN_PFX`, `CODESIGN_PASSWORD`) ; le PFX est importé dans le magasin de l'utilisateur et signtool le sélectionne par son empreinte, de sorte que le mot de passe n'apparaît jamais sur une ligne de commande ; le certificat et le PFX sont retirés à la fin du job. L'horodatage RFC 3161 en HTTP est voulu : le jeton d'horodatage est signé par l'autorité d'horodatage (TSA).
+- **Chaîne d'approvisionnement** : les archives ClamAV et YARA sont épinglées par SHA-256 (l'archive ClamAV est en plus vérifiée par sa signature GPG Talos avec `scripts/keys/cisco-talos.gpg`, obligatoire en CI et pour les builds de release via `-RequireSignature`) ; le certificat racine de signature des CVD est épinglé par SHA-256 (tag `clamav-1.5.0`) et vérifié à chaque usage. L'asset des règles « core » de YARA-Forge n'est accepté que pour un tag de publication, un nom d'asset, une taille et un SHA-256 explicitement autorisés et compilés dans optiSCAN ; le digest de l'API GitHub et les octets téléchargés doivent tous deux correspondre à cet épinglage local, et l'URL de téléchargement doit désigner cet asset exact. L'épinglage initial est la publication `20261004`, asset `yara-forge-rules-core.zip`, taille 1 747 609 octets, SHA-256 `0b548dff76139b7a041d20923ccfddfa614db6b6ee8710c181ff037a753ffe69`. Les nouvelles publications hebdomadaires ne sont pas appliquées tant qu'une mise à jour d'optiSCAN relue n'ajoute pas leurs métadonnées exactes à la liste autorisée. Le téléchargement et la décompression sont plafonnés et l'extraction est confinée au dossier des règles. Moteurs épinglés (`scripts/runtime-versions.json`) : ClamAV 1.4.6 (signature Talos vérifiée, clé `5BAD CA26 65EF 59DC F8A2 3D8B 707F 0DB4 8083 6771`) et YARA 4.5.5, dernier binaire Windows publié en amont (les versions 4.5.6 à 4.5.8 sont publiées en sources seulement). Un marqueur `.pinned-version` fait remplacer par `fetch-runtime-deps.ps1` les moteurs restant d'un ancien épinglage. Les GitHub Actions sont épinglées par SHA de commit.
+- **CI** : les builds Release traitent les avertissements comme des erreurs ; CodeQL (C# et, sans compilation, C/C++ pour `native/`) ; SDK épinglé par `global.json`, Inno Setup et CycloneDX épinglés ; Dependabot ; revue des dépendances sur les PR (échec en gravité élevée) ; gitleaks ; artefact SBOM CycloneDX à la publication sur `main` ; signature Authenticode des binaires, de l'installeur et du désinstalleur lorsque les secrets de signature sont définis.
 
-## Threat model notes
+## Notes sur le modèle de menace
 
-optiSCAN is a **desktop antivirus for Windows**. It assumes:
+optiSCAN est un **antivirus de bureau pour Windows**. Il part des hypothèses suivantes :
 
-- Protection against typical user-space malware and misconfiguration.
-- **Not** a guarantee against malware running with the same user privileges or kernel-level attackers.
-- DPAPI `CurrentUser` protects local data from other users, not from same-session malware.
-- Running **two real-time engines** (Defender + optiSCAN RTP) increases disk I/O and false-positive risk; complement mode is the default when Defender is detected.
+- Protection contre les logiciels malveillants courants en espace utilisateur et contre les erreurs de configuration.
+- **Aucune** garantie face à un logiciel malveillant exécuté avec les mêmes privilèges que l'utilisateur, ni face à un attaquant au niveau du noyau.
+- Un utilisateur local standard ne doit pas pouvoir affaiblir le service SYSTEM (les changements de politique exigent un administrateur élevé), ni s'en servir pour supprimer ou lire des fichiers auxquels il n'a pas accès.
+- DPAPI `CurrentUser` protège les données locales des autres utilisateurs, pas d'un logiciel malveillant de la même session. Aucune entropie supplémentaire n'est utilisée : du code de la même session pourrait la lire de toute façon, elle n'apporterait donc aucune protection.
+- Limites connues : la protection temps réel n'analyse que les extensions à risque ; un processus dont le jeton ne peut pas être ouvert (processus protégé, PPL) n'est pas analysé à son lancement (c'est désormais journalisé) ; le prototype AMSI (non livré) laisse passer en cas d'erreur, analyse le JSON par recherche de sous-chaîne et n'identifie le serveur du pipe que par la session 0 ; le `clamd.conf` de la session interactive se trouve dans un dossier inscriptible par l'utilisateur (altération possible uniquement avec les mêmes privilèges) ; `status` sur le pipe expose la disponibilité des moteurs aux utilisateurs authentifiés.
+- Faire tourner **deux moteurs temps réel** (Defender + temps réel d'optiSCAN) augmente les entrées/sorties disque et le risque de faux positifs ; le mode complément est le mode par défaut lorsque Defender est détecté.
 
-## Component states (v3.0)
+## État des composants (candidate v3.1)
 
-| Component | Present on disk | Active |
-|-----------|-----------------|--------|
-| `optiSCAN.exe` + ClamAV/YARA | Yes (install) | On-demand / scheduled scans |
-| `optiSCAN.AmsiProvider.dll` | Optional (installer) | Only if platform protection ON **and** HKLM AMSI registration succeeds |
-| `optiSCAN.Minifilter.sys` | Optional | Only if signed and loaded (phase 2) |
-| Windows Defender | OS | Primary RTP when enabled |
+| Composant | Présent sur le disque | Actif |
+|-----------|-----------------------|-------|
+| `optiSCAN.exe` + ClamAV/YARA | Oui (installation) | Analyses à la demande / planifiées ; temps réel local (FileSystemWatcher) |
+| `optiSCAN.Service.exe` | Facultatif (tâche de l'installeur) | Hôte SYSTEM : temps réel sur les dossiers des utilisateurs interactifs, IPC |
+| `optiSCAN.AmsiProvider.dll` | Non | Non livré |
+| `optiSCAN.Minifilter.sys` | Non | Non livré |
+| Windows Defender | Système | Temps réel principal lorsqu'il est activé |
 
-## Hardening backlog
+## Durcissement restant à faire
 
-- Code signing for installer and native binaries (Authenticode / EV for minifilter)
-- Minifilter driver full implementation and build in CI (stub in repo today)
-- Rate-limit IPC `ScanPath` / `ScanBuffer` when AMSI is disabled
+- Fournir un certificat de signature de code (la chaîne est prête ; sans certificat, les binaires sont livrés non signés)
+- Interception temps réel avant exécution (minifiltre ou AMSI) — hors du périmètre de la v3.1
