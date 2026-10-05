@@ -2,7 +2,7 @@
 
 **Guide produit** : [README.md](../README.md) à la racine (architecture, release §8, audit §12).
 
-**Version** : release **v3.0**, assembly **3.0.0**. Scripts : `scripts/` · Installeur : `installer/` · CI : `.github/workflows/`.
+**Version visée** : candidate **v3.1**, assembly **3.1.0** ; non publiée. Scripts : `scripts/` · Installeur : `installer/` · CI : `.github/workflows/`.
 
 ---
 
@@ -10,9 +10,12 @@
 
 | Document | Rôle |
 |----------|------|
-| [GUIDE_DISTRIBUTION.md](GUIDE_DISTRIBUTION.md) | Signature, .NET auto, Embed CVD/YARA, publish / Inno, checklist |
-| [DIAGNOSTIC_INTEGRATION_WINDOWS.md](DIAGNOSTIC_INTEGRATION_WINDOWS.md) | Friction SmartScreen / AV ; profil install allégé façon version 2 (2 moteurs) |
-| [POLITIQUE_CONFIDENTIALITE.md](POLITIQUE_CONFIDENTIALITE.md) | Politique de confidentialité utilisateur (v3.0) |
+| [GUIDE_DISTRIBUTION.md](GUIDE_DISTRIBUTION.md) | Signature, modes runtime .NET, Embed CVD/YARA, publish / Inno, checklist |
+| [SIGNATURE_PROCEDURE.md](SIGNATURE_PROCEDURE.md) | Procédure Authenticode réellement utilisée par la CI et en local |
+| [../ROADMAP.md](../ROADMAP.md) | Feuille de route produit de l’antivirus après la v3.1 |
+| [../RELEASE_PLAN_v3.1.md](../RELEASE_PLAN_v3.1.md) | Étapes et critères de validation de la candidate v3.1 |
+| [DIAGNOSTIC_INTEGRATION_WINDOWS.md](DIAGNOSTIC_INTEGRATION_WINDOWS.md) | Diagnostic historique de distribution Windows ; profil allégé façon version 2 (2 moteurs) |
+| [POLITIQUE_CONFIDENTIALITE.md](POLITIQUE_CONFIDENTIALITE.md) | Politique de confidentialité utilisateur (candidate v3.1) |
 | [CONFORMITE_RGPD.md](CONFORMITE_RGPD.md) | Analyse traitements / RGPD (note interne, pas un avis juridique) |
 | [README.md](README.md) | Cet index |
 
@@ -21,10 +24,10 @@
 | Document | Rôle |
 |----------|------|
 | [../README.md](../README.md) | Guide unique (architecture, modules, release, langues, sécurité) |
-| [../SECURITY.md](../SECURITY.md) | Politique de sécurité, signalement, composants v3.0 |
-| [../LICENSE.txt](../LICENSE.txt) | CLUF v3.0 |
-| [../AUDIT_optiSCAN_360.md](../AUDIT_optiSCAN_360.md) | Audit 360 (2 octobre 2026) |
-| [../installer/redist/LISEZMOI.md](../installer/redist/LISEZMOI.md) | Runtime .NET 8 embarqué optionnel dans l'installeur |
+| [../SECURITY.md](../SECURITY.md) | Politique de sécurité, signalement, composants v3.1 candidate |
+| [../LICENSE.txt](../LICENSE.txt) | CLUF v3.1 |
+| [../AUDIT_optiSCAN_360.md](../AUDIT_optiSCAN_360.md) | Audit 360 unique du 2 octobre 2026 : constats (séries N, R, E, M, F), traitement, notation et réserves |
+| [../installer/redist/LISEZMOI.md](../installer/redist/LISEZMOI.md) | Modes runtime .NET et limite actuelle du dossier redist |
 
 ---
 
