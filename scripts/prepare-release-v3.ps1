@@ -66,14 +66,17 @@ Invoke-Step 'dotnet publish' {
     if ($SelfContained) {
         dotnet publish $csproj -p:OptiscanShipping=true -c Release -r win-x64 --self-contained true `
             -p:PublishSingleFile=false -o $pubDir
+        if ($LASTEXITCODE -ne 0) { return }
         dotnet publish $svc -p:OptiscanShipping=true -c Release -r win-x64 --self-contained true `
             -p:PublishSingleFile=false -o $pubDir
     } else {
+        # Le profil FolderProfile publie l'application en autonome : le service est publié
+        # dans le même dossier et le même mode, avec sa DLL et ses dépendances (l'exe seul
+        # ne démarre pas).
         dotnet publish $csproj -p:OptiscanShipping=true -c Release /p:PublishProfile=FolderProfile
-        dotnet publish $svc -p:OptiscanShipping=true -c Release -r win-x64 --self-contained false `
-            -o (Join-Path $root "optiSCAN.Service\bin\Release\net10.0-windows10.0.17763.0\publish\win-x64")
-        Copy-Item (Join-Path $root "optiSCAN.Service\bin\Release\net10.0-windows10.0.17763.0\publish\win-x64\optiSCAN.Service.exe") `
-            (Join-Path $pubDir 'optiSCAN.Service.exe') -ErrorAction SilentlyContinue
+        if ($LASTEXITCODE -ne 0) { return }
+        dotnet publish $svc -p:OptiscanShipping=true -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=false -o $pubDir
     }
 }
 
