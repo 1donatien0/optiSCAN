@@ -8,7 +8,7 @@
       - arrête la tâche planifiée optiSCAN_Watchdog (qui relance l'exe),
       - termine tout optiSCAN.exe / optiSCAN.Service.exe en cours (verrous de fichiers),
       - nettoie le dossier publish périmé,
-      - publie en Release win-x64 (framework-dependent),
+      - publie en Release win-x64 avec le runtime .NET inclus,
       - (optionnel) signe l'exe si un certificat est fourni,
       - compile l'installeur Inno (ISCC) si disponible.
 
@@ -19,17 +19,17 @@
     RID cible (défaut: win-x64).
 
 .PARAMETER SelfContained
-    Publier en self-contained (inclut le runtime .NET). Défaut: $false.
+    Paramètre conservé pour compatibilité. La publication est toujours self-contained.
 
 .PARAMETER SignToolPath / CertSubject
-    Si fournis, signe optiSCAN.exe avec signtool (certificat du magasin par sujet).
+    Si le sujet est fourni, signe l'application, le service et les DLL plateforme publiés
+    avec signtool (certificat du magasin par sujet). L'installeur n'est pas signé ici.
 
 .PARAMETER SkipInstaller
     Ne pas compiler l'installeur Inno.
 
 .EXAMPLE
     pwsh -File scripts\publish-release.ps1
-    pwsh -File scripts\publish-release.ps1 -SelfContained
     pwsh -File scripts\publish-release.ps1 -CertSubject "Dona By"
 #>
 [CmdletBinding()]
@@ -74,20 +74,30 @@ Write-Step 'Nettoyage du dossier publish'
 if (Test-Path $publishDir) { Remove-Item -Recurse -Force $publishDir }
 
 # 4) Publier
-Write-Step "dotnet publish ($Configuration / $Runtime / self-contained=$($SelfContained.IsPresent))"
-$sc = if ($SelfContained) { 'true' } else { 'false' }
-dotnet publish $proj -p:OptiscanShipping=true -c $Configuration -r $Runtime --self-contained $sc -p:CleanPublishArtifactsBeforePublish=true
+Write-Step "dotnet publish ($Configuration / $Runtime / self-contained=true)"
+dotnet publish $proj -p:OptiscanShipping=true -c $Configuration -r $Runtime --self-contained true -p:CleanPublishArtifactsBeforePublish=true
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish a échoué (code $LASTEXITCODE)." }
 
 $exe = Join-Path $publishDir 'optiSCAN.exe'
 if (-not (Test-Path $exe)) { throw "optiSCAN.exe introuvable après publish : $exe" }
+
+# Service de protection : même mode, même dossier, avec sa DLL et ses dépendances.
+$svcProj = Join-Path $repo 'optiSCAN.Service\optiSCAN.Service.csproj'
+dotnet publish $svcProj -p:OptiscanShipping=true -c $Configuration -r $Runtime --self-contained true -p:PublishSingleFile=false -o $publishDir
+if ($LASTEXITCODE -ne 0) { throw "dotnet publish du service a échoué (code $LASTEXITCODE)." }
+foreach ($f in 'optiSCAN.Service.exe', 'optiSCAN.Service.dll') {
+    if (-not (Test-Path (Join-Path $publishDir $f))) { throw "$f introuvable après publish : $publishDir" }
+}
 Write-Host "Publié : $exe" -ForegroundColor Green
 
 # 5) Signature optionnelle de l'exécutable
 if ($CertSubject) {
-    Write-Step 'Signature Authenticode de optiSCAN.exe'
+    Write-Step 'Signature Authenticode des binaires optiSCAN'
     $st = if ($SignToolPath) { $SignToolPath } else { 'signtool.exe' }
-    & $st sign /n $CertSubject /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $exe
+    # Mêmes fichiers que la CI : le service tourne en SYSTEM, il doit être signé comme l'interface.
+    $toSign = 'optiSCAN.exe', 'optiSCAN.dll', 'optiSCAN.Service.exe', 'optiSCAN.Service.dll', 'optiSCAN.Platform.dll' |
+        ForEach-Object { Join-Path $publishDir $_ }
+    & $st sign /n $CertSubject /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 @toSign
     if ($LASTEXITCODE -ne 0) { throw "signtool a échoué (code $LASTEXITCODE)." }
 }
 else {

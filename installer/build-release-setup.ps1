@@ -55,6 +55,12 @@ if (-not $SkipPublish) {
     dotnet publish $csproj -c Release /p:PublishProfile=FolderProfile /p:OptiscanShipping=true
     if ($LASTEXITCODE -ne 0) { throw "dotnet publish a echoue (code $LASTEXITCODE)." }
     $targetPublishDir = Resolve-PublishRoot $defaultPublishDir
+    # Service de protection : meme dossier, meme mode (autonome, comme FolderProfile), avec sa DLL
+    # et ses dependances. L'installeur refuse de se compiler sans optiSCAN.Service.dll.
+    $svcCsproj = Join-Path $root 'optiSCAN.Service\optiSCAN.Service.csproj'
+    Write-Host 'dotnet publish du service (meme dossier)...' -ForegroundColor Cyan
+    dotnet publish $svcCsproj -c Release -r win-x64 --self-contained true -p:PublishSingleFile=false -p:OptiscanShipping=true -o $targetPublishDir
+    if ($LASTEXITCODE -ne 0) { throw "dotnet publish du service a echoue (code $LASTEXITCODE)." }
     $publishExe = Join-Path $targetPublishDir 'optiSCAN.exe'
 } else {
     if ((Test-Path -LiteralPath $staleFlatPublish) -and -not (Test-Path -LiteralPath $publishExe)) {
@@ -63,6 +69,7 @@ Publication win-x64 absente mais ancien publish\optiSCAN.exe detecte ($staleFlat
 Relancez d'abord :
   .\scripts\clean-before-publish.ps1 -IncludeObj -IncludeCiPublish
   dotnet publish $csproj -c Release /p:PublishProfile=FolderProfile
+  dotnet publish optiSCAN.Service\optiSCAN.Service.csproj -c Release -r win-x64 --self-contained true -o <dossier publish>
 "@
     }
 }

@@ -33,6 +33,16 @@
 #endif
 #endif
 
+; ── Contrôle du service à la compilation ────────────────────────────────────
+; Sans optiSCAN.Service.dll dans le dossier publié, l'installeur livrerait un service qui ne
+; démarre pas (ou pas de service du tout). /DAllowMissingService pour un build de développement.
+#define AppPublishDir Copy(AppPublishSource, 1, Len(AppPublishSource) - 1)
+#ifndef AllowMissingService
+#if !FileExists(AppPublishDir + "optiSCAN.Service.dll") && !FileExists(AddBackslash(SourcePath) + AppPublishDir + "optiSCAN.Service.dll")
+  #error optiSCAN.Service.dll absent du dossier publié : publier optiSCAN.Service dans le même dossier que optiSCAN (scripts\prepare-release-v3.ps1 ou publish-release.ps1), ou compiler avec /DAllowMissingService.
+#endif
+#endif
+
 [Setup]
 AppId={#AppId}
 AppName={#AppName}
@@ -144,9 +154,9 @@ Source: "..\optiSCAN\clamav\database\*"; DestDir: "{app}\clamav\database"; Exclu
 Source: "..\optiSCAN\rules\*"; DestDir: "{app}\rules"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
 Source: "..\optiSCAN\yara\*"; DestDir: "{app}\yara"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
 ; ── Service Windows (pour tâche platformservice opt-in) ───────────────────────
-; Chemin dédié : AppPublishSource finit par \* et ne peut pas servir de préfixe fichier.
-Source: "..\optiSCAN\bin\Release\net10.0-windows10.0.17763.0\publish\win-x64\optiSCAN.Service.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
-Source: "..\optiSCAN.Service\bin\Release\net10.0-windows10.0.17763.0\publish\win-x64\optiSCAN.Service.exe"; DestDir: "{app}"; Flags: ignoreversion skipifsourcedoesntexist
+; optiSCAN.Service.exe, sa DLL et ses dépendances arrivent par AppPublishSource : le service est
+; publié dans le même dossier que l'application (CI, prepare-release-v3, publish-release).
+; Un exe copié seul ne démarre pas ; la présence de la DLL est vérifiée plus haut à la compilation.
 ; Script exclusions Defender : copié pour usage manuel / depuis l'app — PAS exécuté
 ; automatiquement à l'install (évite le marqueur heuristique « tamper » post-v2).
 Source: "..\scripts\add-defender-exclusions.ps1"; DestDir: "{app}\scripts"; Flags: ignoreversion
@@ -228,7 +238,7 @@ procedure StopProtectionService(const Name: string);
 var
   ResultCode: Integer;
 begin
-  Exec('sc.exe', 'stop ' + Name, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{sys}\sc.exe'), 'stop ' + Name, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
 
 procedure DeleteProtectionService(const Name: string);
@@ -236,7 +246,7 @@ var
   ResultCode: Integer;
 begin
   StopProtectionService(Name);
-  Exec('sc.exe', 'delete ' + Name, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{sys}\sc.exe'), 'delete ' + Name, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
 
 procedure InstallCurrentProtectionService();
@@ -252,7 +262,7 @@ begin
     Exit;
   end;
 
-  if not Exec('sc.exe', 'create {#ProtectionServiceName} binPath= "\"' + ExpandConstant('{app}\optiSCAN.Service.exe') + '\"" start= auto DisplayName= "{#ProtectionServiceDisplayName}"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
+  if not Exec(ExpandConstant('{sys}\sc.exe'), 'create {#ProtectionServiceName} binPath= "\"' + ExpandConstant('{app}\optiSCAN.Service.exe') + '\"" start= auto DisplayName= "{#ProtectionServiceDisplayName}"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
      or (ResultCode <> 0) then
   begin
     Log(Format('sc create a échoué (code %d)', [ResultCode]));
@@ -263,12 +273,12 @@ begin
     Exit;
   end;
 
-  if not Exec('sc.exe', 'description {#ProtectionServiceName} "{#ProtectionServiceDescription}"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
+  if not Exec(ExpandConstant('{sys}\sc.exe'), 'description {#ProtectionServiceName} "{#ProtectionServiceDescription}"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
      or (ResultCode <> 0) then
     Log(Format('sc description a échoué (code %d)', [ResultCode]));
 
   // 1056 : service déjà démarré.
-  if not Exec('sc.exe', 'start {#ProtectionServiceName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
+  if not Exec(ExpandConstant('{sys}\sc.exe'), 'start {#ProtectionServiceName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
      or ((ResultCode <> 0) and (ResultCode <> 1056)) then
   begin
     Log(Format('sc start a échoué (code %d)', [ResultCode]));
@@ -311,8 +321,8 @@ begin
   StopProtectionService('{#ProtectionServiceName}');
   for Attempt := 1 to 15 do
   begin
-    Exec('taskkill.exe', '/F /IM optiSCAN.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-    Exec('taskkill.exe', '/F /IM optiSCAN.Service.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM optiSCAN.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM optiSCAN.Service.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     if not OptiScanProcessStillRunning() then
       Break;
     Sleep(200);
@@ -367,10 +377,10 @@ begin
   RegDeleteKeyIncludingSubkeys(HKCU, 'Software\optiSCAN');
 
   Exec(ExpandConstant('{app}\{#AppExeName}'), '--remove-defender-exclusions --quiet', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  Exec('schtasks.exe', '/Delete /TN "optiSCAN_DailyScan" /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
-  Exec('schtasks.exe', '/Delete /TN "optiSCAN_Watchdog" /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{sys}\schtasks.exe'), '/Delete /TN "optiSCAN_DailyScan" /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{sys}\schtasks.exe'), '/Delete /TN "optiSCAN_Watchdog" /F', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 
-  Exec('fltmc.exe', 'unload optiSCANMinifilter', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Exec(ExpandConstant('{sys}\fltmc.exe'), 'unload optiSCANMinifilter', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   DeleteProtectionService('{#ProtectionServiceName}');
 
   if RegKeyExists(HKLM, 'SOFTWARE\Microsoft\AMSI\Providers\{A8F4E2B1-9C3D-4E5F-8A7B-1C2D3E4F5A6B}') then
@@ -458,7 +468,7 @@ procedure WriteOriginalUserReg(const Args: string);
 var
   ResultCode: Integer;
 begin
-  ExecAsOriginalUser('reg.exe', Args, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  ExecAsOriginalUser(ExpandConstant('{sys}\reg.exe'), Args, '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;
 
 procedure WriteInstallerUiCulture();
@@ -505,7 +515,7 @@ procedure ResetOriginalUserFreshclamConf();
 var
   ResultCode: Integer;
 begin
-  ExecAsOriginalUser('powershell.exe',
+  ExecAsOriginalUser(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
     '-NoProfile -NonInteractive -Command "& { $p = Join-Path $env:LOCALAPPDATA ''optiSCAN\clamav\freshclam.conf''; if (Test-Path -LiteralPath $p) { $b = [IO.File]::ReadAllBytes($p); $t = [Text.Encoding]::UTF8.GetString($b); $bom = ($b.Length -ge 3 -and $b[0] -eq 239 -and $b[1] -eq 187 -and $b[2] -eq 191); if ($bom -or $t.Contains(''CVDCertsDirectory'')) { Remove-Item -LiteralPath $p -Force } } }"',
     '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
 end;

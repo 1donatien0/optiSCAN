@@ -91,6 +91,12 @@ if ($yaraRules.Count -eq 0) {
     Write-Host "  OK        rules\ - $($yaraRules.Count) regle(s) .yar" -ForegroundColor Green
 }
 
+Write-Host "`n[ Service de protection ]"
+Check "optiSCAN.Service.exe"              "Service Windows optiSCANProtection"
+Check "optiSCAN.Service.dll"              "Assembly du service (l'exe seul ne demarre pas)"
+Check "optiSCAN.Service.runtimeconfig.json" "Configuration runtime du service"
+Check "optiSCAN.Platform.dll"             "Bibliotheque plateforme partagee"
+
 Write-Host "`n[ Ressources ]"
 Check "optiSCAN.ico"      "Icone application"
 Check "optiSCAN_hero.png" "Image hero bouclier"
