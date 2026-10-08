@@ -10,11 +10,11 @@ Cet audit remplace l'audit précédent (`AUDIT_optiSCAN_360.md` au commit `43da2
 - **Inspection binaire** de `installer/output/optiSCAN_Setup_v3.0.0.exe` : en-tête PE, répertoire de sécurité Authenticode. Le contenu n'a pas pu être listé (`innoextract` 1.9 ne lit pas Inno 6.7.0).
 - **Mesures sur binaires réels** : clamd (INSTREAM direct et à travers un relais), YARA 4.5 (`-C`, `--scan-list`, fichiers illisibles), vérification GPG des archives ClamAV, empreintes des archives officielles retéléchargées.
 - **Builds et tests sous Linux** (SDK .NET 10, `EnableWindowsTargeting`) après chaque lot de corrections.
-- **Non fait** : exécution de `dotnet test` sur Windows, installation du service sur une machine Windows, tests d'exploitation dynamiques (pas de preuve de concept de jonction ou de squat). Ce qui en dépend est listé en [section 9](#9-réserves-ouvertes-et-conditions-de-clôture).
+- **Windows, 7 octobre 2026** : suite Release exécutée sur Windows, 630 réussis, 0 échec, 0 ignoré (SDK 10.0.401), dont le test de charge du watcher réel. Sorties intermédiaires isolées dans `%TEMP%` après un refus d'accès ACL dans `optiSCAN/obj`. **Non fait** : installation et validation du service sur une VM, vérification visuelle de l'interface/installeur et tests dynamiques avec privilèges (jonction dans `C:\Windows\Temp`, squat). Ces points restent en [section 9](#9-réserves-ouvertes-et-conditions-de-clôture).
 
 Échelle de confiance : **Prouvé** (compilation ou lecture sans ambiguïté), **Élevée** (le code ne laisse pas d'autre lecture raisonnable), **Probable** (dépend d'un comportement Windows ou d'une séquence à observer).
 
-Les constats sont regroupés en trois séries, selon le moment de l'examen où ils sont apparus :
+Les constats sont regroupés en séries, selon le moment de l'examen où ils sont apparus :
 
 | Série | Origine | Nombre |
 |---|---|---:|
@@ -22,6 +22,8 @@ Les constats sont regroupés en trois séries, selon le moment de l'examen où i
 | **R1–R10** | Révélés ou introduits par les premiers correctifs | 10 (+ 2 sans numéro) |
 | **E, M, F** | Relecture ligne à ligne des chemins sensibles : gravité élevée, moyenne, faible | 12 + 21 + 23 |
 | **X1–X11** | Relevés en relecture des correctifs | 11 |
+| **Y1–Y5** | Relecture du 7 octobre 2026 (publication, outils système, partages, ressource, logo) | 5 |
+| **Z1–Z9** | Relecture approfondie du 7 octobre 2026 (frontières de privilège, clamd, couverture de détection) | 9 |
 
 ## Synthèse
 
@@ -240,7 +242,7 @@ L'échec était masqué à chaque étape : `continue-on-error: true` en CI, simp
 | **Temps réel SYSTEM et jonctions** | Une jonction créée dans un dossier surveillé faisait analyser des fichiers situés ailleurs ; un dossier déjà jonction au démarrage était accepté. | `RealTimePathGuard` : dossier refusé si un élément de son chemin est un substitut de nom (contrôlé à la constitution de la liste et à la création du watcher ; OneDrive accepté) ; fichier ouvert sans suivre de lien, chemin réel (`GetFinalPathNameByHandle`) exigé sous le chemin réel du dossier ; poignée gardée sans partage de suppression pendant l'analyse. L'analyse porte sur une copie (E5). |
 | **Quarantaine : lecture puis suppression** | Second accès par chemin entre lecture et suppression. | Une seule poignée (voir R2) ; l'original reste en place si le manifeste ne peut pas être enregistré. |
 | **Liens physiques** | Non examinés. | Refusés pour la suppression et la quarantaine (`IsSoleName`, `NumberOfLinks == 1`). |
-| **Publication** | `FolderProfile.pubxml` publiait en mode dépendant du framework alors que l'installeur n'installe plus de runtime. | Profil autonome ; tous les scripts de publication passent `OptiscanShipping=true`. Reste le mode dépendant du framework de `publish-release.ps1` sans `-SelfContained` (section 9). |
+| **Publication** | `FolderProfile.pubxml` publiait en mode dépendant du framework alors que l'installeur n'installe plus de runtime. | Profil autonome ; tous les scripts de publication passent `OptiscanShipping=true`. Le script `publish-release.ps1` publie désormais toujours en self-contained ; son ancien paramètre `-SelfContained` reste accepté pour compatibilité. Publication Windows à valider avant release. |
 
 **Point conservé : le pipe de scan reste ouvert aux utilisateurs authentifiés.** L'interface de chaque compte doit pouvoir demander un scan au service. Un client n'obtient rien qu'il ne pouvait déjà lire (ouverture sous son identité), et ce qu'il peut consommer est borné par compte : 2 connexions, 30 scans par minute, 2 simultanés, 256 Mo par fichier. Restreindre le pipe au compte de la console casserait les sessions multiples et le Bureau à distance.
 
@@ -448,6 +450,85 @@ La version reprise effaçait l'historique des détections de Defender et laissai
 
 L'épinglage d'E6 refuse toute publication YARA-Forge plus récente que `20261004` jusqu'à une nouvelle version d'optiSCAN : sans calendrier de publication, les règles vieillissent. Limite listée en section 9 ; le renouvellement des empreintes approuvées sans republier l'application, avec vérification cryptographique et retrait d'une publication compromise, est inscrit dans [ROADMAP.md](ROADMAP.md).
 
+### 4.6 Relecture du 7 octobre 2026 : Y1 à Y5
+
+#### Y1 — Installeur livré avec un service qui ne démarre pas · Élevée (fonctionnel) · Prouvé · ✅
+
+`prepare-release-v3.ps1` (sans `-SelfContained`) publiait le service à part puis ne copiait que `optiSCAN.Service.exe` (`-ErrorAction SilentlyContinue`) ; `publish-release.ps1` ne publiait pas le service ; `setup.iss` reprenait l'exe seul, en `skipifsourcedoesntexist`. Sans `optiSCAN.Service.dll` ni ses dépendances, l'hôte d'application ne démarre pas. Seule la CI publiait correctement. **Correction** : les trois scripts de publication (`prepare-release-v3.ps1`, `publish-release.ps1`, puis `installer/build-release-setup.ps1`, relevé en alignant la documentation) publient le service dans le dossier de l'application, dans le même mode ; `setup.iss` ne prend le service que par `AppPublishSource` et refuse de compiler sans `optiSCAN.Service.dll` (`/DAllowMissingService` pour un build de développement) ; `verify-runtime-deps.ps1` exige l'exe, la DLL, le `runtimeconfig.json` du service et `optiSCAN.Platform.dll`. `publish-release.ps1 -CertSubject` signe les mêmes binaires que la CI.
+
+#### Y2 — Outils Windows lancés par nom nu · Faible (défense en profondeur) · Élevée · ✅
+
+`sc.exe`, `schtasks.exe`, `powershell.exe`, `cmd.exe`, `fltmc.exe`, `powercfg.exe`, `taskmgr.exe`, `shutdown.exe` et `explorer.exe` étaient lancés par leur nom : la recherche de `CreateProcess` passe par le dossier courant avant System32. Même chose dans l'installeur élevé (`sc`, `taskkill`, `schtasks`, `fltmc`, `reg`, `powershell`). **Correction** : `SystemExecutables` (chemins System32, PowerShell 5.1, Explorateur) dans l'application, `{sys}\…` dans `setup.iss` ; un test refuse tout nouveau lancement par nom nu.
+
+#### Y3 — Suppression des partages : échec intermédiaire masqué · Faible · Prouvé · ✅
+
+Les `net share … /delete` étaient chaînés par `&` : seul le code de la dernière commande comptait. **Correction** : `BuildRemoveSharesCommand` (`cmd /d /s /c`, `net.exe` par chemin complet, dossier de travail System32) tente chaque suppression et rend 1 si l'une échoue.
+
+#### Y4 — Ressource `optiSCAN.png` déclarée avec une autre casse que le fichier · Faible (build) · Prouvé · ✅
+
+Le fichier est `optiSCAN.PNG` : la compilation échouait hors Windows (`BG1002`). **Correction** : déclaration alignée ; un test compare les noms des ressources à ceux du disque, casse comprise.
+
+#### Y5 — Logo battant de l'accueil rogné · Faible (interface) · Prouvé · ✅
+
+La colonne du bouclier faisait 160 px de large pour un logo de 190 px et un halo de 240 px : WPF rognait les deux au rectangle de la colonne, et la pulsation montrait des bords coupés. Le halo (3 s) et le logo (2,5 s) battaient aussi à deux cadences. **Correction** : zone de 200 × 200 (la hauteur utile de la rangée), logo de 180 px, halo externe gardé à 240 px par une marge négative, un seul storyboard adouci (`SineEase`) pour le halo et le bouclier.
+
+Vérification : build Release sans avertissement ; sous Linux, 499 tests dont 280 réussis, les 219 échecs identiques nom pour nom à ceux de `8a0ef28` (environnement) ; scripts PowerShell sans erreur d'analyse. À confirmer sur Windows : compilation de `setup.iss` (contrôle ISPP) et rendu du bouclier.
+
+
+### 4.7 Relecture approfondie du 7 octobre 2026 : Z1 à Z9
+
+Relecture des frontières de privilège : pipe et politique, quarantaine du service, copies d'analyse, clés USB, nettoyeur, installeur.
+
+#### Z1 — Nettoyeur : suppression à travers une jonction · Élevée (conditionnelle) · Élevée · ✅
+
+`CleanDir` parcourait `Directory.EnumerateFiles(…, AllDirectories)`, qui descend dans les jonctions, puis supprimait par chemin. Un compte standard peut créer un dossier dans `C:\Windows\Temp` : une jonction vers `C:\Windows\System32` ou le profil d'un autre compte faisait supprimer ces fichiers par l'administrateur qui lançait « Temp Windows ». Même risque, avec les droits du compte, dans `%TEMP%` et les caches de navigateurs. Les chemins système venaient en outre de la variable `SystemRoot`. **Correction** : `SafeDirectoryCleaner` refuse une racine qui est un lien, énumère sans point de réanalyse et supprime chaque fichier par `SafePathDelete` (descente nom par nom, refus d'un dossier remplacé par une jonction entre l'énumération et la suppression) ; chemins par `SpecialFolder.Windows`.
+
+#### Z2 — Copie d'analyse nommée d'après un périphérique DOS · Moyenne · Élevée · ✅
+
+`ScanStaging` gardait le nom d'origine. Sous Windows 10, `…\scan-staging\x\COM1.txt` désigne le port COM1 : le service SYSTEM y écrivait les octets fournis par un compte standard (`scan_path` sur un fichier créé par `\\?\`, `scan_buffer`, temps réel, USB), et `NUL` donnait une copie vide, donc « propre ». **Correction** : `SafeStagingName` remplace les noms réservés (avec ou sans extension, chiffres en exposant compris), les flux nommés, les caractères interdits et les noms réduits à des points par `content` + extension.
+
+#### Z3 — Préfixe `\\?\` et noms courts devant les dossiers protégés · Faible (défense en profondeur) · Prouvé · ✅
+
+`IsSensitivePath` comparait des préfixes de chaînes : `\\?\C:\Windows\…` ou `C:\PROGRA~1\…` n'étaient pas reconnus. Les écritures restaient bloquées plus loin (`SafePathDelete`, contrôle du chemin réel), mais pas la suppression d'une menace en processus élevé. **Correction** : préfixe `\\?\` retiré avant comparaison, autres chemins de périphérique (`\\.\`, `GLOBALROOT`, volume par GUID) refusés, noms 8.3 développés.
+
+#### Z4 — `scan_buffer` ouvert sans client · Faible · Prouvé · ✅
+
+L'opération ne servait qu'au fournisseur AMSI, non livré, et restait joignable par tout compte authentifié. **Correction** : fermée (`ScanBufferEnabled`) jusqu'à la réintégration d'AMSI.
+
+#### Z5 — Clé USB : le service suivait les jonctions · Faible · Élevée · ✅
+
+L'énumération SYSTEM d'un support amovible descendait dans les jonctions d'une clé NTFS (vers `C:\Windows`, un autre profil), et un dossier illisible arrêtait toute une extension. **Correction** : énumération sans point de réanalyse, dossiers illisibles ignorés.
+
+#### Z6 — `set_policy` : contrôle et écriture non atomiques · Faible · Probable · ✅
+
+Une requête « renforcer » d'un compte standard, contrôlée juste avant qu'un administrateur ne change la quarantaine automatique, pouvait réécrire l'ancien réglage. **Correction** : contrôle et écriture sous un même verrou.
+
+#### Z7 — Tube clamd : reconnexion à un nom recréé par un autre compte · Élevée (conditionnelle) · Élevée · ✅
+
+Le relais clamd écoute sur `optiSCAN_clamd_<GUID>`, nom écrit dans `clamd.pipe`. La liste des tubes est lisible par tout compte, et clamd, sans objet job, survit à l'hôte. Après un arrêt ou un plantage de l'hôte, le relais disparaît ; l'hôte suivant relit le nom et s'y reconnecte (`PingOwnedAsync` puis `ClamdClient`). Un compte standard qui a recréé ce nom entre-temps recevait les octets des fichiers analysés par le service SYSTEM (`INSTREAM`) et pouvait répondre « OK » : lecture de fichiers d'autres comptes et aveuglement du temps réel. Le client se connectait en outre au niveau d'usurpation par défaut ; un compte de service disposant de `SeImpersonatePrivilege` obtenait un jeton SYSTEM utilisable. **Correction** : le client clamd (et le pont interne) n'accorde que l'identification, et exige un serveur du même compte (`PipeServerAccount`) avant d'envoyer le premier octet.
+
+#### Z8 — Détection limitée à une liste d'extensions · Élevée (détection) · Prouvé · ✅
+
+Le temps réel, la surveillance des processus et l'analyse des clés USB ne regardaient qu'une liste d'extensions. `.lnk`, archives (`.zip`, `.rar`, `.7z`, `.cab`), `.xll`, `.one`, `.chm`, `.cpl`, `.vbe`, `.msix`/`.appx`, `.doc`/`.xls`/`.ppt` (macros anciennes), `.rtf`, `.pdf` ne déclenchaient rien, ni un exécutable déposé en `.dat` ou `.tmp`, lancé par `CreateProcess` ou chargé par `rundll32 x.dat,Entry` (`rundll32` et `regsvr32` n'étaient pas suivis). **Correction** :
+- liste élargie (`RiskyFileExtensions`) ;
+- `ExecutableSniffer` : un fichier hors liste est analysé si son contenu est un PE (`MZ`, puis `PE\0\0` à `e_lfanew`). Temps réel : l'en-tête est lu une fois, après le délai de stabilisation, par une ouverture partagée qui ne gêne pas l'auteur du fichier, sans suivre de lien et sous le dossier surveillé ; un fichier qui n'est pas un PE sort aussitôt du cache de dé-duplication ;
+- processus : image et arguments des hôtes (dont `rundll32`, `regsvr32`) retenus sur extension ou en-tête PE ; cible `x.dat,Entry` séparée de son point d'entrée ; tout chemin absolu entre guillemets est candidat ;
+- clés USB : un seul parcours au lieu d'un par extension, exécutables (extension ou en-tête) placés avant les autres fichiers dans la limite de fichiers.
+
+Coût : une lecture de 68 octets par fichier hors liste écrit dans un dossier surveillé, une fois le fichier stabilisé.
+
+#### Z9 — clamd et son relais survivaient à l'hôte · Moyenne · Prouvé · ✅
+
+Sans objet job, un arrêt brutal de l'hôte laissait clamd et le relais tourner, et c'est ce qui rendait Z7 exploitable. **Correction** : processus créés suspendus, rattachés à un objet job `KILL_ON_JOB_CLOSE` propre à l'hôte, puis relancés. Windows ferme la poignée du job à la fin de l'hôte, même sur un plantage, et termine clamd et le relais.
+
+#### Relevés sans correction (à décider)
+
+- **Instance élevée et données du compte** : un optiSCAN élevé (relance UAC) régénère et utilise `freshclam.conf` dans `%LOCALAPPDATA%` (directives `OnUpdateExecute`…), et peut lancer `winget.exe` trouvé dans le `PATH` du compte. Un programme du même compte, non élevé, peut s'y glisser : contournement d'UAC, pas une frontière de sécurité Windows. Piste : ne pas lancer freshclam ni winget depuis une instance élevée, ou écrire la configuration dans un dossier réservé aux administrateurs.
+- **Désinstalleur** : `{localappdata}` désigne le profil du compte administrateur qui désinstalle, pas forcément celui de l'utilisateur.
+- **Quotas du pipe par compte** : le compte est lu sur le PID client ; un PID réutilisé pourrait faire compter une connexion comme SYSTEM (exempte de quota). Déni de service local seulement.
+
+Vérification : build Release sans avertissement ; sous Linux, après Z9, 579 tests dont 359 réussis ; les échecs sont ceux d'environnement de `8a0ef28` (plus un nouveau test qui passe par `WindowsIdentity`) ; les tests de liens (nettoyeur, USB) s'exécutent réellement sous Linux. À confirmer sous Windows : nettoyage de `C:\Windows\Temp` avec une jonction (mode développeur), refus de `COM1.txt`.
+
 ---
 
 ## 5. Évolutions structurantes
@@ -537,16 +618,16 @@ La note a progressé par lots de corrections : 5,3 → 6,3 (séries N, avant R1)
 - `AtomicFile` (sauvegarde, reprise, écritures concurrentes), `ElevationHelper.NeedsElevation` (frontière de dossier, corrigée au passage : `C:\WindowsApps` était pris pour `C:\Windows`), ACL de `ProtectionPipeAcl`, `ThreatRepairService`, `ProcessStartMonitor`, rattachement des menaces du temps réel, certificat épinglé, `freshclam.conf`, exclusions interdites, risque, partages, parseur clamscan, paquets YARA-Forge (vrais ZIP, digest obligatoire, URL, plafonds) ;
 - série X : ACL du dossier d'installation (`InstallLocationTrust`), exclusions Defender et périmètres protégés selon le dossier, copies d'analyse ignorées seulement pendant leur vie, `%LOCALAPPDATA%\optiSCAN` analysé hors bases et quarantaine, commandes élevées sans `cmd` et vidage sans suivre les liens, serveur du pipe identifié par le service.
 
-Total actuel : 494 tests. Les tests qui créent des liens, passent par les API NT, les pipes ou les ACL ne vérifient quelque chose que sous Windows (`OperatingSystem.IsWindows()`) ; les tests de liens sont sautés silencieusement si la console ne peut pas créer de lien symbolique (activer le mode développeur).
+Total au 5 octobre : 494 tests. Après les relectures du 7 octobre (séries Y et Z, robustesse) : 579, dont les nouveaux tests de liens (nettoyeur, clés USB), de noms de copie d'analyse, d'en-tête PE et de garde-fous sur le code source (lancements par nom nu, `ConfigureAwait(false)` dans les vues, niveau d'usurpation du tube clamd). Les tests qui créent des liens, passent par les API NT, les pipes ou les ACL ne vérifient quelque chose que sous Windows (`OperatingSystem.IsWindows()`) ; les tests de liens sont sautés silencieusement si la console ne peut pas créer de lien symbolique (activer le mode développeur).
 
 ---
 
 ## 9. Réserves ouvertes et conditions de clôture
 
-**Reportées par décision (coût) :**
+**Non livrées / bloquantes pour la release signée :**
 
-- signature Authenticode de l'installeur et des binaires : la chaîne est en place et inactive sans certificat ; sans elle, `PipeServerTrust` ne peut pas vérifier de signature ;
-- interception avant exécution : AMSI signé, minifiltre EV/WHQL.
+- signature Authenticode de l'installeur et des binaires : la chaîne est en place et inactive sans certificat ; aucun certificat n'est disponible, les artefacts sont non signés et `PipeServerTrust` ne peut pas vérifier de signature ;
+- interception avant exécution : AMSI signé, minifiltre EV/WHQL, hors périmètre de cette candidate.
 
 **Limites de produit assumées :**
 
@@ -554,13 +635,13 @@ Total actuel : 494 tests. Les tests qui créent des liens, passent par les API N
 - **fichier restauré re-détecté** : restauré à son emplacement d'origine, il peut être remis en quarantaine par le temps réel si la quarantaine automatique est active ; la confirmation le dit, sans exclusion temporaire ;
 - **YARA 4.5.5** : les correctifs 4.5.6–4.5.8 exigent de compiler YARA dans la CI Windows ;
 - **règles YARA-Forge bloquées** sur la release approuvée `20261004` jusqu'à ce qu'une mise à jour d'optiSCAN approuve la suivante ;
-- **publication dépendante du framework** : `publish-release.ps1` sans `-SelfContained` produit une application qui exige le runtime .NET 10 Desktop, que l'installeur ne vérifie ni n'installe ; ajouter une vérification bloquante avant de distribuer ce mode ;
+- **saturation des événements temps réel** : l'admission est limitée à 128 callbacks et le cache à 8 192 chemins. Une saturation déclenche un rattrapage coalescé par dossier ; si de nouveaux débordements arrivent pendant le délai de 30 s ou le rattrapage, un nouveau passage est planifié après ce délai. Un test Windows avec 480 créations sur deux vagues vérifie la borne, le nouveau passage et le traitement de tous les fichiers. La validation en VM de la charge réelle et un état de santé durable dans l'interface restent à faire ;
 - **masquage des chemins** limité aux profils Windows standard ; le temps réel observe après écriture et ne remplace pas Defender ;
 - **installation imposée sous `Program Files`** : une installation antérieure placée ailleurs doit être désinstallée avant la mise à jour ; un build de développement ou une copie portable fonctionne sans service ni exclusion Defender (X3).
 
 **Conditions de clôture :**
 
-1. Sur Windows, pour la révision exacte : `dotnet test -c Release` (SDK .NET 10), dans une console qui peut créer des liens symboliques.
+1. **Validé le 7 octobre sur Windows** (SDK 10.0.401) : suite Release, 630 réussis, 0 échec, 0 ignoré, avec le test de charge réel du `FileSystemWatcher`. Le test a utilisé un `Directory.Build.props` temporaire sous `%TEMP%` pour isoler les sorties après refus d'accès ACL dans `optiSCAN/obj` ; les contrôles de la condition 5 ci-dessous restent séparément à faire en VM.
 2. Service installé, compte standard puis administrateur :
    - scan par l'interface et scan d'un dossier utilisateur avec clamd actif (pas de repli clamscan systématique dans le journal `CompositeClamAv`) ;
    - réduire la protection en compte standard : l'invite UAC doit apparaître ;
@@ -570,8 +651,9 @@ Total actuel : 494 tests. Les tests qui créent des liens, passent par les API N
    - installeur lancé avec `/DIR=C:\optiSCAN` : refus ; service lancé depuis une copie dans un dossier modifiable : hôte non démarré, événement dans le journal Application ;
    - fichier EICAR écrit dans `%TEMP%\optiscan_scan-staging\x\` puis dans `%LOCALAPPDATA%\optiSCAN\` : détecté par le temps réel ;
    - panneau Optimiser, en administrateur : télémétrie, DISM et cache Windows Update appliqués sans erreur dans le journal ; mise à jour depuis une version qui avait créé `optiSCAN-ClearDefenderHistory` : tâche absente ensuite.
-3. `scripts\fetch-runtime-deps.ps1 -RequireSignature` puis `verify-runtime-deps.ps1` ; `clamscan --version` (1.4.6) et `yara64 --version` (4.5.5).
-4. Après publication sur GitHub : premier passage du job CodeQL `c-cpp` (M19) et de la CI avec `-RequireSignature` ; signature par empreinte vérifiée quand un certificat sera disponible.
+3. `scripts\fetch-runtime-deps.ps1 -RequireSignature` puis `verify-runtime-deps.ps1` ; `clamscan --version` (1.4.6) et `yara64 --version` (4.5.5). Sur le poste de validation, les exécutables ClamAV x64 et x86 quittent avec NTSTATUS `0xC0000142` avant d'afficher leur version ; ce contrôle reste à refaire dans un environnement Windows où les binaires démarrent.
+4. Après publication du workflow sur GitHub : premier passage réussi du job CodeQL `c-cpp` (M19) et de la CI avec `-RequireSignature`. La signature Authenticode reste un critère bloquant distinct : certificat requis, puis signatures des artefacts vérifiées.
+5. **Partiellement validé** : la suite Windows (630/630) comprend le test de charge du watcher réel : borne de 128 événements, débordements, rattrapage différé et traitement de 480 fichiers. **À valider en VM** : `ISCC` échoue sans `optiSCAN.Service.dll` ; service installé démarré ; jonction dans `C:\Windows\Temp` non suivie par « Nettoyer » ; `COM1.txt` analysé sous le nom `content.txt` ; `.exe` renommé en `.dat` dans Téléchargements analysé ; `--service-host` tué → `clamd.exe` terminé ; arrêt du service → hôte fermé ; scans avec clamd actif sans repli clamscan systématique ; bouclier de l'accueil entier.
 
 ---
 
@@ -581,12 +663,32 @@ Total actuel : 494 tests. Les tests qui créent des liens, passent par les API N
 - **Tests sous Linux**, avec un faux framework WindowsDesktop : 494 tests, 275 réussis. Les 219 échecs viennent tous de l'environnement (WPF et `ProtectedData` de référence non exécutables, API NT, pipes nommés, ACL Windows) ; à chaque lot, la liste des échecs a été comparée nom pour nom à la précédente, sans régression.
 - **Binaires réels** : clamd INSTREAM (direct et à travers un relais), comportement de YARA 4.5, vérification GPG (archive valide acceptée, altérée refusée), empreintes des archives officielles.
 - **Scripts et workflows** : scripts PowerShell sans erreur d'analyse (`pwsh` 7.6), y compris ceux embarqués dans `WindowsDefenderExclusionService` ; workflows YAML valides.
-- **Logique de la quarantaine du service** vérifiée sous Linux par un test temporaire qui remplit le manifeste directement (migration, conservation, résumé, liste, restauration sans écrasement, refus des destinations relatives, suppression).
+- **Suite Release Windows, 7 octobre** : 630 tests réussis, aucun échec ni test ignoré ; le test temps réel crée 480 fichiers sur deux vagues et vérifie que la file reste bornée, que le rattrapage reprend après débordement et que chaque fichier est traité. Les sorties ont été isolées sous `%TEMP%` à cause des ACL du `obj` du workspace. Cela ne couvre pas l'installation du service, l'installeur Inno, le parcours visuel de l'interface ni les contrôles privilégiés encore listés en section 9.
+
+---
 
 ## 11. Limites
 
-- Analyse statique et exécutions sous Linux uniquement : ni exécution sur Windows (AppContainer, pipes, Defender, WMI, verrouillage NTFS, `FileSystemWatcher`, Inno Setup), ni test d'exploitation dynamique. Les refus de renommer un dossier parent tant qu'un fichier y est ouvert, et la suppression annulable, sont des comportements documentés de NTFS, non observés ici.
+- L'analyse statique et les builds précédents ont été faits sous Linux ; la suite Release a aussi été exécutée sous Windows. L'installation du service, AppContainer/Defender en conditions installées, WMI, Inno Setup, la jonction privilégiée et les scénarios de verrouillage/suppression NTFS restent à vérifier sur VM. Les refus de renommer un dossier parent tant qu'un fichier y est ouvert et la suppression annulable ne sont pas observés ici.
 - Contenu de l'installeur non extrait (Inno 6.7.0 non pris en charge par innoextract 1.9).
 - Le modèle de menace de SECURITY.md exclut les attaques du même utilisateur contre DPAPI ; plusieurs constats E (E1, E2, E4) sont donc des affaiblissements de défense en profondeur bornés par les privilèges du compte attaquant.
 - La gravité repose sur des faits de code vérifiés ; la probabilité d'exploitation reste une appréciation.
 - La branche `win` (WinUI) n'a pas été examinée.
+
+---
+
+## 12. Corrections de robustesse du 7 octobre 2026
+
+Corrections de stabilité appliquées après les relectures Y et Z. Elles ne changent aucune frontière de sécurité ; la note n'en dépend pas.
+
+- **Gestionnaires `async void`** : `btnAnalyze_Click`, `btnCleanNow_Click` (Nettoyer), `BtnScheduledRunNow_Click`, `BtnCheckAppUpdate_Click`, `BtnOpenSourceForge_Click` (Options) et `AsyncRelayCommand.Execute` journalisent leurs exceptions. Leur suite reprend sur le thread de l'interface : un `ConfigureAwait(false)` y ferait lever chaque accès à un contrôle, puis le `catch` lui-même, et `CommandManager.InvalidateRequerySuggested` hors de ce thread laisserait les boutons désactivés.
+- **Arrêt de l'hôte** : `shutdown` (jeton vérifié) appelle désormais le gestionnaire fourni par `ProtectionServiceHost`, qui arrête temps réel, IPC et conteneur avant la fin du processus. Sans gestionnaire (tests), seule l'écoute IPC s'arrête. Le relais clamd (AppContainer) et le faux clamd gardent `Environment.Exit` : `Shutdown()` passerait par `OnExit`, qui instancie `ServiceContainer.Default`.
+- **Tâches de fond** supervisées : `EnsureQuarantineBlobLayout`, `DefenderLegacyCleanup.RunAndMark`, `RecoverWatcherAsync`, pompe du relais clamd. Le préchauffage de clamd et `EnsureOptiscanExclusionsAsync` l'étaient déjà.
+- **Captures vides** : commentées quand l'exception est attendue (annulation), journalisées sinon (`FreshclamConfSupport`, fermeture de `ClamdClient`).
+- **Defender** : les retraits refusés écrivent `FAILED:<valeur>` ; `ParseResult` les journalise (chemins masqués) sans changer la ligne de résultat lue.
+- **Quarantaine** : la migration des blobs sans MAC lit et chiffre hors verrou ; l'écriture se fait sous verrou et seulement si l'entrée est toujours au manifeste.
+- **Base ClamAV** : `ClamAvEngine.DatabaseDir` est résolu une fois par instance (la résolution crée et supprime un dossier de test, et en SYSTEM vérifie ProgramData et retente la copie initiale des signatures) ; recalculé seulement si le dossier a disparu.
+
+Vérification : build Release sans avertissement ; sous Linux, 579 tests ; les 220 échecs sont tous dus à l'environnement (WPF, API NT, `WindowsIdentity`, ACL), mêmes noms qu'à `8a0ef28` plus le nouveau test de `DatabaseDir`, qui passe par `WindowsIdentity` comme son voisin.
+
+Mise à jour du 7 octobre : sur Windows / SDK 10.0.401, suite Release complète : **630 réussis, 0 échec, 0 ignoré**. Le nouveau test de charge du `FileSystemWatcher` crée 300 fichiers pendant le premier rattrapage puis 180 pendant le délai de récupération ; il confirme que les 480 fichiers sont traités et que la file reste sous son plafond de 128. Les contrôles manuels d'installation et de la condition 5 restent ouverts.

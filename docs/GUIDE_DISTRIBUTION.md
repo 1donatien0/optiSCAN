@@ -48,7 +48,7 @@ optiSCAN analyse à la demande, surveille les changements de fichiers avec `File
 
 ## 3. Dépendance au runtime .NET
 
-Publication **win-x64 uniquement** (`ArchitecturesAllowed=x64compatible`). La chaîne recommandée `prepare-release-v3.ps1` et `build-release-setup.ps1` utilise le profil `FolderProfile`, actuellement **self-contained** : le runtime .NET 10 est dans le publish. En revanche, `publish-release.ps1` sans `-SelfContained` produit un publish framework-dependent ; l'installateur ne vérifie ni n'installe alors le runtime automatiquement, et le poste cible doit déjà avoir le **.NET 10 Desktop Runtime x64**. Le code Inno contient des fonctions de téléchargement, mais elles ne sont pas raccordées au parcours actuel. Le projet cible **.NET 10 (LTS)**, pris en charge par Microsoft jusqu'au **14 novembre 2028** ; .NET 8 arrive en fin de support le 10 novembre 2026 ([politique de support .NET](https://dotnet.microsoft.com/en-us/platform/support/policy)). La version du SDK est fixée par `global.json`.
+Publication **win-x64 uniquement** (`ArchitecturesAllowed=x64compatible`). Les scripts de release `prepare-release-v3.ps1` et `publish-release.ps1` publient en **self-contained** : le runtime .NET 10 est inclus. Le paramètre historique `-SelfContained` de `publish-release.ps1` est conservé pour compatibilité ; le script ne produit plus de publish dépendant du framework. Un publish manuel framework-dependent exige le **.NET 10 Desktop Runtime x64** sur le poste cible ; l'installeur ne le vérifie ni ne l'installe. Le code Inno contient des fonctions de téléchargement, mais elles ne sont pas raccordées au parcours actuel. Le projet cible **.NET 10 (LTS)**, pris en charge par Microsoft jusqu'au **14 novembre 2028** ; .NET 8 arrive en fin de support le 10 novembre 2026 ([politique de support .NET](https://dotnet.microsoft.com/en-us/platform/support/policy)). La version du SDK est fixée par `global.json`.
 
 Pour éviter ce prérequis sur un poste neuf, utiliser le profil self-contained de la chaîne recommandée. Le dossier `installer/redist/` n'est pas consommé par le parcours Inno courant ; un redist y placé ne sera pas embarqué.
 
@@ -56,8 +56,8 @@ Pour une expérience « zéro dépendance » ou un package plus léger :
 
 | Option | Commande / mécanisme | Effet |
 |--------|----------------------|--------|
-| Self-contained | `scripts\prepare-release-v3.ps1` (profil par défaut) ; ou `scripts\publish-release.ps1 -SelfContained` | Runtime dans le publish (installeur plus lourd) |
-| Framework-dependent | `scripts\publish-release.ps1` sans `-SelfContained` | .NET 10 Desktop Runtime doit déjà être installé sur le poste cible |
+| Self-contained | `scripts\prepare-release-v3.ps1` ou `scripts\publish-release.ps1` (mode fixe) | Runtime dans le publish (installeur plus lourd) |
+| Framework-dependent manuel | `dotnet publish ... --self-contained false` (hors chaîne release standard) | .NET 10 Desktop Runtime doit déjà être installé sur le poste cible |
 | Redist Inno | Non pris en charge par le parcours courant | `installer/redist/` n'est pas lu par le script Inno |
 | Installeur léger (défaut) | `scripts\publish-release.ps1` | Sans bases ClamAV ni règles YARA ; téléchargement au premier lancement si la release YARA-Forge `latest` correspond à l'asset, la taille et l'empreinte approuvés dans le code |
 | Offline (tout) | `-EmbedOfflineSignatures` | CVD ClamAV + règles YARA embarqués |
@@ -82,7 +82,7 @@ L'UI de publication de Visual Studio s'est révélée peu fiable ici. Préférer
 .\installer\build-release-setup.ps1 -SkipPublish
 ```
 
-Le script `publish-release.ps1` publie et compile l'installeur. Son ancien paramètre `-CertSubject` ne signe que `optiSCAN.exe` ; pour signer tous les binaires publiés, utiliser `scripts/codesign.ps1`, puis passer `-SignPfxPath` à `installer/build-release-setup.ps1` afin de signer aussi l'installeur et son désinstalleur. Sans le secret ou le certificat, la build reste non signée.
+Le script `publish-release.ps1` publie et compile l'installeur. Avec `-CertSubject`, il signe l'application, le service et les DLL plateforme publiés ; il ne signe pas l'installeur ni son désinstalleur. Pour une publication entièrement signée, utiliser la procédure de [`SIGNATURE_PROCEDURE.md`](SIGNATURE_PROCEDURE.md), qui signe aussi l'installeur et son désinstalleur. Sans certificat, la build reste non signée.
 
 Le publish WPF recopie aussi les assets disque (`optiSCAN.ico`, hero, shield) via la cible MSBuild `CopyEmbeddedAssetsToPublish` — nécessaires au systray, à `verify-runtime-deps` et à Inno.
 
@@ -93,7 +93,7 @@ Le publish WPF recopie aussi les assets disque (`optiSCAN.ico`, hero, shield) vi
 - [ ] Code committé et build CI vert (tests + CodeQL + gitleaks).
 - [ ] Vérifier que le pilote minifiltre et le fournisseur AMSI restent absents du publish et de l'installateur tant que leur implémentation n'a pas été validée.
 - [ ] Si le certificat est disponible, signer les binaires avec `scripts/codesign.ps1`, puis l'installeur et le désinstalleur avec `-SignPfxPath` ; sinon documenter que la build est non signée.
-- [ ] Publish self-contained ou runtime .NET 10 préinstallé pour le mode framework-dependent.
+- [ ] Vérifier que le runtime est inclus dans le publish de release (`verify-runtime-deps.ps1`).
 - [ ] Assets publish présents (`optiSCAN.ico`, hero, shield) — `verify-runtime-deps.ps1`.
 - [ ] Testé sur poste vierge + poste avec Kaspersky/Defender.
 - [ ] Politique de confidentialité accessible ([POLITIQUE_CONFIDENTIALITE.md](POLITIQUE_CONFIDENTIALITE.md) ; à exposer aussi dans l'app / site).
