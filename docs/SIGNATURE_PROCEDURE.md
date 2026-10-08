@@ -42,7 +42,7 @@ pwsh -File installer\build-release-setup.ps1 -SkipPublish `
 
 `codesign.ps1` importe le certificat dans `CurrentUser\My`, le sélectionne par empreinte, signe les binaires listés, les vérifie, puis retire la clé importée. `build-release-setup.ps1 -SignPfxPath` applique la même méthode à l'installeur et au désinstalleur Inno. Sans certificat, lancer la chaîne de publication sans ces options.
 
-L'ancienne option `scripts/publish-release.ps1 -CertSubject` ne signe que `optiSCAN.exe` ; elle ne signe pas tous les binaires ni l'installeur. Utiliser la procédure ci-dessus pour une publication entièrement signée.
+L'option `scripts/publish-release.ps1 -CertSubject` signe l'application, le service et les DLL plateforme publiés, mais pas l'installeur ni son désinstalleur. Utiliser la procédure ci-dessus pour une publication entièrement signée.
 
 ## Vérification manuelle
 

@@ -25,7 +25,7 @@ Ce qui a alourdi la friction après la version 2 :
 
 - **Deux moteurs** : ClamAV (clamd/clamscan + freshclam) **et** YARA (rules + binaire)
 - x64 only (`ArchitecturesAllowed=x64compatible`)
-- Publish autonome avec le profil de publication recommandé ; les autres scripts peuvent produire un publish framework-dependent
+- Publish autonome avec les scripts de release ; un publish manuel framework-dependent exige un runtime .NET déjà installé
 - **Bases ClamAV et règles YARA non embarquées par défaut** — téléchargées après install via MAJ signatures (freshclam + asset YARA-Forge approuvé localement). Le téléchargement des règles échoue fermé si la release upstream `latest` ne correspond plus à la pin optiSCAN, jusqu'à publication d'une nouvelle empreinte approuvée. Offline : `/DEmbedOfflineSignatures` (ou `/DEmbedClamAvDatabase` / `/DEmbedYaraRules`)
 - Binaire **yara64.exe** toujours dans le setup (moteur) ; seuls les `.yar` sont optionnels
 - Exclusion des outils ClamAV développeur (~47 Mo)
@@ -58,7 +58,7 @@ Optionnel (utilisateur coche) :
 | Plus d’appel `RegisterDefenderExclusions` en post-install | Fait (script toujours copié pour opt-in app) |
 | AMSI / `.sys` | Absents du produit et de l'installateur |
 | Bases ClamAV / règles YARA post-install (défaut) | Fait |
-| Publish .NET / x64 | Profil recommandé self-contained ; chemin framework-dependent exige le runtime sur la machine et n'est pas vérifié par l'installeur |
+| Publish .NET / x64 | Les scripts de release publient self-contained ; un publish manuel framework-dependent exige le runtime sur la machine et n'est pas vérifié par l'installeur |
 
 ---
 
