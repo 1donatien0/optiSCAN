@@ -50,7 +50,16 @@ namespace optiSCAN
         {
             _isRunning = true;
             CommandManager.InvalidateRequerySuggested();
-            try { await _execute(parameter); }
+            try
+            {
+                await _execute(parameter); // contexte UI conservé : la suite touche CommandManager
+            }
+            catch (Exception ex)
+            {
+                // Logguer l'exception pour éviter un crash silencieux du process
+                // Les async void crashent le process si une exception n'est pas gérée
+                optiSCAN.Services.AppLogger.Error("AsyncRelayCommand", "Command execution failed", ex);
+            }
             finally
             {
                 _isRunning = false;

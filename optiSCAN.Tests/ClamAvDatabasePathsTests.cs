@@ -141,4 +141,40 @@ public sealed class ClamAvDatabasePathsTests
             try { Directory.Delete(root, recursive: true); } catch { /* best effort */ }
         }
     }
+
+    private sealed class NoExclusions : IExclusionSettingsAccessor
+    {
+        public ExclusionSettings Current { get; } = new();
+    }
+
+    [Fact]
+    public void Engine_resolves_the_database_folder_once_and_again_only_if_it_disappears()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "optiscan-db-" + Guid.NewGuid().ToString("N"));
+        var binDir = Path.Combine(root, "clamav");
+        var dbDir = Path.Combine(binDir, "database");
+        Directory.CreateDirectory(dbDir);
+
+        try
+        {
+            var engine = new ClamAvEngine(binDir, new NoExclusions());
+            var first = engine.DatabaseDir;
+            Assert.Equal(Path.GetFullPath(dbDir), first, ignoreCase: true);
+
+            // Pas de nouveau dossier de test créé : le résultat gardé est rendu tel quel.
+            var before = Directory.GetDirectories(dbDir).Length;
+            Assert.Same(first, engine.DatabaseDir);
+            Assert.Equal(before, Directory.GetDirectories(dbDir).Length);
+
+            // Dossier supprimé : nouvelle résolution, qui le recrée.
+            Directory.Delete(dbDir, recursive: true);
+            var again = engine.DatabaseDir;
+            Assert.Equal(Path.GetFullPath(dbDir), again, ignoreCase: true);
+            Assert.True(Directory.Exists(again));
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { /* best effort */ }
+        }
+    }
 }

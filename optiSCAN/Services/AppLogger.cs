@@ -61,7 +61,8 @@ namespace optiSCAN.Services
             var line = FormatLine(level, component, message, ex);
 
             // Console / Debug : toujours, peu importe le niveau (utile en dev).
-            try { System.Diagnostics.Debug.WriteLine(line); } catch { }
+            try { System.Diagnostics.Debug.WriteLine(line); }
+            catch { /* Debug.WriteLine peut échouer dans certains contextes - ignorer */ }
 
             // Fichier : seulement si le niveau est >= seuil.
             if (level < MinimumFileLevel) return;

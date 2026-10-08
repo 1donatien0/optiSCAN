@@ -148,7 +148,9 @@ public sealed class HardeningFollowUpTests
             new SecurityIdentifier("S-1-15-2-1430448594-2639229838-973813799-439329657-1197984847-4069167804-1277922394"),
             FileSystemRights.ReadAndExecute,
             AccessControlType.Allow));
-        Assert.True(OptiScanProgramData.IsTrustedSecurity(container));
+        // Seul le SID AppContainer configuré pour clamd est admis; un SID générique
+        // ou issu d'une autre installation ne doit pas être considéré comme fiable.
+        Assert.False(OptiScanProgramData.IsTrustedSecurity(container));
 
         var userOwned = new FileSecurity();
         userOwned.SetOwner(users);

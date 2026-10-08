@@ -232,7 +232,7 @@ public static class PlatformProtectionBootstrap
         {
             using var proc = Process.Start(new ProcessStartInfo
             {
-                FileName = "sc.exe",
+                FileName = SystemExecutables.System32("sc.exe"),
                 Arguments = $"query {serviceName}",
                 UseShellExecute = false,
                 CreateNoWindow = true,
@@ -255,7 +255,7 @@ public static class PlatformProtectionBootstrap
     {
         using var proc = Process.Start(new ProcessStartInfo
         {
-            FileName = "sc.exe",
+            FileName = SystemExecutables.System32("sc.exe"),
             Arguments = arguments,
             UseShellExecute = false,
             CreateNoWindow = true,

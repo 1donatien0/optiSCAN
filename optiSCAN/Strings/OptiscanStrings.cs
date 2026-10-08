@@ -44,7 +44,7 @@ namespace optiSCAN.Strings
 
         public static class UiMessages
         {
-            public static string ProtectionActive => LocalizationService.GetString("Ui_ProtectionActive");
+            public static string Ready => LocalizationService.GetString("Ui_Ready");
             public static string ProtectionReducedTray => LocalizationService.GetString("Ui_ProtectionTray");
             public static string AnalyseInterrompueSurDemande => LocalizationService.GetString("Ui_ScanInterrupted");
             public static string RestoreFromQuarantineSuccess => LocalizationService.GetString("Ui_RestoreOk");

@@ -66,7 +66,7 @@ public static class MainWindowStartupCoordinator
         host.ViewModel?.RefreshProtectionStatus();
         host.RefreshOverviewProtection();
         host.Navigation.NavigateTo(OptiscanStrings.PanelIds.Overview);
-        host.SetStatus(OptiscanStrings.UiMessages.ProtectionActive, false, false);
+        host.SetStatus(OptiscanStrings.UiMessages.Ready, false, false);
 
         if (!host.GuardSession && host.Window != null)
             host.ShowOnboardingIfNeeded(host.Window, host.Container);

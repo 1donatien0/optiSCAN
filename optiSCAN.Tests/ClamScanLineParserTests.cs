@@ -72,7 +72,7 @@ public sealed class ClamScanLineParserTests
     [InlineData(0, 0, false, ScanStatus.Completed)]
     [InlineData(1, 1, false, ScanStatus.Completed)]
     [InlineData(1, 0, false, ScanStatus.Error)]
-    [InlineData(2, 1, false, ScanStatus.Completed)]
+    [InlineData(2, 1, false, ScanStatus.Error)]
     [InlineData(2, 0, false, ScanStatus.Error)]
     [InlineData(2, 0, true, ScanStatus.Cancelled)]
     public void ClassifyExit_honors_clamscan_status(int exitCode, int threats, bool cancelled, ScanStatus expected)

@@ -15,7 +15,9 @@ namespace optiSCAN.Services
     public sealed class ProcessStartMonitor : IDisposable
     {
         private static readonly Regex QuotedPathRegex = new(
-            @"[""']([^""']+\.(?:exe|dll|scr|com|msi|bat|cmd|ps1|vbs|js|hta|wsf|jar))[""']",
+            // Tout chemin absolu entre guillemets (lecteur ou UNC), quelle que soit l'extension :
+            // le contenu est ensuite filtré (extension listée ou en-tête PE).
+            @"[""']((?:[A-Za-z]:\\|\\\\)[^""']+)[""']",
             RegexOptions.IgnoreCase | RegexOptions.Compiled);
 
         private readonly ScanOrchestrator _orchestrator;
@@ -132,14 +134,16 @@ namespace optiSCAN.Services
             var results = new List<string>();
 
             var image = TryGetExecutablePath(pid);
-            if (!string.IsNullOrWhiteSpace(image) && File.Exists(image) && RiskyFileExtensions.IsRisky(image))
+            // L'image d'un processus lancé est un exécutable, quelle que soit son extension
+            // (un PE renommé en .dat se lance par CreateProcess) : extension listée ou en-tête PE.
+            if (!string.IsNullOrWhiteSpace(image) && File.Exists(image) && RiskyFileExtensions.IsRiskyOrExecutable(image))
                 results.Add(image);
 
             if (RiskyFileExtensions.IsScriptHostProcess(processName) && !string.IsNullOrWhiteSpace(commandLine))
             {
                 foreach (var candidate in ExtractCommandLineCandidates(commandLine))
                 {
-                    if (File.Exists(candidate) && RiskyFileExtensions.IsRisky(candidate))
+                    if (File.Exists(candidate) && RiskyFileExtensions.IsRiskyOrExecutable(candidate))
                         results.Add(candidate);
                 }
             }
@@ -161,6 +165,13 @@ namespace optiSCAN.Services
                 var trimmed = token.Trim('"', '\'');
                 if (trimmed.Length > 0)
                     candidates.Add(trimmed);
+            }
+            // rundll32 x.dat,Entry : le fichier est avant la virgule.
+            foreach (var candidate in candidates.ToList())
+            {
+                var comma = candidate.IndexOf(',');
+                if (comma > 0)
+                    candidates.Add(candidate[..comma].Trim('"', '\''));
             }
             return candidates.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }

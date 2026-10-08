@@ -109,6 +109,37 @@ internal static class RealTimePathGuard
         return handle;
     }
 
+    /// <summary>
+    /// Dit si un fichier hors liste d'extensions est un exécutable PE, sans gêner son auteur :
+    /// ouverture partagée (lecture, écriture, suppression), sans suivre de lien, et seulement si
+    /// le chemin réel reste sous le dossier surveillé. Hors Windows : lecture par chemin.
+    /// </summary>
+    internal static bool IsExecutableWithinRoot(string watchRoot, string file)
+    {
+        if (!OperatingSystem.IsWindows())
+            return ExecutableSniffer.IsPortableExecutable(file);
+
+        var rootFinal = FinalPathOf(watchRoot, directory: true);
+        if (rootFinal == null)
+            return false;
+
+        using var handle = CreateFile(
+            file,
+            GenericRead,
+            FileShareRead | FileShareWrite | FileShareDelete,
+            IntPtr.Zero,
+            OpenExisting,
+            FileFlagOpenReparsePoint,
+            IntPtr.Zero);
+        if (handle.IsInvalid || IsNameSurrogate(handle))
+            return false;
+
+        var fileFinal = FinalPath(handle);
+        return fileFinal != null
+            && IsUnder(fileFinal, rootFinal)
+            && ExecutableSniffer.IsPortableExecutable(handle);
+    }
+
     /// <summary>Comparaison de chemins réels, insensible à la casse, sur une frontière de dossier.</summary>
     internal static bool IsUnder(string path, string root)
     {

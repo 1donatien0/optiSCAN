@@ -155,7 +155,7 @@ namespace optiSCAN.Services
                 $legacyTargets = @($ours)
                 if ($ours.Count -gt 0) { $legacyTargets += @($data.engine | Where-Object { $procNow -contains [string]$_ }) }
                 foreach ($name in $legacyTargets) {
-                    try { Remove-MpPreference -ExclusionProcess ([string]$name) -ErrorAction Stop } catch { }
+                    try { Remove-MpPreference -ExclusionProcess ([string]$name) -ErrorAction Stop } catch { Write-Output "FAILED:$name" }
                 }
                 if ($failures.Count -gt 0) {
                     Write-Output ('PARTIAL:' + ($failures -join ';') + ';ADDED=' + $added)
@@ -265,10 +265,10 @@ namespace optiSCAN.Services
                 $data = $payload | ConvertFrom-Json
                 $removed = 0
                 foreach ($p in $data.paths) {
-                    try { Remove-MpPreference -ExclusionPath ([string]$p) -ErrorAction Stop; $removed++ } catch { }
+                    try { Remove-MpPreference -ExclusionPath ([string]$p) -ErrorAction Stop; $removed++ } catch { Write-Output "FAILED:$p" }
                 }
                 foreach ($proc in $data.processes) {
-                    try { Remove-MpPreference -ExclusionProcess ([string]$proc) -ErrorAction Stop; $removed++ } catch { }
+                    try { Remove-MpPreference -ExclusionProcess ([string]$proc) -ErrorAction Stop; $removed++ } catch { Write-Output "FAILED:$proc" }
                 }
                 # Noms nus de la 3.0.0 : ceux d'optiSCAN sont retirés ; ceux des moteurs
                 # (clamscan.exe...) peuvent appartenir à une autre installation, ils ne sont
@@ -278,7 +278,7 @@ namespace optiSCAN.Services
                 $legacyTargets = @($ours)
                 if ($ours.Count -gt 0) { $legacyTargets += @($data.engine | Where-Object { $procNow -contains [string]$_ }) }
                 foreach ($name in $legacyTargets) {
-                    try { Remove-MpPreference -ExclusionProcess ([string]$name) -ErrorAction Stop; $removed++ } catch { }
+                    try { Remove-MpPreference -ExclusionProcess ([string]$name) -ErrorAction Stop; $removed++ } catch { Write-Output "FAILED:$name" }
                 }
                 Write-Output ('OK:' + $removed)
                 exit 0
@@ -320,11 +320,11 @@ namespace optiSCAN.Services
                 $legacyTargets = @($ours)
                 if ($ours.Count -gt 0) { $legacyTargets += @($data.engine | Where-Object { $procNow -contains [string]$_ }) }
                 foreach ($name in $legacyTargets) {
-                    try { Remove-MpPreference -ExclusionProcess ([string]$name) -ErrorAction Stop; $removed++ } catch { }
+                    try { Remove-MpPreference -ExclusionProcess ([string]$name) -ErrorAction Stop; $removed++ } catch { Write-Output "FAILED:$name" }
                 }
                 foreach ($p in @($pref.ExclusionPath)) {
                     if ([string]$p -match '\\AppData\\Local\\optiSCAN\\?$') {
-                        try { Remove-MpPreference -ExclusionPath ([string]$p) -ErrorAction Stop; $removed++ } catch { }
+                        try { Remove-MpPreference -ExclusionPath ([string]$p) -ErrorAction Stop; $removed++ } catch { Write-Output "FAILED:$p" }
                     }
                 }
                 Write-Output ('OK:' + $removed)
@@ -348,8 +348,17 @@ namespace optiSCAN.Services
 
         private static DefenderExclusionResult ParseResult(int exitCode, string output)
         {
-            var line = output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-                .LastOrDefault() ?? string.Empty;
+            var lines = output.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            var line = lines.LastOrDefault() ?? string.Empty;
+
+            // Retraits refusés par Defender (« FAILED:<valeur> ») : le script continue, on les journalise.
+            var failed = lines
+                .Where(l => l.StartsWith("FAILED:", StringComparison.Ordinal))
+                .Select(l => PathRedaction.RedactPath(l["FAILED:".Length..]))
+                .ToList();
+            if (failed.Count > 0)
+                AppLogger.Warn("DefenderExclusion",
+                    $"{failed.Count} exclusion(s) non retirée(s) : {string.Join(", ", failed)}");
 
             if (exitCode == 0)
             {
@@ -383,7 +392,7 @@ namespace optiSCAN.Services
         {
             var psi = new ProcessStartInfo
             {
-                FileName = "powershell.exe",
+                FileName = SystemExecutables.PowerShell,
                 UseShellExecute = false,
                 CreateNoWindow = true,
                 RedirectStandardOutput = true,

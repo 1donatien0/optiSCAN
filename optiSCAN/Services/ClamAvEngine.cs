@@ -32,15 +32,29 @@ namespace optiSCAN.Services
         /// Répertoire de la base de signatures : priorité dossier 'database' local,
         /// sinon le répertoire ClamAV lui-même (pour les installs système).
         /// </summary>
+        /// <remarks>
+        /// Résolu une fois par instance puis gardé : la résolution crée et supprime un dossier de
+        /// test, vérifie les droits de ProgramData en SYSTEM et retente la copie initiale des
+        /// signatures, ce qui n'a pas à se refaire à chaque lancement de clamscan (un par fichier
+        /// en temps réel sans clamd). Recalculé seulement si le dossier a disparu entre-temps.
+        /// </remarks>
         public string DatabaseDir
         {
             get
             {
+                var cached = Volatile.Read(ref _databaseDir);
+                if (cached != null && Directory.Exists(cached))
+                    return cached;
+
                 // Même logique que FreshclamUpdater : dossier inscriptible (souvent
                 // %LocalAppData% si l'app est sous Program Files).
-                return ClamAvDatabasePaths.ResolveWritableDatabaseDir(_clamavDir);
+                var resolved = ClamAvDatabasePaths.ResolveWritableDatabaseDir(_clamavDir);
+                Volatile.Write(ref _databaseDir, resolved);
+                return resolved;
             }
         }
+
+        private string? _databaseDir;
 
         // ── Vérification ─────────────────────────────────────────────────────────
 
@@ -412,7 +426,10 @@ namespace optiSCAN.Services
             }))
             {
                 try { await tcs.Task; }
-                catch (TaskCanceledException) { }
+                catch (TaskCanceledException)
+                {
+                    // Attendu lors de l'annulation
+                }
             }
         }
 

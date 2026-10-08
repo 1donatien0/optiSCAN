@@ -537,7 +537,10 @@ namespace optiSCAN.Services
             CollectRiskyFiles(root, maxFiles, CancellationToken.None);
 
         /// <summary>
-        /// Collecte les fichiers à risque par extension (plus rapide qu'un parcours fichier par fichier).
+        /// Collecte les fichiers à analyser sur un support amovible, en un seul parcours :
+        /// extension listée (<see cref="RiskyFileExtensions"/>) ou contenu PE quelle que soit
+        /// l'extension. Les exécutables passent en premier, pour qu'un support rempli de PDF ou
+        /// d'archives ne repousse pas un <c>.exe</c> au-delà de <paramref name="maxFiles"/>.
         /// Respecte <paramref name="maxFiles"/>, le jeton d'annulation et un délai max d'énumération.
         /// </summary>
         public static List<string> CollectRiskyFiles(
@@ -547,46 +550,56 @@ namespace optiSCAN.Services
             TimeSpan? enumerationTimeout = null,
             IExclusionSettingsAccessor? exclusions = null)
         {
-            var list = new List<string>(Math.Min(maxFiles, 256));
             if (!Directory.Exists(root) || maxFiles <= 0)
-                return list;
+                return new List<string>();
 
             var deadline = enumerationTimeout.HasValue
                 ? DateTime.UtcNow + enumerationTimeout.Value
                 : DateTime.MaxValue;
             var excl = (exclusions ?? new DefaultExclusionSettingsAccessor()).Current;
-            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var ext in RiskyFileExtensions.All)
+            var executables = new List<string>(Math.Min(maxFiles, 256));
+            var others = new List<string>(Math.Min(maxFiles, 256));
+
+            IEnumerable<string> candidates;
+            try
             {
-                if (list.Count >= maxFiles || ct.IsCancellationRequested || DateTime.UtcNow >= deadline)
-                    break;
-
-                IEnumerable<string> candidates;
-                try
-                {
-                    candidates = Directory.EnumerateFiles(root, "*" + ext, SearchOption.AllDirectories);
-                }
-                catch
-                {
-                    continue;
-                }
-
-                foreach (var file in candidates)
-                {
-                    if (list.Count >= maxFiles || ct.IsCancellationRequested || DateTime.UtcNow >= deadline)
-                        return list;
-                    if (ShouldSkipUsbScanPath(file))
-                        continue;
-                    if (excl.IsFileExcluded(file))
-                        continue;
-                    if (!seen.Add(file))
-                        continue;
-                    list.Add(file);
-                }
+                // Sans suivre de jonction : une clé NTFS peut en contenir une vers C:\Windows
+                // ou un autre profil, que le service SYSTEM parcourrait sinon. Un dossier
+                // illisible n'interrompt pas le parcours.
+                candidates = Directory.EnumerateFiles(root, "*", SafeDirectoryCleaner.WithoutLinks);
+            }
+            catch
+            {
+                return new List<string>();
             }
 
-            return list;
+            try
+            {
+                foreach (var file in candidates)
+                {
+                    if (executables.Count >= maxFiles || ct.IsCancellationRequested || DateTime.UtcNow >= deadline)
+                        break;
+                    if (ShouldSkipUsbScanPath(file) || excl.IsFileExcluded(file))
+                        continue;
+
+                    if (RiskyFileExtensions.IsExecutable(file))
+                        executables.Add(file);
+                    else if (RiskyFileExtensions.IsRisky(file))
+                    {
+                        if (others.Count < maxFiles)
+                            others.Add(file);
+                    }
+                    else if (ExecutableSniffer.IsPortableExecutable(file))
+                        executables.Add(file);
+                }
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                // Support retiré pendant le parcours : on garde ce qui a été trouvé.
+            }
+
+            return executables.Concat(others).Take(maxFiles).ToList();
         }
 
         internal static bool ShouldSkipUsbScanPath(string path)

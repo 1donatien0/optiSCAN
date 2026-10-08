@@ -18,19 +18,20 @@ public sealed class EngineFailureTests
         var merged = ScanThreatMerger.Merge(ScanType.Folder, @"C:\d", clam, yara, new FixedExclusions());
 
         Assert.Equal(ScanStatus.Error, merged.Status);
-        Assert.Equal("clamscan code 2", merged.ErrorMessage);
+        Assert.Contains("clamscan code 2", merged.ErrorMessage);
     }
 
     [Fact]
-    public void Merge_keeps_completed_but_records_a_partial_engine_error()
+    public void Merge_marks_a_partial_engine_error_as_incomplete()
     {
         var clam = new ScanResult { Status = ScanStatus.Error, FilesScanned = 40, ErrorMessage = "2 fichiers illisibles" };
         var yara = new ScanResult { Status = ScanStatus.Completed, FilesScanned = 40 };
 
         var merged = ScanThreatMerger.Merge(ScanType.Folder, @"C:\d", clam, yara, new FixedExclusions());
 
-        Assert.Equal(ScanStatus.Completed, merged.Status);
-        Assert.Contains("partiel", merged.ErrorMessage);
+        Assert.Equal(ScanStatus.Error, merged.Status);
+        Assert.Contains("Scan incomplet", merged.ErrorMessage);
+        Assert.Contains("2 fichiers illisibles", merged.ErrorMessage);
     }
 
     [Fact]
@@ -48,11 +49,12 @@ public sealed class EngineFailureTests
         var merged = ScanThreatMerger.Merge(ScanType.File, path, clam, yara, new FixedExclusions());
 
         Assert.Single(merged.Threats);
-        Assert.Equal(ScanStatus.Completed, merged.Status);
+        Assert.Equal(ScanStatus.Error, merged.Status);
+        Assert.Contains("YARA code 1", merged.ErrorMessage);
     }
 
     [Fact]
-    public async Task MultiTarget_is_error_only_when_no_zone_could_be_scanned()
+    public async Task MultiTarget_marks_partial_coverage_as_error()
     {
         var allFail = await MultiTargetScanAggregator.AggregateAsync(
             ScanType.QuickScan,
@@ -68,7 +70,8 @@ public sealed class EngineFailureTests
                 ? new ScanResult { Status = ScanStatus.Error, ErrorMessage = "refus" }
                 : new ScanResult { Status = ScanStatus.Completed, FilesScanned = 10 }),
             CancellationToken.None);
-        Assert.Equal(ScanStatus.Completed, oneFails.Status);
+        Assert.Equal(ScanStatus.Error, oneFails.Status);
+        Assert.Contains("Scan partiel", oneFails.ErrorMessage);
         Assert.Contains("A", oneFails.ErrorMessage);
     }
 

@@ -199,7 +199,7 @@ public static class PlatformProtectionStatusService
         {
             using var proc = Process.Start(new ProcessStartInfo
             {
-                FileName = "fltmc.exe",
+                FileName = SystemExecutables.System32("fltmc.exe"),
                 Arguments = "filters",
                 UseShellExecute = false,
                 CreateNoWindow = true,

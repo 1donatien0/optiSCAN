@@ -18,6 +18,12 @@ public sealed class ProtectionPipeServer : IDisposable
     // un buffer base64 ne peut donc pas dépasser cette taille. La borne est alignée dessus.
     internal const int MaxScanBufferBase64Length = ProtectionPipeJsonFraming.DefaultMaxBytes;
 
+    /// <summary><c>scan_buffer</c> : fermé tant que le fournisseur AMSI n'est pas livré.</summary>
+    internal static readonly bool ScanBufferEnabled = false;
+
+    /// <summary>Sérialise le contrôle et l'écriture de <c>set_policy</c>.</summary>
+    private static readonly object PolicyGate = new();
+
     /// <summary>Temps maximal pour recevoir une requête complète.</summary>
     private static readonly TimeSpan RequestReadTimeout = TimeSpan.FromSeconds(10);
 
@@ -75,7 +81,10 @@ public sealed class ProtectionPipeServer : IDisposable
             if (_listenTask != null)
                 await _listenTask.ConfigureAwait(false);
         }
-        catch (OperationCanceledException) { }
+        catch (OperationCanceledException)
+        {
+            // Attendu lors de l'annulation
+        }
 
         _cts.Dispose();
         _cts = null;
@@ -295,10 +304,16 @@ public sealed class ProtectionPipeServer : IDisposable
                 // Un compte standard peut renforcer la protection (activer) ; la réduire, ou
                 // toucher à la quarantaine automatique, exige SYSTEM ou un administrateur élevé.
                 // L'interface relance alors une instance élevée (--push-host-policy).
-                if (!HostPolicyStore.IsStrengtheningOnly(request)
-                    && !NamedPipeClientAccess.IsElevatedAdministrator(pipe))
-                    return ProtectionPipeResponse.Error("Non autorisé");
-                return HostPolicyStore.TryApply(request);
+                // Contrôle et écriture sous le même verrou : sinon une requête « renforcer » lue
+                // avant la décision d'un administrateur pouvait l'écraser juste après (et rétablir
+                // l'ancien réglage de quarantaine automatique).
+                lock (PolicyGate)
+                {
+                    if (!HostPolicyStore.IsStrengtheningOnly(request)
+                        && !NamedPipeClientAccess.IsElevatedAdministrator(pipe))
+                        return ProtectionPipeResponse.Error("Non autorisé");
+                    return HostPolicyStore.TryApply(request);
+                }
 
             case ProtectionPipeOperations.GetStatus:
                 return new ProtectionPipeResponse
@@ -314,7 +329,12 @@ public sealed class ProtectionPipeServer : IDisposable
                 if (_onShutdown != null)
                     _onShutdown();
                 else
-                    _ = Task.Run(() => Environment.Exit(0));
+                {
+                    // Sans gestionnaire (tests, hôte local) : seule l'écoute IPC s'arrête. L'hôte du
+                    // service passe toujours onShutdown, qui arrête RTP, IPC et conteneur puis quitte.
+                    AppLogger.Warn("ProtectionPipeServer", "Arrêt demandé sans gestionnaire : seule l'écoute IPC s'arrête.");
+                    _cts?.Cancel();
+                }
                 return ProtectionPipeResponse.SuccessClean();
 
             case ProtectionPipeOperations.ScanPath:
@@ -330,6 +350,11 @@ public sealed class ProtectionPipeServer : IDisposable
                 return ExecuteScanWithRateLimit(account, () => ScanClientFile(pipe, fullPath));
 
             case ProtectionPipeOperations.ScanBuffer:
+                // Seul le fournisseur AMSI l'utilisait, et il n'est pas livré (audit N3) : l'opération
+                // restait ouverte à tout compte authentifié sans aucun client. Fermée tant qu'AMSI
+                // n'est pas réintégré avec sa propre revue.
+                if (!ScanBufferEnabled)
+                    return ProtectionPipeResponse.Error("Opération non disponible");
                 if (string.IsNullOrWhiteSpace(request.BufferBase64))
                     return ProtectionPipeResponse.Error("Buffer vide");
                 if (request.BufferBase64.Length > MaxScanBufferBase64Length)

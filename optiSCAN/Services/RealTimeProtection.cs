@@ -4,8 +4,8 @@ using System.IO;
 namespace optiSCAN.Services
 {
     /// <summary>
-    /// Protection en temps réel via FileSystemWatcher.
-    /// Surveille les dossiers critiques et analyse immédiatement les nouveaux/modifiés fichiers.
+    /// Surveillance des fichiers via FileSystemWatcher.
+    /// Analyse les nouveaux fichiers et les modifications après leur stabilisation.
     /// </summary>
     public class RealTimeProtection : IDisposable
     {
@@ -13,15 +13,30 @@ namespace optiSCAN.Services
         private readonly QuarantineManager _quarantineManager;
         private readonly NotificationService _notifications;
         private readonly ConcurrentDictionary<string, DateTime> _recentlyScanned;
-        private readonly ConcurrentDictionary<string, byte> _recoveringWatchers = new(StringComparer.OrdinalIgnoreCase);
+        private readonly Dictionary<string, WatcherRecoveryState> _watcherRecoveryStates = new(StringComparer.OrdinalIgnoreCase);
         private readonly List<FileSystemWatcher> _watchers;
         private readonly SemaphoreSlim _scanSemaphore;
+        private readonly object _watcherEventGate = new();
+        private readonly object _recentCacheGate = new();
         // Timer dédié au nettoyage périodique du cache, même si le watcher ne reçoit pas d'événements.
         private System.Threading.Timer? _cacheCleanupTimer;
-        private bool _isEnabled;
+        private CancellationTokenSource? _watcherRecoveryLifetime;
+        private volatile bool _isEnabled;
         private volatile bool _disposed;
         private const int MaxConcurrentScans = 3;
+        internal const int MaxPendingWatcherEvents = 128;
+        private const int MaxRecentPathEntries = 8192;
+        private const int RecentPathTrimTarget = MaxRecentPathEntries * 3 / 4;
+        private const int WatcherRecoveryCooldownMilliseconds = 30_000;
+        private readonly int _watcherRecoveryCooldownMilliseconds;
         private int _suspendCount;
+        private int _pendingWatcherEvents;
+        private int _maxPendingWatcherEventsObserved;
+        private int _watcherQueueOverflowCount;
+        private int _activeRecoveries;
+        private int _watcherRecoveryPassCount;
+        private int _watcherRecoveryRescheduleCount;
+        private long _lastQueueOverflowLogMilliseconds = -30_000;
 
         // Délai d'attente après création/modification (éviter les scans sur écriture partielle)
         private static readonly TimeSpan StabilizationDelay = TimeSpan.FromMilliseconds(500);
@@ -30,6 +45,12 @@ namespace optiSCAN.Services
 
         public event EventHandler<Models.ThreatInfo>? ThreatDetected;
         public bool IsEnabled => _isEnabled;
+        internal int PendingWatcherEvents => Volatile.Read(ref _pendingWatcherEvents);
+        internal int MaxPendingWatcherEventsObserved => Volatile.Read(ref _maxPendingWatcherEventsObserved);
+        internal int WatcherQueueOverflowCount => Volatile.Read(ref _watcherQueueOverflowCount);
+        internal int ActiveWatcherRecoveries => Volatile.Read(ref _activeRecoveries);
+        internal int WatcherRecoveryPassCount => Volatile.Read(ref _watcherRecoveryPassCount);
+        internal int WatcherRecoveryRescheduleCount => Volatile.Read(ref _watcherRecoveryRescheduleCount);
 
         /// <summary>Ignore les événements watcher pendant un scan manuel (compteur réentrant).</summary>
         public void Suspend() => Interlocked.Increment(ref _suspendCount);
@@ -59,6 +80,29 @@ namespace optiSCAN.Services
             IExclusionSettingsAccessor? exclusions = null,
             ScanLogManager? logger = null,
             IUiEventBus? uiEvents = null)
+            : this(orchestrator, quarantineManager, notifications, preferences, exclusions, logger, uiEvents,
+                WatcherRecoveryCooldownMilliseconds)
+        {
+        }
+
+        internal RealTimeProtection(
+            ScanOrchestrator orchestrator,
+            QuarantineManager quarantineManager,
+            NotificationService notifications,
+            int watcherRecoveryCooldownMilliseconds)
+            : this(orchestrator, quarantineManager, notifications, null, null, null, null, watcherRecoveryCooldownMilliseconds)
+        {
+        }
+
+        private RealTimeProtection(
+            ScanOrchestrator orchestrator,
+            QuarantineManager quarantineManager,
+            NotificationService notifications,
+            IUserPreferencesAccessor? preferences,
+            IExclusionSettingsAccessor? exclusions,
+            ScanLogManager? logger,
+            IUiEventBus? uiEvents,
+            int watcherRecoveryCooldownMilliseconds)
         {
             _logger = logger;
             _uiEvents = uiEvents;
@@ -70,19 +114,32 @@ namespace optiSCAN.Services
             _recentlyScanned = new ConcurrentDictionary<string, DateTime>(StringComparer.OrdinalIgnoreCase); // NTFS : chemins insensibles à la casse
             _watchers = new List<FileSystemWatcher>();
             _scanSemaphore = new SemaphoreSlim(MaxConcurrentScans);
+            _watcherRecoveryCooldownMilliseconds = Math.Max(0, watcherRecoveryCooldownMilliseconds);
         }
 
         /// <summary>
         /// Démarre la surveillance en temps réel sur les dossiers critiques, le bureau et les téléchargements.
         /// Sans effet si la protection est déjà active.
         /// </summary>
-        public void Start()
+        public void Start() => Start(RealTimeWatchPaths.GetWatchFolders(_exclusions));
+
+        internal void Start(IEnumerable<string> watchPaths)
         {
-            if (_isEnabled || _disposed) return;
+            lock (_watcherEventGate)
+            {
+                if (_isEnabled || _disposed) return;
+                _watcherRecoveryLifetime?.Dispose();
+                _watcherRecoveryLifetime = new CancellationTokenSource();
+                _watcherRecoveryStates.Clear();
+                Interlocked.Exchange(ref _maxPendingWatcherEventsObserved, 0);
+                Interlocked.Exchange(ref _watcherQueueOverflowCount, 0);
+                Interlocked.Exchange(ref _watcherRecoveryPassCount, 0);
+                Interlocked.Exchange(ref _watcherRecoveryRescheduleCount, 0);
+                _isEnabled = true;
+            }
 
             // Les événements d'erreur des watchers peuvent arriver dès leur création.
-            _isEnabled = true;
-            foreach (var folder in RealTimeWatchPaths.GetWatchFolders(_exclusions))
+            foreach (var folder in watchPaths)
                 AddWatcher(folder);
 
             // Cleanup périodique du cache : toutes les 5 min, on supprime les
@@ -94,11 +151,14 @@ namespace optiSCAN.Services
                 dueTime: TimeSpan.FromMinutes(5),
                 period: TimeSpan.FromMinutes(5));
 
-            lock (_watchers)
-                _isEnabled = _watchers.Count > 0;
+            lock (_watcherEventGate)
+            {
+                lock (_watchers)
+                    _isEnabled = !_disposed && _isEnabled && _watchers.Count > 0;
+            }
             WriteLog(_isEnabled
-                ? $"Protection temps réel activée ({_watchers.Count} dossier(s) surveillé(s))"
-                : "Protection temps réel indisponible : aucun dossier n'a pu être surveillé");
+                ? $"Surveillance temps réel activée ({_watchers.Count} dossier(s) surveillé(s))"
+                : "Surveillance temps réel indisponible : aucun dossier n'a pu être surveillé");
         }
 
         /// <summary>
@@ -107,11 +167,12 @@ namespace optiSCAN.Services
         /// </summary>
         public void Stop()
         {
-            if (!_isEnabled && _watchers.Count == 0)
+            bool hadWatchers;
+            lock (_watcherEventGate)
             {
-                _cacheCleanupTimer?.Dispose();
-                _cacheCleanupTimer = null;
-                return;
+                _isEnabled = false;
+                _watcherRecoveryLifetime?.Cancel();
+                _watcherRecoveryStates.Clear();
             }
 
             _cacheCleanupTimer?.Dispose();
@@ -119,6 +180,7 @@ namespace optiSCAN.Services
 
             lock (_watchers)
             {
+                hadWatchers = _watchers.Count > 0;
                 foreach (var watcher in _watchers)
                 {
                     watcher.EnableRaisingEvents = false;
@@ -126,23 +188,26 @@ namespace optiSCAN.Services
                 }
                 _watchers.Clear();
             }
-            _recentlyScanned.Clear();
+            if (!hadWatchers)
+                return;
 
-            _isEnabled = false;
-            WriteLog("Protection temps réel désactivée");
+            lock (_recentCacheGate)
+                _recentlyScanned.Clear();
+
+            WriteLog("Surveillance temps réel désactivée");
         }
 
-        private bool AddWatcher(string path)
+        private FileSystemWatcher? AddWatcher(string path)
         {
             if (_exclusions.Current.IsFolderExcluded(path))
-                return false;
+                return null;
 
             // Un dossier surveillé qui est (ou passe par) une jonction ferait analyser par SYSTEM
             // tout un autre emplacement : refusé dès le démarrage.
             if (!RealTimePathGuard.IsDirectPath(path))
             {
                 AppLogger.Warn("RealTimeProtection", $"Dossier non surveillé (jonction ou lien dans le chemin) : {PathRedaction.RedactPath(path)}");
-                return false;
+                return null;
             }
 
             FileSystemWatcher? watcher = null;
@@ -166,10 +231,10 @@ namespace optiSCAN.Services
 
                 lock (_watchers)
                 {
-                    if (_disposed)
+                    if (_disposed || !_isEnabled)
                     {
                         watcher.Dispose();
-                        return false;
+                        return null;
                     }
                     _watchers.Add(watcher);
                     try
@@ -182,13 +247,13 @@ namespace optiSCAN.Services
                         throw;
                     }
                 }
-                return true;
+                return watcher;
             }
             catch (Exception ex)
             {
                 watcher?.Dispose();
                 WriteLog($"Impossible de surveiller {PathRedaction.RedactPath(path)} : {PathRedaction.RedactPath(ex.Message)}");
-                return false;
+                return null;
             }
         }
 
@@ -207,6 +272,9 @@ namespace optiSCAN.Services
         /// </remarks>
         private async void SurFichierModifie(object sender, FileSystemEventArgs e)
         {
+            if (!TryReserveWatcherEvent(sender, e.FullPath))
+                return;
+
             try
             {
                 // Ignorer les dossiers
@@ -214,15 +282,18 @@ namespace optiSCAN.Services
 
                 if (IsSuspended) return;
 
-                if (!RiskyFileExtensions.IsRisky(e.FullPath)) return;
+                var listed = RiskyFileExtensions.IsRisky(e.FullPath);
 
                 var utcNow = DateTime.UtcNow;
-                _recentlyScanned[e.FullPath] = utcNow;
+                if (TrackRecentPath(e.FullPath, utcNow))
+                    HandleRecentCacheSaturation(sender, e.FullPath);
 
                 await Task.Delay(StabilizationDelay);
 
                 // Un événement plus récent a repoussé le scan : seul le dernier traite le fichier.
                 if (!_recentlyScanned.TryGetValue(e.FullPath, out var latest) || latest != utcNow)
+                    return;
+                if (!listed && !IsUnlistedExecutable(sender, e.FullPath, utcNow))
                     return;
                 if (!await WaitForStableFileAsync(e.FullPath, utcNow))
                     return;
@@ -249,6 +320,10 @@ namespace optiSCAN.Services
                 // Logger sans propager — protection temps réel ne doit JAMAIS crasher.
                 WriteLog($"[RTP] SurFichierModifie exception ({PathRedaction.RedactPath(e.FullPath)}): {PathRedaction.RedactPath(ex.Message)}");
             }
+            finally
+            {
+                Interlocked.Decrement(ref _pendingWatcherEvents);
+            }
         }
 
         /// <summary>
@@ -260,19 +335,25 @@ namespace optiSCAN.Services
         /// </remarks>
         private async void SurFichierRenomme(object sender, RenamedEventArgs e)
         {
+            if (!TryReserveWatcherEvent(sender, e.FullPath))
+                return;
+
             try
             {
                 if (Directory.Exists(e.FullPath)) return;
 
                 if (IsSuspended) return;
 
-                if (!RiskyFileExtensions.IsRisky(e.FullPath)) return;
+                var listed = RiskyFileExtensions.IsRisky(e.FullPath);
 
                 var utcNow = DateTime.UtcNow;
-                _recentlyScanned[e.FullPath] = utcNow;
+                if (TrackRecentPath(e.FullPath, utcNow))
+                    HandleRecentCacheSaturation(sender, e.FullPath);
 
                 await Task.Delay(StabilizationDelay);
                 if (!_recentlyScanned.TryGetValue(e.FullPath, out var latest) || latest != utcNow)
+                    return;
+                if (!listed && !IsUnlistedExecutable(sender, e.FullPath, utcNow))
                     return;
                 if (!await WaitForStableFileAsync(e.FullPath, utcNow))
                     return;
@@ -297,6 +378,58 @@ namespace optiSCAN.Services
             {
                 WriteLog($"[RTP] SurFichierRenomme exception ({PathRedaction.RedactPath(e.FullPath)}): {PathRedaction.RedactPath(ex.Message)}");
             }
+            finally
+            {
+                Interlocked.Decrement(ref _pendingWatcherEvents);
+            }
+        }
+
+        private bool TryReserveWatcherEvent(object sender, string filePath)
+        {
+            lock (_watcherEventGate)
+            {
+                if (_disposed || !_isEnabled)
+                    return false;
+                if (_pendingWatcherEvents < MaxPendingWatcherEvents)
+                {
+                    var pending = Interlocked.Increment(ref _pendingWatcherEvents);
+                    UpdateMaximum(ref _maxPendingWatcherEventsObserved, pending);
+                    return true;
+                }
+            }
+
+            Interlocked.Increment(ref _watcherQueueOverflowCount);
+            try { HandleWatcherQueueOverflow(sender, filePath); }
+            catch (Exception ex) { AppLogger.Error("RealTimeProtection", "Could not schedule watcher overflow recovery", ex); }
+            return false;
+        }
+
+        private void HandleWatcherQueueOverflow(object sender, string filePath)
+        {
+            var recoveryScheduled = sender is FileSystemWatcher watcher
+                && ScheduleWatcherRecovery(watcher, watcher.Path);
+            if (!TryAcquireRecoveryLogWindow())
+                return;
+
+            AppLogger.Warn("RealTimeProtection",
+                $"[RTP] Limite de {MaxPendingWatcherEvents} événements en attente atteinte sur {PathRedaction.RedactPath(filePath)}. "
+                + (recoveryScheduled
+                    ? "Rattrapage du dossier programmé ; couverture potentiellement incomplète pendant la saturation."
+                    : "Un nouveau rattrapage est conservé après le passage en cours ou le délai de reprise ; couverture potentiellement incomplète pendant la saturation."));
+        }
+
+        private void HandleRecentCacheSaturation(object sender, string filePath)
+        {
+            var recoveryScheduled = sender is FileSystemWatcher watcher
+                && ScheduleWatcherRecovery(watcher, watcher.Path);
+            if (!TryAcquireRecoveryLogWindow())
+                return;
+
+            AppLogger.Warn("RealTimeProtection",
+                $"[RTP] Le cache de déduplication a atteint {MaxRecentPathEntries} chemins sur {PathRedaction.RedactPath(filePath)} ; "
+                + (recoveryScheduled
+                    ? "les entrées les plus anciennes ont été retirées et un rattrapage est programmé."
+                    : "les entrées les plus anciennes ont été retirées ; un nouveau rattrapage est conservé après le passage en cours ou le délai de reprise."));
         }
 
         /// <summary>
@@ -312,11 +445,175 @@ namespace optiSCAN.Services
                 return;
 
             var path = watcher.Path;
-            WriteLog($"Perte d'événements FileSystemWatcher sur {PathRedaction.RedactPath(path)} : {PathRedaction.RedactPath(e.GetException()?.Message)}. Réinitialisation et rattrapage en cours.");
-            if (!_recoveringWatchers.TryAdd(path, 0))
+            if (ScheduleWatcherRecovery(watcher, path))
+                WriteLog($"Perte d'événements FileSystemWatcher sur {PathRedaction.RedactPath(path)} : {PathRedaction.RedactPath(e.GetException()?.Message)}. Réinitialisation et rattrapage en cours.");
+            else if (_isEnabled && !_disposed && TryAcquireRecoveryLogWindow())
+                AppLogger.Warn("RealTimeProtection", $"Perte d'événements FileSystemWatcher sur {PathRedaction.RedactPath(path)} ; un nouveau rattrapage est conservé après le passage en cours ou le délai de reprise.");
+        }
+
+        private bool TryAcquireRecoveryLogWindow()
+        {
+            var now = Environment.TickCount64;
+            var previous = Interlocked.Read(ref _lastQueueOverflowLogMilliseconds);
+            return now - previous >= WatcherRecoveryCooldownMilliseconds
+                && Interlocked.CompareExchange(ref _lastQueueOverflowLogMilliseconds, now, previous) == previous;
+        }
+
+        private bool ScheduleWatcherRecovery(FileSystemWatcher watcher, string path)
+        {
+            WatcherRecoveryState state;
+            CancellationToken token;
+            var startsWorker = false;
+            lock (_watcherEventGate)
+            {
+                if (_disposed || !_isEnabled || _watcherRecoveryLifetime == null)
+                    return false;
+
+                if (!_watcherRecoveryStates.TryGetValue(path, out var existingState))
+                {
+                    state = new WatcherRecoveryState(watcher, path);
+                    _watcherRecoveryStates.Add(path, state);
+                }
+                else
+                {
+                    state = existingState;
+                    state.Watcher = watcher;
+                }
+
+                var wasAlreadyRequested = state.Requested;
+                state.Requested = true;
+                token = _watcherRecoveryLifetime.Token;
+                if (state.Running)
+                {
+                    if (!wasAlreadyRequested)
+                        Interlocked.Increment(ref _watcherRecoveryRescheduleCount);
+                    return false;
+                }
+
+                state.Running = true;
+                startsWorker = true;
+                Interlocked.Increment(ref _activeRecoveries);
+            }
+
+            try
+            {
+                if (!startsWorker)
+                    return false;
+                _ = Task.Run(() => RunWatcherRecoveryLoopAsync(state, token));
+                return true;
+            }
+            catch (Exception ex)
+            {
+                lock (_watcherEventGate)
+                    FinishWatcherRecoveryWorkerUnderLock(state);
+                AppLogger.Error("RealTimeProtection", "Could not start watcher recovery", ex);
+                return false;
+            }
+        }
+
+        private async Task RunWatcherRecoveryLoopAsync(WatcherRecoveryState state, CancellationToken ct)
+        {
+            try
+            {
+                while (true)
+                {
+                    FileSystemWatcher watcher;
+                    int delayMilliseconds;
+                    lock (_watcherEventGate)
+                    {
+                        if (_disposed || !_isEnabled || ct.IsCancellationRequested || !state.Requested)
+                        {
+                            FinishWatcherRecoveryWorkerUnderLock(state);
+                            return;
+                        }
+
+                        watcher = state.Watcher;
+                        var now = Environment.TickCount64;
+                        delayMilliseconds = state.LastStartedMilliseconds == 0
+                            ? 0
+                            : (int)Math.Max(0, _watcherRecoveryCooldownMilliseconds - (now - state.LastStartedMilliseconds));
+
+                        if (delayMilliseconds == 0)
+                        {
+                            state.Requested = false;
+                            state.LastStartedMilliseconds = now;
+                            Interlocked.Increment(ref _watcherRecoveryPassCount);
+                        }
+                    }
+
+                    if (delayMilliseconds > 0)
+                    {
+                        await Task.Delay(delayMilliseconds, ct).ConfigureAwait(false);
+                        continue;
+                    }
+
+                    var replacement = await RecoverWatcherAsync(watcher, state.Path, ct).ConfigureAwait(false);
+                    if (replacement != null)
+                    {
+                        lock (_watcherEventGate)
+                        {
+                            if (_watcherRecoveryStates.TryGetValue(state.Path, out var current)
+                                && ReferenceEquals(current, state))
+                                state.Watcher = replacement;
+                        }
+                    }
+                }
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                lock (_watcherEventGate)
+                    FinishWatcherRecoveryWorkerUnderLock(state);
+            }
+            catch (Exception ex)
+            {
+                lock (_watcherEventGate)
+                    FinishWatcherRecoveryWorkerUnderLock(state);
+                AppLogger.Error("RealTimeProtection", "RecoverWatcherAsync failed", ex);
+            }
+        }
+
+        private void FinishWatcherRecoveryWorkerUnderLock(WatcherRecoveryState state)
+        {
+            if (!state.Running)
                 return;
 
-            _ = Task.Run(() => RecoverWatcherAsync(watcher, path));
+            state.Running = false;
+            if (_watcherRecoveryStates.TryGetValue(state.Path, out var current)
+                && ReferenceEquals(current, state))
+                _watcherRecoveryStates.Remove(state.Path);
+            Interlocked.Decrement(ref _activeRecoveries);
+        }
+
+        private static void UpdateMaximum(ref int maximum, int value)
+        {
+            var observed = Volatile.Read(ref maximum);
+            while (value > observed)
+            {
+                var previous = Interlocked.CompareExchange(ref maximum, value, observed);
+                if (previous == observed)
+                    return;
+                observed = previous;
+            }
+        }
+
+        /// <summary>
+        /// Fichier dont l'extension n'est pas listée : analysé seulement si son contenu est un
+        /// exécutable PE (un second étage déposé en <c>.dat</c> ou <c>.tmp</c>). L'en-tête est lu
+        /// une fois, après le délai de stabilisation, par une ouverture qui ne gêne pas l'auteur du
+        /// fichier. Sinon l'entrée de dé-duplication est retirée : le volume d'écritures de
+        /// %TEMP% ou de ProgramData ne fait pas grossir le cache.
+        /// </summary>
+        private bool IsUnlistedExecutable(object sender, string filePath, DateTime eventTime)
+        {
+            var root = WatchRootOf(sender);
+            if (root != null
+                && !ScanStaging.IsStagingPath(filePath)
+                && RealTimePathGuard.IsExecutableWithinRoot(root, filePath))
+                return true;
+
+            lock (_recentCacheGate)
+                _recentlyScanned.TryRemove(new KeyValuePair<string, DateTime>(filePath, eventTime));
+            return false;
         }
 
         private async Task<bool> WaitForStableFileAsync(string filePath, DateTime eventTime)
@@ -363,28 +660,29 @@ namespace optiSCAN.Services
             return false;
         }
 
-        private async Task RecoverWatcherAsync(FileSystemWatcher failedWatcher, string path)
+        private async Task<FileSystemWatcher?> RecoverWatcherAsync(FileSystemWatcher failedWatcher, string path, CancellationToken ct)
         {
             try
             {
                 if (!OperatingSystem.IsWindows())
-                    return;
+                    return null;
 
                 lock (_watchers)
                 {
                     if (_disposed || !_isEnabled)
-                        return;
+                        return null;
                     _watchers.Remove(failedWatcher);
                     failedWatcher.EnableRaisingEvents = false;
                     failedWatcher.Dispose();
                 }
 
-                if (!AddWatcher(path))
+                var replacementWatcher = AddWatcher(path);
+                if (replacementWatcher == null)
                 {
                     lock (_watchers)
                         _isEnabled = _watchers.Count > 0;
                     WriteLog($"Surveillance non rétablie : {PathRedaction.RedactPath(path)}");
-                    return;
+                    return null;
                 }
 
                 var skipped = 0;
@@ -393,12 +691,13 @@ namespace optiSCAN.Services
                              _exclusions.Current.IsFolderExcluded,
                              _ => Interlocked.Increment(ref skipped)))
                 {
-                    if (IsSuspended || _disposed)
+                    if (ct.IsCancellationRequested || IsSuspended || _disposed)
                         break;
-                    if (!RiskyFileExtensions.IsRisky(file))
+                    if (!RiskyFileExtensions.IsRisky(file)
+                        && !RealTimePathGuard.IsExecutableWithinRoot(path, file))
                         continue;
 
-                    await _scanSemaphore.WaitAsync().ConfigureAwait(false);
+                    await _scanSemaphore.WaitAsync(ct).ConfigureAwait(false);
                     try
                     {
                         await ScanFileAsync(path, file, WatcherChangeTypes.Changed).ConfigureAwait(false);
@@ -411,15 +710,27 @@ namespace optiSCAN.Services
 
                 if (skipped > 0)
                     WriteLog($"Rattrapage incomplet pour {PathRedaction.RedactPath(path)} : {skipped} élément(s) inaccessible(s), hors ligne ou lié(s).");
+                return replacementWatcher;
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                // Arrêt demandé : le worker est terminé par le coordinateur.
+                return null;
             }
             catch (Exception ex)
             {
                 WriteLog($"Récupération du watcher impossible ({PathRedaction.RedactPath(path)}) : {PathRedaction.RedactPath(ex.Message)}");
+                return null;
             }
-            finally
-            {
-                _recoveringWatchers.TryRemove(path, out _);
-            }
+        }
+
+        private sealed class WatcherRecoveryState(FileSystemWatcher watcher, string path)
+        {
+            public FileSystemWatcher Watcher { get; set; } = watcher;
+            public string Path { get; } = path;
+            public bool Requested { get; set; } = true;
+            public bool Running { get; set; }
+            public long LastStartedMilliseconds { get; set; }
         }
 
         private static string? WatchRootOf(object sender) => (sender as FileSystemWatcher)?.Path;
@@ -554,11 +865,40 @@ namespace optiSCAN.Services
 
         private void CleanupRecentCache()
         {
+            lock (_recentCacheGate)
+                CleanupRecentCacheUnderLock();
+        }
+
+        private bool TrackRecentPath(string filePath, DateTime eventTime)
+        {
+            var evictedRecentEntries = false;
+            lock (_recentCacheGate)
+            {
+                _recentlyScanned[filePath] = eventTime;
+                if (_recentlyScanned.Count <= MaxRecentPathEntries)
+                    return false;
+
+                CleanupRecentCacheUnderLock();
+                var count = _recentlyScanned.Count;
+                if (count <= MaxRecentPathEntries)
+                    return false;
+
+                var removeCount = count - RecentPathTrimTarget;
+                foreach (var entry in _recentlyScanned.OrderBy(pair => pair.Value).Take(removeCount))
+                    _recentlyScanned.TryRemove(new KeyValuePair<string, DateTime>(entry.Key, entry.Value));
+                evictedRecentEntries = true;
+            }
+
+            return evictedRecentEntries;
+        }
+
+        private void CleanupRecentCacheUnderLock()
+        {
             var threshold = DateTime.UtcNow.AddMinutes(-5);
             foreach (var kvp in _recentlyScanned)
             {
                 if (kvp.Value < threshold)
-                    _recentlyScanned.TryRemove(kvp.Key, out _);
+                    _recentlyScanned.TryRemove(new KeyValuePair<string, DateTime>(kvp.Key, kvp.Value));
             }
         }
 
@@ -572,13 +912,26 @@ namespace optiSCAN.Services
         /// <summary>Arrête la protection et libère le sémaphore et le timer de nettoyage.</summary>
         public void Dispose()
         {
-            if (_disposed) return;
-            _disposed = true;
+            lock (_watcherEventGate)
+            {
+                if (_disposed) return;
+                _disposed = true;
+            }
             Stop();
 
-            // Les handlers async void peuvent encore tenir une place : on attend qu'elles
-            // soient toutes libres avant de libérer le sémaphore. Sinon (scan bloqué), il est
-            // laissé au ramasse-miettes plutôt que libéré sous les pieds d'un scan en cours.
+            // Les callbacks et rattrapages sont bornés et comptés. Attendre leur fin avant
+            // de libérer le sémaphore évite une utilisation après Dispose.
+            var deadline = DateTime.UtcNow.AddSeconds(15);
+            while ((Volatile.Read(ref _pendingWatcherEvents) > 0 || Volatile.Read(ref _activeRecoveries) > 0)
+                   && DateTime.UtcNow < deadline)
+                Thread.Sleep(50);
+
+            if (Volatile.Read(ref _pendingWatcherEvents) > 0 || Volatile.Read(ref _activeRecoveries) > 0)
+            {
+                AppLogger.Warn("RealTimeProtection", "Arrêt : des événements ou rattrapages sont encore en cours, sémaphore laissé en place");
+                return;
+            }
+
             var drained = 0;
             for (; drained < MaxConcurrentScans; drained++)
             {

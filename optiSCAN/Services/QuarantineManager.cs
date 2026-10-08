@@ -67,7 +67,11 @@ namespace optiSCAN.Services
             _doc = LoadManifest();
             UpgradeSignedManifestVersion();
             RebaseRelocatedBlobs();
-            _ = Task.Run(EnsureQuarantineBlobLayout);
+            _ = Task.Run(() =>
+            {
+                try { EnsureQuarantineBlobLayout(); }
+                catch (Exception ex) { AppLogger.Error("QuarantineManager", "EnsureQuarantineBlobLayout failed", ex); }
+            });
         }
 
         /// <summary>
@@ -490,7 +494,13 @@ namespace optiSCAN.Services
             static string Normalize(string p) =>
                 Path.TrimEndingDirectorySeparator(Path.GetFullPath(p));
 
-            var target = Normalize(fullPath);
+            // \\?\C:\Windows\… ou \\?\UNC\… : même chemin sans le préfixe, sinon la comparaison
+            // par préfixe le laissait passer. Les autres formes (\\.\COM1, \\?\GLOBALROOT\…,
+            // \\?\Volume{…}) ne désignent pas un fichier ordinaire : refusées.
+            if (!TryStripWin32DevicePrefix(fullPath, out var plain))
+                return true;
+
+            var target = ExpandShortNames(Normalize(plain));
             foreach (var f in forbidden)
             {
                 if (string.IsNullOrEmpty(f)) continue;
@@ -501,6 +511,70 @@ namespace optiSCAN.Services
             }
             return false;
         }
+
+        /// <summary>
+        /// Retire <c>\\?\</c> devant une lettre de lecteur ou <c>UNC\</c>. Faux pour toute autre
+        /// forme de chemin de périphérique (<c>\\.\</c>, <c>\\?\GLOBALROOT</c>, volume par GUID).
+        /// </summary>
+        internal static bool TryStripWin32DevicePrefix(string path, out string plain)
+        {
+            plain = path;
+            var p = path.Replace('/', '\\');
+            if (p.StartsWith(@"\\.\", StringComparison.Ordinal) || p.StartsWith(@"\\??\", StringComparison.Ordinal)
+                || p.StartsWith(@"\??\", StringComparison.Ordinal))
+                return false;
+            if (!p.StartsWith(@"\\?\", StringComparison.Ordinal))
+                return true;
+
+            var rest = p[4..];
+            if (rest.StartsWith(@"UNC\", StringComparison.OrdinalIgnoreCase))
+            {
+                plain = @"\\" + rest[4..];
+                return true;
+            }
+            if (rest.Length >= 3 && char.IsAsciiLetter(rest[0]) && rest[1] == ':' && rest[2] == '\\')
+            {
+                plain = rest;
+                return true;
+            }
+            return false;
+        }
+
+        /// <summary>
+        /// Développe les noms courts 8.3 (<c>C:\PROGRA~1</c>) de la partie existante du chemin, pour
+        /// que la comparaison aux dossiers protégés porte sur les noms longs. Hors Windows : inchangé.
+        /// </summary>
+        private static string ExpandShortNames(string full)
+        {
+            if (!OperatingSystem.IsWindows() || !full.Contains('~'))
+                return full;
+            try
+            {
+                var existing = full;
+                var tail = string.Empty;
+                while (!string.IsNullOrEmpty(existing) && !Path.Exists(existing))
+                {
+                    tail = tail.Length == 0 ? Path.GetFileName(existing) : Path.Combine(Path.GetFileName(existing), tail);
+                    existing = Path.GetDirectoryName(existing) ?? string.Empty;
+                }
+                if (string.IsNullOrEmpty(existing))
+                    return full;
+
+                var buffer = new char[32768];
+                var length = GetLongPathName(existing, buffer, buffer.Length);
+                if (length == 0 || length > buffer.Length)
+                    return full;
+                var expanded = new string(buffer, 0, (int)length);
+                return tail.Length == 0 ? expanded : Path.Combine(expanded, tail);
+            }
+            catch
+            {
+                return full;
+            }
+        }
+
+        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
+        private static extern uint GetLongPathName(string shortPath, char[] longPath, int bufferLength);
 
         /// <summary>Déchiffre un fichier .quar en contenu clair.</summary>
         private byte[] DecryptQuarantineFile(string path)
@@ -541,46 +615,62 @@ namespace optiSCAN.Services
             try
             {
                 int filesUpdated = 0;
+                // Copier la liste hors du lock pour éviter de bloquer d'autres opérations
+                QuarantineEntry[] entries;
                 lock (_lock)
                 {
-                    foreach (var entry in _doc.Entries.ToList())
+                    entries = _doc.Entries.ToArray();
+                }
+
+                foreach (var entry in entries)
+                {
+                    try
                     {
-                        try
+                        if (!File.Exists(entry.QuarantinePath))
+                            continue;
+                        var raw = ReadBlobBounded(entry.QuarantinePath);
+                        if (IsV2QuarantineBlob(raw))
+                            continue;
+
+                        // Ancien format sans MAC : migré seulement si le manifeste signé
+                        // en donne l'empreinte et qu'elle correspond.
+                        var plaintext = DecryptWithoutQuarantineHeader(raw);
+                        if (!HashMatches(plaintext, entry.Sha256))
                         {
-                            if (!File.Exists(entry.QuarantinePath))
-                                continue;
-                            var raw = ReadBlobBounded(entry.QuarantinePath);
-                            if (IsV2QuarantineBlob(raw))
-                                continue;
-
-                            // Ancien format sans MAC : migré seulement si le manifeste signé
-                            // en donne l'empreinte et qu'elle correspond.
-                            var plaintext = DecryptWithoutQuarantineHeader(raw);
-                            if (!HashMatches(plaintext, entry.Sha256))
-                            {
-                                AppLogger.Warn("QuarantineManager",
-                                    $"Migration blob legacy refusée (empreinte absente ou invalide) pour {entry.Id}");
-                                CryptographicOperations.ZeroMemory(plaintext);
-                                continue;
-                            }
-
-                            var blob = BuildV2QuarantineBlob(plaintext);
+                            AppLogger.Warn("QuarantineManager",
+                                $"Migration blob legacy refusée (empreinte absente ou invalide) pour {entry.Id}");
                             CryptographicOperations.ZeroMemory(plaintext);
-                            AtomicFile.WriteAllBytes(entry.QuarantinePath, blob);
-                            filesUpdated++;
+                            continue;
                         }
-                        catch (Exception ex)
-                        {
-                            AppLogger.Warn("QuarantineManager", $"Fichier quarantaine ({entry.Id})", ex);
-                        }
-                    }
 
-                    if (filesUpdated > 0)
+                        var blob = BuildV2QuarantineBlob(plaintext);
+                        CryptographicOperations.ZeroMemory(plaintext);
+
+                        // Lecture et chiffrement hors verrou ; l'écriture, elle, se fait sous le
+                        // verrou et seulement si l'entrée existe encore : une suppression ou une
+                        // restauration pendant la migration ne laisse pas de fichier orphelin.
+                        lock (_lock)
+                        {
+                            if (!_doc.Entries.Contains(entry) || !File.Exists(entry.QuarantinePath))
+                                continue;
+                            AtomicFile.WriteAllBytes(entry.QuarantinePath, blob);
+                        }
+                        filesUpdated++;
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Warn("QuarantineManager", $"Fichier quarantaine ({entry.Id})", ex);
+                    }
+                }
+
+                if (filesUpdated > 0)
+                {
+                    lock (_lock)
                     {
                         SaveManifest();
-                        AppLogger.Info("QuarantineManager",
-                            $"Quarantaine : {filesUpdated} fichier(s) mis à jour.");
                     }
+                    AppLogger.Info("QuarantineManager",
+                        $"Quarantaine : {filesUpdated} fichier(s) mis à jour.");
                 }
             }
             catch (Exception ex)
