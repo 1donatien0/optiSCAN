@@ -46,7 +46,7 @@ namespace optiSCAN.Services
             {
                 var psi = new ProcessStartInfo
                 {
-                    FileName = "powercfg.exe",
+                    FileName = SystemExecutables.System32("powercfg.exe"),
                     UseShellExecute = false,
                     CreateNoWindow = true,
                 };
@@ -86,7 +86,7 @@ namespace optiSCAN.Services
             {
                 Process.Start(new ProcessStartInfo
                 {
-                    FileName = "taskmgr.exe",
+                    FileName = SystemExecutables.System32("taskmgr.exe"),
                     Arguments = "/0 /startup",
                     UseShellExecute = true,
                 });
@@ -219,7 +219,7 @@ namespace optiSCAN.Services
                     {
                         Process.Start(new ProcessStartInfo
                         {
-                            FileName = "explorer.exe",
+                            FileName = SystemExecutables.Explorer,
                             UseShellExecute = true,
                         });
                     }
@@ -565,7 +565,7 @@ namespace optiSCAN.Services
             {
                 var psi = new ProcessStartInfo
                 {
-                    FileName = "shutdown.exe",
+                    FileName = SystemExecutables.System32("shutdown.exe"),
                     UseShellExecute = false,
                     CreateNoWindow = true,
                 };

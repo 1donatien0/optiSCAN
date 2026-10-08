@@ -56,6 +56,9 @@ namespace optiSCAN
                     catch { /* processus arrêté */ }
                 }
 #endif
+                // Environment.Exit et non Shutdown() : Shutdown passe par OnExit, qui crée
+                // ServiceContainer.Default (réglages, quarantaine, journaux) dans ce processus
+                // auxiliaire. Il n'a rien à libérer : sortie immédiate voulue.
                 Environment.Exit(0);
             }
 
@@ -67,6 +70,8 @@ namespace optiSCAN
                     try { ClamdRelay.Run(relayPort, relayParent, relayFile); }
                     catch { /* processus arrêté */ }
                 }
+                // Relais lancé dans l'AppContainer de clamd : Shutdown() passerait par OnExit et
+                // créerait ServiceContainer.Default dans le conteneur. Sortie immédiate voulue.
                 Environment.Exit(0);
             }
 
@@ -449,11 +454,13 @@ namespace optiSCAN
         {
             try
             {
-                using var host = new ProtectionServiceHost(ServiceContainer.Default);
+                // Arrêt demandé par le service (pipe, jeton vérifié), fin du processus ou Ctrl+C :
+                // dans tous les cas, l'hôte s'arrête proprement avant que le processus ne quitte.
+                var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                using var host = new ProtectionServiceHost(ServiceContainer.Default, () => tcs.TrySetResult());
                 host.Start();
                 new ScanLogManager().WriteToLog("[ServiceHost] Protection système active (IPC + RTP + processus)");
 
-                var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 AppDomain.CurrentDomain.ProcessExit += (_, _) => tcs.TrySetResult();
                 Console.CancelKeyPress += (_, e) =>
                 {

@@ -51,12 +51,52 @@
                 </StackPanel>
             </StackPanel>
 
-            <!-- Bouclier avec animation pulse — PNG inchangé, halos violet Donaby -->
-            <Grid Grid.Column="1" Width="160" HorizontalAlignment="Center" VerticalAlignment="Center">
-                <!-- Halo externe pulsé (token thème) -->
+            <!-- Bouclier battant — PNG inchangé, halos violet Donaby.
+                 La zone fait la taille du logo (200 × 200, la hauteur utile de la rangée) : plus étroite,
+                 WPF rognait le logo (190) et le halo (240) au rectangle de la colonne, et la pulsation
+                 laissait voir des bords coupés. Le halo externe garde sa place par une marge négative.
+                 Un seul storyboard, une seule cadence : le halo bat avec le bouclier. -->
+            <Grid Grid.Column="1" Width="200" Height="200"
+                  HorizontalAlignment="Center" VerticalAlignment="Center">
+                <Grid.Triggers>
+                    <EventTrigger RoutedEvent="Loaded">
+                        <BeginStoryboard>
+                            <Storyboard RepeatBehavior="Forever" AutoReverse="True">
+                                <DoubleAnimation Storyboard.TargetName="haloOuterScale"
+                                                 Storyboard.TargetProperty="ScaleX"
+                                                 From="1" To="1.16" Duration="0:0:1.25">
+                                    <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut"/></DoubleAnimation.EasingFunction>
+                                </DoubleAnimation>
+                                <DoubleAnimation Storyboard.TargetName="haloOuterScale"
+                                                 Storyboard.TargetProperty="ScaleY"
+                                                 From="1" To="1.16" Duration="0:0:1.25">
+                                    <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut"/></DoubleAnimation.EasingFunction>
+                                </DoubleAnimation>
+                                <DoubleAnimation Storyboard.TargetName="shieldHaloOuter"
+                                                 Storyboard.TargetProperty="Opacity"
+                                                 From="0.15" To="0.05" Duration="0:0:1.25">
+                                    <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut"/></DoubleAnimation.EasingFunction>
+                                </DoubleAnimation>
+                                <DoubleAnimation Storyboard.TargetName="shieldPulseScale"
+                                                 Storyboard.TargetProperty="ScaleX"
+                                                 From="1" To="1.05" Duration="0:0:1.25">
+                                    <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut"/></DoubleAnimation.EasingFunction>
+                                </DoubleAnimation>
+                                <DoubleAnimation Storyboard.TargetName="shieldPulseScale"
+                                                 Storyboard.TargetProperty="ScaleY"
+                                                 From="1" To="1.05" Duration="0:0:1.25">
+                                    <DoubleAnimation.EasingFunction><SineEase EasingMode="EaseInOut"/></DoubleAnimation.EasingFunction>
+                                </DoubleAnimation>
+                            </Storyboard>
+                        </BeginStoryboard>
+                    </EventTrigger>
+                </Grid.Triggers>
+
+                <!-- Halo externe pulsé (token thème) : 240 px, marge négative pour ne pas être rogné -->
                 <Ellipse x:Name="shieldHaloOuter"
-                         Width="240" Height="240"
+                         Width="240" Height="240" Margin="-20"
                          HorizontalAlignment="Center" VerticalAlignment="Center"
+                         IsHitTestVisible="False"
                          Opacity="0.15">
                     <Ellipse.Fill>
                         <RadialGradientBrush>
@@ -68,23 +108,6 @@
                     <Ellipse.RenderTransform>
                         <ScaleTransform x:Name="haloOuterScale" ScaleX="1" ScaleY="1"/>
                     </Ellipse.RenderTransform>
-                    <Ellipse.Triggers>
-                        <EventTrigger RoutedEvent="Loaded">
-                            <BeginStoryboard>
-                                <Storyboard RepeatBehavior="Forever" AutoReverse="True">
-                                    <DoubleAnimation Storyboard.TargetName="haloOuterScale"
-                                                     Storyboard.TargetProperty="ScaleX"
-                                                     From="1" To="1.22" Duration="0:0:3"/>
-                                    <DoubleAnimation Storyboard.TargetName="haloOuterScale"
-                                                     Storyboard.TargetProperty="ScaleY"
-                                                     From="1" To="1.22" Duration="0:0:3"/>
-                                    <DoubleAnimation Storyboard.TargetName="shieldHaloOuter"
-                                                     Storyboard.TargetProperty="Opacity"
-                                                     From="0.15" To="0.04" Duration="0:0:3"/>
-                                </Storyboard>
-                            </BeginStoryboard>
-                        </EventTrigger>
-                    </Ellipse.Triggers>
                 </Ellipse>
 
                 <!-- Lueur violette interne — fusionne le teal du PNG avec la palette UI -->
@@ -101,10 +124,10 @@
                     </Ellipse.Fill>
                 </Ellipse>
 
-                <!-- Logo optiSCAN (bouclier réel) avec pulse -->
+                <!-- Logo optiSCAN (bouclier réel) : 180 px, 189 px au plus fort du battement -->
                 <Image x:Name="shieldImage"
                        Source="/optiSCAN;component/optiSCAN_hero.png"
-                       Width="190" Height="190"
+                       Width="180" Height="180"
                        HorizontalAlignment="Center" VerticalAlignment="Center"
                        RenderOptions.BitmapScalingMode="HighQuality"
                        Effect="{DynamicResource HeroShieldPulseGlow}">
@@ -112,20 +135,6 @@
                     <Image.RenderTransform>
                         <ScaleTransform x:Name="shieldPulseScale" ScaleX="1" ScaleY="1"/>
                     </Image.RenderTransform>
-                    <Image.Triggers>
-                        <EventTrigger RoutedEvent="Loaded">
-                            <BeginStoryboard>
-                                <Storyboard RepeatBehavior="Forever" AutoReverse="True">
-                                    <DoubleAnimation Storyboard.TargetName="shieldPulseScale"
-                                                     Storyboard.TargetProperty="ScaleX"
-                                                     From="1" To="1.06" Duration="0:0:2.5"/>
-                                    <DoubleAnimation Storyboard.TargetName="shieldPulseScale"
-                                                     Storyboard.TargetProperty="ScaleY"
-                                                     From="1" To="1.06" Duration="0:0:2.5"/>
-                                </Storyboard>
-                            </BeginStoryboard>
-                        </EventTrigger>
-                    </Image.Triggers>
                 </Image>
             </Grid>
 

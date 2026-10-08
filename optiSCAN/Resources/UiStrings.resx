@@ -119,7 +119,7 @@
   <data name="Scan_ZonePrefix" xml:space="preserve"><value>Zone </value></data>
   <data name="Scan_LastScanNone" xml:space="preserve"><value>Jamais</value></data>
   <data name="Scan_LastScanFormat" xml:space="preserve"><value>{0}</value></data>
-  <data name="Ui_ProtectionActive" xml:space="preserve"><value>Protection active.</value></data>
+  <data name="Ui_Ready" xml:space="preserve"><value>optiSCAN est prêt.</value></data>
   <data name="Ui_ProtectionTray" xml:space="preserve"><value>optiSCAN réduit dans la barre système</value></data>
   <data name="Ui_ScanInterrupted" xml:space="preserve"><value>Analyse interrompue sur demande.</value></data>
   <data name="Ui_RestoreOk" xml:space="preserve"><value>Fichier restauré depuis la quarantaine</value></data>
@@ -158,8 +158,8 @@
   <data name="Status_UsbScanComplete" xml:space="preserve"><value>Analyse USB de {0} terminée — {1:N0} fichier(s), {2} menace(s)</value></data>
   <data name="Status_UsbScanFailed" xml:space="preserve"><value>Analyse USB de {0} interrompue ou échouée</value></data>
   <data name="Notif_HistoryBtn" xml:space="preserve"><value>Ouvrir l'historique</value></data>
-  <data name="Notif_RtpStartedTitle" xml:space="preserve"><value>Protection temps réel activée</value></data>
-  <data name="Notif_RtpStartedBody" xml:space="preserve"><value>optiSCAN surveille les fichiers en arrière-plan</value></data>
+  <data name="Notif_RtpStartedTitle" xml:space="preserve"><value>Surveillance des fichiers activée</value></data>
+  <data name="Notif_RtpStartedBody" xml:space="preserve"><value>optiSCAN analyse les fichiers surveillés après leur écriture</value></data>
   <data name="Notif_UpdateTitle" xml:space="preserve"><value>Mises à jour disponibles</value></data>
   <data name="Notif_UpdateBody" xml:space="preserve"><value>Nouvelles signatures ClamAV v{0}</value></data>
   <data name="Notif_UpdateBtn" xml:space="preserve"><value>Mettre à jour</value></data>
@@ -434,14 +434,14 @@
   <data name="Opt_LangRestartTitle" xml:space="preserve"><value>Changer la langue</value></data>
   <data name="Opt_LangRestartMessage" xml:space="preserve"><value>optiSCAN va redémarrer pour afficher l'interface dans la langue choisie.</value></data>
   <data name="Opt_Antivirus" xml:space="preserve"><value>Antivirus</value></data>
-  <data name="Opt_Rtp" xml:space="preserve"><value>Protection temps réel</value></data>
-  <data name="Opt_RtpSub" xml:space="preserve"><value>Dossiers du scan rapide (Temp, démarrage, Prefetch…) et extensions à risque élargies.</value></data>
+  <data name="Opt_Rtp" xml:space="preserve"><value>Surveillance temps réel des fichiers</value></data>
+  <data name="Opt_RtpSub" xml:space="preserve"><value>Analyse les fichiers créés ou modifiés dans les dossiers surveillés, après l’écriture.</value></data>
   <data name="Opt_ProcessMonitor" xml:space="preserve"><value>Surveillance des lancements de processus</value></data>
-  <data name="Opt_ProcessMonitorSub" xml:space="preserve"><value>Analyse les exécutables et scripts au démarrage (WMI) — complète la protection fichier.</value></data>
+  <data name="Opt_ProcessMonitorSub" xml:space="preserve"><value>Analyse les exécutables et scripts après le démarrage du processus (WMI) — complète la surveillance des fichiers.</value></data>
   <data name="Opt_TamperProtection" xml:space="preserve"><value>Protection anti-manipulation</value></data>
   <data name="Opt_TamperProtectionSub" xml:space="preserve"><value>Relance optiSCAN en arrière-plan si la protection temps réel est attendue mais l'application est arrêtée.</value></data>
   <data name="Opt_PlatformProtection" xml:space="preserve"><value>Service Windows de protection système</value></data>
-  <data name="Opt_PlatformProtectionSub" xml:space="preserve"><value>Moteur RTP/AMSI/minifilter dans optiSCAN.Service (IPC). Nécessite des droits administrateur à l'installation.</value></data>
+  <data name="Opt_PlatformProtectionSub" xml:space="preserve"><value>Service Windows de surveillance des fichiers et IPC ; l’analyse intervient après l’écriture. AMSI et minifiltre ne sont pas inclus. Installation avec droits administrateur.</value></data>
   <data name="Repair_Quarantined" xml:space="preserve"><value>Fichier mis en quarantaine.</value></data>
   <data name="Repair_QuarantineFailed" xml:space="preserve"><value>Échec de la quarantaine.</value></data>
   <data name="Platform_StatusTitle" xml:space="preserve"><value>Protection système</value></data>
@@ -767,7 +767,7 @@ Les supprimer ? Les fichiers ne sont pas effacés, seul le partage est retiré. 
   <data name="Onboarding_Step2" xml:space="preserve"><value>Les signatures antivirus (ClamAV + YARA) se téléchargent automatiquement en arrière-plan. Aucune action n'est requise.&#10;&#10;Vous pouvez suivre l'avancement dans Antivirus → Signatures, ou désactiver le téléchargement automatique dans Options.</value></data>
   <data name="Onboarding_Step3" xml:space="preserve"><value>Étape suivante : lancez une analyse rapide avec F5 depuis l'onglet Antivirus.&#10;&#10;Sans droits administrateur, l'analyse complète et le scan planifié restent partiels.</value></data>
   <data name="Onboarding_DefenderTitle" xml:space="preserve"><value>Windows Defender détecté</value></data>
-  <data name="Onboarding_DefenderStep" xml:space="preserve"><value>Windows Defender protège déjà votre PC en temps réel.&#10;&#10;Recommandé : laisser Defender actif et utiliser optiSCAN en complément (analyses manuelles et planifiées avec ClamAV + YARA).&#10;&#10;Oui = mode complément (plus fluide, moins de conflits)&#10;Non = activer aussi la protection temps réel optiSCAN</value></data>
+  <data name="Onboarding_DefenderStep" xml:space="preserve"><value>Windows Defender protège déjà votre PC en temps réel.&#10;&#10;Recommandé : laisser Defender actif et utiliser optiSCAN en complément (analyses manuelles et planifiées avec ClamAV + YARA).&#10;&#10;Oui = mode complément (plus fluide, moins de conflits)&#10;Non = activer aussi la surveillance des fichiers par optiSCAN (analyse après écriture)</value></data>
   <data name="Defender_Opt_Title" xml:space="preserve"><value>Cohabitation avec Windows Defender</value></data>
   <data name="Defender_Opt_StatusInactive" xml:space="preserve"><value>Windows Defender n'est pas le service antivirus actif sur ce poste.</value></data>
   <data name="Defender_Opt_StatusComplement" xml:space="preserve"><value>Mode complément : Defender garde le temps réel ; optiSCAN analyse à la demande (recommandé).</value></data>

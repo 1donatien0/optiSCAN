@@ -145,10 +145,21 @@ namespace optiSCAN.Services
 
             if (!string.IsNullOrEmpty(_pipeName))
             {
-                var pipe = new NamedPipeClientStream(".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous);
+                // Identification seulement : un faux serveur ne peut pas usurper ce processus
+                // (SYSTEM pour l'hôte du service). Puis serveur du même compte exigé, avant
+                // d'envoyer le moindre octet (voir PipeServerAccount).
+                var pipe = new NamedPipeClientStream(
+                    ".", _pipeName, PipeDirection.InOut, PipeOptions.Asynchronous,
+                    PipeServerAccount.ClientImpersonation);
                 using var linked = CancellationTokenSource.CreateLinkedTokenSource(ct);
                 linked.CancelAfter(_pipeConnectTimeoutMs);
                 await pipe.ConnectAsync(linked.Token).ConfigureAwait(false);
+                if (!PipeServerAccount.IsSameAccount(pipe))
+                {
+                    await pipe.DisposeAsync().ConfigureAwait(false);
+                    AppLogger.Warn("ClamdClient", "Tube clamd servi par un autre compte : connexion refusée.");
+                    throw new IOException("Serveur du tube clamd non reconnu.");
+                }
                 _stream = pipe;
             }
             else
@@ -223,9 +234,9 @@ namespace optiSCAN.Services
 
         private void DisposeSocket()
         {
-            try { _reader?.Dispose(); } catch { /* ignore */ }
-            try { _stream?.Dispose(); } catch { /* ignore */ }
-            try { _client?.Dispose(); } catch { /* ignore */ }
+            try { _reader?.Dispose(); } catch (Exception ex) { AppLogger.Warn("ClamdClient", "Dispose reader failed", ex); }
+            try { _stream?.Dispose(); } catch (Exception ex) { AppLogger.Warn("ClamdClient", "Dispose stream failed", ex); }
+            try { _client?.Dispose(); } catch (Exception ex) { AppLogger.Warn("ClamdClient", "Dispose client failed", ex); }
             _reader = null;
             _stream = null;
             _client = null;

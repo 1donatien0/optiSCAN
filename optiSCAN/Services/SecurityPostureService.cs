@@ -199,6 +199,21 @@ namespace optiSCAN.Services
             && !name.Any(c => char.IsControl(c) || "\"&|<>^%!()".Contains(c));
 
         /// <summary>
+        /// Ligne de commande cmd.exe qui supprime chaque partage et rend 1 si l'une des suppressions
+        /// échoue : toutes sont tentées, mais un échec au milieu de la série n'est plus masqué par
+        /// le code de retour de la dernière. Les noms doivent avoir passé <see cref="IsCmdSafeShareName"/>.
+        /// </summary>
+        internal static string BuildRemoveSharesCommand(IEnumerable<string> names, string netExePath)
+        {
+            // /d : sans AutoRun ; /s : cmd retire seulement les guillemets extérieurs.
+            // « if defined » est évalué à l'exécution, contrairement à %VAR%.
+            var commands = names.Select(n => $"\"{netExePath}\" share \"{n}\" /delete || set OPTISCAN_SHARE_FAIL=1");
+            return "/d /s /c \"set \"OPTISCAN_SHARE_FAIL=\" & "
+                + string.Join(" & ", commands)
+                + " & if defined OPTISCAN_SHARE_FAIL exit 1\"";
+        }
+
+        /// <summary>
         /// Supprime les partages exposés que l'utilisateur a confirmés (intersection avec l'état courant).
         /// Demande l'UAC si l'app n'est pas élevée. Bloquant : à appeler hors thread UI.
         /// </summary>
@@ -219,11 +234,11 @@ namespace optiSCAN.Services
             if (names.Count == 0)
                 return refused == 0;
 
-            var script = string.Join(" & ", names.Select(n => $"net share \"{n}\" /delete"));
             var psi = new ProcessStartInfo
             {
-                FileName = "cmd.exe",
-                Arguments = "/c " + script,
+                FileName = SystemExecutables.System32("cmd.exe"),
+                Arguments = BuildRemoveSharesCommand(names, SystemExecutables.System32("net.exe")),
+                WorkingDirectory = Environment.SystemDirectory,
                 UseShellExecute = true,
                 WindowStyle = ProcessWindowStyle.Hidden,
             };

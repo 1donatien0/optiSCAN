@@ -56,112 +56,121 @@ namespace optiSCAN.Views
         // ── Analyser ─────────────────────────────────────────────────────────
         private async void btnAnalyze_Click(object sender, RoutedEventArgs e)
         {
-            var sel = ReadCleanSelection();
-            if (!sel.AnySystem && !sel.AnyBrowser)
+            try
             {
-                System.Windows.MessageBox.Show(
-                    LocalizationService.GetString("Clean_LogHint"),
-                    LocalizationService.GetString("Clean_Title"),
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                return;
-            }
-
-            btnAnalyze.IsEnabled = false;
-            btnCleanNow.IsEnabled = false;
-            _analysed = false;
-            SetEmptyResultState(false);
-            SetLog(LocalizationService.GetString("Clean_LogAnalyzeStart"));
-
-            await Task.Run(() =>
-            {
-                long tempWin = sel.TempWin
-                    ? MeasureDir(Path.Combine(Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows", "Temp"))
-                    : 0;
-                long tempUser = sel.TempUser ? MeasureDir(Path.GetTempPath()) : 0;
-                long logsSize = sel.Logs ? MeasureDir(WindowsLogsPath()) : 0;
-                long wuSize = sel.WUCache ? MeasureDir(WindowsUpdateCachePath()) : 0;
-                long edgeCache = sel.Edge ? MeasureDir(EdgeCachePath()) : 0;
-                long chromeCache = sel.Chrome ? MeasureDir(ChromeCachePath()) : 0;
-                long ffCache = sel.Firefox ? MeasureDir(FirefoxCachePath()) : 0;
-                long braveCache = sel.Brave ? MeasureDir(BraveCachePath()) : 0;
-                long operaCache = sel.Opera ? MeasureDir(OperaCachePath()) : 0;
-                long vivaldiCache = sel.Vivaldi ? MeasureDir(VivaldiCachePath()) : 0;
-                long arcCache = sel.Arc ? MeasureDir(ArcCachePath()) : 0;
-                long historySize = sel.History ? MeasureFiles(HistoryTargets(sel)) : 0;
-
-                long sysTotal = tempWin + tempUser + logsSize + wuSize;
-                long browserTotal = edgeCache + chromeCache + ffCache + braveCache + operaCache + vivaldiCache + arcCache + historySize;
-                long total = sysTotal + browserTotal;
-
-                Dispatcher.Invoke(() =>
+                var sel = ReadCleanSelection();
+                if (!sel.AnySystem && !sel.AnyBrowser)
                 {
-                    txtTempSize.Text = FormatSize(sysTotal);
-                    txtBrowserSize.Text = FormatSize(browserTotal);
-                    txtTotalSize.Text = FormatSize(total);
+                    System.Windows.MessageBox.Show(
+                        LocalizationService.GetString("Clean_LogHint"),
+                        LocalizationService.GetString("Clean_Title"),
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    return;
+                }
 
-                    if (sel.TempWin)
-                        AppendLog(LocalizationService.Format("Clean_LogLineTempWin", FormatSize(tempWin)));
-                    if (sel.TempUser)
-                        AppendLog(LocalizationService.Format("Clean_LogLineTempUser", FormatSize(tempUser)));
-                    if (sel.Logs)
-                        AppendLog(LocalizationService.Format("Clean_LogLineLogs", FormatSize(logsSize)));
-                    if (sel.WUCache)
-                        AppendLog(LocalizationService.Format("Clean_LogLineWU", FormatSize(wuSize)));
-                    if (sel.Edge)
-                        AppendLog(LocalizationService.Format("Clean_LogLineEdge", FormatSize(edgeCache)));
-                    if (sel.Chrome)
-                        AppendLog(LocalizationService.Format("Clean_LogLineChrome", FormatSize(chromeCache)));
-                    if (sel.Firefox)
-                        AppendLog(LocalizationService.Format("Clean_LogLineFirefox", FormatSize(ffCache)));
-                    if (sel.Brave)
-                        AppendLog(LocalizationService.Format("Clean_LogLineBrave", FormatSize(braveCache)));
-                    if (sel.Opera)
-                        AppendLog(LocalizationService.Format("Clean_LogLineOpera", FormatSize(operaCache)));
-                    if (sel.Vivaldi)
-                        AppendLog(LocalizationService.Format("Clean_LogLineVivaldi", FormatSize(vivaldiCache)));
-                    if (sel.Arc)
-                        AppendLog(LocalizationService.Format("Clean_LogLineArc", FormatSize(arcCache)));
-                    if (sel.History)
+                btnAnalyze.IsEnabled = false;
+                btnCleanNow.IsEnabled = false;
+                _analysed = false;
+                SetEmptyResultState(false);
+                SetLog(LocalizationService.GetString("Clean_LogAnalyzeStart"));
+
+                await Task.Run(() =>
+                {
+                    long tempWin = sel.TempWin
+                        ? MeasureDir(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Temp"))
+                        : 0;
+                    long tempUser = sel.TempUser ? MeasureDir(Path.GetTempPath()) : 0;
+                    long logsSize = sel.Logs ? MeasureDir(WindowsLogsPath()) : 0;
+                    long wuSize = sel.WUCache ? MeasureDir(WindowsUpdateCachePath()) : 0;
+                    long edgeCache = sel.Edge ? MeasureDir(EdgeCachePath()) : 0;
+                    long chromeCache = sel.Chrome ? MeasureDir(ChromeCachePath()) : 0;
+                    long ffCache = sel.Firefox ? MeasureDir(FirefoxCachePath()) : 0;
+                    long braveCache = sel.Brave ? MeasureDir(BraveCachePath()) : 0;
+                    long operaCache = sel.Opera ? MeasureDir(OperaCachePath()) : 0;
+                    long vivaldiCache = sel.Vivaldi ? MeasureDir(VivaldiCachePath()) : 0;
+                    long arcCache = sel.Arc ? MeasureDir(ArcCachePath()) : 0;
+                    long historySize = sel.History ? MeasureFiles(HistoryTargets(sel)) : 0;
+
+                    long sysTotal = tempWin + tempUser + logsSize + wuSize;
+                    long browserTotal = edgeCache + chromeCache + ffCache + braveCache + operaCache + vivaldiCache + arcCache + historySize;
+                    long total = sysTotal + browserTotal;
+
+                    Dispatcher.Invoke(() =>
                     {
-                        AppendLog(LocalizationService.Format("Clean_LogLineHistory", FormatSize(historySize)));
+                        txtTempSize.Text = FormatSize(sysTotal);
+                        txtBrowserSize.Text = FormatSize(browserTotal);
+                        txtTotalSize.Text = FormatSize(total);
+
+                        if (sel.TempWin)
+                            AppendLog(LocalizationService.Format("Clean_LogLineTempWin", FormatSize(tempWin)));
+                        if (sel.TempUser)
+                            AppendLog(LocalizationService.Format("Clean_LogLineTempUser", FormatSize(tempUser)));
+                        if (sel.Logs)
+                            AppendLog(LocalizationService.Format("Clean_LogLineLogs", FormatSize(logsSize)));
+                        if (sel.WUCache)
+                            AppendLog(LocalizationService.Format("Clean_LogLineWU", FormatSize(wuSize)));
+                        if (sel.Edge)
+                            AppendLog(LocalizationService.Format("Clean_LogLineEdge", FormatSize(edgeCache)));
+                        if (sel.Chrome)
+                            AppendLog(LocalizationService.Format("Clean_LogLineChrome", FormatSize(chromeCache)));
                         if (sel.Firefox)
-                            AppendLog(LocalizationService.GetString("Clean_LogHistoryFirefox"));
-                    }
-                    AppendLog($"─────────────────────────");
-                    AppendLog(LocalizationService.Format("Clean_LogTotal", FormatSize(total)));
-                    AppendLog(LocalizationService.GetString("Clean_LogAnalyzeEnd"));
+                            AppendLog(LocalizationService.Format("Clean_LogLineFirefox", FormatSize(ffCache)));
+                        if (sel.Brave)
+                            AppendLog(LocalizationService.Format("Clean_LogLineBrave", FormatSize(braveCache)));
+                        if (sel.Opera)
+                            AppendLog(LocalizationService.Format("Clean_LogLineOpera", FormatSize(operaCache)));
+                        if (sel.Vivaldi)
+                            AppendLog(LocalizationService.Format("Clean_LogLineVivaldi", FormatSize(vivaldiCache)));
+                        if (sel.Arc)
+                            AppendLog(LocalizationService.Format("Clean_LogLineArc", FormatSize(arcCache)));
+                        if (sel.History)
+                        {
+                            AppendLog(LocalizationService.Format("Clean_LogLineHistory", FormatSize(historySize)));
+                            if (sel.Firefox)
+                                AppendLog(LocalizationService.GetString("Clean_LogHistoryFirefox"));
+                        }
+                        AppendLog($"─────────────────────────");
+                        AppendLog(LocalizationService.Format("Clean_LogTotal", FormatSize(total)));
+                        AppendLog(LocalizationService.GetString("Clean_LogAnalyzeEnd"));
 
-                    _analysed = true;
-                    btnCleanNow.IsEnabled = total > 0 || sel.Dns || sel.Recycle;
-                    SetEmptyResultState(total == 0 && !sel.Dns && !sel.Recycle);
+                        _analysed = true;
+                        btnCleanNow.IsEnabled = total > 0 || sel.Dns || sel.Recycle;
+                        SetEmptyResultState(total == 0 && !sel.Dns && !sel.Recycle);
+                    });
                 });
-            });
 
-            btnAnalyze.IsEnabled = true;
+                btnAnalyze.IsEnabled = true;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("CleanControl", "btnAnalyze_Click failed", ex);
+                btnAnalyze.IsEnabled = true;
+                AppendLog(LocalizationService.Format("Clean_ErrCleaning", ex.Message));
+            }
         }
 
         // ── Nettoyer ─────────────────────────────────────────────────────────
         private async void btnCleanNow_Click(object sender, RoutedEventArgs e)
         {
-            if (!_analysed) return;
-
-            var sel = ReadCleanSelection();
-
-            btnAnalyze.IsEnabled = false;
-            btnCleanNow.IsEnabled = false;
-            AppendLog(LocalizationService.GetString("Clean_LogCleanStart"));
-            var cleanStarted = DateTime.Now;
-
             try
             {
+                if (!_analysed) return;
+
+                var sel = ReadCleanSelection();
+
+                btnAnalyze.IsEnabled = false;
+                btnCleanNow.IsEnabled = false;
+                AppendLog(LocalizationService.GetString("Clean_LogCleanStart"));
+                var cleanStarted = DateTime.Now;
+
                 await Task.Run(() =>
                 {
                     long freed = 0;
 
                     if (sel.TempWin)
                     {
-                        string path = Path.Combine(Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows", "Temp");
+                        string path = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Windows), "Temp");
                         long f = CleanDir(path);
                         freed += f;
                         Dispatcher.Invoke(() => AppendLog(LocalizationService.Format("Clean_LogFreedTempWin", FormatSize(f))));
@@ -296,7 +305,7 @@ namespace optiSCAN.Views
             }
             catch (Exception ex)
             {
-                AppLogger.Warn("CleanControl", "Nettoyage système", ex);
+                AppLogger.Error("CleanControl", "btnCleanNow_Click failed", ex);
                 AppendLog(LocalizationService.Format("Clean_ErrCleaning", ex.Message));
             }
             finally
@@ -354,9 +363,9 @@ namespace optiSCAN.Views
         private static string VivaldiCachePath() => Path.Combine(LocalApp, @"Vivaldi\User Data\Default\Cache");
         private static string ArcCachePath() => Path.Combine(LocalApp, @"Arc\User Data\Default\Cache");
         private static string WindowsLogsPath() => Path.Combine(
-            Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows", @"Logs");
+            Environment.GetFolderPath(Environment.SpecialFolder.Windows), @"Logs");
         private static string WindowsUpdateCachePath() => Path.Combine(
-            Environment.GetEnvironmentVariable("SystemRoot") ?? @"C:\Windows",
+            Environment.GetFolderPath(Environment.SpecialFolder.Windows),
             @"SoftwareDistribution\Download");
 
         // ── Historique de navigation (navigateurs Chromium uniquement) ───────
@@ -485,55 +494,12 @@ namespace optiSCAN.Views
         }
 
         // ── Helpers fichiers ─────────────────────────────────────────────────
-        private static long MeasureDir(string path)
-        {
-            if (string.IsNullOrEmpty(path) || !Directory.Exists(path)) return 0;
-            try
-            {
-                long total = 0;
-                foreach (var f in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
-                {
-                    try { total += new FileInfo(f).Length; }
-                    catch (Exception ex)
-                    {
-                        AppLogger.Warn("CleanControl", $"Mesure ignorée : {f}", ex);
-                    }
-                }
-                return total;
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Warn("CleanControl", $"Mesure impossible « {path} » : {ex.Message}");
-                return 0;
-            }
-        }
+        // Mesure et vidage sans suivre de jonction ni de lien : voir SafeDirectoryCleaner.
+        private static long MeasureDir(string path) => SafeDirectoryCleaner.Measure(path);
 
-        private static long CleanDir(string path)
-        {
-            if (string.IsNullOrEmpty(path) || !Directory.Exists(path)) return 0;
-            long freed = 0;
-            try
-            {
-                foreach (var f in Directory.EnumerateFiles(path, "*", SearchOption.AllDirectories))
-                {
-                    try
-                    {
-                        long s = new FileInfo(f).Length;
-                        File.Delete(f);
-                        freed += s;
-                    }
-                    catch (Exception ex)
-                    {
-                        AppLogger.Warn("CleanControl", $"Fichier non supprimé : {f}", ex);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Warn("CleanControl", $"Nettoyage incomplet « {path} » : {ex.Message}");
-            }
-            return freed;
-        }
+        private static long CleanDir(string path) =>
+            SafeDirectoryCleaner.Clean(path, (file, ex) =>
+                AppLogger.Warn("CleanControl", $"Fichier non supprimé : {file}", ex));
 
         private CleanSelection ReadCleanSelection() => new()
         {

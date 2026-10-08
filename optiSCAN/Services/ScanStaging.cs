@@ -106,10 +106,7 @@ internal static class ScanStaging
         var directory = Path.Combine(Root, Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(directory);
         Register(directory);
-        var name = Path.GetFileName(originalName ?? string.Empty);
-        if (string.IsNullOrWhiteSpace(name))
-            name = "content.bin";
-        var path = Path.Combine(directory, name);
+        var path = Path.Combine(directory, SafeStagingName(originalName));
 
         try
         {
@@ -154,6 +151,66 @@ internal static class ScanStaging
             throw;
         }
 
+    }
+
+    private const string FallbackStem = "content";
+
+    /// <summary>
+    /// Nom de la copie d'analyse : le nom d'origine quand il est sûr, sinon <c>content</c> suivi de
+    /// l'extension d'origine (certaines signatures en dépendent).
+    /// </summary>
+    /// <remarks>
+    /// Le nom vient du client du pipe, d'un fichier surveillé ou d'une clé USB. Sous Windows 10,
+    /// <c>…\scan-staging\x\COM1.txt</c> désigne le port COM1 et non un fichier : le service SYSTEM
+    /// y écrirait les octets du client (port série, imprimante LPT, console), et un <c>NUL</c>
+    /// rendrait une copie vide, donc « propre ». Un tel nom se crée sur NTFS par un chemin
+    /// <c>\\?\</c>. Sont aussi refusés les flux nommés (<c>:</c>), les caractères interdits par
+    /// Windows et les noms réduits à des points.
+    /// </remarks>
+    internal static string SafeStagingName(string? originalName)
+    {
+        var name = Path.GetFileName((originalName ?? string.Empty).Replace('/', '\\').Split('\\')[^1]);
+        name = name.TrimEnd('.', ' ');
+
+        var extension = SafeExtension(name);
+        if (string.IsNullOrWhiteSpace(name)
+            || name.Length > 200
+            || name.Any(c => c < 32 || "<>:\"/\\|?*".Contains(c))
+            || name.Trim('.').Length == 0
+            || IsReservedDeviceName(name))
+            return FallbackStem + extension;
+
+        return name;
+    }
+
+    /// <summary>Extension courte et alphanumérique, ou chaîne vide.</summary>
+    private static string SafeExtension(string name)
+    {
+        var dot = name.LastIndexOf('.');
+        if (dot <= 0 || dot == name.Length - 1)
+            return string.Empty;
+        var ext = name[(dot + 1)..];
+        return ext.Length <= 16 && ext.All(char.IsAsciiLetterOrDigit) ? "." + ext : string.Empty;
+    }
+
+    private static readonly HashSet<string> ReservedDeviceNames = new(StringComparer.OrdinalIgnoreCase)
+    {
+        "CON", "PRN", "AUX", "NUL", "CONIN$", "CONOUT$", "CLOCK$",
+        "COM0", "COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+        "COM\u00B9", "COM\u00B2", "COM\u00B3",
+        "LPT0", "LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+        "LPT\u00B9", "LPT\u00B2", "LPT\u00B3",
+    };
+
+    /// <summary>
+    /// Nom de périphérique DOS, avec ou sans extension (<c>COM1</c>, <c>com1.txt</c>,
+    /// <c>NUL .tar.gz</c>) : Windows ignore ce qui suit le premier point et les espaces finaux.
+    /// </summary>
+    internal static bool IsReservedDeviceName(string name)
+    {
+        var dot = name.IndexOf('.');
+        var stem = (dot >= 0 ? name[..dot] : name).TrimEnd(' ');
+        return ReservedDeviceNames.Contains(stem);
     }
 
     private static void TryDeleteDirectory(string directory)

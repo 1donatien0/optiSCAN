@@ -36,7 +36,7 @@ namespace optiSCAN.Services
                 DeleteWatchdogTask();
                 var psi = new ProcessStartInfo
                 {
-                    FileName = "schtasks.exe",
+                    FileName = SystemExecutables.System32("schtasks.exe"),
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardOutput = true,
@@ -75,7 +75,7 @@ namespace optiSCAN.Services
             {
                 var psi = new ProcessStartInfo
                 {
-                    FileName = "schtasks.exe",
+                    FileName = SystemExecutables.System32("schtasks.exe"),
                     UseShellExecute = false,
                     CreateNoWindow = true,
                 };

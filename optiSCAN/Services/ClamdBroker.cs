@@ -271,11 +271,15 @@ internal static class ClamdRelay
                         var dataHandle = new Microsoft.Win32.SafeHandles.SafePipeHandle(new IntPtr(value), ownsHandle: true);
                         var data = new NamedPipeClientStream(PipeDirection.InOut, false, true, dataHandle);
                         var file = controlFile;
-                        _ = Task.Run(() => Pump(data, port, file));
+                        _ = Task.Run(() =>
+                        {
+                            try { Pump(data, port, file); }
+                            catch (Exception ex) { AppLogger.Error("ClamdBroker", "Pump failed", ex); }
+                        });
                     }
-                    catch
+                    catch (Exception ex)
                     {
-                        /* handle inutilisable */
+                        AppLogger.Warn("ClamdBroker", "Failed to create pipe handle", ex);
                     }
                 }
                 seen++;
@@ -442,7 +446,8 @@ internal sealed class ClamdRelayChannel : IDisposable
         {
             var name = "optiSCAN_data_" + Guid.NewGuid().ToString("N");
             var serverHandle = ClamdPipeAcl.CreateHandle(name, true, _allowedSid);
-            var client = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.None);
+            var client = new NamedPipeClientStream(".", name, PipeDirection.InOut, PipeOptions.None,
+                PipeServerAccount.ClientImpersonation);
             client.Connect(2000);
             var server = new NamedPipeServerStream(PipeDirection.InOut, true, true, serverHandle);
             var raw = client.SafePipeHandle;

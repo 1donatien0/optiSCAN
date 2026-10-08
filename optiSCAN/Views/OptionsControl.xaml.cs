@@ -505,32 +505,40 @@ namespace optiSCAN.Views
 
         private async void BtnScheduledRunNow_Click(object sender, RoutedEventArgs e)
         {
-            bool exists = await System.Threading.Tasks.Task.Run(() => ScheduledScan.IsTaskExists());
-            if (!exists)
-            {
-                System.Windows.MessageBox.Show(LocalizationService.GetString("Opt_SchedEnableFirst"), LocalizationService.GetString("App_TitleShort"), MessageBoxButton.OK, MessageBoxImage.Information);
-                return;
-            }
-
-            if (btnScheduledRunNow != null) btnScheduledRunNow.IsEnabled = false;
             try
             {
-                bool ok = await System.Threading.Tasks.Task.Run(() => ScheduledScan.RunNow());
-                if (!ok)
+                bool exists = await System.Threading.Tasks.Task.Run(() => ScheduledScan.IsTaskExists()).ConfigureAwait(true);
+                if (!exists)
                 {
-                    System.Windows.MessageBox.Show(LocalizationService.GetString("Opt_SchedRunFailed"), LocalizationService.GetString("App_TitleShort"),
-                        MessageBoxButton.OK, MessageBoxImage.Warning);
+                    System.Windows.MessageBox.Show(LocalizationService.GetString("Opt_SchedEnableFirst"), LocalizationService.GetString("App_TitleShort"), MessageBoxButton.OK, MessageBoxImage.Information);
                     return;
                 }
-                System.Windows.MessageBox.Show(
-                    LocalizationService.GetString("Opt_SchedRunOk"),
-                    LocalizationService.GetString("App_TitleShort"),
-                    MessageBoxButton.OK,
-                    MessageBoxImage.Information);
-                await RefreshScheduledStatusAsync();
+
+                if (btnScheduledRunNow != null) btnScheduledRunNow.IsEnabled = false;
+                try
+                {
+                    bool ok = await System.Threading.Tasks.Task.Run(() => ScheduledScan.RunNow()).ConfigureAwait(true);
+                    if (!ok)
+                    {
+                        System.Windows.MessageBox.Show(LocalizationService.GetString("Opt_SchedRunFailed"), LocalizationService.GetString("App_TitleShort"),
+                            MessageBoxButton.OK, MessageBoxImage.Warning);
+                        return;
+                    }
+                    System.Windows.MessageBox.Show(
+                        LocalizationService.GetString("Opt_SchedRunOk"),
+                        LocalizationService.GetString("App_TitleShort"),
+                        MessageBoxButton.OK,
+                        MessageBoxImage.Information);
+                    await RefreshScheduledStatusAsync().ConfigureAwait(true);
+                }
+                finally
+                {
+                    if (btnScheduledRunNow != null) btnScheduledRunNow.IsEnabled = true;
+                }
             }
-            finally
+            catch (Exception ex)
             {
+                AppLogger.Error("OptionsControl", "BtnScheduledRunNow_Click failed", ex);
                 if (btnScheduledRunNow != null) btnScheduledRunNow.IsEnabled = true;
             }
         }
@@ -569,41 +577,48 @@ namespace optiSCAN.Views
 
         private async void BtnCheckAppUpdate_Click(object sender, RoutedEventArgs e)
         {
-            AppUpdateCheckResult result;
             try
             {
-                result = await new UpdateService().CheckForUpdatesAsync().ConfigureAwait(true);
-            }
-            catch (Exception ex)
-            {
-                AppLogger.Error("OptionsControl", "CheckForUpdatesAsync", ex);
-                result = new AppUpdateCheckResult
-                {
-                    Status = AppUpdateChannelStatus.StagingError,
-                    CurrentVersion = ProductVersionInfo.SemVer,
-                    ReleaseLabel = ProductVersionInfo.ReleaseLabel,
-                    UserMessage = LocalizationService.Format("Opt_AppUpdateCheckError", ex.Message),
-                };
-            }
-
-            if (System.Windows.MessageBox.Show(
-                result.UserMessage,
-                LocalizationService.GetString("Opt_AppUpdateTitle"),
-                MessageBoxButton.YesNo,
-                result.Success ? MessageBoxImage.Information : MessageBoxImage.Warning) == MessageBoxResult.Yes)
-            {
+                AppUpdateCheckResult result;
                 try
                 {
-                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
-                    {
-                        FileName = OptiscanStrings.Urls.OptiscanSourceForge,
-                        UseShellExecute = true
-                    });
+                    result = await new UpdateService().CheckForUpdatesAsync().ConfigureAwait(true);
                 }
                 catch (Exception ex)
                 {
-                    AppLogger.Warn("OptionsControl", "Navigate SourceForge (update check)", ex);
+                    AppLogger.Error("OptionsControl", "CheckForUpdatesAsync", ex);
+                    result = new AppUpdateCheckResult
+                    {
+                        Status = AppUpdateChannelStatus.StagingError,
+                        CurrentVersion = ProductVersionInfo.SemVer,
+                        ReleaseLabel = ProductVersionInfo.ReleaseLabel,
+                        UserMessage = LocalizationService.Format("Opt_AppUpdateCheckError", ex.Message),
+                    };
                 }
+
+                if (System.Windows.MessageBox.Show(
+                    result.UserMessage,
+                    LocalizationService.GetString("Opt_AppUpdateTitle"),
+                    MessageBoxButton.YesNo,
+                    result.Success ? MessageBoxImage.Information : MessageBoxImage.Warning) == MessageBoxResult.Yes)
+                {
+                    try
+                    {
+                        System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                        {
+                            FileName = OptiscanStrings.Urls.OptiscanSourceForge,
+                            UseShellExecute = true
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        AppLogger.Warn("OptionsControl", "Navigate SourceForge (update check)", ex);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("OptionsControl", "BtnCheckAppUpdate_Click failed", ex);
             }
         }
 
@@ -619,7 +634,7 @@ namespace optiSCAN.Views
             }
             catch (Exception ex)
             {
-                AppLogger.Warn("OptionsControl", "Navigate SourceForge", ex);
+                AppLogger.Error("OptionsControl", "BtnOpenSourceForge_Click failed", ex);
             }
             await Task.CompletedTask;
         }

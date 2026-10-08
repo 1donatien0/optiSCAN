@@ -8,13 +8,16 @@ using System.Security.Principal;
 namespace optiSCAN.Services;
 
 /// <summary>
-/// Lance clamd dans un AppContainer. Le TCP 127.0.0.1 n'est alors joignable
-/// que par un autre processus du même conteneur, pas par un scan de ports.
+/// Lance clamd dans un AppContainer. Le conteneur limite l'accès aux fichiers;
+/// le TCP clamd reste un socket non authentifié, lié à la boucle locale par
+/// clamd.conf. Son accessibilité locale dépend des filtres AppContainer/loopback
+/// de Windows; les clients optiSCAN passent par le tube nommé avec ACL.
 /// </summary>
 internal static class ClamdIsolation
 {
     private const uint ExtendedStartupInfoPresent = 0x00080000;
     private const uint CreateNoWindow = 0x08000000;
+    private const uint CreateSuspended = 0x00000004;
     private const int ProcThreadAttributeSecurityCapabilities = 0x00020009;
     private const int AlreadyExists = unchecked((int)0x800700B7);
     private const uint SeGroupEnabled = 0x00000004;
@@ -126,14 +129,30 @@ internal static class ClamdIsolation
                     IntPtr.Zero,
                     IntPtr.Zero,
                     false,
-                    ExtendedStartupInfoPresent | CreateNoWindow,
+                    // Suspendu : rattaché à l'objet job avant d'exécuter la moindre instruction.
+                    ExtendedStartupInfoPresent | CreateNoWindow | CreateSuspended,
                     IntPtr.Zero,
                     workingDirectory,
                     ref startup,
                     out var info))
                 throw new Win32Exception(Marshal.GetLastWin32Error());
 
-            CloseHandle(info.Thread);
+            try
+            {
+                AttachToHostLifetime(info.Process);
+                if (ResumeThread(info.Thread) == uint.MaxValue)
+                {
+                    var error = Marshal.GetLastWin32Error();
+                    TerminateProcess(info.Process, 1);
+                    CloseHandle(info.Process);
+                    throw new Win32Exception(error);
+                }
+            }
+            finally
+            {
+                CloseHandle(info.Thread);
+            }
+
             lock (ProcessHandles)
                 ProcessHandles[info.ProcessId] = info.Process;
             return Process.GetProcessById(info.ProcessId);
@@ -478,6 +497,103 @@ internal static class ClamdIsolation
 
     [DllImport("advapi32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
     private static extern bool ConvertStringSidToSid(string sid, out IntPtr result);
+
+    /// <summary>
+    /// Objet job « tuer à la fermeture » propre à ce processus. Sa poignée n'est jamais fermée
+    /// explicitement : Windows la ferme quand l'hôte se termine, même sur un plantage ou un
+    /// <c>Kill</c>, et termine alors clamd et son relais. Sans lui, clamd survivait à l'hôte ;
+    /// l'hôte suivant se reconnectait à un tube que plus personne ne servait (voir Z7).
+    /// </summary>
+    private static readonly Lazy<IntPtr> HostLifetimeJob = new(CreateKillOnCloseJob);
+
+    private static IntPtr CreateKillOnCloseJob()
+    {
+        var job = CreateJobObject(IntPtr.Zero, null);
+        if (job == IntPtr.Zero)
+        {
+            AppLogger.Warn("ClamdIsolation", $"Objet job indisponible (erreur {Marshal.GetLastWin32Error()}) : clamd pourra survivre à l'hôte.");
+            return IntPtr.Zero;
+        }
+
+        var limits = new JobObjectExtendedLimitInformation
+        {
+            BasicLimitInformation = new JobObjectBasicLimitInformation { LimitFlags = JobObjectLimitKillOnJobClose },
+        };
+        if (!SetInformationJobObject(job, JobObjectExtendedLimitInformationClass, ref limits,
+                (uint)Marshal.SizeOf<JobObjectExtendedLimitInformation>()))
+        {
+            AppLogger.Warn("ClamdIsolation", $"Limite « tuer à la fermeture » refusée (erreur {Marshal.GetLastWin32Error()}).");
+            CloseHandle(job);
+            return IntPtr.Zero;
+        }
+
+        return job;
+    }
+
+    /// <summary>Rattache un processus lancé (encore suspendu) à la durée de vie de l'hôte.</summary>
+    private static void AttachToHostLifetime(IntPtr process)
+    {
+        var job = HostLifetimeJob.Value;
+        if (job == IntPtr.Zero)
+            return;
+        if (!AssignProcessToJobObject(job, process))
+            AppLogger.Warn("ClamdIsolation", $"Rattachement à l'objet job refusé (erreur {Marshal.GetLastWin32Error()}) : clamd pourra survivre à l'hôte.");
+    }
+
+    internal const uint JobObjectLimitKillOnJobClose = 0x00002000;
+    private const int JobObjectExtendedLimitInformationClass = 9;
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct JobObjectBasicLimitInformation
+    {
+        public long PerProcessUserTimeLimit;
+        public long PerJobUserTimeLimit;
+        public uint LimitFlags;
+        public UIntPtr MinimumWorkingSetSize;
+        public UIntPtr MaximumWorkingSetSize;
+        public uint ActiveProcessLimit;
+        public UIntPtr Affinity;
+        public uint PriorityClass;
+        public uint SchedulingClass;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct IoCounters
+    {
+        public ulong ReadOperationCount;
+        public ulong WriteOperationCount;
+        public ulong OtherOperationCount;
+        public ulong ReadTransferCount;
+        public ulong WriteTransferCount;
+        public ulong OtherTransferCount;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    internal struct JobObjectExtendedLimitInformation
+    {
+        public JobObjectBasicLimitInformation BasicLimitInformation;
+        public IoCounters IoInfo;
+        public UIntPtr ProcessMemoryLimit;
+        public UIntPtr JobMemoryLimit;
+        public UIntPtr PeakProcessMemoryUsed;
+        public UIntPtr PeakJobMemoryUsed;
+    }
+
+    [DllImport("kernel32.dll", SetLastError = true, CharSet = CharSet.Unicode, EntryPoint = "CreateJobObjectW")]
+    private static extern IntPtr CreateJobObject(IntPtr attributes, string? name);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool SetInformationJobObject(
+        IntPtr job, int infoClass, ref JobObjectExtendedLimitInformation info, uint length);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool AssignProcessToJobObject(IntPtr job, IntPtr process);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern uint ResumeThread(IntPtr thread);
+
+    [DllImport("kernel32.dll", SetLastError = true)]
+    private static extern bool TerminateProcess(IntPtr process, uint exitCode);
 
     [DllImport("kernel32.dll")]
     private static extern IntPtr LocalFree(IntPtr handle);

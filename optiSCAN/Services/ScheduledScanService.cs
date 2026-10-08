@@ -37,7 +37,7 @@ namespace optiSCAN.Services
 
                 var psi = new ProcessStartInfo
                 {
-                    FileName = "schtasks.exe",
+                    FileName = SystemExecutables.System32("schtasks.exe"),
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardOutput = true,
@@ -79,7 +79,7 @@ namespace optiSCAN.Services
             {
                 var psi = new ProcessStartInfo
                 {
-                    FileName = "schtasks.exe",
+                    FileName = SystemExecutables.System32("schtasks.exe"),
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardOutput = true,
@@ -108,7 +108,7 @@ namespace optiSCAN.Services
             {
                 var psi = new ProcessStartInfo
                 {
-                    FileName = "schtasks.exe",
+                    FileName = SystemExecutables.System32("schtasks.exe"),
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardOutput = true,
@@ -140,7 +140,7 @@ namespace optiSCAN.Services
                 // 1) XML — indépendant de la locale pour l'heure du trigger
                 var xmlPsi = new ProcessStartInfo
                 {
-                    FileName = "schtasks.exe",
+                    FileName = SystemExecutables.System32("schtasks.exe"),
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardOutput = true,
@@ -158,7 +158,7 @@ namespace optiSCAN.Services
                 // 2) LIST /V — « Next Run Time » / « Prochaine exécution » (locale Windows)
                 var listPsi = new ProcessStartInfo
                 {
-                    FileName = "schtasks.exe",
+                    FileName = SystemExecutables.System32("schtasks.exe"),
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardOutput = true,
@@ -192,7 +192,7 @@ namespace optiSCAN.Services
             {
                 var psi = new ProcessStartInfo
                 {
-                    FileName = "schtasks.exe",
+                    FileName = SystemExecutables.System32("schtasks.exe"),
                     UseShellExecute = false,
                     CreateNoWindow = true,
                     RedirectStandardOutput = true,

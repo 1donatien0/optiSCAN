@@ -7,6 +7,7 @@ namespace optiSCAN.Services;
 public sealed class ProtectionServiceHost : IDisposable
 {
     private readonly IProtectionServiceHostDependencies _container;
+    private readonly Action? _onShutdownRequested;
     private ProtectionPipeServer? _pipeServer;
     private ServiceHostThreatHandler? _threatHandler;
     private System.Threading.Timer? _retentionTimer;
@@ -16,13 +17,20 @@ public sealed class ProtectionServiceHost : IDisposable
     private static readonly TimeSpan RetentionFirstRun = TimeSpan.FromMinutes(2);
     private static readonly TimeSpan RetentionPeriod = TimeSpan.FromHours(24);
 
-    public ProtectionServiceHost(ServiceContainer container)
-        : this((IProtectionServiceHostDependencies)container)
+    /// <param name="onShutdownRequested">
+    /// Appelé quand le service Windows demande l'arrêt par le pipe (jeton vérifié) : l'appelant
+    /// arrête alors l'hôte proprement (<see cref="StopAsync"/>) puis quitte le processus.
+    /// </param>
+    public ProtectionServiceHost(ServiceContainer container, Action? onShutdownRequested = null)
+        : this((IProtectionServiceHostDependencies)container, onShutdownRequested)
     {
     }
 
-    public ProtectionServiceHost(IProtectionServiceHostDependencies container) =>
+    public ProtectionServiceHost(IProtectionServiceHostDependencies container, Action? onShutdownRequested = null)
+    {
         _container = container;
+        _onShutdownRequested = onShutdownRequested;
+    }
 
     public void Start()
     {
@@ -38,7 +46,10 @@ public sealed class ProtectionServiceHost : IDisposable
         _container.ProcessStartMonitor.ThreatDetected += _threatHandler.OnThreatDetected;
         _container.RemovableDriveScan.ThreatDetected += _threatHandler.OnThreatDetected;
 
-        _pipeServer = new ProtectionPipeServer(_container.Orchestrator, serviceQuarantine: _container.Quarantine);
+        _pipeServer = new ProtectionPipeServer(
+            _container.Orchestrator,
+            onShutdown: _onShutdownRequested,
+            serviceQuarantine: _container.Quarantine);
         _pipeServer.Start();
 
         _retentionTimer = new System.Threading.Timer(_ => ApplyQuarantineRetention(), null, RetentionFirstRun, RetentionPeriod);

@@ -25,7 +25,11 @@ internal static class DefenderLegacyCleanup
         if (string.Equals(ReadMarker(), ProductVersionInfo.SemVer, StringComparison.Ordinal))
             return;
 
-        _ = Task.Run(() => RunAndMark());
+        _ = Task.Run(() =>
+        {
+            try { RunAndMark(); }
+            catch (Exception ex) { AppLogger.Error("DefenderLegacyCleanup", "RunAndMark failed", ex); }
+        });
     }
 
     /// <summary>Appel direct (installeur) : nettoie et enregistre la version.</summary>

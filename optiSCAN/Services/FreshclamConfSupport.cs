@@ -160,8 +160,14 @@ namespace optiSCAN.Services
                     Directory.CreateDirectory(dir);
 
                 try { if (File.Exists(targetPath)) File.Delete(targetPath); }
-                catch (UnauthorizedAccessException) { }
-                catch (IOException) { }
+                catch (UnauthorizedAccessException ex)
+                {
+                    AppLogger.Warn("FreshclamConfSupport", "Failed to delete existing config (unauthorized)", ex);
+                }
+                catch (IOException ex)
+                {
+                    AppLogger.Warn("FreshclamConfSupport", "Failed to delete existing config (IO)", ex);
+                }
 
                 File.WriteAllBytes(targetPath, bytes);
 

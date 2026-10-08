@@ -44,7 +44,7 @@ namespace optiSCAN.Services
         private string? _pipeName;
         private bool _disposed;
 
-        /// <summary>Tube nommé du relais. Le TCP de clamd n'est pas exposé hors du conteneur.</summary>
+        /// <summary>Tube nommé du relais, avec ACL du compte; le TCP clamd reste local et non authentifié.</summary>
         public string? PipeName => _pipeName;
 
         public static ClamdHost Shared
