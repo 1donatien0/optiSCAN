@@ -24,7 +24,7 @@
 | **12** | Audit et qualité de l’édition WinUI |
 | **13** | Sécurité de l’édition WinUI (posture /100) |
 | **14** | Crédits |
-| — | [Branches Git](#branches-git) (`main`, `dev`, `win`) |
+| — | [Branches Git](#branches-git) (`main`, `dev`, `win`) Nous ne travaillons que sur `win` ici | 
 
 ---
 
