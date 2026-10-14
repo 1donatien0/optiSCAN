@@ -207,7 +207,7 @@ internal static class SafePathDelete
     /// Un seul lien de répertoire. Au-delà, ce chemin est un lien physique vers un fichier
     /// qui a déjà un autre nom : on ne le lit pas pour le supprimer.
     /// </summary>
-    private static bool IsSoleName(SafeFileHandle handle)
+    internal static bool IsSoleName(SafeFileHandle handle)
     {
         if (handle.IsInvalid || handle.IsClosed)
             return false;

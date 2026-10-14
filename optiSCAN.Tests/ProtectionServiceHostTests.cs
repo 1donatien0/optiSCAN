@@ -45,7 +45,7 @@ public sealed class ProtectionServiceHostTests
             ProcessStartMonitor = new ProcessStartMonitor(
                 _orchestrator, _quarantine, _notifications, () => RealTimeProtection.IsPaused);
             RemovableDriveScan = new RemovableDriveScanService(
-                _orchestrator, _quarantine, _notifications, _logger, RealTimeProtection, new UiEventBus());
+                _orchestrator, _quarantine, _notifications, _logger, new UiEventBus());
         }
 
         public RealTimeProtection RealTimeProtection { get; }

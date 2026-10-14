@@ -74,9 +74,18 @@ licences, qui s'appliquent indépendamment du présent contrat :
     Copyright : Cisco Systems, Inc. et contributeurs
     Site : https://www.clamav.net
     Le code source de ClamAV est disponible sur https://github.com/Cisco-Talos/clamav
+    Texte de la licence et avis des bibliothèques livrées avec ClamAV (OpenSSL,
+    libcurl, libxml2, PCRE2, UnRAR…) : dossier clamav\x64\licenses de
+    l'installation.
+
+  • YARA — Moteur de règles de détection
+    Licence : BSD 3-Clause
+    Copyright : The YARA Authors
+    Dépôt : https://github.com/VirusTotal/yara
+    Texte de la licence : licenses\YARA-COPYING.txt de l'installation.
 
   • YARA-Forge — Règles de détection comportementale
-    Licence : BSD / MIT selon les règles concernées
+    Licence : propre à chaque règle (indiquée dans ses métadonnées)
     Dépôt : https://github.com/YARAHQ/yara-forge
 
   • MaterialDesignInXamlToolkit
@@ -84,8 +93,12 @@ licences, qui s'appliquent indépendamment du présent contrat :
     Dépôt : https://github.com/MaterialDesignInXAML/MaterialDesignInXamlToolkit
 
   • QuestPDF
-    Licence : MIT License (usage communauté)
-    Dépôt : https://github.com/QuestPDF/QuestPDF
+    Licence : licence QuestPDF, niveau Community (gratuit sous conditions,
+    notamment un chiffre d'affaires annuel inférieur à 1 M USD)
+    Site : https://questpdf.com/license/
+
+  La liste complète des composants tiers et de leurs licences figure dans
+  licenses\THIRD-PARTY-NOTICES.md de l'installation.
 
   Ces composants restent la propriété de leurs auteurs respectifs. Leur
   utilisation au sein d'optiSCAN ne vous transfère aucun droit sur ceux-ci.

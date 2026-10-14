@@ -156,6 +156,17 @@ namespace optiSCAN.Services
                     return result;
                 }
 
+                // Instance élevée : freshclam.conf, la base et le journal sont dans le profil de
+                // l'utilisateur, modifiables sans élévation (directive OnUpdateExecute, jonction
+                // sur la base). Les lancer avec un jeton administrateur contournerait UAC.
+                if (ElevatedSessionGuard.IsElevatedUserSession)
+                {
+                    result.Success = false;
+                    result.Message = LocalizationService.GetString("Freshclam_ElevatedRefused");
+                    SurSortieFreshclam(UiLogText.Info(result.Message));
+                    return result;
+                }
+
                 // Pré-vérification : connectivité réseau (évite un timeout long et opaque).
                 if (!IsNetworkAvailable())
                 {
@@ -237,6 +248,11 @@ namespace optiSCAN.Services
                     proc.BeginErrorReadLine();
                     await tcs.Task.ConfigureAwait(false);
                 }
+
+                // Exited arrive avant la fin de la lecture asynchrone : sans cette attente, la ligne
+                // « up-to-date » pouvait être lue après le calcul du résultat.
+                try { proc.WaitForExit(); }
+                catch (Exception ex) { AppLogger.Debug("FreshclamUpdater", "Fin de lecture : " + ex.Message); }
 
                 result.ExitCode = proc.ExitCode;
                 result.FinishedAt = DateTime.Now;

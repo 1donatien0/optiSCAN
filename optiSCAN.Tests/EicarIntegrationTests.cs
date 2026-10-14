@@ -170,15 +170,24 @@ public sealed class EicarIntegrationTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// En CI (<c>OPTISCAN_REQUIRE_ENGINES=1</c>), un moteur absent fait échouer le test au lieu de
+    /// le laisser passer sans rien vérifier (audit A6). En local, il est sauté comme avant.
+    /// </summary>
+    internal static bool EnginesRequired =>
+        string.Equals(Environment.GetEnvironmentVariable("OPTISCAN_REQUIRE_ENGINES"), "1", StringComparison.Ordinal);
+
     private bool TryCreateYaraEngine(out YaraEngine engine)
     {
         engine = null!;
         var yaraBin = ResolveYaraBinDir();
-        if (yaraBin == null)
-            return false;
+        if (yaraBin != null)
+            engine = new YaraEngine(yaraBin, _rulesDir);
 
-        engine = new YaraEngine(yaraBin, _rulesDir);
-        return engine.IsAvailable;
+        var available = yaraBin != null && engine.IsAvailable;
+        if (!available && EnginesRequired)
+            Assert.Fail("YARA introuvable alors que OPTISCAN_REQUIRE_ENGINES=1 : lancer scripts/fetch-runtime-deps.ps1.");
+        return available;
     }
 
     private static string ResolveTestRulesYarPath()

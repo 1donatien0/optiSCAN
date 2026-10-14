@@ -47,7 +47,9 @@ namespace optiSCAN.Views
                 var wingetPath = _winget.ResolveWingetPath();
                 if (wingetPath == null)
                 {
-                    AppendUpdateLog(LocalizationService.GetString("Upd_LogWingetMissing"));
+                    AppendUpdateLog(LocalizationService.GetString(WingetUpdateService.IsRefusedInElevatedSession
+                        ? "Upd_LogWingetElevated"
+                        : "Upd_LogWingetMissing"));
                     return;
                 }
                 AppendUpdateLog(LocalizationService.Format("Upd_LogWinget", wingetPath));

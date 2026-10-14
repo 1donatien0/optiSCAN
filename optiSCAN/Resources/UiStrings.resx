@@ -139,7 +139,13 @@
   <data name="Confirm_PurgeQuarantine" xml:space="preserve"><value>Supprimer définitivement les {0} entrée(s) de la quarantaine ? Cette action est irréversible.</value></data>
   <data name="Notif_ThreatTitle" xml:space="preserve"><value>Menace détectée</value></data>
   <data name="Notif_QuarantineBtn" xml:space="preserve"><value>Mettre en quarantaine</value></data>
-  <data name="Notif_IgnoreBtn" xml:space="preserve"><value>Ignorer</value></data>
+  <data name="Notif_IgnoreBtn" xml:space="preserve"><value>Exclure…</value></data>
+  <data name="Toast_ConfirmIgnore" xml:space="preserve"><value>Exclure « {0} » de toutes les analyses ?
+
+Ce fichier a été détecté comme « {1} ».
+{2}
+
+Il ne sera plus jamais analysé ni signalé. N'acceptez que si vous êtes certain qu'il est sain.</value></data>
   <data name="Notif_OpenApp" xml:space="preserve"><value>Ouvrir optiSCAN</value></data>
   <data name="Notif_OpenAntivirus" xml:space="preserve"><value>Ouvrir Antivirus</value></data>
   <data name="Notif_QuarantinedTitle" xml:space="preserve"><value>Fichier mis en quarantaine</value></data>
@@ -157,6 +163,12 @@
   <data name="Status_UsbScanStarting" xml:space="preserve"><value>Analyse USB de {0} en cours…</value></data>
   <data name="Status_UsbScanComplete" xml:space="preserve"><value>Analyse USB de {0} terminée — {1:N0} fichier(s), {2} menace(s)</value></data>
   <data name="Status_UsbScanFailed" xml:space="preserve"><value>Analyse USB de {0} interrompue ou échouée</value></data>
+  <data name="Notif_ServiceThreatTitle" xml:space="preserve"><value>Menace détectée par la protection système</value></data>
+  <data name="Notif_ServiceThreatQuarantined" xml:space="preserve"><value>{0} — {1} : mis en quarantaine</value></data>
+  <data name="Notif_ServiceThreatDetected" xml:space="preserve"><value>{0} — {1} : non mis en quarantaine, consultez l'historique</value></data>
+  <data name="Notif_ServiceThreatsSummary" xml:space="preserve"><value>{0} menaces détectées par la protection système — consultez l'historique</value></data>
+  <data name="Notif_DeferredThreatsTitle" xml:space="preserve"><value>Menaces détectées pendant le mode jeu</value></data>
+  <data name="Notif_DeferredThreatsBody" xml:space="preserve"><value>{0} menace(s) détectée(s) pendant que les notifications étaient suspendues — consultez l'historique</value></data>
   <data name="Notif_HistoryBtn" xml:space="preserve"><value>Ouvrir l'historique</value></data>
   <data name="Notif_RtpStartedTitle" xml:space="preserve"><value>Surveillance des fichiers activée</value></data>
   <data name="Notif_RtpStartedBody" xml:space="preserve"><value>optiSCAN analyse les fichiers surveillés après leur écriture</value></data>
@@ -438,7 +450,7 @@
   <data name="Opt_RtpSub" xml:space="preserve"><value>Analyse les fichiers créés ou modifiés dans les dossiers surveillés, après l’écriture.</value></data>
   <data name="Opt_ProcessMonitor" xml:space="preserve"><value>Surveillance des lancements de processus</value></data>
   <data name="Opt_ProcessMonitorSub" xml:space="preserve"><value>Analyse les exécutables et scripts après le démarrage du processus (WMI) — complète la surveillance des fichiers.</value></data>
-  <data name="Opt_TamperProtection" xml:space="preserve"><value>Protection anti-manipulation</value></data>
+  <data name="Opt_TamperProtection" xml:space="preserve"><value>Relance automatique de la protection</value></data>
   <data name="Opt_TamperProtectionSub" xml:space="preserve"><value>Relance optiSCAN en arrière-plan si la protection temps réel est attendue mais l'application est arrêtée.</value></data>
   <data name="Opt_PlatformProtection" xml:space="preserve"><value>Service Windows de protection système</value></data>
   <data name="Opt_PlatformProtectionSub" xml:space="preserve"><value>Service Windows de surveillance des fichiers et IPC ; l’analyse intervient après l’écriture. AMSI et minifiltre ne sont pas inclus. Installation avec droits administrateur.</value></data>
@@ -457,7 +469,20 @@
   <data name="Platform_MinifilterNotLoaded" xml:space="preserve"><value>Contrôle à l'ouverture installé, mais pas démarré</value></data>
   <data name="Platform_MinifilterAbsent" xml:space="preserve"><value>Les programmes ne sont pas contrôlés à l'ouverture</value></data>
   <data name="Opt_BackupBeforeQuarantine" xml:space="preserve"><value>Copie de sécurité avant quarantaine</value></data>
-  <data name="Opt_BackupBeforeQuarantineSub" xml:space="preserve"><value>Conserve une copie locale (32 Mo max.) dans %LocalAppData%\optiSCAN\SafetyBackups.</value></data>
+  <data name="Notif_RtDegradedTitle" xml:space="preserve"><value>Protection temps réel dégradée</value></data>
+  <data name="Notif_RtDegradedBody" xml:space="preserve"><value>{0} dossier(s) surveillé(s) ne le sont plus entièrement. optiSCAN tente de rétablir la surveillance ; le détail est sur le badge de protection.</value></data>
+  <data name="Protection_RtDegradedDetail" xml:space="preserve"><value>Temps réel dégradé : {0} dossier(s) non entièrement surveillé(s).</value></data>
+  <data name="Upd_LogWingetElevated" xml:space="preserve"><value>winget n'est pas lancé depuis une fenêtre optiSCAN ouverte en administrateur : rouvrez optiSCAN normalement pour mettre à jour vos applications.</value></data>
+  <data name="Freshclam_ElevatedRefused" xml:space="preserve"><value>Les signatures ne sont pas mises à jour depuis une fenêtre optiSCAN ouverte en administrateur : rouvrez optiSCAN normalement.</value></data>
+  <data name="Twk_Undo" xml:space="preserve"><value>Rétablir l'origine</value></data>
+  <data name="Twk_UndoTip" xml:space="preserve"><value>Rétablit les réglages tels qu'ils étaient avant le premier passage d'optiSCAN (registre de votre compte, plan d'alimentation, télémétrie).</value></data>
+  <data name="Twk_UndoConfirm" xml:space="preserve"><value>Rétablir les réglages modifiés par optiSCAN tels qu'ils étaient avant ?&#10;&#10;La télémétrie, si elle a été réduite, revient aux réglages par défaut de Windows (invite administrateur). Le nettoyage DISM ne peut pas être annulé.</value></data>
+  <data name="Twk_UndoStart" xml:space="preserve"><value>Rétablissement des réglages d'origine…</value></data>
+  <data name="Twk_UndoDone" xml:space="preserve"><value>Réglages d'origine rétablis.</value></data>
+  <data name="Twk_UndoPartial" xml:space="preserve"><value>Certains réglages n'ont pas pu être rétablis ; ils restent proposés.</value></data>
+  <data name="Twk_UndoNothing" xml:space="preserve"><value>Aucun réglage modifié par optiSCAN à rétablir.</value></data>
+  <data name="Upd_WingetTimeout" xml:space="preserve"><value>winget n'a pas répondu en {0} min et a été arrêté.</value></data>
+  <data name="Opt_BackupBeforeQuarantineSub" xml:space="preserve"><value>Conserve une copie chiffrée (32 Mo max. par fichier) dans %LocalAppData%\optiSCAN\SafetyBackups, gardée 30 jours (256 Mo au total) ; elle sert à restaurer si la quarantaine est illisible.</value></data>
   <data name="Opt_AggressiveSignatures" xml:space="preserve"><value>Mises à jour signatures renforcées</value></data>
   <data name="Opt_AggressiveSignaturesSub" xml:space="preserve"><value>ClamAV toutes les 2 h et règles YARA toutes les 12 h (au lieu de 4 h / 24 h).</value></data>
   <data name="Main_GuardSession" xml:space="preserve"><value>Session de protection en arrière-plan active.</value></data>
@@ -527,6 +552,7 @@ Les supprimer ? Les fichiers ne sont pas effacés, seul le partage est retiré. 
   <data name="Opt_VirusTotalSub" xml:space="preserve"><value>Envoie uniquement le hash SHA-256 du fichier pour la réputation cloud.</value></data>
   <data name="VT_NoApiKey" xml:space="preserve"><value>Ajoutez une clé API VirusTotal dans Options.</value></data>
   <data name="VT_HashFailed" xml:space="preserve"><value>Impossible de calculer le hash du fichier.</value></data>
+  <data name="VT_UnknownHash" xml:space="preserve"><value>Fichier inconnu de VirusTotal (jamais soumis).</value></data>
   <data name="VT_HttpError" xml:space="preserve"><value>VirusTotal a répondu HTTP {0}.</value></data>
   <data name="VT_Summary" xml:space="preserve"><value>Détections : {0} malveillants, {1} suspects, {2} sains, {3} non détectés.</value></data>
   <data name="VT_Error" xml:space="preserve"><value>Erreur : {0}</value></data>

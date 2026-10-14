@@ -45,7 +45,8 @@ namespace optiSCAN.ViewModels
             var epoch = Interlocked.Increment(ref _scanEpoch);
             var progress = new Progress<ScanProgress>(p => SurChangementProgressionScan(p, epoch));
 
-            _realTimeProtection.Suspend();
+            // Pas de suspension du temps réel pendant le scan : une lecture ne déclenche aucun
+            // événement, et la couper laissait la machine sans protection jusqu'à 12 h (audit V2).
             try
             {
                 ScanResult result = type switch
@@ -124,7 +125,6 @@ namespace optiSCAN.ViewModels
                 ScanProgressDetail = string.Empty;
                 _cts?.Dispose();
                 _cts = null;
-                _realTimeProtection.Resume();
             }
         }
 

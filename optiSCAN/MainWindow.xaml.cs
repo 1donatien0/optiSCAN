@@ -525,6 +525,13 @@ namespace optiSCAN
             SelectAntivirusQuarantineTab = () => (panelAntivirus as Views.AntivirusView)?.SelectQuarantineTab(),
             SelectAntivirusSignaturesTab = () => (panelAntivirus as Views.AntivirusView)?.SelectSignaturesTab(),
             TriggerManualSignatureUpdate = () => BtnManualUpdateSignatures_Click(this, new RoutedEventArgs()),
+            ConfirmIgnore = (path, virus) => System.Windows.MessageBox.Show(
+                    this,
+                    LocalizationService.Format("Toast_ConfirmIgnore", Path.GetFileName(path), virus ?? "?", path),
+                    OptiscanStrings.Confirmations.Title,
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning,
+                    MessageBoxResult.No) == MessageBoxResult.Yes,
         };
 
         /// <summary>Titre de protection, recommandations hygiène et activité (vue d’ensemble).</summary>

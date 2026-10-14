@@ -42,9 +42,68 @@ namespace optiSCAN.Services
         private static readonly TimeSpan StabilizationDelay = TimeSpan.FromMilliseconds(500);
         private static readonly TimeSpan StabilitySampleDelay = TimeSpan.FromMilliseconds(250);
         private static readonly TimeSpan StabilityTimeout = TimeSpan.FromSeconds(20);
+        private const int PinRetryCount = 3;
+        private static readonly TimeSpan PinRetryDelay = TimeSpan.FromMilliseconds(1500);
 
         public event EventHandler<Models.ThreatInfo>? ThreatDetected;
         public bool IsEnabled => _isEnabled;
+
+        // ── Santé (audit A15) ───────────────────────────────────────────────
+        // Un dossier qui n'a pas pu être surveillé, un watcher non rétabli ou un rattrapage
+        // incomplet n'étaient visibles que dans les journaux : l'interface affichait « protégé ».
+        private readonly Dictionary<string, string> _healthIssues = new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>Changement de l'état de santé (dossiers en défaut). Peut venir de n'importe quel thread.</summary>
+        public event EventHandler? HealthChanged;
+
+        /// <summary>Nombre de dossiers surveillés en défaut (0 : surveillance complète).</summary>
+        public int DegradedFolderCount
+        {
+            get { lock (_healthIssues) return _healthIssues.Count; }
+        }
+
+        /// <summary>Raisons des dossiers en défaut, chemins masqués, pour l'infobulle et le journal.</summary>
+        public IReadOnlyList<string> HealthIssues
+        {
+            get { lock (_healthIssues) return _healthIssues.Values.ToList(); }
+        }
+
+        private void SetHealthIssue(string path, string? reason)
+        {
+            bool changed;
+            lock (_healthIssues)
+            {
+                if (reason == null)
+                    changed = _healthIssues.Remove(path);
+                else
+                {
+                    changed = !_healthIssues.TryGetValue(path, out var previous) || previous != reason;
+                    _healthIssues[path] = reason;
+                }
+            }
+
+            if (changed)
+                RaiseHealthChanged();
+        }
+
+        private void ClearHealthIssues()
+        {
+            bool changed;
+            lock (_healthIssues)
+            {
+                changed = _healthIssues.Count > 0;
+                _healthIssues.Clear();
+            }
+
+            if (changed)
+                RaiseHealthChanged();
+        }
+
+        private void RaiseHealthChanged()
+        {
+            try { HealthChanged?.Invoke(this, EventArgs.Empty); }
+            catch (Exception ex) { AppLogger.Warn("RealTimeProtection", "HealthChanged", ex); }
+        }
         internal int PendingWatcherEvents => Volatile.Read(ref _pendingWatcherEvents);
         internal int MaxPendingWatcherEventsObserved => Volatile.Read(ref _maxPendingWatcherEventsObserved);
         internal int WatcherQueueOverflowCount => Volatile.Read(ref _watcherQueueOverflowCount);
@@ -52,7 +111,10 @@ namespace optiSCAN.Services
         internal int WatcherRecoveryPassCount => Volatile.Read(ref _watcherRecoveryPassCount);
         internal int WatcherRecoveryRescheduleCount => Volatile.Read(ref _watcherRecoveryRescheduleCount);
 
-        /// <summary>Ignore les événements watcher pendant un scan manuel (compteur réentrant).</summary>
+        /// <summary>
+        /// Ignore les événements du watcher (compteur réentrant). N'est plus appelé pendant les
+        /// scans manuels ni USB (audit V2) : à réserver à un arrêt bref et explicite.
+        /// </summary>
         public void Suspend() => Interlocked.Increment(ref _suspendCount);
 
         /// <summary>Réactive la surveillance après <see cref="Suspend"/>.</summary>
@@ -64,7 +126,7 @@ namespace optiSCAN.Services
 
         private bool IsSuspended => Volatile.Read(ref _suspendCount) > 0;
 
-        /// <summary>Vrai pendant un scan manuel ou USB (surveillance processus en pause).</summary>
+        /// <summary>Vrai tant qu'une suspension explicite est en cours (surveillance processus en pause).</summary>
         public bool IsPaused => IsSuspended;
 
         private readonly IUserPreferencesAccessor _prefs;
@@ -137,6 +199,7 @@ namespace optiSCAN.Services
                 Interlocked.Exchange(ref _watcherRecoveryRescheduleCount, 0);
                 _isEnabled = true;
             }
+            ClearHealthIssues();
 
             // Les événements d'erreur des watchers peuvent arriver dès leur création.
             foreach (var folder in watchPaths)
@@ -174,6 +237,7 @@ namespace optiSCAN.Services
                 _watcherRecoveryLifetime?.Cancel();
                 _watcherRecoveryStates.Clear();
             }
+            ClearHealthIssues();
 
             _cacheCleanupTimer?.Dispose();
             _cacheCleanupTimer = null;
@@ -253,6 +317,8 @@ namespace optiSCAN.Services
             {
                 watcher?.Dispose();
                 WriteLog($"Impossible de surveiller {PathRedaction.RedactPath(path)} : {PathRedaction.RedactPath(ex.Message)}");
+                if (_isEnabled && !_disposed)
+                    SetHealthIssue(path, $"non surveillé : {PathRedaction.RedactPath(path)}");
                 return null;
             }
         }
@@ -445,6 +511,9 @@ namespace optiSCAN.Services
                 return;
 
             var path = watcher.Path;
+            // Événements perdus : le dossier est en défaut jusqu'à la fin du rattrapage.
+            if (_isEnabled && !_disposed)
+                SetHealthIssue(path, $"événements perdus, rattrapage en cours : {PathRedaction.RedactPath(path)}");
             if (ScheduleWatcherRecovery(watcher, path))
                 WriteLog($"Perte d'événements FileSystemWatcher sur {PathRedaction.RedactPath(path)} : {PathRedaction.RedactPath(e.GetException()?.Message)}. Réinitialisation et rattrapage en cours.");
             else if (_isEnabled && !_disposed && TryAcquireRecoveryLogWindow())
@@ -682,6 +751,7 @@ namespace optiSCAN.Services
                     lock (_watchers)
                         _isEnabled = _watchers.Count > 0;
                     WriteLog($"Surveillance non rétablie : {PathRedaction.RedactPath(path)}");
+                    SetHealthIssue(path, $"surveillance non rétablie : {PathRedaction.RedactPath(path)}");
                     return null;
                 }
 
@@ -710,6 +780,11 @@ namespace optiSCAN.Services
 
                 if (skipped > 0)
                     WriteLog($"Rattrapage incomplet pour {PathRedaction.RedactPath(path)} : {skipped} élément(s) inaccessible(s), hors ligne ou lié(s).");
+                // Watcher rétabli et rattrapage terminé : le dossier est de nouveau couvert.
+                // Les éléments inaccessibles sont ceux qu'une analyse manuelle ne lirait pas non
+                // plus ; ils ne rendent pas la surveillance défaillante.
+                if (!ct.IsCancellationRequested)
+                    SetHealthIssue(path, null);
                 return replacementWatcher;
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
@@ -755,7 +830,21 @@ namespace optiSCAN.Services
                 Models.ScanResult result;
                 string? scannedSha256;
                 string? refusal = "dossier surveillé inconnu";
-                using (var pin = watchRoot == null ? null : RealTimePathGuard.PinWithinRoot(watchRoot, filePath, out refusal))
+                IDisposable? pinned = null;
+                // Un fichier encore ouvert en écriture par son auteur (téléchargement, archive en
+                // cours d'extraction) refuse l'ouverture exclusive : sans nouvel essai, il n'était
+                // jamais analysé. Trois essais espacés, puis abandon journalisé.
+                for (var attempt = 0; watchRoot != null; attempt++)
+                {
+                    pinned = RealTimePathGuard.PinWithinRoot(watchRoot, filePath, out refusal);
+                    if (pinned != null || attempt >= PinRetryCount
+                        || !string.Equals(refusal, RealTimePathGuard.InaccessibleRefusal, StringComparison.Ordinal)
+                        || !File.Exists(filePath))
+                        break;
+                    await Task.Delay(PinRetryDelay).ConfigureAwait(false);
+                }
+
+                using (var pin = pinned)
                 {
                     if (pin == null)
                     {
@@ -768,6 +857,16 @@ namespace optiSCAN.Services
 
                 if (result.Status != Models.ScanStatus.Completed)
                     WriteLog($"[RTP] Scan incomplet ({PathRedaction.RedactPath(filePath)}) : {result.ErrorMessage ?? result.Status.ToString()}");
+
+                if (result.ThreatsFound > 0
+                    && scannedSha256 != null
+                    && RestoredContentGrace.IsGranted(filePath, scannedSha256))
+                {
+                    // Fichier que l'utilisateur vient de restaurer, contenu inchangé : ni alerte
+                    // ni nouvelle quarantaine. Toute modification du contenu annule ce répit.
+                    WriteLog($"[RTP] Fichier restauré par l'utilisateur, ignoré : {PathRedaction.RedactPath(filePath)}");
+                    return;
+                }
 
                 if (result.ThreatsFound > 0)
                 {

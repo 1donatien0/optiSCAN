@@ -7,7 +7,6 @@ internal sealed class ServiceHostThreatHandler
 {
     private readonly IServiceHostThreatContext _context;
     private readonly IExclusionSettingsAccessor _exclusions;
-    private readonly IUserPreferencesAccessor _prefs;
 
     public ServiceHostThreatHandler(IProtectionServiceHostDependencies container)
         : this(
@@ -24,26 +23,30 @@ internal sealed class ServiceHostThreatHandler
     {
         _context = context;
         _exclusions = exclusions;
-        _prefs = preferences;
+        _ = preferences;
     }
 
     public void OnThreatDetected(object? sender, ThreatInfo threat)
     {
         try
         {
-            if (_exclusions.Current.AutoQuarantineEnabled)
-            {
-                var repair = ThreatRepairService.TryRemediate(threat, _context.Quarantine, _prefs);
-                _context.Logger.WriteToLog(
-                    $"[ServiceHost] Remédiation {PathRedaction.RedactPath(threat.FilePath)}: {repair.Message}");
-            }
-            else
-            {
-                _context.Logger.WriteToLog(
-                    $"[ServiceHost] Menace {threat.VirusName} — {PathRedaction.RedactPath(threat.FilePath)}");
-            }
+            // La quarantaine automatique est déjà faite par la source (temps réel, processus,
+            // lecteur amovible), avec l'empreinte du contenu analysé. La refaire ici, sans
+            // empreinte, mettait en quarantaine un contenu remplacé après l'analyse, justement
+            // ce que l'empreinte refuse ; et un succès de la source s'affichait en « échec ».
+            var outcome = threat.Status == ThreatStatus.Quarantined
+                ? "mise en quarantaine"
+                : _exclusions.Current.AutoQuarantineEnabled
+                    ? "quarantaine automatique refusée ou impossible"
+                    : "quarantaine automatique désactivée";
+            _context.Logger.WriteToLog(
+                $"[ServiceHost] Menace {threat.VirusName} — {PathRedaction.RedactPath(threat.FilePath)} ({outcome})");
 
-            _ = EnrichCloudAsync(threat);
+            // Relevée par les sessions ouvertes (notification et historique de l'utilisateur).
+            _context.Detections.Record(threat);
+
+            if (threat.Status != ThreatStatus.Quarantined)
+                _ = EnrichCloudAsync(threat);
         }
         catch (Exception ex)
         {

@@ -40,6 +40,13 @@ namespace optiSCAN.Services
             Add(Environment.GetFolderPath(Environment.SpecialFolder.Desktop));
             Add(Environment.GetFolderPath(Environment.SpecialFolder.Recent));
 
+            // %APPDATA% (Roaming) : emplacement le plus courant des charges qui se réinstallent
+            // (dossier au nom aléatoire + clé Run). Il contient aussi le dossier Démarrage.
+            // %LOCALAPPDATA% entier reste hors du scan rapide (caches de navigateurs, très volumineux).
+            Add(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData));
+            // Dossier public : accessible en écriture à tous les comptes, cachette fréquente.
+            Add(Environment.GetEnvironmentVariable("PUBLIC"));
+
             // Démarrage — persistance classique (équivalent des « dossiers de démarrage » Defender)
             Add(Environment.GetFolderPath(Environment.SpecialFolder.Startup));
             Add(Environment.GetFolderPath(Environment.SpecialFolder.CommonStartup));
@@ -54,7 +61,38 @@ namespace optiSCAN.Services
                 Add(Path.Combine(winDir, "SysWOW64", "drivers"));
             }
 
-            return dirs.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            return RemoveNested(dirs);
+        }
+
+        /// <summary>
+        /// Sans doublons ni dossiers contenus dans une autre cible (Démarrage est sous %APPDATA%,
+        /// %TEMP% sous %LOCALAPPDATA%\Temp) : chaque fichier n'est analysé qu'une fois.
+        /// L'ordre d'origine est conservé.
+        /// </summary>
+        internal static List<string> RemoveNested(IEnumerable<string> paths)
+        {
+            static string Norm(string p) => Path.TrimEndingDirectorySeparator(Path.GetFullPath(p));
+
+            var list = paths
+                .Where(p => !string.IsNullOrWhiteSpace(p))
+                .Select(p => (Original: p, Full: Norm(p)))
+                .ToList();
+            var result = new List<string>();
+            var seen = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (original, full) in list)
+            {
+                if (!seen.Add(full))
+                    continue;
+                var nested = list.Any(o =>
+                    !string.Equals(o.Full, full, StringComparison.OrdinalIgnoreCase)
+                    && full.Length > o.Full.Length
+                    && full.StartsWith(o.Full, StringComparison.OrdinalIgnoreCase)
+                    && (full[o.Full.Length] == Path.DirectorySeparatorChar || o.Full.EndsWith(Path.DirectorySeparatorChar)));
+                if (!nested)
+                    result.Add(original);
+            }
+
+            return result;
         }
 
         /// <summary>

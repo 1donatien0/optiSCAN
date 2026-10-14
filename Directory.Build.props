@@ -13,6 +13,12 @@
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
   </PropertyGroup>
 
+  <!-- L'interface ne propose que fr-FR et en-US. Garder les satellites .NET
+       correspondants dans le paquet autonome, sans les autres langues du runtime. -->
+  <PropertyGroup Condition="'$(OptiscanShipping)' == 'true'">
+    <SatelliteResourceLanguages>en;fr</SatelliteResourceLanguages>
+  </PropertyGroup>
+
   <!-- Analyseurs .NET : ceux du SDK .NET 10 (global.json), sans paquet NuGet séparé
        qui retarderait sur le SDK. -->
 </Project>

@@ -37,19 +37,35 @@ public sealed class ProtectionServiceHost : IDisposable
         if (_started)
             return;
 
-        _container.ApplyHostPreferences();
-        SystemTweaksService.RemoveDefenderHistoryTask();
-        DefenderLegacyCleanup.TryRunOnceInBackground();
-
+        // Abonnement avant le démarrage du temps réel : une menace vue pendant le démarrage
+        // est journalisée elle aussi.
         _threatHandler = new ServiceHostThreatHandler(_container, _container.ExclusionSettingsAccessor, _container.UserPreferencesAccessor);
         _container.RealTimeProtection.ThreatDetected += _threatHandler.OnThreatDetected;
         _container.ProcessStartMonitor.ThreatDetected += _threatHandler.OnThreatDetected;
         _container.RemovableDriveScan.ThreatDetected += _threatHandler.OnThreatDetected;
 
+        // Copies d'analyse laissées par un arrêt brutal : supprimées avant toute nouvelle copie.
+        ScanStaging.PurgeStale();
+        _container.ApplyHostPreferences();
+        SystemTweaksService.RemoveDefenderHistoryTask();
+        DefenderLegacyCleanup.TryRunOnceInBackground();
+
         _pipeServer = new ProtectionPipeServer(
             _container.Orchestrator,
             onShutdown: _onShutdownRequested,
-            serviceQuarantine: _container.Quarantine);
+            serviceQuarantine: _container.Quarantine,
+            realTimeDegradedFolders: () => _container.RealTimeProtection.IsEnabled
+                ? _container.RealTimeProtection.DegradedFolderCount
+                : null);
+        // Le service n'a personne à qui l'afficher : il journalise, les sessions le relèvent.
+        _container.RealTimeProtection.HealthChanged += (_, _) =>
+        {
+            var issues = _container.RealTimeProtection.HealthIssues;
+            if (issues.Count > 0)
+                AppLogger.Warn("ProtectionServiceHost", "Temps réel dégradé : " + string.Join(" ; ", issues));
+            else
+                AppLogger.Info("ProtectionServiceHost", "Temps réel : surveillance complète rétablie");
+        };
         _pipeServer.Start();
 
         _retentionTimer = new System.Threading.Timer(_ => ApplyQuarantineRetention(), null, RetentionFirstRun, RetentionPeriod);

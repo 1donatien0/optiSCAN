@@ -50,9 +50,11 @@ public class RemovableDriveDiscoveryTests
     }
 
     [Fact]
-    public void ShouldSkipUsbScanPath_skips_recycle_and_system_folders()
+    public void ShouldSkipUsbScanPath_skips_only_the_volume_system_folder()
     {
-        Assert.True(RemovableDriveDiscovery.ShouldSkipUsbScanPath(@"F:\$RECYCLE.BIN\file.exe"));
+        // Les corbeilles d'une clé USB sont une cachette classique de vers : analysées.
+        Assert.False(RemovableDriveDiscovery.ShouldSkipUsbScanPath(@"F:\$RECYCLE.BIN\file.exe"));
+        Assert.False(RemovableDriveDiscovery.ShouldSkipUsbScanPath(@"F:\RECYCLER\S-1-5-21\autorun.exe"));
         Assert.True(RemovableDriveDiscovery.ShouldSkipUsbScanPath(@"F:\System Volume Information\idx"));
         Assert.False(RemovableDriveDiscovery.ShouldSkipUsbScanPath(@"F:\tools\setup.exe"));
     }

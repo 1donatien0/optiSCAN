@@ -30,6 +30,14 @@ namespace optiSCAN
             }
         }
 
+        /// <summary>
+        /// Vrai dans les modes sans fenêtre (hôte SYSTEM, scans planifiés, actions élevées) :
+        /// aucune boîte de dialogue d'erreur. Dans l'hôte, en session 0, personne ne peut la
+        /// fermer : elle bloquait le thread (finaliseur compris) et empêchait un processus
+        /// condamné de se terminer, donc d'être relancé par le service (audit V5).
+        /// </summary>
+        private static volatile bool _noInteractiveUi;
+
         /// <summary>Session garde : RTP active, fenêtre masquée (systray).</summary>
         public static bool GuardSession { get; private set; }
 
@@ -44,6 +52,10 @@ namespace optiSCAN
         protected override async void OnStartup(StartupEventArgs e)
         {
             var earlyMode = HeadlessScanArguments.ParseMode(e.Args);
+            _noInteractiveUi = !Environment.UserInteractive
+                || earlyMode is not (HeadlessScanArguments.Mode.None
+                    or HeadlessScanArguments.Mode.Guard
+                    or HeadlessScanArguments.Mode.ServiceQuarantine);
             if (earlyMode == HeadlessScanArguments.Mode.ClamdStub)
             {
                 ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -110,7 +122,7 @@ namespace optiSCAN
             {
                 ShutdownMode = ShutdownMode.OnExplicitShutdown;
                 base.OnStartup(e);
-                TamperProtectionService.RunWatchdogCheck();
+                ProtectionWatchdogService.RunWatchdogCheck();
                 Shutdown();
                 return;
             }
@@ -342,6 +354,15 @@ namespace optiSCAN
             CrashDialogKind kind,
             bool terminating = false)
         {
+            if (_noInteractiveUi)
+            {
+                // Déjà journalisée par LogFatal. Un processus condamné se termine tout de suite :
+                // le service relance l'hôte, la tâche planifiée se termine en erreur.
+                if (terminating)
+                    Environment.Exit(1);
+                return;
+            }
+
             try
             {
                 var title = kind switch

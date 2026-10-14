@@ -123,6 +123,7 @@ function Test-ClamReady {
         Select-Object -ExpandProperty Count
     if ($missing -gt 0) { return $missing }
     if (-not (Test-PinMarker $clamX64 $clamPin)) { return 1 }
+    if (-not (Test-Path (Join-Path $clamX64 'licenses\COPYING.txt'))) { return 1 }
     return 0
 }
 
@@ -172,6 +173,20 @@ function Copy-ClamAvRuntime([string] $srcDir, [string] $destDir) {
             throw "Binaire ClamAV manquant dans l'archive : $name"
         }
     }
+
+    # Licences : la GPLv2 (COPYING.txt) et les avis des bibliothèques (COPYING\COPYING.*)
+    # accompagnent obligatoirement les binaires livrés (audit V9).
+    $licDir = Join-Path $destDir 'licenses'
+    New-Item -ItemType Directory -Force -Path $licDir | Out-Null
+    $licenses = @(Get-ChildItem -Path $srcDir -Recurse -File -Filter 'COPYING*' -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -notmatch '[\\/]UserManual[\\/]' })
+    foreach ($lic in $licenses) {
+        Copy-Item -LiteralPath $lic.FullName -Destination (Join-Path $licDir $lic.Name) -Force
+    }
+    if (-not (Test-Path (Join-Path $licDir 'COPYING.txt'))) {
+        throw "Licence ClamAV (COPYING.txt) absente de l'archive."
+    }
+    Write-Host "  OK licences ClamAV ($($licenses.Count) fichier(s))" -ForegroundColor Green
 }
 
 function Install-ClamCertsLayout {

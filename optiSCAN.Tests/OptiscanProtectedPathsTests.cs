@@ -43,6 +43,39 @@ public sealed class OptiscanProtectedPathsTests
     }
 
     [Fact]
+    public void Executables_dropped_in_user_writable_data_folders_are_scanned()
+    {
+        var root = OptiscanProtectedPaths.GetLocalAppDataRoot();
+        foreach (var sub in OptiscanProtectedPaths.LocalAppDataProtectedSubfolders)
+        {
+            var folder = Path.Combine(root, sub);
+            // Le dossier est parcouru ; seuls les fichiers de données d'optiSCAN sont exclus.
+            Assert.False(OptiscanProtectedPaths.IsUnderProtectedPath(folder));
+            Assert.False(OptiscanProtectedPaths.IsUnderProtectedPath(Path.Combine(folder, "payload.exe")));
+            Assert.False(OptiscanProtectedPaths.IsUnderProtectedPath(Path.Combine(folder, "x", "loader.ps1")));
+            Assert.False(new ExclusionSettings { ExcludedFolders = { folder } }
+                .IsFolderExcluded(Path.Combine(folder, "payload.dll")));
+        }
+
+        Assert.True(OptiscanProtectedPaths.IsUnderProtectedPath(Path.Combine(root, "clamav", "database", "main.cld")));
+        Assert.True(OptiscanProtectedPaths.IsUnderProtectedPath(Path.Combine(root, "rules", "_compiled.yarc")));
+        Assert.True(OptiscanProtectedPaths.IsUnderProtectedPath(Path.Combine(root, "SafetyBackups", "a.optibak")));
+    }
+
+    [Fact]
+    public void ClamScan_exclude_patterns_keep_data_folders_browsable()
+    {
+        var clamav = Path.Combine(OptiscanProtectedPaths.GetLocalAppDataRoot(), "clamav");
+        var patterns = AppInstallPaths.GetClamScanExcludePatterns()
+            .Select(p => new System.Text.RegularExpressions.Regex(p, System.Text.RegularExpressions.RegexOptions.IgnoreCase))
+            .ToList();
+
+        Assert.Contains(patterns, r => r.IsMatch(Path.Combine(clamav, "database", "daily.cvd")));
+        Assert.DoesNotContain(patterns, r => r.IsMatch(Path.Combine(clamav, "payload.exe")));
+        Assert.DoesNotContain(patterns, r => r.IsMatch(clamav));
+    }
+
+    [Fact]
     public void ClamScan_exclude_patterns_are_nonempty()
     {
         var patterns = AppInstallPaths.GetClamScanExcludePatterns().ToList();

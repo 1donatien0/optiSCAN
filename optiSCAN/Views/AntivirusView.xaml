@@ -46,8 +46,9 @@
                                FontSize="{DynamicResource FontSize.Small}" Foreground="{DynamicResource TextMuted}"/>
                 </StackPanel>
 
-                <!-- Badge : ClamAV + YARA + protection temps réel (ProtectionBadgeLevel) -->
-                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- Badge : ClamAV + YARA + protection temps réel (ProtectionBadgeLevel) ; infobulle : santé du temps réel -->
+                <StackPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center"
+                            ToolTip="{Binding ProtectionBadgeDetail}" ToolTipService.ShowOnDisabled="True">
                     <Border Width="7" Height="7" CornerRadius="4"
                             Margin="0,0,6,0" VerticalAlignment="Center">
                         <Border.Style>

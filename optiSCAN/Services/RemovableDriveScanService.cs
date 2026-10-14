@@ -25,7 +25,6 @@ namespace optiSCAN.Services
         private readonly QuarantineManager _quarantine;
         private readonly NotificationService _notifications;
         private readonly ScanLogManager _logger;
-        private readonly RealTimeProtection _realTimeProtection;
         private readonly IUiEventBus _uiEvents;
         private readonly IUserPreferencesAccessor _prefs;
         private readonly IExclusionSettingsAccessor _exclusions;
@@ -48,7 +47,6 @@ namespace optiSCAN.Services
             QuarantineManager quarantine,
             NotificationService notifications,
             ScanLogManager logger,
-            RealTimeProtection realTimeProtection,
             IUiEventBus uiEvents,
             IUserPreferencesAccessor? preferences = null,
             IExclusionSettingsAccessor? exclusions = null)
@@ -57,7 +55,6 @@ namespace optiSCAN.Services
             _quarantine = quarantine;
             _notifications = notifications;
             _logger = logger;
-            _realTimeProtection = realTimeProtection;
             _uiEvents = uiEvents;
             _prefs = preferences ?? new DefaultUserPreferencesAccessor();
             _exclusions = exclusions ?? new DefaultExclusionSettingsAccessor();
@@ -104,8 +101,12 @@ namespace optiSCAN.Services
 
         private void SeedKnownRemovableRoots()
         {
-            foreach (var root in RemovableDriveDiscovery.GetReadyRemovableRoots())
-                _knownRoots.Add(root);
+            var ready = RemovableDriveDiscovery.GetReadyRemovableRoots();
+            lock (_knownRoots)
+            {
+                foreach (var root in ready)
+                    _knownRoots.Add(root);
+            }
         }
 
         private void TryStartVolumeWatcher()
@@ -138,7 +139,10 @@ namespace optiSCAN.Services
                 {
                     var root = RemovableDriveDiscovery.NormalizeRootFromDriveName(driveName);
                     if (root != null)
-                        _knownRoots.Remove(root);
+                    {
+                        lock (_knownRoots)
+                            _knownRoots.Remove(root);
+                    }
                     return;
                 }
 
@@ -162,12 +166,20 @@ namespace optiSCAN.Services
             try
             {
                 await Task.Delay(MountSettleDelayMs).ConfigureAwait(false);
-                var newRoots = RemovableDriveDiscovery.FindNewRemovableRoots(_knownRoots);
-                foreach (var root in newRoots)
+
+                // Le minuteur (toutes les 4 s) et l'événement WMI arrivent sur des fils différents :
+                // un lecteur est « réclamé » sous verrou, une seule fois, avant son analyse.
+                // Sans verrou, le HashSet pouvait être corrompu et une clé analysée deux fois.
+                List<string> claimed;
+                lock (_knownRoots)
                 {
-                    _knownRoots.Add(root);
-                    await ScanRootIfEligibleAsync(root).ConfigureAwait(false);
+                    claimed = RemovableDriveDiscovery.FindNewRemovableRoots(_knownRoots).ToList();
+                    foreach (var root in claimed)
+                        _knownRoots.Add(root);
                 }
+
+                foreach (var root in claimed)
+                    await ScanRootIfEligibleAsync(root).ConfigureAwait(false);
             }
             catch (Exception ex)
             {
@@ -226,7 +238,9 @@ namespace optiSCAN.Services
             ScanResult? result = null;
             var scanSucceeded = false;
 
-            _realTimeProtection.Suspend();
+            // Le temps réel et la surveillance des processus restent actifs pendant l'analyse :
+            // les lire ne déclenche aucun événement, et les couper laissait la machine sans
+            // protection jusqu'à 45 min à chaque insertion (audit V2).
             try
             {
                 using var cts = new CancellationTokenSource(detailed ? DetailedScanTimeout : QuickScanTimeout);
@@ -283,8 +297,6 @@ namespace optiSCAN.Services
             }
             finally
             {
-                _realTimeProtection.Resume();
-
                 var phase = scanSucceeded ? RemovableDriveScanPhase.Completed : RemovableDriveScanPhase.Failed;
                 var threats = result?.Threats.Count ?? 0;
                 var files = result?.FilesScanned ?? 0;
@@ -607,16 +619,13 @@ namespace optiSCAN.Services
             if (string.IsNullOrWhiteSpace(path))
                 return true;
 
+            // Les corbeilles d'une clé ($RECYCLE.BIN, RECYCLER, RECYCLED) sont analysées : c'est
+            // la cachette classique des vers USB. Seul le dossier système du volume est ignoré.
             var parts = path.Split(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             foreach (var part in parts)
             {
-                if (part.Equals("$RECYCLE.BIN", StringComparison.OrdinalIgnoreCase)
-                    || part.Equals("System Volume Information", StringComparison.OrdinalIgnoreCase)
-                    || part.Equals("RECYCLER", StringComparison.OrdinalIgnoreCase)
-                    || part.Equals("RECYCLED", StringComparison.OrdinalIgnoreCase))
-                {
+                if (part.Equals("System Volume Information", StringComparison.OrdinalIgnoreCase))
                     return true;
-                }
             }
 
             return false;

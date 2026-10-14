@@ -78,6 +78,58 @@ internal static class ScanStaging
         return false;
     }
 
+    /// <summary>Âge au-delà duquel une copie d'analyse ne peut plus être en cours d'utilisation.</summary>
+    internal static readonly TimeSpan StaleAge = TimeSpan.FromHours(2);
+
+    /// <summary>
+    /// Supprime les copies d'analyse laissées par un arrêt brutal (plantage, coupure) : elles
+    /// gardaient des copies de fichiers malveillants et s'accumulaient. Sous SYSTEM, au-delà
+    /// de 200 000 entrées, la reprise de ProgramData échouait et l'hôte refusait de démarrer.
+    /// Seuls les dossiers anciens et inconnus de ce processus sont retirés (une analyse d'un
+    /// autre processus du même compte peut être en cours). Rend le nombre de dossiers retirés.
+    /// </summary>
+    internal static int PurgeStale(TimeSpan? olderThan = null, string? rootOverride = null)
+    {
+        var removed = 0;
+        try
+        {
+            var root = rootOverride ?? Root;
+            if (!Directory.Exists(root))
+                return 0;
+
+            var cutoff = DateTime.UtcNow - (olderThan ?? StaleAge);
+            foreach (var directory in Directory.EnumerateDirectories(root))
+            {
+                try
+                {
+                    var full = Path.GetFullPath(directory);
+                    if (ActiveDirectories.ContainsKey(full))
+                        continue;
+                    var info = new DirectoryInfo(full);
+                    if (info.CreationTimeUtc > cutoff || info.LastWriteTimeUtc > cutoff)
+                        continue;
+                    // Un lien posé à la place d'un dossier de copie est retiré lui-même, sans
+                    // parcourir sa cible (Directory.Delete ne suit pas les points de réanalyse).
+                    Directory.Delete(full, recursive: true);
+                    removed++;
+                }
+                catch (Exception ex)
+                {
+                    AppLogger.Debug("ScanStaging", "Copie ancienne non supprimée : " + ex.Message);
+                }
+            }
+
+            if (removed > 0)
+                AppLogger.Info("ScanStaging", $"{removed} copie(s) d'analyse orpheline(s) supprimée(s).");
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("ScanStaging", "Nettoyage des copies d'analyse", ex);
+        }
+
+        return removed;
+    }
+
     private static void Register(string directory) =>
         ActiveDirectories[Path.GetFullPath(directory)] = 0;
 

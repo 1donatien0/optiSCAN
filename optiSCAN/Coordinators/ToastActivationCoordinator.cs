@@ -19,6 +19,12 @@ public static class ToastActivationCoordinator
         public required Action SelectAntivirusQuarantineTab { get; init; }
         public required Action SelectAntivirusSignaturesTab { get; init; }
         public required Action TriggerManualSignatureUpdate { get; init; }
+
+        /// <summary>
+        /// Confirmation avant d'exclure un fichier depuis une notification (chemin, nom de la
+        /// menace). Absente ou refusée : aucune exclusion.
+        /// </summary>
+        public Func<string, string?, bool>? ConfirmIgnore { get; init; }
     }
 
     public static void Handle(ToastActivationEventArgs e, Host host)
@@ -42,7 +48,12 @@ public static class ToastActivationCoordinator
                 break;
 
             case "ignore":
-                if (!string.IsNullOrEmpty(e.FilePath))
+                // Le bouton d'une notification excluait le fichier de toutes les analyses, pour
+                // toujours, en un clic souvent pris pour « fermer ». La fenêtre s'ouvre et
+                // l'exclusion n'a lieu qu'après confirmation explicite.
+                host.ShowWindow();
+                if (!string.IsNullOrEmpty(e.FilePath)
+                    && host.ConfirmIgnore?.Invoke(e.FilePath, e.VirusName) == true)
                 {
                     var result = c.Actions.IgnoreThreat(e.FilePath);
                     host.SetStatus(result.Message, result.IsError, result.IsWarning);

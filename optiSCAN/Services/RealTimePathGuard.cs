@@ -10,6 +10,8 @@ namespace optiSCAN.Services;
 /// analyser par SYSTEM des fichiers situés ailleurs. Ce garde :
 /// <list type="bullet">
 /// <item>refuse un dossier à surveiller dont le chemin passe par une jonction ou un lien ;</item>
+/// <item>refuse un fichier qui a plusieurs noms (lien physique) : son contenu peut être celui
+/// d'un fichier situé ailleurs, et le chemin rendu par le système ne le montre pas ;</item>
 /// <item>avant chaque analyse, ouvre le fichier et vérifie que son chemin réel (résolu par le
 /// système) reste sous le chemin réel du dossier surveillé ;</item>
 /// <item>garde ce fichier ouvert, sans partage d'écriture ni de suppression : le fichier lui-même
@@ -20,6 +22,9 @@ namespace optiSCAN.Services;
 /// </summary>
 internal static class RealTimePathGuard
 {
+    /// <summary>Motif rendu quand le fichier ne peut pas être ouvert (verrouillé, refusé).</summary>
+    internal const string InaccessibleRefusal = "fichier inaccessible";
+
     /// <summary>
     /// Vrai si aucun élément du chemin (du lecteur jusqu'au dossier lui-même) n'est une jonction,
     /// un lien symbolique ou un autre point de réanalyse « substitut de nom ».
@@ -87,7 +92,7 @@ internal static class RealTimePathGuard
         if (handle.IsInvalid)
         {
             handle.Dispose();
-            refusal = "fichier inaccessible";
+            refusal = InaccessibleRefusal;
             return null;
         }
 
@@ -95,6 +100,13 @@ internal static class RealTimePathGuard
         {
             handle.Dispose();
             refusal = "lien symbolique";
+            return null;
+        }
+
+        if (!SafePathDelete.IsSoleName(handle))
+        {
+            handle.Dispose();
+            refusal = "lien physique";
             return null;
         }
 
@@ -131,7 +143,7 @@ internal static class RealTimePathGuard
             OpenExisting,
             FileFlagOpenReparsePoint,
             IntPtr.Zero);
-        if (handle.IsInvalid || IsNameSurrogate(handle))
+        if (handle.IsInvalid || IsNameSurrogate(handle) || !SafePathDelete.IsSoleName(handle))
             return false;
 
         var fileFinal = FinalPath(handle);

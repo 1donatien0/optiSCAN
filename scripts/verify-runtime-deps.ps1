@@ -56,6 +56,7 @@ if (Test-Path $clambc) {
     Write-Host "  SKIP      clamav\x64\clambc.exe (optionnel)" -ForegroundColor Yellow
 }
 Check "clamav\certs\clamav.crt"  "Certificat CA Cisco-Talos"
+Check "clamav\x64\licenses\COPYING.txt" "Licence GPLv2 de ClamAV (obligatoire avec les binaires)"
 
 Write-Host "`n[ Signatures ClamAV ]"
 $sigFiles = Get-ChildItem -Path (Join-Path $PublishDir "clamav\database") -Filter "*.cvd" -ErrorAction SilentlyContinue

@@ -174,8 +174,13 @@ namespace optiSCAN.Services
             }
             catch (Exception ex)
             {
-                AppLogger.Warn("QuarantineManager", "Lecture clé maîtresse", ex);
-                // Clé corrompue → on la régénère. Les .quar existants deviennent illisibles sans cette clé (comportement attendu).
+                // Clé illisible (DPAPI indisponible un instant, profil chargé sans ses secrets,
+                // fichier verrouillé) : une nouvelle clé est créée, mais l'ancienne est d'abord
+                // conservée à part. Sans elle, toute la quarantaine existante serait perdue pour
+                // de bon ; avec elle, elle reste récupérable.
+                AppLogger.Error("QuarantineManager", "Lecture clé maîtresse impossible : ancienne clé conservée, nouvelle clé créée", ex);
+                AtomicFile.PreserveAside(_keyPath, "unreadable");
+                AtomicFile.PreserveAside(_manifestPath, "previous-key");
             }
 
             // Génération d'une clé 256 bits aléatoire et stockage chiffré DPAPI.
@@ -392,7 +397,6 @@ namespace optiSCAN.Services
 
         private bool RestoreToPath(QuarantineEntry entry, string destination)
         {
-            if (!File.Exists(entry.QuarantinePath)) return false;
 
             // Contrôle lexical d'abord ; le chemin réel est revérifié après création
             // (RestoreFileWriter) : une jonction dans le chemin ne peut pas rediriger l'écriture.
@@ -420,11 +424,15 @@ namespace optiSCAN.Services
             {
                 // Jamais d'écrasement : si le nom est pris, « nom_restored.ext », etc.
                 IRestoreTarget? target = null;
+                string? restoredPath = null;
                 foreach (var candidate in ServiceQuarantineAdmin.CandidateNames(fullDest))
                 {
                     target = RestoreFileWriter.TryCreate(candidate);
                     if (target != null)
+                    {
+                        restoredPath = candidate;
                         break;
+                    }
                 }
 
                 if (target == null)
@@ -449,6 +457,10 @@ namespace optiSCAN.Services
                     }
                 }
 
+                // Restauré par décision de l'utilisateur : le temps réel de cette session ne le
+                // remet pas aussitôt en quarantaine (même chemin, même contenu, 15 min).
+                if (restoredPath != null)
+                    RestoredContentGrace.Register(restoredPath, Convert.ToHexString(SHA256.HashData(plaintext)));
                 return CompleteExternalRestore(entry);
             }
             finally
@@ -751,12 +763,18 @@ namespace optiSCAN.Services
                 if (File.Exists(entry.QuarantinePath))
                     File.Delete(entry.QuarantinePath);
 
+                bool sharedHash;
                 lock (_lock)
                 {
                     _activityLog?.RecordQuarantineDeleted(entry);
                     _doc.Entries.Remove(entry);
                     SaveManifest();
+                    sharedHash = _doc.Entries.Exists(e => string.Equals(e.Sha256, entry.Sha256, StringComparison.OrdinalIgnoreCase));
                 }
+
+                // Supprimé définitivement : la copie de sécurité du même contenu part aussi.
+                if (!sharedHash)
+                    ThreatRemediationService.DeleteSafetyCopies(entry.Sha256);
                 return true;
             }
             catch (Exception ex)
@@ -794,25 +812,28 @@ namespace optiSCAN.Services
         {
             try
             {
-                if (!File.Exists(entry.QuarantinePath))
-                    return null;
-                var plaintext = DecryptQuarantineFile(entry.QuarantinePath);
-                // AES-GCM authentifie déjà le contenu ; l'empreinte du manifeste lie en plus
-                // le fichier chiffré à son entrée.
-                if (!string.IsNullOrEmpty(entry.Sha256) && !HashMatches(plaintext, entry.Sha256))
+                if (File.Exists(entry.QuarantinePath))
                 {
+                    var plaintext = DecryptQuarantineFile(entry.QuarantinePath);
+                    // AES-GCM authentifie déjà le contenu ; l'empreinte du manifeste lie en plus
+                    // le fichier chiffré à son entrée.
+                    if (string.IsNullOrEmpty(entry.Sha256) || HashMatches(plaintext, entry.Sha256))
+                        return plaintext;
                     AppLogger.Warn("QuarantineManager", $"SHA-256 mismatch pour {entry.Id}");
                     CryptographicOperations.ZeroMemory(plaintext);
-                    return null;
                 }
-
-                return plaintext;
             }
             catch (Exception ex)
             {
                 AppLogger.Warn("QuarantineManager", $"Lecture de l'entrée {entry.Id}", ex);
-                return null;
             }
+
+            // Fichier chiffré absent, illisible (clé perdue) ou altéré : copie de sécurité
+            // du même contenu, si l'option était active, vérifiée par la même empreinte.
+            var fallback = ThreatRemediationService.TryReadSafetyCopy(entry.Sha256);
+            if (fallback != null)
+                AppLogger.Info("QuarantineManager", $"Restauration de {entry.Id} depuis la copie de sécurité");
+            return fallback;
         }
 
         /// <summary>Après une restauration écrite ailleurs : retire l'entrée et son fichier chiffré.</summary>
@@ -918,6 +939,7 @@ namespace optiSCAN.Services
                                 expected))
                         {
                             AppLogger.Fatal("QuarantineManager", "HMAC manifest invalide — refus de chargement");
+                            KeepRejectedManifest(json);
                             throw new InvalidDataException("Manifest HMAC invalide");
                         }
                     }
@@ -925,12 +947,32 @@ namespace optiSCAN.Services
                     {
                         // Quelle que soit la version déclarée : un manifeste non signé n'est pas fiable.
                         AppLogger.Fatal("QuarantineManager", $"Manifeste sans HMAC (version {doc.Version}) — refus de chargement");
+                        KeepRejectedManifest(json);
                         throw new InvalidDataException("Manifest unsigned");
                     }
 
                     return doc;
                 },
                 fallbackValue: new QuarantineDocument());
+        }
+
+        /// <summary>
+        /// Un manifeste refusé n'est jamais chargé, mais il est gardé à part : le prochain
+        /// enregistrement l'écraserait (puis son .bak), et avec lui la seule liste des fichiers
+        /// chiffrés de la quarantaine.
+        /// </summary>
+        private void KeepRejectedManifest(string json)
+        {
+            try
+            {
+                var aside = _manifestPath + ".rejected-" + DateTime.UtcNow.ToString("yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture)
+                    + "-" + Guid.NewGuid().ToString("N")[..8];
+                File.WriteAllText(aside, json);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("QuarantineManager", "Copie du manifeste refusé impossible", ex);
+            }
         }
 
         private bool TrySaveManifest()

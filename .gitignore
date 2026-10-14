@@ -45,6 +45,7 @@ optiSCAN/clamav/database/*.cud
 optiSCAN/yara/*.exe
 optiSCAN/yara/.pinned-version
 optiSCAN/clamav/x64/.pinned-version
+optiSCAN/clamav/x64/licenses/
 publish/
 
 # Dossier output de l'installer

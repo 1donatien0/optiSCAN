@@ -177,6 +177,9 @@ namespace optiSCAN.Services
                 // Une exclusion de lecteur entier ou de dossier système (ajoutée avant ce
                 // contrôle, ou par édition du fichier) est ignorée.
                 if (IsForbiddenFolderExclusion(folder)) continue;
+                // Dossier de données d'optiSCAN modifiable par la session : listé dans les Options,
+                // mais seuls ses fichiers de données sont exclus (règle ci-dessus), pas le dossier.
+                if (OptiscanProtectedPaths.IsDataOnlyRoot(folder)) continue;
 
                 var normPath = path.Replace('/', '\\').TrimEnd('\\');
                 var normFolder = folder.Replace('/', '\\').TrimEnd('\\');
@@ -232,6 +235,13 @@ namespace optiSCAN.Services
         }
 
         /// <summary>
+        /// Résultats déjà calculés : <see cref="IsFolderExcluded"/> le demande pour chaque exclusion
+        /// et chaque fichier parcouru, et le calcul lit six dossiers connus de Windows.
+        /// </summary>
+        private static readonly System.Collections.Concurrent.ConcurrentDictionary<string, bool> ForbiddenCache =
+            new(StringComparer.OrdinalIgnoreCase);
+
+        /// <summary>
         /// Exclusions refusées : racine d'un lecteur, dossier Windows (et tout son contenu),
         /// racines Program Files / ProgramData / Users, profil du compte courant, ou un parent
         /// de l'un d'eux. Exclure ces dossiers retirerait l'essentiel du système des analyses.
@@ -240,6 +250,16 @@ namespace optiSCAN.Services
         {
             if (string.IsNullOrWhiteSpace(folder))
                 return true;
+            if (ForbiddenCache.TryGetValue(folder, out var cached))
+                return cached;
+            var computed = ComputeForbiddenFolderExclusion(folder);
+            if (ForbiddenCache.Count < 1024)
+                ForbiddenCache[folder] = computed;
+            return computed;
+        }
+
+        private static bool ComputeForbiddenFolderExclusion(string folder)
+        {
             string full;
             try { full = Path.GetFullPath(folder.Replace('/', '\\')).TrimEnd('\\'); }
             catch { return true; }

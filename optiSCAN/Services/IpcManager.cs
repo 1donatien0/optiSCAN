@@ -13,6 +13,8 @@ namespace optiSCAN.Services
     {
         public const int HWND_BROADCAST = 0xffff;
 
+        private const uint MsgfltAllow = 1;
+
         private static readonly Lazy<int> WmShowMeLazy = new(() =>
             NativeMethods.RegisterWindowMessage(
                 $"WM_SHOWME_OPTISCAN_{Process.GetCurrentProcess().SessionId}"));
@@ -56,6 +58,12 @@ namespace optiSCAN.Services
             {
                 if (PresentationSource.FromVisual(window) is HwndSource src)
                 {
+                    // Fenêtre élevée : Windows bloque par défaut les messages d'un processus moins
+                    // élevé (seconde instance lancée normalement, menu contextuel). Ce message-là
+                    // seul est autorisé, sans quoi la fenêtre ne se rouvrait pas.
+                    try { NativeMethods.ChangeWindowMessageFilterEx(src.Handle, messageId, MsgfltAllow, IntPtr.Zero); }
+                    catch (Exception ex) { AppLogger.Debug("IpcManager", "Filtre de message : " + ex.Message); }
+
                     src.AddHook((IntPtr h, int m, IntPtr w, IntPtr l, ref bool handled) =>
                     {
                         if (m == messageId)
@@ -76,6 +84,10 @@ namespace optiSCAN.Services
 
             [DllImport("user32.dll", CharSet = CharSet.Auto)]
             public static extern int RegisterWindowMessage(string message);
+
+            [DllImport("user32.dll", SetLastError = true)]
+            [return: MarshalAs(UnmanagedType.Bool)]
+            public static extern bool ChangeWindowMessageFilterEx(IntPtr hwnd, int message, uint action, IntPtr changeFilterStruct);
         }
     }
 }

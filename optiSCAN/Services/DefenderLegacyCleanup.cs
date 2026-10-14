@@ -46,6 +46,10 @@ internal static class DefenderLegacyCleanup
             if (!optiSCAN.Platform.InstallLocationTrust.IsCurrentInstallTrusted(out _))
                 WindowsDefenderExclusionService.RemoveOptiscanExclusions();
 
+            // Exclusions de processus sur optiSCAN.exe et le service (jusqu'à la 3.1 candidate) :
+            // Defender ne voyait plus les fichiers que ces processus ouvrent (audit A3).
+            WindowsDefenderExclusionService.RemoveRetiredProcessExclusions();
+
             var result = WindowsDefenderExclusionService.RemoveLegacyExclusions();
             // Defender absent ou désactivé (autre antivirus) : ses préférences, dont les
             // exclusions de la 3.0.0, subsistent et redeviendront actives s'il est réactivé.

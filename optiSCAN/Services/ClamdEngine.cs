@@ -78,12 +78,22 @@ namespace optiSCAN.Services
             IProgress<ScanProgress>? progress,
             CancellationToken ct)
         {
-            var unscannedEntries = new List<string>();
-            var files = EnumerateScannableFiles(folderPath, isFolderExcluded, unscannedEntries.Add).ToList();
-            var result = await RunFileListViaClamdAsync(files, folderPath, ScanType.Folder, progress, ct)
+            // Parcours en flux : un disque entier n'est plus d'abord copié en liste en mémoire.
+            var unscannedEntries = new System.Collections.Concurrent.ConcurrentQueue<string>();
+            var files = EnumerateScannableFiles(folderPath, isFolderExcluded, unscannedEntries.Enqueue);
+            var (result, aborted) = await RunFilesViaClamdAsync(files, folderPath, ScanType.Folder, progress, ct)
                 .ConfigureAwait(false);
 
-            if (unscannedEntries.Count > 0)
+            if (aborted)
+            {
+                // clamd hors service : tout le dossier repasse par clamscan (repli du composite),
+                // qui signalera lui-même les éléments illisibles.
+                result.UnscannedFiles.Clear();
+                result.HasCoverageGaps = false;
+                return result;
+            }
+
+            if (!unscannedEntries.IsEmpty)
             {
                 result.FilesSkipped += unscannedEntries.Count;
                 result.HasCoverageGaps = true;
@@ -197,8 +207,17 @@ namespace optiSCAN.Services
                             continue;
                         }
 
-                        if ((attributes & (RecallOnDataAccess | FileAttributes.Offline)) != 0
-                            || (attributes & FileAttributes.ReparsePoint) != 0)
+                        // Fichier cloud hors ligne : l'ouvrir le téléchargerait. Signalé, pas lu.
+                        if ((attributes & (RecallOnDataAccess | FileAttributes.Offline)) != 0)
+                        {
+                            onUnscanned?.Invoke(entry.FullName);
+                            continue;
+                        }
+
+                        // Point de réanalyse : seul un lien (symbolique, jonction) est écarté. Un
+                        // fichier OneDrive présent sur le disque porte lui aussi ce marqueur ; il
+                        // était ignoré, alors que Bureau et Documents sont souvent dans OneDrive.
+                        if ((attributes & FileAttributes.ReparsePoint) != 0 && !IsLocalNonLinkReparse(entry))
                         {
                             onUnscanned?.Invoke(entry.FullName);
                             continue;
@@ -210,12 +229,62 @@ namespace optiSCAN.Services
             }
         }
 
+        /// <summary>
+        /// Vrai pour un point de réanalyse qui n'est pas un lien (fichier cloud présent, fichier
+        /// dédupliqué) : son contenu est local et s'ouvre normalement. Faux pour un lien
+        /// symbolique ou une jonction, ou si la cible ne peut pas être lue.
+        /// </summary>
+        internal static bool IsLocalNonLinkReparse(FileSystemInfo entry)
+        {
+            try
+            {
+                return entry.LinkTarget == null;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Connexions clamd simultanées : clamd traite plusieurs flux à la fois (MaxThreads 10 par
+        /// défaut) ; un fichier à la fois laissait le processeur presque inactif pendant un scan
+        /// complet.
+        /// </summary>
+        internal static int ScanParallelism => Math.Clamp(Environment.ProcessorCount / 2, 2, 4);
+
         private async Task<ScanResult> RunFileListViaClamdAsync(
             IEnumerable<string> files,
             string targetPath,
             ScanType type,
             IProgress<ScanProgress>? progress,
             CancellationToken ct)
+        {
+            var list = files as IReadOnlyList<string> ?? files.ToList();
+            var processed = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var (result, aborted) = await RunFilesViaClamdAsync(list, targetPath, type, progress, ct, processed).ConfigureAwait(false);
+            if (aborted)
+            {
+                // Liste connue : les fichiers non vus sont confiés au repli clamscan.
+                foreach (var f in result.UnscannedFiles)
+                    processed.Add(f);
+                foreach (var file in list)
+                {
+                    if (!processed.Contains(file) && !_exclusions.Current.IsFileExcluded(file))
+                        result.UnscannedFiles.Add(file);
+                }
+            }
+
+            return result;
+        }
+
+        private async Task<(ScanResult Result, bool Aborted)> RunFilesViaClamdAsync(
+            IEnumerable<string> files,
+            string targetPath,
+            ScanType type,
+            IProgress<ScanProgress>? progress,
+            CancellationToken ct,
+            HashSet<string>? processed = null)
         {
             var pipeName = await RequirePipeAsync(ct).ConfigureAwait(false);
             LastMode = "clamd";
@@ -227,50 +296,74 @@ namespace optiSCAN.Services
                 Status = ScanStatus.Running,
             };
 
-            var fileList = files as IReadOnlyList<string> ?? files.ToList();
+            var gate = new object();
             var successes = 0;
             var failures = 0;
-            for (var fileIndex = 0; fileIndex < fileList.Count; fileIndex++)
+            var aborted = false;
+            using var abort = CancellationTokenSource.CreateLinkedTokenSource(ct);
+            var options = new ParallelOptions
             {
-                var file = fileList[fileIndex];
-                if (ct.IsCancellationRequested)
-                    break;
-                if (_exclusions.Current.IsFileExcluded(file))
-                {
-                    merged.FilesSkipped++;
-                    continue;
-                }
+                MaxDegreeOfParallelism = ScanParallelism,
+                CancellationToken = abort.Token,
+            };
 
-                var partial = await ScanSingleCoreAsync(file, pipeName, progress: null, ct).ConfigureAwait(false);
-                if (partial.Status == ScanStatus.Cancelled)
-                    break;
-
-                if (partial.Status == ScanStatus.Error)
+            try
+            {
+                await Parallel.ForEachAsync(files, options, async (file, token) =>
                 {
-                    failures++;
-                    merged.UnscannedFiles.Add(file);
-                    if (successes == 0 && failures >= MaxFailuresBeforeAbort)
+                    if (_exclusions.Current.IsFileExcluded(file))
                     {
-                        // clamd ne répond plus : le repli rescanne tout le dossier.
-                        for (var remaining = fileIndex + 1; remaining < fileList.Count; remaining++)
-                            merged.UnscannedFiles.Add(fileList[remaining]);
-                        merged.Status = ScanStatus.Error;
-                        merged.ErrorMessage = "clamd ne répond pas pour ce dossier";
-                        merged.FinishedAt = DateTime.Now;
-                        return merged;
+                        lock (gate)
+                            merged.FilesSkipped++;
+                        return;
                     }
 
-                    continue;
-                }
+                    var partial = await ScanSingleCoreAsync(file, pipeName, progress: null, token).ConfigureAwait(false);
+                    if (partial.Status == ScanStatus.Cancelled)
+                        return;
 
-                successes++;
-                foreach (var threat in partial.Threats)
-                    merged.Threats.Add(threat);
-                merged.FilesScanned += Math.Max(partial.FilesScanned, 1);
-                ReportFileProgress(progress, merged, file);
+                    lock (gate)
+                    {
+                        if (partial.Status == ScanStatus.Error)
+                        {
+                            failures++;
+                            merged.UnscannedFiles.Add(file);
+                            if (successes == 0 && failures >= MaxFailuresBeforeAbort && !aborted)
+                            {
+                                aborted = true;
+                                abort.Cancel();
+                            }
+                            return;
+                        }
+
+                        successes++;
+                        processed?.Add(file);
+                        foreach (var threat in partial.Threats)
+                            merged.Threats.Add(threat);
+                        merged.FilesScanned += Math.Max(partial.FilesScanned, 1);
+                        ReportFileProgress(progress, merged, file);
+                    }
+                }).ConfigureAwait(false);
+            }
+            catch (OperationCanceledException) when (aborted && !ct.IsCancellationRequested)
+            {
+                /* clamd ne répond plus : traité ci-dessous */
+            }
+            catch (OperationCanceledException)
+            {
+                merged.Status = ScanStatus.Cancelled;
+                merged.FinishedAt = DateTime.Now;
+                return (merged, false);
             }
 
             merged.FinishedAt = DateTime.Now;
+            if (aborted)
+            {
+                merged.Status = ScanStatus.Error;
+                merged.ErrorMessage = "clamd ne répond pas pour ce dossier";
+                return (merged, true);
+            }
+
             merged.Status = ct.IsCancellationRequested ? ScanStatus.Cancelled : ScanStatus.Completed;
             if (failures > 0)
                 AppLogger.Info("ClamdEngine", $"{failures} fichier(s) non lus par clamd, confiés au repli clamscan");
@@ -282,7 +375,7 @@ namespace optiSCAN.Services
                 FilesScanned = merged.FilesScanned,
                 ThreatsFound = merged.ThreatsFound,
             });
-            return merged;
+            return (merged, false);
         }
 
         private static void ReportFileProgress(IProgress<ScanProgress>? progress, ScanResult merged, string file)

@@ -354,6 +354,7 @@ namespace optiSCAN.ViewModels
             _rulesUpdater.UpdateOutput += SurAjoutSortieMiseAJour;
             _rulesUpdater.UpdateCompleted += SurTermineeMiseAJourRegles;
             container.ProtectionStateRefreshRequested += SurDemandeRafraichissementProtection;
+            _realTimeProtection.HealthChanged += SurDemandeRafraichissementProtection;
 
             QuickScanCommand = new AsyncRelayCommand(async _ => await StartScanAsync(ScanType.QuickScan));
             FullScanCommand = new AsyncRelayCommand(async _ => await StartScanAsync(ScanType.FullScan));
@@ -462,12 +463,51 @@ namespace optiSCAN.ViewModels
         /// <summary>Recalcule le badge de protection (en-tête Antivirus).</summary>
         public void RefreshProtectionStatus()
         {
+            // Service SYSTEM actif : le temps réel tourne dans le service, pas dans la session.
+            // Sans ce cas, le badge restait « dégradé » alors que la machine était protégée.
+            var serviceActive = _prefs.Current.UsePlatformProtectionService
+                && PlatformProtectionBootstrap.LastKnownRemoteProtectionActive;
+            var running = _realTimeProtection.IsEnabled || serviceActive;
+
+            // Santé (audit A15) : dossiers non surveillés ou rattrapage en cours, dans la
+            // session ou dans le service (relevé par ServiceDetectionWatcher).
+            var localDegraded = _realTimeProtection.IsEnabled ? _realTimeProtection.DegradedFolderCount : 0;
+            var serviceDegraded = serviceActive ? Math.Max(0, ServiceDetectionWatcher.ServiceRealTimeDegradedFolders) : 0;
+            var degraded = localDegraded + serviceDegraded;
+
             ProtectionBadgeLevel = ProtectionStatusEvaluator.Evaluate(
                 IsClamAvAvailable,
                 _yara.IsAvailable,
                 YaraRulesCount,
                 _exclusions.Current.RealTimeEnabled,
-                _realTimeProtection.IsEnabled);
+                running,
+                realTimeProtectionHealthy: degraded == 0);
+
+            // Une alerte à l'entrée dans l'état dégradé du temps réel de la session (celle du
+            // service est émise par ServiceDetectionWatcher).
+            if (localDegraded > 0 && _lastLocalDegraded == 0)
+                _notifications.ShowRealTimeDegraded(localDegraded);
+            _lastLocalDegraded = localDegraded;
+
+            ProtectionBadgeDetail = degraded == 0
+                ? null
+                : LocalizationService.Format("Protection_RtDegradedDetail", degraded)
+                    + (localDegraded > 0 ? Environment.NewLine + string.Join(Environment.NewLine, _realTimeProtection.HealthIssues) : string.Empty);
+        }
+
+        private string? _protectionBadgeDetail;
+        private int _lastLocalDegraded;
+
+        /// <summary>Infobulle du badge : raison d'un temps réel dégradé, sinon rien.</summary>
+        public string? ProtectionBadgeDetail
+        {
+            get => _protectionBadgeDetail;
+            private set
+            {
+                if (_protectionBadgeDetail == value) return;
+                _protectionBadgeDetail = value;
+                OnPropertyChanged();
+            }
         }
 
         private void SurDemandeRafraichissementProtection(object? sender, EventArgs e)
@@ -533,6 +573,7 @@ namespace optiSCAN.ViewModels
                 _updater.UpdateCompleted -= SurTermineeMiseAJourSignatures;
                 _rulesUpdater.UpdateOutput -= SurAjoutSortieMiseAJour;
                 _rulesUpdater.UpdateCompleted -= SurTermineeMiseAJourRegles;
+                _realTimeProtection.HealthChanged -= SurDemandeRafraichissementProtection;
                 _updater.DisableAutoUpdate();
                 _rulesUpdater.DisableAutoUpdate();
             }

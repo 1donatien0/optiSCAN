@@ -55,7 +55,7 @@ namespace optiSCAN.Services
         public ProcessStartMonitor ProcessStartMonitor { get; }
 
         /// <summary>Watchdog planifié contre l'arrêt non autorisé de la protection.</summary>
-        public TamperProtectionService TamperProtection { get; }
+        public ProtectionWatchdogService ProtectionWatchdog { get; }
 
         /// <summary>Scan automatique des lecteurs amovibles à l'insertion.</summary>
         public RemovableDriveScanService RemovableDriveScan { get; }
@@ -121,7 +121,7 @@ namespace optiSCAN.Services
                 {
                     PlatformProtectionBootstrap.EnsurePlatformProtectionRunning();
                     if (_userPreferences.Current.TamperProtectionEnabled)
-                        TamperProtection.EnsureWatchdogTask();
+                        ProtectionWatchdog.EnsureWatchdogTask();
                 }
                 RequestProtectionStateRefresh();
                 return;
@@ -133,7 +133,7 @@ namespace optiSCAN.Services
                 if (_userPreferences.Current.ProcessMonitorEnabled)
                     ProcessStartMonitor.Start();
                 if (_userPreferences.Current.TamperProtectionEnabled)
-                    TamperProtection.EnsureWatchdogTask();
+                    ProtectionWatchdog.EnsureWatchdogTask();
             }
             else
             {
@@ -158,6 +158,7 @@ namespace optiSCAN.Services
                 {
                     RealTimeProtection.Stop();
                     ProcessStartMonitor.Stop();
+                    RemovableDriveScan.Stop();
                     HostPolicyStore.PushToService(_userPreferences, _exclusionSettings);
                 }
             }
@@ -165,12 +166,15 @@ namespace optiSCAN.Services
             {
                 PlatformProtectionBootstrap.TryStopWindowsService();
                 PlatformRegistration.TryUnregisterAmsiProvider();
+                PlatformProtectionBootstrap.InvalidateReachabilityCache();
                 if (_exclusionSettings.Current.RealTimeEnabled)
                 {
                     RealTimeProtection.Start();
                     if (_userPreferences.Current.ProcessMonitorEnabled)
                         ProcessStartMonitor.Start();
                 }
+                if (_userPreferences.Current.RemovableDriveScanEnabled)
+                    RemovableDriveScan.Start();
             }
 
             RequestProtectionStateRefresh();
@@ -182,7 +186,7 @@ namespace optiSCAN.Services
             _userPreferences.Current.RemovableDriveScanEnabled = enabled;
             _userPreferences.Current.Save();
             HostPolicyStore.PushToService(_userPreferences, _exclusionSettings);
-            if (enabled) RemovableDriveScan.Start();
+            if (enabled && !ProtectionDelegatedToService()) RemovableDriveScan.Start();
             else RemovableDriveScan.Stop();
             RequestProtectionStateRefresh();
         }
@@ -217,7 +221,7 @@ namespace optiSCAN.Services
             _userPreferences.Current.ProcessMonitorEnabled = enabled;
             _userPreferences.Current.Save();
             HostPolicyStore.PushToService(_userPreferences, _exclusionSettings);
-            if (enabled && _exclusionSettings.Current.RealTimeEnabled)
+            if (enabled && _exclusionSettings.Current.RealTimeEnabled && !ProtectionDelegatedToService())
                 ProcessStartMonitor.Start();
             else
                 ProcessStartMonitor.Stop();
@@ -230,9 +234,9 @@ namespace optiSCAN.Services
             _userPreferences.Current.TamperProtectionEnabled = enabled;
             _userPreferences.Current.Save();
             if (enabled)
-                TamperProtection.EnsureWatchdogTask();
+                ProtectionWatchdog.EnsureWatchdogTask();
             else
-                TamperProtection.DeleteWatchdogTask();
+                ProtectionWatchdog.DeleteWatchdogTask();
         }
 
         public event EventHandler? ProtectionStateRefreshRequested
@@ -262,7 +266,11 @@ namespace optiSCAN.Services
             if (HostPolicyStore.TryRead(out var policy))
                 CopyHostPolicy(policy);
 
-            DefenderCoexistenceService.EnsureFirstLaunchExclusionSettings(_exclusionSettings, _userPreferences);
+            // Pas de logique de premier lancement ici : elle sert à l'interface (choix entre
+            // Defender et optiSCAN). Dans l'hôte SYSTEM, les préférences du profil systemprofile
+            // gardaient « premier lancement en attente » pour toujours, et cette logique coupait
+            // le temps réel du service à chaque démarrage dès que Defender était actif, contre la
+            // politique de l'administrateur. L'hôte suit la politique et rien d'autre.
             ApplySignatureAutoUpdate(_userPreferences.Current.SignatureAutoUpdateEnabled);
             SignatureUpdatePolicy.NotifyAndScheduleStartupRefresh(this, _userPreferences);
 
@@ -311,9 +319,19 @@ namespace optiSCAN.Services
             _userPreferences.Current.RemovableDriveScanEnabled = policy.RemovableDriveScanEnabled;
         }
 
+        private ServiceDetectionWatcher? _serviceDetectionWatcher;
+
         /// <summary>Restaure RTP et MAJ auto selon les préférences persistées (appel au démarrage UI).</summary>
         public void ApplyPreferencesOnStartup()
         {
+            _ = Task.Run(() => ScanStaging.PurgeStale());
+            _ = Task.Run(() => ThreatRemediationService.PurgeSafetyCopies());
+            // Menaces trouvées par le service SYSTEM : relevées ici pour être notifiées et
+            // inscrites dans l'historique de l'utilisateur.
+            _serviceDetectionWatcher ??= new ServiceDetectionWatcher(_userPreferences, Notifications, Logger, _uiEventBus);
+            _serviceDetectionWatcher.Start();
+            // Tâche créée par une version antérieure (/SC DAILY) : recréée avec rattrapage au réveil.
+            _ = Task.Run(() => ScheduledScan.UpgradeLegacyTask());
             DefenderCoexistenceService.EnsureFirstLaunchExclusionSettings(_exclusionSettings, _userPreferences);
 
             ApplySignatureAutoUpdate(_userPreferences.Current.SignatureAutoUpdateEnabled);
@@ -325,7 +343,7 @@ namespace optiSCAN.Services
                 if (PlatformProtectionBootstrap.IsRemoteProtectionActive())
                 {
                     if (_userPreferences.Current.TamperProtectionEnabled)
-                        TamperProtection.EnsureWatchdogTask();
+                        ProtectionWatchdog.EnsureWatchdogTask();
                     ApplyRemovableDriveAndEnginePrefs();
                     return;
                 }
@@ -346,12 +364,38 @@ namespace optiSCAN.Services
             }
 
             if (_userPreferences.Current.TamperProtectionEnabled)
-                TamperProtection.EnsureWatchdogTask();
+                ProtectionWatchdog.EnsureWatchdogTask();
             else
-                TamperProtection.DeleteWatchdogTask();
+                ProtectionWatchdog.DeleteWatchdogTask();
 
             ApplyRemovableDriveAndEnginePrefs();
             // Exclusions Defender : opt-in uniquement (Options → Réappliquer), pas au démarrage.
+        }
+
+        /// <summary>
+        /// Vrai dans l'interface quand le service SYSTEM assure la protection : la surveillance des
+        /// lecteurs amovibles et des processus n'a pas à tourner une seconde fois dans la session
+        /// (chaque clé USB était analysée deux fois, chaque lancement de processus aussi), et clamd
+        /// n'a pas à être préchargé (environ 1 Go de mémoire) : il démarre au premier scan manuel.
+        /// Jamais vrai dans l'hôte SYSTEM lui-même, qui se « verrait » sinon par son propre pipe.
+        /// </summary>
+        private bool ProtectionDelegatedToService()
+        {
+            try
+            {
+                using (var identity = System.Security.Principal.WindowsIdentity.GetCurrent())
+                {
+                    if (identity.IsSystem)
+                        return false;
+                }
+            }
+            catch
+            {
+                return false;
+            }
+
+            return _userPreferences.Current.UsePlatformProtectionService
+                && PlatformProtectionBootstrap.IsRemoteProtectionActive();
         }
 
         private void ApplyRemovableDriveAndEnginePrefs()
@@ -361,7 +405,8 @@ namespace optiSCAN.Services
             else
                 DistractionFreeMonitor.Stop();
 
-            if (_userPreferences.Current.UseClamdEngine)
+            var delegated = ProtectionDelegatedToService();
+            if (_userPreferences.Current.UseClamdEngine && !delegated)
             {
                 _ = Task.Run(async () =>
                 {
@@ -370,7 +415,7 @@ namespace optiSCAN.Services
                 });
             }
 
-            if (_userPreferences.Current.RemovableDriveScanEnabled)
+            if (_userPreferences.Current.RemovableDriveScanEnabled && !delegated)
                 RemovableDriveScan.Start();
             else
                 RemovableDriveScan.Stop();
@@ -463,7 +508,7 @@ namespace optiSCAN.Services
             SignatureStatus = _services.GetRequiredService<SignatureStatusService>();
             RealTimeProtection = _services.GetRequiredService<RealTimeProtection>();
             ProcessStartMonitor = _services.GetRequiredService<ProcessStartMonitor>();
-            TamperProtection = _services.GetRequiredService<TamperProtectionService>();
+            ProtectionWatchdog = _services.GetRequiredService<ProtectionWatchdogService>();
             RemovableDriveScan = _services.GetRequiredService<RemovableDriveScanService>();
             ScheduledScan = _services.GetRequiredService<ScheduledScanService>();
 
@@ -508,6 +553,7 @@ namespace optiSCAN.Services
                 return;
             _shutdownDone = true;
             _uiEventBus.ClearHandlers();
+            _serviceDetectionWatcher?.Dispose();
             try { RealTimeProtection.Dispose(); }
             catch (Exception ex) { AppLogger.Warn("ServiceContainer", "RealTimeProtection.Dispose", ex); }
             try { ProcessStartMonitor.Dispose(); }

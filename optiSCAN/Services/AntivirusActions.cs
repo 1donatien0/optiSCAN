@@ -48,9 +48,28 @@ namespace optiSCAN.Services
         public ActionResult QuarantineThreat(string filePath, Guid sourceSessionId = default) =>
             QuarantineThreat(ResolveThreatForPath(filePath), sourceSessionId);
 
+        /// <summary>
+        /// Chemin complet seulement. Une détection du service relevée par une session sans droit
+        /// sur le chemin ne porte que le nom du fichier : « bad.exe » serait résolu dans le dossier
+        /// courant et l'action viserait un autre fichier.
+        /// </summary>
+        internal static bool IsActionablePath(string? filePath)
+        {
+            if (string.IsNullOrWhiteSpace(filePath))
+                return false;
+            try
+            {
+                return Path.IsPathFullyQualified(filePath);
+            }
+            catch (ArgumentException)
+            {
+                return false;
+            }
+        }
+
         public ActionResult QuarantineThreat(ThreatInfo threat, Guid sourceSessionId = default)
         {
-            if (string.IsNullOrEmpty(threat.FilePath))
+            if (!IsActionablePath(threat.FilePath))
                 return Complete(false, LocalizationService.GetString("Av_Action_InvalidPath"), isError: true);
 
             var existing = _quarantine.GetEntries().FirstOrDefault(e =>
@@ -105,7 +124,7 @@ namespace optiSCAN.Services
 
         public ActionResult IgnoreThreat(string filePath)
         {
-            if (string.IsNullOrWhiteSpace(filePath))
+            if (!IsActionablePath(filePath))
                 return Complete(false, LocalizationService.GetString("Av_Action_InvalidPath"), isError: true);
 
             if (!_exclusions.Current.AddFile(filePath))
@@ -128,6 +147,8 @@ namespace optiSCAN.Services
 
         public ActionResult DeleteThreatFile(string filePath)
         {
+            if (!IsActionablePath(filePath))
+                return Complete(false, LocalizationService.GetString("Av_Action_InvalidPath"), isError: true);
             try
             {
                 // Refus identique à la restauration quarantaine : pas de suppression dans System32, Windows, etc.

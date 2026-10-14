@@ -76,7 +76,9 @@ namespace optiSCAN.Services
                 else if (!string.IsNullOrEmpty(sub.ErrorMessage))
                     failedTargets.Add(target + " (" + sub.ErrorMessage + ")");
 
-                filesBaseline = Math.Max(filesBaseline, Math.Max(relay.FilesScannedHigh, sub.FilesScanned));
+                // Sans progression (scan planifié, service), le relais ne voit rien passer : les
+                // fichiers de chaque zone s'additionnent, au lieu de garder le plus grand total.
+                filesBaseline = Math.Max(relay.FilesScannedHigh, filesBaseline + sub.FilesScanned);
                 merged.FilesScanned = filesBaseline;
                 merged.FilesSkipped += sub.FilesSkipped;
                 merged.TotalBytesScanned += sub.TotalBytesScanned;

@@ -69,7 +69,7 @@ public sealed class DetectionCoverageTests : IDisposable
     }
 
     [Theory]
-    [InlineData(0x10)]      // avant la fin de l'en-tête DOS
+    [InlineData(0x02)]      // dans la signature MZ
     [InlineData(0x20000)]   // au-delà du plafond
     [InlineData(-4)]
     public void Invalid_pe_offset_is_refused(int lfanew)
@@ -80,6 +80,34 @@ public sealed class DetectionCoverageTests : IDisposable
 
         Assert.False(ExecutableSniffer.IsPortableExecutable(new MemoryStream(bytes)));
     }
+
+    [Fact]
+    public void Pe_header_overlapping_the_dos_header_is_recognized()
+    {
+        // e_lfanew = 4 : « PE\0\0 » aux octets 4 à 7, accepté par le chargeur Windows (audit V10).
+        var bytes = new byte[0x200];
+        bytes[0] = (byte)'M';
+        bytes[1] = (byte)'Z';
+        BitConverter.GetBytes(4).CopyTo(bytes, 0x3C);
+        bytes[4] = (byte)'P';
+        bytes[5] = (byte)'E';
+
+        Assert.True(ExecutableSniffer.IsPortableExecutable(new MemoryStream(bytes)));
+    }
+
+    [Theory]
+    [InlineData("page.html")]
+    [InlineData("facture.svg")]
+    [InlineData("lien.url")]
+    [InlineData("requete.iqy")]
+    [InlineData("formules.slk")]
+    [InlineData("classeur.xlsb")]
+    [InlineData("pilote.inf")]
+    [InlineData("archive.tar")]
+    [InlineData("archive.gz")]
+    [InlineData("archive.xz")]
+    public void Initial_access_formats_are_watched(string name) =>
+        Assert.True(RiskyFileExtensions.IsRisky(name));
 
     [Fact]
     public void Truncated_pe_is_refused() =>

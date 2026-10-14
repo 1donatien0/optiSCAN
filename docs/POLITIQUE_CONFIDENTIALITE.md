@@ -20,9 +20,11 @@ optiSCAN est conçu pour fonctionner **localement sur votre ordinateur**. Par d�
 |--------|-------------|-------|
 | Historique, préférences et exclusions de l'interface | `%LOCALAPPDATA%\optiSCAN` de votre compte Windows | Jusqu'à suppression par vous ou désinstallation avec purge choisie |
 | Quarantaine de l'interface (AES-GCM) | `%LOCALAPPDATA%\optiSCAN\Quarantine` de votre compte Windows | Jusqu'à suppression/restauration ou purge choisie |
+| Copies de sécurité avant quarantaine (option, désactivable) | `%LOCALAPPDATA%\optiSCAN\SafetyBackups` de votre compte Windows, chiffrées | **30 jours** au plus (256 Mo au total) ; supprimées avec l'élément de quarantaine |
 | Journaux du processus interactif | `%LOCALAPPDATA%\optiSCAN\Logs` de votre compte Windows | Journaux applicatifs : rotation après **30 jours** |
 | État et staging du service | `%ProgramData%\optiSCAN` | Gérés par le service ; supprimés par l'installeur à la désinstallation |
 | Quarantaine du service avancé (AES-GCM) | `%ProgramData%\optiSCAN\Quarantine`, accessible à SYSTEM et aux administrateurs | Supprimée automatiquement après **90 jours**, ou plus tôt par un administrateur ; supprimée à la désinstallation |
+| Détections du service avancé | `%ProgramData%\optiSCAN\detections.json`, accessible à SYSTEM et aux administrateurs | Les **200** dernières ; supprimées à la désinstallation. Votre session n'en voit le chemin complet que pour les fichiers de votre profil |
 | Journaux du service avancé | `%LOCALAPPDATA%\optiSCAN` du compte **SYSTEM** (généralement sous `systemprofile`) | Supprimés à la désinstallation |
 
 - Les journaux ne sont **pas chiffrés**. Les chemins sous les profils Windows standard (`C:\Users\…`) sont masqués, y compris dans les messages et traces d'exception ; d'autres chemins personnalisés ou données de diagnostic peuvent rester lisibles.

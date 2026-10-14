@@ -30,7 +30,15 @@ jobs:
       - name: Build (Release, warnings as errors)
         run: dotnet build optiSCAN.sln --configuration Release --no-restore
 
+      # Moteurs réels (sans freshclam) : les tests de détection EICAR doivent vraiment détecter,
+      # pas sortir en succès faute de moteur (audit A6).
+      - name: Fetch ClamAV and YARA engines (no signatures)
+        shell: pwsh
+        run: pwsh -File scripts/fetch-runtime-deps.ps1 -RequireSignature
+
       - name: Run tests (Release)
+        env:
+          OPTISCAN_REQUIRE_ENGINES: '1'
         run: >
           dotnet test optiSCAN.Tests/optiSCAN.Tests.csproj
           --configuration Release

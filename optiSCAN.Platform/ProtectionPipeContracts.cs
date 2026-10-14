@@ -57,6 +57,45 @@ public sealed class ProtectionPipeRequest
     /// </summary>
     [JsonPropertyName("dest")]
     public string? DestinationFolder { get; set; }
+
+    /// <summary>
+    /// <see cref="ProtectionPipeOperations.RecentDetections"/> : numéro de la dernière détection
+    /// déjà vue par le client ; seules les suivantes sont rendues.
+    /// </summary>
+    [JsonPropertyName("since")]
+    public long? SinceSequence { get; set; }
+}
+
+/// <summary>Détection faite par le service SYSTEM, telle qu'une session la reçoit.</summary>
+public sealed class ServiceDetectionItem
+{
+    /// <summary>Numéro croissant, propre à la machine.</summary>
+    [JsonPropertyName("seq")]
+    public long Sequence { get; set; }
+
+    [JsonPropertyName("at")]
+    public DateTime DetectedAtUtc { get; set; }
+
+    [JsonPropertyName("threat")]
+    public string VirusName { get; set; } = string.Empty;
+
+    [JsonPropertyName("engine")]
+    public string? Engine { get; set; }
+
+    /// <summary>Nom du fichier, toujours fourni.</summary>
+    [JsonPropertyName("file")]
+    public string FileName { get; set; } = string.Empty;
+
+    /// <summary>
+    /// Chemin complet : seulement pour un administrateur élevé, ou si le fichier est dans le
+    /// profil du compte qui demande. Les chemins des autres comptes ne sortent pas du service.
+    /// </summary>
+    [JsonPropertyName("path")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? FullPath { get; set; }
+
+    [JsonPropertyName("quarantined")]
+    public bool Quarantined { get; set; }
 }
 
 /// <summary>Élément de la quarantaine du service, tel que le reçoit l'interface d'administration.</summary>
@@ -124,6 +163,24 @@ public sealed class ProtectionPipeResponse
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public List<ServiceQuarantineItem>? Entries { get; set; }
 
+    /// <summary>Détections du service postérieures à <see cref="ProtectionPipeRequest.SinceSequence"/>.</summary>
+    [JsonPropertyName("detections")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public List<ServiceDetectionItem>? Detections { get; set; }
+
+    /// <summary>Numéro de la détection la plus récente du service (0 : aucune).</summary>
+    [JsonPropertyName("latest")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public long? LatestSequence { get; set; }
+
+    /// <summary>
+    /// Temps réel du service : nombre de dossiers surveillés en défaut (0 : complet), ou null si
+    /// le temps réel du service est arrêté. Aucun chemin : la réponse va à tout compte.
+    /// </summary>
+    [JsonPropertyName("rt_degraded")]
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public int? RealTimeDegradedFolders { get; set; }
+
     public static ProtectionPipeResponse SuccessClean() => new() { Ok = true, Clean = true };
 
     public static ProtectionPipeResponse Threat(string name, string? engine = null, bool incomplete = false) => new()
@@ -157,4 +214,11 @@ public static class ProtectionPipeOperations
     public const string QuarantineRestore = "quarantine_restore";
     public const string QuarantineDelete = "quarantine_delete";
     public const string QuarantinePurge = "quarantine_purge";
+
+    /// <summary>
+    /// Détections récentes du service, pour que la session les affiche (le service SYSTEM ne
+    /// peut pas notifier l'utilisateur lui-même). Ouverte à tout compte authentifié ; les chemins
+    /// complets sont filtrés par compte.
+    /// </summary>
+    public const string RecentDetections = "recent_detections";
 }
