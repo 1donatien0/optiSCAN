@@ -129,6 +129,9 @@ namespace optiSCAN.Services
         /// <summary>Premier lancement sur poste Defender : RTP optiSCAN tenu désactivé jusqu'à l'onboarding.</summary>
         public bool FirstLaunchDefenderPending { get; set; }
 
+        /// <summary>Numéro de la dernière détection du service SYSTEM déjà montrée dans cette session.</summary>
+        public long LastSeenServiceDetection { get; set; }
+
         /// <summary>
         /// Seuil (jours) au-delà duquel une suggestion de nettoyage est affichée sur l'accueil.
         /// Valeur par défaut : <see cref="RecommendationThresholds.CleanSuggestThresholdDays"/>.

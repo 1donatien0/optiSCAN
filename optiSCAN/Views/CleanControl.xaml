@@ -460,6 +460,20 @@
                                                VerticalAlignment="Center" Margin="6,0,0,0"/>
                                 </StackPanel>
                             </Button>
+                            <Button x:Name="btnTwkUndo"
+                                    Click="btnTwkUndo_Click"
+                                    Loaded="btnTwkUndo_Loaded"
+                                    Style="{StaticResource SecondaryButton}"
+                                    Height="36" Margin="0,0,10,0" Padding="12,0"
+                                    ToolTip="{loc:Loc Key=Twk_UndoTip}"
+                                    AutomationProperties.Name="{loc:Loc Key=Twk_Undo}">
+                                <StackPanel Orientation="Horizontal">
+                                    <md:PackIcon Kind="Restore" Width="15" Height="15"
+                                                 VerticalAlignment="Center"/>
+                                    <TextBlock Text="{loc:Loc Key=Twk_Undo}" FontSize="{DynamicResource FontSize.Body}"
+                                               VerticalAlignment="Center" Margin="6,0,0,0"/>
+                                </StackPanel>
+                            </Button>
                             <Button x:Name="btnTwkStartup"
                                     Click="btnTwkStartup_Click"
                                     Style="{StaticResource SecondaryButton}"

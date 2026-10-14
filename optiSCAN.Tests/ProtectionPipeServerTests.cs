@@ -34,7 +34,7 @@ public sealed class ProtectionPipeServerTests
   }
 
   [Fact]
-  public async Task ScanPath_clean_file_returns_clean()
+  public async Task ScanPath_is_closed_by_default()
   {
     var pipeName = "optiSCAN_Test_" + Guid.NewGuid().ToString("N");
     var dir = Path.Combine(Path.GetTempPath(), "optiscan_ipc_" + Guid.NewGuid().ToString("N"));
@@ -44,6 +44,36 @@ public sealed class ProtectionPipeServerTests
 
     var orch = new ScanOrchestrator(new FakeClam(), new FakeYara());
     var server = new ProtectionPipeServer(orch, pipeName);
+    server.Start();
+
+    try
+    {
+      await Task.Delay(200);
+      using var client = new ProtectionPipeClient(pipeName, TimeSpan.FromSeconds(10));
+      var response = await client.ScanPathAsync(file);
+
+      Assert.False(response.Ok);
+      Assert.Equal("Opération non disponible", response.Message);
+    }
+    finally
+    {
+      await server.StopAsync();
+      server.Dispose();
+      try { Directory.Delete(dir, recursive: true); } catch { /* test cleanup */ }
+    }
+  }
+
+  [Fact]
+  public async Task ScanPath_clean_file_returns_clean()
+  {
+    var pipeName = "optiSCAN_Test_" + Guid.NewGuid().ToString("N");
+    var dir = Path.Combine(Path.GetTempPath(), "optiscan_ipc_" + Guid.NewGuid().ToString("N"));
+    Directory.CreateDirectory(dir);
+    var file = Path.Combine(dir, "clean.txt");
+    await File.WriteAllTextAsync(file, "hello");
+
+    var orch = new ScanOrchestrator(new FakeClam(), new FakeYara());
+    var server = new ProtectionPipeServer(orch, pipeName, enableScanPath: true);
     server.Start();
 
     try
@@ -134,7 +164,7 @@ public sealed class ProtectionPipeServerTests
       return;
 
     var orch = new ScanOrchestrator(new FakeClam(), new FakeYara());
-    var server = new ProtectionPipeServer(orch, pipeName);
+    var server = new ProtectionPipeServer(orch, pipeName, enableScanPath: true);
     server.Start();
 
     try
@@ -163,7 +193,7 @@ public sealed class ProtectionPipeServerTests
 
     var orch = new ScanOrchestrator(new FakeClam(), new FakeYara());
     var limiter = new IpcScanRateLimiter(maxPerMinute: 1, maxConcurrent: 1);
-    var server = new ProtectionPipeServer(orch, pipeName, scanRateLimiter: limiter);
+    var server = new ProtectionPipeServer(orch, pipeName, scanRateLimiter: limiter, enableScanPath: true);
     server.Start();
 
     try

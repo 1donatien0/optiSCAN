@@ -164,6 +164,29 @@ internal static class NamedPipeClientAccess
         }
     }
 
+    /// <summary>
+    /// SID du client lu sur son jeton usurpé (<c>ImpersonateNamedPipeClient</c>), donc lié à la
+    /// connexion et non à un PID qui peut avoir été réutilisé. Null si l'usurpation échoue.
+    /// </summary>
+    internal static string? GetImpersonatedClientSid(NamedPipeServerStream pipe)
+    {
+        if (!ImpersonateNamedPipeClient(pipe.SafePipeHandle))
+            return null;
+        try
+        {
+            using var identity = WindowsIdentity.GetCurrent(TokenAccessLevels.Query);
+            return identity.User?.Value;
+        }
+        catch
+        {
+            return null;
+        }
+        finally
+        {
+            RevertToSelf();
+        }
+    }
+
     internal const string UnknownAccount = "?";
     internal const string SelfAccount = "self";
     internal const string SystemAccount = "S-1-5-18";

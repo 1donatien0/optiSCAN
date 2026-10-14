@@ -8,17 +8,25 @@ namespace optiSCAN.Services
     /// </summary>
     internal static class RealTimeWatchPaths
     {
-        private static readonly string[] SystemFolders =
+        /// <summary>
+        /// Résolus par l'API et non codés en dur : Windows n'est pas toujours sur C: (audit A9).
+        /// </summary>
+        private static IEnumerable<string> SystemFolders()
         {
-            @"C:\ProgramData",
-            @"C:\Windows\Downloaded Program Files",
-        };
+            var programData = Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData);
+            if (!string.IsNullOrWhiteSpace(programData))
+                yield return programData;
+
+            var windows = Environment.GetFolderPath(Environment.SpecialFolder.Windows);
+            if (!string.IsNullOrWhiteSpace(windows))
+                yield return Path.Combine(windows, "Downloaded Program Files");
+        }
 
         public static IReadOnlyList<string> GetWatchFolders(IExclusionSettingsAccessor? exclusions = null)
         {
             var folders = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
 
-            foreach (var path in SystemFolders)
+            foreach (var path in SystemFolders())
                 TryAdd(folders, path);
 
             foreach (var path in ScanTargets.QuickScanTargets())
@@ -28,8 +36,8 @@ namespace optiSCAN.Services
                 AddInteractiveUserFolders(folders);
 
             var excl = (exclusions ?? new DefaultExclusionSettingsAccessor()).Current;
-            return folders
-                .Where(p => !excl.IsFolderExcluded(p))
+            // Un dossier contenu dans un autre n'est pas surveillé deux fois (événements doublés).
+            return ScanTargets.RemoveNested(folders.Where(p => !excl.IsFolderExcluded(p)))
                 .OrderBy(p => p, StringComparer.OrdinalIgnoreCase)
                 .ToList();
         }
@@ -83,8 +91,11 @@ namespace optiSCAN.Services
                 TryAdd(folders, Path.Combine(userDir, "Downloads"));
                 TryAdd(folders, Path.Combine(userDir, "Desktop"));
                 TryAdd(folders, Path.Combine(userDir, "AppData", "Local", "Temp"));
-                TryAdd(folders, Path.Combine(userDir, "AppData", "Roaming", "Microsoft", "Windows", "Start Menu", "Programs", "Startup"));
+                // Roaming entier (contient le dossier Démarrage), comme le scan rapide.
+                TryAdd(folders, Path.Combine(userDir, "AppData", "Roaming"));
             }
+
+            TryAdd(folders, Path.Combine(users, "Public"));
         }
 
         private static void TryAdd(HashSet<string> folders, string? path)

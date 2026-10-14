@@ -1,6 +1,6 @@
 # Feuille de route produit — optiSCAN Antivirus
 
-**Mise à jour :** 5 octobre 2026
+**Mise à jour :** 13 octobre 2026
 
 **Horizon :** évolutions envisagées après la validation et la publication de la v3.1.
 
@@ -18,7 +18,7 @@ optiSCAN réunit une application WPF, un service Windows, les analyses à la dem
 
 - AMSI et le minifiltre Windows sont des prototypes et ne sont pas livrés. La surveillance actuelle ne doit donc pas être présentée comme une interception préventive avant écriture ou exécution.
 - Un scan peut se terminer avec des erreurs ou une couverture incomplète ; ces états doivent rester distincts d’un résultat sain.
-- La release v3.1 et ses validations Windows restent régies par le [plan de release](RELEASE_PLAN_v3.1.md). L’[audit 360](AUDIT_optiSCAN_360.md) documente la base technique et ses [réserves](AUDIT_optiSCAN_360.md#9-réserves-ouvertes-et-conditions-de-clôture).
+- La release v3.1 et ses validations Windows restent régies par le [plan de release](RELEASE_PLAN_v3.1.md). L’[audit 360](AUDIT_optiSCAN_360.md) documente la base technique et ses [réserves](AUDIT_optiSCAN_360.md#5-registre-des-risques-ouverts).
 
 ## Priorités après la v3.1
 
@@ -39,7 +39,7 @@ Améliorer l’information présentée à l’utilisateur lorsque la surveillanc
 
 ### 3. Renforcer la fiabilité de la surveillance temps réel
 
-Tester la création et la reprise des watchers, les débordements d’événements, les écritures répétées, les fichiers volumineux, le manque d’espace et le redémarrage du service. Rendre persistants les avertissements importants et vérifier que les détections du service SYSTEM sont consultables et gérables par le parcours administrateur déjà prévu.
+Tester la création et la reprise des watchers, les débordements d’événements, les écritures répétées, les fichiers volumineux, le manque d’espace et le redémarrage du service. Rendre persistants les avertissements importants. Les détections du service SYSTEM sont notifiées et inscrites dans l'historique de la session depuis la candidate v3.1 (`recent_detections`) ; un dossier perdu par le temps réel passe désormais le badge de protection à « dégradé », avec notification (audit indépendant A15).
 
 **Critères de sortie :** une perte de surveillance ou un rattrapage incomplet est signalé et inscrit dans l’historique ; les scénarios Windows d’installation, de mise à niveau, de restauration et de purge de quarantaine passent sur une machine de test.
 
@@ -56,6 +56,19 @@ Maintenir les versions prises en charge de .NET, ClamAV et YARA ; vérifier l’
 Rendre les erreurs compréhensibles sans exposer davantage de données privées. Définir les informations utiles à un rapport de diagnostic, vérifier leur masquage et documenter ce que les analyses transmettent ou conservent. Continuer à maintenir la parité française et anglaise ainsi que l’accessibilité des principaux parcours.
 
 **Critères de sortie :** un utilisateur peut comprendre pourquoi une analyse n’a pas abouti, retrouver les actions proposées et partager un diagnostic avec une exposition maîtrisée des chemins et données locales.
+
+### 6. Suites de l'audit indépendant du 13 octobre 2026
+
+Corrigés dans la candidate : A3, A4, A5 (fermeture de `scan_path`), A6 (moteurs exigés en CI), A9, A10 et les points de la revue ligne à ligne ([audit, section 6](AUDIT_optiSCAN_360.md#6-relecture-des-corrections--défauts-trouvés-et-corrigés)). Restent à planifier :
+
+- **A1, A2** — commiter la candidate, produire l'installateur depuis la CI seulement, rendre la signature Authenticode obligatoire au job de publication (avant toute diffusion publique) ;
+- **A5 (suite)** — exécuter YARA et clamscan dans l'AppContainer de clamd, YARA 4.5.8 compilé en CI ;
+- **A7, A8** — moteur dans une bibliothèque sans WPF, hébergé directement par `optiSCAN.Service` ; appels natifs centralisés, fin du singleton `ServiceContainer` ;
+- **A12** — purger l'historique Git avant un passage du dépôt en public ;
+- **A14** — scinder le README (utilisateur, développeur, CHANGELOG) ; remplacer l'audit-journal par un registre des risques ouverts ;
+- **A13** — monter QuestPDF et xUnit sur un poste Windows, en comparant les PDF produits et en exécutant la suite.
+
+A11 (retour arrière d'Optimiser, nom de la relance automatique) et A15 (santé du temps réel dans l'interface) sont corrigés dans la candidate.
 
 ## Périmètre et décisions futures
 

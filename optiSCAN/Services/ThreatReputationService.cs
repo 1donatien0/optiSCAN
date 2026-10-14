@@ -74,6 +74,20 @@ namespace optiSCAN.Services
                 using var resp = await _http.SendAsync(req, ct).ConfigureAwait(false);
                 var body = await resp.Content.ReadAsStringAsync(ct).ConfigureAwait(false);
 
+                if (resp.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    // Empreinte inconnue de VirusTotal : ce n'est pas une erreur, et le résultat est mis
+                    // en cache comme un autre.
+                    var unknown = new ReputationResult
+                    {
+                        Success = true,
+                        Summary = LocalizationService.GetString("VT_UnknownHash"),
+                        Permalink = $"https://www.virustotal.com/gui/file/{hash}",
+                    };
+                    Cache[hash] = (unknown, DateTime.UtcNow.Add(CacheTtl));
+                    return unknown;
+                }
+
                 if (!resp.IsSuccessStatusCode)
                 {
                     return new ReputationResult

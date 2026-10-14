@@ -1,4 +1,6 @@
-# Ajoute optiSCAN aux exclusions Windows Defender (chemins + processus).
+# Ajoute optiSCAN aux exclusions Windows Defender : dossiers réservés aux administrateurs
+# (installation, %ProgramData%\optiSCAN) et moteurs par chemin complet. Jamais optiSCAN.exe
+# ni optiSCAN.Service.exe en exclusion de processus (audit A3) : ils sont retirés s'ils y sont.
 # Relance en administrateur si nécessaire.
 # Usage :
 #   .\scripts\add-defender-exclusions.ps1
@@ -74,6 +76,25 @@ function Ensure-ExclusionProcess([string[]] $Existing, [string] $Name, [ref] $De
     }
 }
 
+# Même règle que InstallLocationTrust.IsAdminOnlyInstall : aucun droit d'écriture accordé
+# à un autre compte que SYSTEM, Administrateurs, TrustedInstaller ou CREATOR OWNER.
+function Test-AdminOnlyFolder([string] $Path) {
+    if (-not (Test-Path -LiteralPath $Path -PathType Container)) { return $false }
+    $trusted = @('S-1-5-18', 'S-1-5-32-544', 'S-1-3-0',
+        'S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464')
+    $write = [Security.AccessControl.FileSystemRights]'WriteData, AppendData, WriteExtendedAttributes, WriteAttributes, Delete, DeleteSubdirectoriesAndFiles, ChangePermissions, TakeOwnership'
+    try { $acl = Get-Acl -LiteralPath $Path -ErrorAction Stop } catch { return $false }
+    $owner = (New-Object Security.Principal.NTAccount($acl.Owner)).Translate([Security.Principal.SecurityIdentifier]).Value
+    if ($trusted -notcontains $owner) { return $false }
+    foreach ($rule in $acl.Access) {
+        if ($rule.AccessControlType -ne 'Allow') { continue }
+        if (($rule.FileSystemRights -band $write) -eq 0) { continue }
+        try { $sid = $rule.IdentityReference.Translate([Security.Principal.SecurityIdentifier]).Value } catch { return $false }
+        if ($trusted -notcontains $sid) { return $false }
+    }
+    return $true
+}
+
 if (-not (Test-DefenderActive)) {
     Write-Warning 'Windows Defender inactif ou indisponible — exclusions ignorees.'
     exit 2
@@ -87,20 +108,24 @@ if ([string]::IsNullOrWhiteSpace($InstallDir)) {
     }
 }
 
+$installTrusted = Test-AdminOnlyFolder $InstallDir
+if (-not $installTrusted) {
+    Write-Warning "Dossier modifiable par d'autres comptes que les administrateurs : aucune exclusion pour $InstallDir"
+}
+
 $paths = @(
-    $InstallDir
-) | ForEach-Object {
-    try { (Resolve-Path -LiteralPath $_ -ErrorAction SilentlyContinue).Path } catch { $_ }
-} | Where-Object { $_ } | Select-Object -Unique
+    $(if ($installTrusted) { $InstallDir }),
+    (Join-Path ${env:ProgramData} 'optiSCAN')
+) | Where-Object { $_ -and (Test-AdminOnlyFolder $_) } | ForEach-Object {
+    (Resolve-Path -LiteralPath $_).Path
+} | Select-Object -Unique
 
 $processes = @(
-    (Join-Path $InstallDir 'optiSCAN.exe'),
-    (Join-Path $InstallDir 'optiSCAN.Service.exe'),
     (Join-Path $InstallDir 'clamav\x64\clamscan.exe'),
     (Join-Path $InstallDir 'clamav\x64\freshclam.exe'),
     (Join-Path $InstallDir 'clamav\x64\clamd.exe'),
     (Join-Path $InstallDir 'yara\yara64.exe')
-) | Where-Object { Test-Path -LiteralPath $_ }
+) | Where-Object { $installTrusted -and (Test-Path -LiteralPath $_) }
 
 $pref = Get-MpPreference
 $pathExisting = @($pref.ExclusionPath)
@@ -136,6 +161,13 @@ if ($ours.Count -gt 0) {
 }
 foreach ($name in $legacyTargets) {
     try { Remove-MpPreference -ExclusionProcess $name -ErrorAction Stop } catch { }
+}
+
+# optiSCAN.exe / optiSCAN.Service.exe par chemin complet (jusqu'à la 3.1 candidate) : retirés.
+foreach ($proc in @((Join-Path $InstallDir 'optiSCAN.exe'), (Join-Path $InstallDir 'optiSCAN.Service.exe'))) {
+    if ($procNow -contains $proc) {
+        try { Remove-MpPreference -ExclusionProcess $proc -ErrorAction Stop } catch { }
+    }
 }
 
 if ($added -eq 0 -and -not $denied) {

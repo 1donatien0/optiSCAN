@@ -16,6 +16,23 @@ namespace optiSCAN.Services
             ResolveDistinctRoots,
             LazyThreadSafetyMode.ExecutionAndPublication);
 
+        /// <summary>Racines entièrement exclues (tout leur contenu).</summary>
+        private static readonly Lazy<IReadOnlyList<string>> CachedWholeRoots = new(
+            () => CachedRoots.Value.Where(r => !IsLocalDataRoot(r)).ToList(),
+            LazyThreadSafetyMode.ExecutionAndPublication);
+
+        /// <summary>Racines modifiables par la session : seuls leurs fichiers de données sont exclus.</summary>
+        private static readonly Lazy<IReadOnlyList<string>> CachedDataRoots = new(
+            () => CachedRoots.Value.Where(IsLocalDataRoot).ToList(),
+            LazyThreadSafetyMode.ExecutionAndPublication);
+
+        private static bool IsLocalDataRoot(string root)
+        {
+            var local = GetLocalAppDataRoot();
+            return LocalAppDataProtectedSubfolders.Any(sub =>
+                string.Equals(root, Path.GetFullPath(Path.Combine(local, sub)), StringComparison.OrdinalIgnoreCase));
+        }
+
         /// <summary>%LOCALAPPDATA%\optiSCAN (seuls certains sous-dossiers sont protégés, voir <see cref="LocalAppDataProtectedSubfolders"/>).</summary>
         public static string GetLocalAppDataRoot()
         {
@@ -27,6 +44,17 @@ namespace optiSCAN.Services
         /// <summary>Racines protégées (installation et sous-dossiers de données applicatives).</summary>
         public static IReadOnlyList<string> GetProtectedRoots() => CachedRoots.Value;
 
+        /// <summary>
+        /// Vrai si <paramref name="path"/> est exclu des analyses d'optiSCAN.
+        /// <para>
+        /// Une racine « entière » (installation réservée aux administrateurs, ou dossiers de
+        /// moteurs d'une installation de développement) exclut tout ce qu'elle contient. Les
+        /// sous-dossiers de <c>%LOCALAPPDATA%\optiSCAN</c>, eux, sont modifiables par n'importe quel
+        /// programme de la session : n'y sont exclus que les fichiers de données d'optiSCAN
+        /// (bases, règles, quarantaine chiffrée, configuration). Un exécutable déposé là est
+        /// analysé : ces dossiers ne servent plus de cachette.
+        /// </para>
+        /// </summary>
         public static bool IsUnderProtectedPath(string? path)
         {
             if (string.IsNullOrWhiteSpace(path))
@@ -42,13 +70,90 @@ namespace optiSCAN.Services
                 return false;
             }
 
-            foreach (var root in CachedRoots.Value)
+            foreach (var root in CachedWholeRoots.Value)
             {
                 if (IsUnderRoot(fullPath, root))
                     return true;
             }
 
+            foreach (var root in CachedDataRoots.Value)
+            {
+                if (IsUnderRoot(fullPath, root) && IsDataFileName(fullPath) && !IsDisguisedExecutable(fullPath))
+                    return true;
+            }
+
             return false;
+        }
+
+        /// <summary>Vrai si <paramref name="folder"/> est une racine où seuls les fichiers de données sont exclus.</summary>
+        public static bool IsDataOnlyRoot(string? folder)
+        {
+            if (string.IsNullOrWhiteSpace(folder))
+                return false;
+            try
+            {
+                var norm = Path.GetFullPath(folder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
+                return CachedDataRoots.Value.Any(r => string.Equals(r, norm, StringComparison.OrdinalIgnoreCase));
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Fichiers que produit optiSCAN dans ses dossiers de données. Aucun format exécutable,
+        /// script ou document n'y figure.
+        /// </summary>
+        internal static readonly HashSet<string> DataFileExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".cvd", ".cld", ".cud", ".cdiff", ".dat", ".ign", ".ign2", ".fp", ".sfp",
+            ".hdb", ".hsb", ".ndb", ".ldb", ".mdb", ".msb", ".cbc", ".info",
+            ".yar", ".yara", ".yarc", ".stamp", ".cache",
+            ".conf", ".log", ".pid", ".port", ".pipe", ".lock", ".crt",
+            ".quar", ".json", ".key", ".bak", ".optibak", ".optiscan-db-seeded",
+        };
+
+        /// <summary>
+        /// Un exécutable PE renommé en fichier de données (« payload.dat », « x.cvd ») se lance
+        /// quand même par CreateProcess ou rundll32 : il n'est pas exclu. L'en-tête n'est lu que
+        /// pour les fichiers de ces dossiers, peu nombreux.
+        /// </summary>
+        private static bool IsDisguisedExecutable(string fullPath)
+        {
+            try
+            {
+                return File.Exists(fullPath) && ExecutableSniffer.IsPortableExecutable(fullPath);
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Extensions exclues par clamscan dans les dossiers de données (motifs <c>--exclude</c>,
+        /// sans lecture d'en-tête possible) : seulement les gros fichiers binaires d'optiSCAN
+        /// (signatures, règles compilées, quarantaine et copies chiffrées), pour la durée d'analyse
+        /// et pour ne pas détecter les signatures elles-mêmes. Les petits fichiers de configuration
+        /// et de journal y sont analysés ; un exécutable déguisé est aussi vu par YARA, clamd et le
+        /// temps réel, qui lisent l'en-tête.
+        /// </summary>
+        internal static readonly string[] ClamScanDataExtensions =
+        {
+            "cvd", "cld", "cud", "cdiff", "yar", "yara", "yarc", "quar", "optibak",
+        };
+
+        internal static bool IsDataFileName(string path)
+        {
+            var name = Path.GetFileName(path);
+            if (string.IsNullOrEmpty(name))
+                return false;
+            // relay-handles.txt (clamd), .optiscan-yara-meta.txt (règles) : textes d'optiSCAN.
+            if (name.Equals("relay-handles.txt", StringComparison.OrdinalIgnoreCase)
+                || name.Equals(".optiscan-yara-meta.txt", StringComparison.OrdinalIgnoreCase))
+                return true;
+            return DataFileExtensions.Contains(Path.GetExtension(name));
         }
 
         /// <summary>Vrai si le dossier fait partie des exclusions obligatoires (non supprimables dans Options).</summary>
@@ -78,10 +183,19 @@ namespace optiSCAN.Services
 
         public static IEnumerable<string> GetClamScanExcludePatterns()
         {
-            foreach (var root in CachedRoots.Value)
+            foreach (var root in CachedWholeRoots.Value)
             {
                 var trimmed = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
                 yield return "^" + Regex.Escape(trimmed) + @"([\\/]|$)";
+            }
+
+            // Racines de données : seuls les fichiers de données (par extension) sont exclus ;
+            // les dossiers sont parcourus.
+            var extensions = string.Join("|", ClamScanDataExtensions.Select(Regex.Escape));
+            foreach (var root in CachedDataRoots.Value)
+            {
+                var trimmed = root.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
+                yield return "^" + Regex.Escape(trimmed) + @"[\\/].*\.(" + extensions + ")$";
             }
         }
 
@@ -175,8 +289,10 @@ namespace optiSCAN.Services
                 try
                 {
                     using var key = Registry.LocalMachine.OpenSubKey(subkey);
-                    if (key?.GetValue("InstallLocation") is string location)
-                        TryAddRoot(roots, location);
+                    // Même règle que pour l'installation courante : entière seulement si réservée
+                    // aux administrateurs, sinon ses moteurs, bases et règles uniquement.
+                    if (key?.GetValue("InstallLocation") is string location && !string.IsNullOrWhiteSpace(location))
+                        AddInstallRoot(roots, location.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
                 }
                 catch
                 {

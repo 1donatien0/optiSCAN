@@ -34,6 +34,11 @@ namespace optiSCAN.Services
         private static void SetHkcuValue(string subKey, string name, int value)
         {
             using var key = Registry.CurrentUser.CreateSubKey(subKey, writable: true);
+            // Valeur d'origine gardée pour « Rétablir les réglages d'origine » (audit A11).
+            var previous = key.GetValue(name);
+            TweakUndoStore.RecordRegistryOriginal(
+                subKey, name, existed: previous != null, value: previous is int i ? i : 0,
+                nonDword: previous != null && previous is not int);
             key.SetValue(name, value, RegistryValueKind.DWord);
         }
 
@@ -44,6 +49,10 @@ namespace optiSCAN.Services
         {
             try
             {
+                var current = GetActivePowerPlanGuid();
+                if (current != null)
+                    TweakUndoStore.RecordPowerPlanOriginal(current);
+
                 var psi = new ProcessStartInfo
                 {
                     FileName = SystemExecutables.System32("powercfg.exe"),
@@ -61,6 +70,126 @@ namespace optiSCAN.Services
                 AppLogger.Warn("SystemTweaksService", "powercfg /setactive", ex);
                 return false;
             }
+        }
+
+        /// <summary>GUID du plan d'alimentation actif (<c>powercfg /getactivescheme</c>), ou null.</summary>
+        internal static string? GetActivePowerPlanGuid()
+        {
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = SystemExecutables.System32("powercfg.exe"),
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                    RedirectStandardOutput = true,
+                };
+                psi.ArgumentList.Add("/getactivescheme");
+                using var p = Process.Start(psi);
+                if (p == null)
+                    return null;
+                var output = p.StandardOutput.ReadToEnd();
+                p.WaitForExit(15000);
+                return ParsePowerPlanGuid(output);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("SystemTweaksService", "powercfg /getactivescheme", ex);
+                return null;
+            }
+        }
+
+        /// <summary>Premier GUID de la sortie de powercfg (indépendant de la langue).</summary>
+        internal static string? ParsePowerPlanGuid(string? output)
+        {
+            if (string.IsNullOrEmpty(output))
+                return null;
+            var m = System.Text.RegularExpressions.Regex.Match(
+                output, "[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}");
+            return m.Success ? m.Value.ToLowerInvariant() : null;
+        }
+
+        /// <summary>
+        /// Rétablit les réglages d'origine enregistrés par <see cref="TweakUndoStore"/> : valeurs
+        /// HKCU (supprimées si elles n'existaient pas) et plan d'alimentation. La télémétrie, qui
+        /// exige une élévation, est rendue à part (<paramref name="telemetryUndoNeeded"/>).
+        /// Ce qui n'a pas pu être rétabli reste enregistré pour un nouvel essai.
+        /// </summary>
+        public static bool UndoAll(out bool telemetryUndoNeeded, out bool explorerRestartNeeded)
+        {
+            var snapshot = TweakUndoStore.Load();
+            telemetryUndoNeeded = snapshot.TelemetryApplied;
+            explorerRestartNeeded = false;
+            var remaining = new TweakUndoStore.Snapshot { TelemetryApplied = snapshot.TelemetryApplied };
+            var ok = true;
+
+            foreach (var original in snapshot.Registry)
+            {
+                try
+                {
+                    using var key = Registry.CurrentUser.OpenSubKey(original.Key, writable: true);
+                    // Valeur d'origine d'un autre type : pas de réécriture approximative.
+                    if (key != null && !original.NonDword)
+                    {
+                        if (original.Existed)
+                            key.SetValue(original.Name, original.Value, RegistryValueKind.DWord);
+                        else
+                            key.DeleteValue(original.Name, throwOnMissingValue: false);
+                    }
+
+                    if (original.Key.Contains(@"Explorer\Advanced", StringComparison.OrdinalIgnoreCase)
+                        || original.Key.EndsWith(@"\Search", StringComparison.OrdinalIgnoreCase))
+                        explorerRestartNeeded = true;
+                }
+                catch (Exception ex)
+                {
+                    ok = false;
+                    remaining.Registry.Add(original);
+                    AppLogger.Warn("SystemTweaksService", $"Rétablissement {original.Key}\\{original.Name}", ex);
+                }
+            }
+
+            if (snapshot.PowerPlanGuid != null && !SetActivePowerPlan(snapshot.PowerPlanGuid))
+            {
+                ok = false;
+                remaining.PowerPlanGuid = snapshot.PowerPlanGuid;
+            }
+
+            TweakUndoStore.Save(remaining);
+            return ok;
+        }
+
+        private static bool SetActivePowerPlan(string guid)
+        {
+            if (ParsePowerPlanGuid(guid) != guid)
+                return false;
+            try
+            {
+                var psi = new ProcessStartInfo
+                {
+                    FileName = SystemExecutables.System32("powercfg.exe"),
+                    UseShellExecute = false,
+                    CreateNoWindow = true,
+                };
+                psi.ArgumentList.Add("/setactive");
+                psi.ArgumentList.Add(guid);
+                using var p = Process.Start(psi);
+                p?.WaitForExit(15000);
+                return p is { ExitCode: 0 };
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("SystemTweaksService", "powercfg /setactive (rétablissement)", ex);
+                return false;
+            }
+        }
+
+        /// <summary>Après un rétablissement élevé réussi de la télémétrie.</summary>
+        public static void MarkTelemetryRestored()
+        {
+            var snapshot = TweakUndoStore.Load();
+            snapshot.TelemetryApplied = false;
+            TweakUndoStore.Save(snapshot);
         }
 
         /// <summary>Effets visuels sur « Meilleures performances » (effet à la reconnexion).</summary>
@@ -292,6 +421,23 @@ namespace optiSCAN.Services
                 "sc.exe", new[] { "config", "DiagTrack", "start=", "disabled" }, new[] { 0, ServiceDoesNotExist });
         }
 
+        /// <summary>
+        /// Retour de la télémétrie aux réglages par défaut de Windows : stratégie retirée,
+        /// service DiagTrack en démarrage automatique et relancé.
+        /// </summary>
+        public static IEnumerable<ElevatedCommand> ElevatedTelemetryUndoCommands()
+        {
+            // reg delete renvoie 1 si la valeur n'existe pas : rien à retirer.
+            yield return new ElevatedCommand(
+                "reg.exe",
+                new[] { "delete", @"HKLM\SOFTWARE\Policies\Microsoft\Windows\DataCollection", "/v", "AllowTelemetry", "/f" },
+                new[] { 0, 1 });
+            yield return new ElevatedCommand(
+                "sc.exe", new[] { "config", "DiagTrack", "start=", "auto" }, new[] { 0, ServiceDoesNotExist });
+            yield return new ElevatedCommand(
+                "sc.exe", new[] { "start", "DiagTrack" }, new[] { 0, ServiceAlreadyRunning, ServiceDoesNotExist });
+        }
+
         /// <summary>Nettoyage des composants Windows (DISM, lent).</summary>
         public static IEnumerable<ElevatedCommand> ElevatedDismCleanupCommands()
         {
@@ -374,7 +520,7 @@ namespace optiSCAN.Services
 
         /// <summary>Identifiants acceptés après <c>--apply-tweaks</c> (liste blanche).</summary>
         internal static readonly IReadOnlySet<string> KnownElevatedTweakIds =
-            new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "telemetry", "dism", "wu-cache" };
+            new HashSet<string>(StringComparer.OrdinalIgnoreCase) { "telemetry", "telemetry-undo", "dism", "wu-cache" };
 
         public static bool ExecuteTweakIds(IReadOnlyCollection<string> ids)
         {
@@ -385,6 +531,8 @@ namespace optiSCAN.Services
             var ok = true;
             if (wanted.Contains("telemetry"))
                 ok &= RunAll(ElevatedTelemetryCommands());
+            if (wanted.Contains("telemetry-undo"))
+                ok &= RunAll(ElevatedTelemetryUndoCommands());
             if (wanted.Contains("dism"))
                 ok &= RunAll(ElevatedDismCleanupCommands());
             if (wanted.Contains("wu-cache"))

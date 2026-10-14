@@ -8,4 +8,7 @@ public interface IServiceHostThreatContext
     ScanLogManager Logger { get; }
 
     CloudThreatIntelService CloudThreatIntel { get; }
+
+    /// <summary>Détections relevées par les sessions (voir <see cref="ServiceDetectionLog"/>).</summary>
+    ServiceDetectionLog Detections => ServiceDetectionLog.Shared;
 }

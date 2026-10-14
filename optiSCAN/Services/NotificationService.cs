@@ -74,9 +74,35 @@ namespace optiSCAN.Services
         internal void DispatchActivation(ToastActivationEventArgs args) =>
             ToastActivated?.Invoke(this, args);
 
+        /// <summary>
+        /// Temps réel dégradé (dossiers non surveillés ou rattrapage en cours) : une alerte à
+        /// l'entrée dans cet état, le détail reste sur le badge de protection.
+        /// </summary>
+        public void ShowRealTimeDegraded(int folderCount)
+        {
+            if (!ShouldShowToast())
+                return;
+            try
+            {
+                new ToastContentBuilder()
+                    .AddArgument("action", "openav")
+                    .AddText(LocalizationService.GetString("Notif_RtDegradedTitle"))
+                    .AddText(LocalizationService.Format("Notif_RtDegradedBody", folderCount))
+                    .Show();
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("NotificationService", "ShowRealTimeDegraded", ex);
+            }
+        }
+
         public void ShowThreatDetected(ThreatInfo threat)
         {
-            if (!ShouldShowToast()) return;
+            if (!ShouldShowToast())
+            {
+                Defer(threat);
+                return;
+            }
 
             try
             {
@@ -97,7 +123,8 @@ namespace optiSCAN.Services
                     .AddButton(new ToastButton()
                         .SetContent(LocalizationService.GetString("Notif_IgnoreBtn"))
                         .AddArgument("action", "ignore")
-                        .AddArgument("file", threat.FilePath))
+                        .AddArgument("file", threat.FilePath)
+                        .AddArgument("virus", threat.VirusName))
                     .AddButton(new ToastButton()
                         .SetContent(LocalizationService.GetString("Notif_OpenAntivirus"))
                         .AddArgument("action", "openav"))
@@ -110,6 +137,95 @@ namespace optiSCAN.Services
             catch (Exception ex)
             {
                 AppLogger.Error("NotificationService", "ShowThreatDetected", ex);
+            }
+        }
+
+        // ── Mode jeu / plein écran : alertes de menace différées ────────────────────
+        // Une menace détectée pendant une partie n'était jamais signalée : la notification était
+        // simplement abandonnée. Elle est gardée, puis résumée à la sortie du mode.
+
+        internal const int MaxDeferredThreats = 50;
+        private static readonly TimeSpan DeferredCheckInterval = TimeSpan.FromSeconds(20);
+        private readonly object _deferGate = new();
+        private readonly List<(ThreatInfo Threat, bool FromService)> _deferredThreats = new();
+        private int _deferredCount;
+        private System.Threading.Timer? _deferTimer;
+
+        internal int DeferredCount
+        {
+            get { lock (_deferGate) return _deferredCount; }
+        }
+
+        private void Defer(ThreatInfo threat, bool fromService = false)
+        {
+            if (!_toastsEnabled)
+                return;
+            lock (_deferGate)
+            {
+                _deferredCount++;
+                if (_deferredThreats.Count < MaxDeferredThreats)
+                    _deferredThreats.Add((threat, fromService));
+                _deferTimer ??= new System.Threading.Timer(_ => FlushDeferred(), null, DeferredCheckInterval, DeferredCheckInterval);
+            }
+        }
+
+        private void DeferCount(int count)
+        {
+            if (!_toastsEnabled || count <= 0)
+                return;
+            lock (_deferGate)
+            {
+                _deferredCount += count;
+                _deferTimer ??= new System.Threading.Timer(_ => FlushDeferred(), null, DeferredCheckInterval, DeferredCheckInterval);
+            }
+        }
+
+        /// <summary>Hors mode jeu : montre ce qui a été retenu (une alerte, ou un résumé).</summary>
+        internal void FlushDeferred()
+        {
+            if (!ShouldShowToast())
+                return;
+
+            List<(ThreatInfo Threat, bool FromService)> threats;
+            int count;
+            lock (_deferGate)
+            {
+                if (_deferredCount == 0)
+                    return;
+                threats = _deferredThreats.ToList();
+                count = _deferredCount;
+                _deferredThreats.Clear();
+                _deferredCount = 0;
+                _deferTimer?.Dispose();
+                _deferTimer = null;
+            }
+
+            if (count == 1 && threats.Count == 1)
+            {
+                // Une détection du service garde sa notification propre (sans boutons d'action :
+                // son chemin peut n'être qu'un nom de fichier).
+                if (threats[0].FromService)
+                    ShowServiceThreat(threats[0].Threat);
+                else
+                    ShowThreatDetected(threats[0].Threat);
+                return;
+            }
+
+            try
+            {
+                new ToastContentBuilder()
+                    .AddArgument("action", "history")
+                    .AddText(LocalizationService.GetString("Notif_DeferredThreatsTitle"))
+                    .AddText(LocalizationService.Format("Notif_DeferredThreatsBody", count))
+                    .AddButton(new ToastButton()
+                        .SetContent(LocalizationService.GetString("Notif_HistoryBtn"))
+                        .AddArgument("action", "history"))
+                    .SetToastDuration(ToastDuration.Long)
+                    .Show();
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("NotificationService", "FlushDeferred", ex);
             }
         }
 
@@ -134,6 +250,61 @@ namespace optiSCAN.Services
             catch (Exception ex)
             {
                 AppLogger.Error("NotificationService", "ShowQuarantined", ex);
+            }
+        }
+
+        /// <summary>Menace trouvée par le service SYSTEM, relevée par la session.</summary>
+        public void ShowServiceThreat(ThreatInfo threat)
+        {
+            if (!ShouldShowToast())
+            {
+                Defer(threat, fromService: true);
+                return;
+            }
+
+            try
+            {
+                var body = threat.Status == ThreatStatus.Quarantined
+                    ? LocalizationService.Format("Notif_ServiceThreatQuarantined", threat.FileName, threat.VirusName)
+                    : LocalizationService.Format("Notif_ServiceThreatDetected", threat.FileName, threat.VirusName);
+                new ToastContentBuilder()
+                    .AddArgument("action", "history")
+                    .AddText(LocalizationService.GetString("Notif_ServiceThreatTitle"))
+                    .AddText(body)
+                    .AddButton(new ToastButton()
+                        .SetContent(LocalizationService.GetString("Notif_HistoryBtn"))
+                        .AddArgument("action", "history"))
+                    .Show();
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("NotificationService", "ShowServiceThreat", ex);
+            }
+        }
+
+        /// <summary>Plusieurs menaces du service relevées d'un coup : une seule notification.</summary>
+        public void ShowServiceThreatsSummary(int count)
+        {
+            if (!ShouldShowToast())
+            {
+                DeferCount(count);
+                return;
+            }
+
+            try
+            {
+                new ToastContentBuilder()
+                    .AddArgument("action", "history")
+                    .AddText(LocalizationService.GetString("Notif_ServiceThreatTitle"))
+                    .AddText(LocalizationService.Format("Notif_ServiceThreatsSummary", count))
+                    .AddButton(new ToastButton()
+                        .SetContent(LocalizationService.GetString("Notif_HistoryBtn"))
+                        .AddArgument("action", "history"))
+                    .Show();
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("NotificationService", "ShowServiceThreatsSummary", ex);
             }
         }
 

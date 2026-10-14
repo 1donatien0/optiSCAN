@@ -71,8 +71,8 @@ public static class ServiceRegistration
                 sp.GetRequiredService<ScanLogManager>(),
                 sp.GetRequiredService<IUiEventBus>());
         });
-        services.AddSingleton<TamperProtectionService>(sp =>
-            new TamperProtectionService(
+        services.AddSingleton<ProtectionWatchdogService>(sp =>
+            new ProtectionWatchdogService(
                 sp.GetRequiredService<IUserPreferencesAccessor>(),
                 sp.GetRequiredService<IExclusionSettingsAccessor>()));
         services.AddSingleton<RemovableDriveScanService>(sp =>
@@ -81,7 +81,6 @@ public static class ServiceRegistration
                 sp.GetRequiredService<QuarantineManager>(),
                 sp.GetRequiredService<NotificationService>(),
                 sp.GetRequiredService<ScanLogManager>(),
-                sp.GetRequiredService<RealTimeProtection>(),
                 sp.GetRequiredService<IUiEventBus>(),
                 sp.GetRequiredService<IUserPreferencesAccessor>(),
                 sp.GetRequiredService<IExclusionSettingsAccessor>()));

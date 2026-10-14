@@ -36,4 +36,43 @@ foreach ($proj in $Projects) {
     }
 }
 
+# Composants natifs livrés à côté des projets .NET (audit V12) : moteurs épinglés dans
+# runtime-versions.json et bibliothèques fournies par l'archive ClamAV. CycloneDX ne les voit
+# pas : ils ne viennent pas de NuGet.
+$versionsPath = Join-Path $PSScriptRoot 'runtime-versions.json'
+$versions = Get-Content -LiteralPath $versionsPath -Raw | ConvertFrom-Json
+function New-Lib([string] $name, [string] $license) {
+    [ordered]@{ type = 'library'; name = $name; licenses = @(@{ license = @{ id = $license } }) }
+}
+$clamLibs = @(
+    (New-Lib 'openssl' 'Apache-2.0'), (New-Lib 'libcurl' 'curl'), (New-Lib 'libxml2' 'MIT'),
+    (New-Lib 'pcre2' 'BSD-3-Clause'), (New-Lib 'json-c' 'MIT'), (New-Lib 'bzip2' 'bzip2-1.0.6'),
+    (New-Lib 'libssh2' 'BSD-3-Clause'), (New-Lib 'nghttp2' 'MIT'), (New-Lib 'zlib' 'Zlib'),
+    (New-Lib 'unrar' 'LicenseRef-UnRAR'), (New-Lib 'pthreads4w' 'Apache-2.0')
+)
+$native = [ordered]@{
+    bomFormat    = 'CycloneDX'
+    specVersion  = '1.5'
+    version      = 1
+    metadata     = [ordered]@{ component = [ordered]@{ type = 'application'; name = 'optiSCAN native runtime' } }
+    components   = @(
+        [ordered]@{
+            type = 'application'; name = 'clamav'; version = $versions.clamavVersion
+            purl = "pkg:generic/clamav@$($versions.clamavVersion)?download_url=$($versions.clamavWinX64Url)"
+            hashes = @(@{ alg = 'SHA-256'; content = $versions.clamavWinX64Sha256.ToLowerInvariant() })
+            licenses = @(@{ license = @{ id = 'GPL-2.0-only' } })
+            components = $clamLibs
+        },
+        [ordered]@{
+            type = 'application'; name = 'yara'; version = $versions.yaraVersion
+            purl = "pkg:github/virustotal/yara@v$($versions.yaraVersion)"
+            hashes = @(@{ alg = 'SHA-256'; content = $versions.yaraWin64Sha256.ToLowerInvariant() })
+            licenses = @(@{ license = @{ id = 'BSD-3-Clause' } })
+        }
+    )
+}
+$nativePath = Join-Path $OutputDir 'optiSCAN-native-bom.json'
+$native | ConvertTo-Json -Depth 10 | Set-Content -LiteralPath $nativePath -Encoding utf8
+Write-Host "SBOM: composants natifs -> $nativePath"
+
 Write-Host "SBOM generation complete ($OutputDir)"

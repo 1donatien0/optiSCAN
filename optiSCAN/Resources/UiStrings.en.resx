@@ -139,7 +139,13 @@
   <data name="Confirm_PurgeQuarantine" xml:space="preserve"><value>Permanently delete {0} quarantine item(s)? This cannot be undone.</value></data>
   <data name="Notif_ThreatTitle" xml:space="preserve"><value>Threat detected</value></data>
   <data name="Notif_QuarantineBtn" xml:space="preserve"><value>Quarantine</value></data>
-  <data name="Notif_IgnoreBtn" xml:space="preserve"><value>Ignore</value></data>
+  <data name="Notif_IgnoreBtn" xml:space="preserve"><value>Exclude…</value></data>
+  <data name="Toast_ConfirmIgnore" xml:space="preserve"><value>Exclude &quot;{0}&quot; from all scans?
+
+This file was detected as &quot;{1}&quot;.
+{2}
+
+It will never be scanned or reported again. Only accept if you are sure it is safe.</value></data>
   <data name="Notif_OpenApp" xml:space="preserve"><value>Open optiSCAN</value></data>
   <data name="Notif_OpenAntivirus" xml:space="preserve"><value>Open Antivirus</value></data>
   <data name="Notif_QuarantinedTitle" xml:space="preserve"><value>File quarantined</value></data>
@@ -157,6 +163,12 @@
   <data name="Status_UsbScanStarting" xml:space="preserve"><value>USB scan of {0} in progress…</value></data>
   <data name="Status_UsbScanComplete" xml:space="preserve"><value>USB scan of {0} complete — {1:N0} file(s), {2} threat(s)</value></data>
   <data name="Status_UsbScanFailed" xml:space="preserve"><value>USB scan of {0} interrupted or failed</value></data>
+  <data name="Notif_ServiceThreatTitle" xml:space="preserve"><value>Threat detected by system protection</value></data>
+  <data name="Notif_ServiceThreatQuarantined" xml:space="preserve"><value>{0} — {1}: quarantined</value></data>
+  <data name="Notif_ServiceThreatDetected" xml:space="preserve"><value>{0} — {1}: not quarantined, see history</value></data>
+  <data name="Notif_ServiceThreatsSummary" xml:space="preserve"><value>{0} threats detected by system protection — see history</value></data>
+  <data name="Notif_DeferredThreatsTitle" xml:space="preserve"><value>Threats detected during game mode</value></data>
+  <data name="Notif_DeferredThreatsBody" xml:space="preserve"><value>{0} threat(s) detected while notifications were paused — see history</value></data>
   <data name="Notif_HistoryBtn" xml:space="preserve"><value>Open history</value></data>
   <data name="Notif_RtpStartedTitle" xml:space="preserve"><value>File monitoring enabled</value></data>
   <data name="Notif_RtpStartedBody" xml:space="preserve"><value>optiSCAN scans monitored files after they are written</value></data>
@@ -438,7 +450,7 @@
   <data name="Opt_RtpSub" xml:space="preserve"><value>Scans files created or changed in watched folders after they are written.</value></data>
   <data name="Opt_ProcessMonitor" xml:space="preserve"><value>Process launch monitoring</value></data>
   <data name="Opt_ProcessMonitorSub" xml:space="preserve"><value>Scans executables and scripts after a process starts (WMI) — complements file monitoring.</value></data>
-  <data name="Opt_TamperProtection" xml:space="preserve"><value>Anti-tamper protection</value></data>
+  <data name="Opt_TamperProtection" xml:space="preserve"><value>Automatic protection restart</value></data>
   <data name="Opt_TamperProtectionSub" xml:space="preserve"><value>Restarts optiSCAN in the background if real-time protection is expected but the app was closed.</value></data>
   <data name="Opt_PlatformProtection" xml:space="preserve"><value>Windows system protection service</value></data>
   <data name="Opt_PlatformProtectionSub" xml:space="preserve"><value>Windows service for file monitoring and IPC; scans run after files are written. AMSI and the minifilter are not included. Administrator rights are required to install.</value></data>
@@ -457,7 +469,20 @@
   <data name="Platform_MinifilterNotLoaded" xml:space="preserve"><value>Open-time check is installed but not running</value></data>
   <data name="Platform_MinifilterAbsent" xml:space="preserve"><value>Programs are not checked when they open</value></data>
   <data name="Opt_BackupBeforeQuarantine" xml:space="preserve"><value>Safety backup before quarantine</value></data>
-  <data name="Opt_BackupBeforeQuarantineSub" xml:space="preserve"><value>Keeps a local copy (32 MB max.) in %LocalAppData%\optiSCAN\SafetyBackups.</value></data>
+  <data name="Notif_RtDegradedTitle" xml:space="preserve"><value>Real-time protection degraded</value></data>
+  <data name="Notif_RtDegradedBody" xml:space="preserve"><value>{0} watched folder(s) are no longer fully monitored. optiSCAN is trying to restore monitoring; details are on the protection badge.</value></data>
+  <data name="Protection_RtDegradedDetail" xml:space="preserve"><value>Real-time protection degraded: {0} folder(s) not fully monitored.</value></data>
+  <data name="Upd_LogWingetElevated" xml:space="preserve"><value>winget is not run from an optiSCAN window opened as administrator: reopen optiSCAN normally to update your applications.</value></data>
+  <data name="Freshclam_ElevatedRefused" xml:space="preserve"><value>Signatures are not updated from an optiSCAN window opened as administrator: reopen optiSCAN normally.</value></data>
+  <data name="Twk_Undo" xml:space="preserve"><value>Restore defaults</value></data>
+  <data name="Twk_UndoTip" xml:space="preserve"><value>Restores the settings as they were before optiSCAN first changed them (your account's registry, power plan, telemetry).</value></data>
+  <data name="Twk_UndoConfirm" xml:space="preserve"><value>Restore the settings changed by optiSCAN to what they were before?&#10;&#10;Telemetry, if it was reduced, returns to Windows defaults (administrator prompt). DISM cleanup cannot be undone.</value></data>
+  <data name="Twk_UndoStart" xml:space="preserve"><value>Restoring original settings…</value></data>
+  <data name="Twk_UndoDone" xml:space="preserve"><value>Original settings restored.</value></data>
+  <data name="Twk_UndoPartial" xml:space="preserve"><value>Some settings could not be restored; they remain available to restore.</value></data>
+  <data name="Twk_UndoNothing" xml:space="preserve"><value>No setting changed by optiSCAN to restore.</value></data>
+  <data name="Upd_WingetTimeout" xml:space="preserve"><value>winget did not respond within {0} min and was stopped.</value></data>
+  <data name="Opt_BackupBeforeQuarantineSub" xml:space="preserve"><value>Keeps an encrypted copy (32 MB max. per file) in %LocalAppData%\optiSCAN\SafetyBackups for 30 days (256 MB in total); used to restore if the quarantine file is unreadable.</value></data>
   <data name="Opt_AggressiveSignatures" xml:space="preserve"><value>Aggressive signature updates</value></data>
   <data name="Opt_AggressiveSignaturesSub" xml:space="preserve"><value>ClamAV every 2 h and YARA rules every 12 h (instead of 4 h / 24 h).</value></data>
   <data name="Main_GuardSession" xml:space="preserve"><value>Background protection session active.</value></data>
@@ -527,6 +552,7 @@ Remove them? Files are not deleted, only the share is removed. Other devices wil
   <data name="Opt_VirusTotalSub" xml:space="preserve"><value>Sends only the file SHA-256 hash for cloud reputation lookup.</value></data>
   <data name="VT_NoApiKey" xml:space="preserve"><value>Add a VirusTotal API key in Options.</value></data>
   <data name="VT_HashFailed" xml:space="preserve"><value>Could not compute file hash.</value></data>
+  <data name="VT_UnknownHash" xml:space="preserve"><value>File unknown to VirusTotal (never submitted).</value></data>
   <data name="VT_HttpError" xml:space="preserve"><value>VirusTotal returned HTTP {0}.</value></data>
   <data name="VT_Summary" xml:space="preserve"><value>Detections: {0} malicious, {1} suspicious, {2} harmless, {3} undetected.</value></data>
   <data name="VT_Error" xml:space="preserve"><value>Error: {0}</value></data>

@@ -178,6 +178,26 @@ namespace optiSCAN.Services
             }
         }
 
+        /// <summary>Plafond de stderr gardé pour le journal : un scan complet peut produire une erreur par fichier illisible.</summary>
+        private const int MaxStderrCaptureChars = 64 * 1024;
+
+        private static void AppendBounded(StringBuilder sb, string? line)
+        {
+            if (line == null)
+                return;
+            lock (sb)
+            {
+                if (sb.Length < MaxStderrCaptureChars)
+                    sb.AppendLine(line);
+            }
+        }
+
+        /// <summary>
+        /// Une seule compilation à la fois : le temps réel lance jusqu'à trois scans en parallèle,
+        /// et chacun compilait <c>_compiled.yarc</c> à l'endroit même où les autres le lisaient.
+        /// </summary>
+        private static readonly SemaphoreSlim CompileGate = new(1, 1);
+
         // ── Compilation des règles ────────────────────────────────────────────────
 
         /// <summary>
@@ -189,6 +209,22 @@ namespace optiSCAN.Services
             if (!IsAvailable) return false;
             if (!File.Exists(_yaracExe)) return false; // yarac non disponible
 
+            await CompileGate.WaitAsync(ct).ConfigureAwait(false);
+            try
+            {
+                // Un autre scan a pu compiler pendant l'attente.
+                if (HasCompiled)
+                    return true;
+                return await CompileRulesCoreAsync(ct).ConfigureAwait(false);
+            }
+            finally
+            {
+                CompileGate.Release();
+            }
+        }
+
+        private async Task<bool> CompileRulesCoreAsync(CancellationToken ct)
+        {
             var ruleFiles = Directory.GetFiles(_rulesDirectory, "*.yar");
             if (ruleFiles.Length == 0) return false;
 
@@ -205,7 +241,10 @@ namespace optiSCAN.Services
                 CreateNoWindow = true
             };
             foreach (var f in ruleFiles) psi.ArgumentList.Add(f);
-            psi.ArgumentList.Add(_compiledRulesPath);
+            // Compilation vers un fichier temporaire, puis remplacement : un scan en cours ne lit
+            // jamais un .yarc à moitié écrit.
+            var compiledTemp = _compiledRulesPath + "." + Guid.NewGuid().ToString("N") + ".tmp";
+            psi.ArgumentList.Add(compiledTemp);
 
             using var process = new Process { StartInfo = psi };
 
@@ -238,7 +277,21 @@ namespace optiSCAN.Services
                 if (!string.IsNullOrWhiteSpace(err))
                     AppLogger.Warn("yarac", PathRedaction.RedactPath(err));
 
-                var success = process.ExitCode == 0 && File.Exists(_compiledRulesPath);
+                var success = process.ExitCode == 0 && File.Exists(compiledTemp);
+                if (success)
+                {
+                    try
+                    {
+                        File.Move(compiledTemp, _compiledRulesPath, overwrite: true);
+                    }
+                    catch (Exception moveEx)
+                    {
+                        // Ancien .yarc encore lu par un scan : il reste en place, la compilation
+                        // sera refaite au prochain scan.
+                        AppLogger.Warn("yarac", "Remplacement de _compiled.yarc différé", moveEx);
+                        success = false;
+                    }
+                }
                 if (success)
                 {
                     // Persiste l'empreinte courante → HasCompiled détectera tout
@@ -259,6 +312,11 @@ namespace optiSCAN.Services
             {
                 AppLogger.Error("yarac", "Compilation échouée", ex);
                 return false;
+            }
+            finally
+            {
+                try { if (File.Exists(compiledTemp)) File.Delete(compiledTemp); }
+                catch (Exception ex) { AppLogger.Debug("yarac", "Fichier temporaire : " + ex.Message); }
             }
         }
 
@@ -470,7 +528,7 @@ namespace optiSCAN.Services
                     if (progress != null && (n == 1 || n % YaraProgressInterval == 0))
                         progress.Report(e.Data);
                 };
-                process.ErrorDataReceived += (_, e) => { if (e.Data != null) stderrLines.AppendLine(e.Data); };
+                process.ErrorDataReceived += (_, e) => AppendBounded(stderrLines, e.Data);
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
 
@@ -641,7 +699,7 @@ namespace optiSCAN.Services
                 process.OutputDataReceived += (_, e) => cap.SurLigneYara(e.Data, MaxYaraStdoutCaptureChars);
                 // CORRECTION : BeginErrorReadLine() sans handler = stderr drainé mais
                 // silencieusement perdu. On ajoute un handler pour logger les erreurs YARA.
-                process.ErrorDataReceived += (_, e) => { if (e.Data != null) stderrLines.AppendLine(e.Data); };
+                process.ErrorDataReceived += (_, e) => AppendBounded(stderrLines, e.Data);
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
 

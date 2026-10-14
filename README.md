@@ -66,13 +66,13 @@ optiSCAN.exe (UI WPF)
     ↔ IPC (optiSCAN.Platform — pipe optiSCAN_Protection, protocole v1)
 optiSCAN.Service.exe  →  optiSCAN.exe --service-host
     ├── RTP (dossiers des comptes interactifs) + ProcessStartMonitor + scan USB
-    ├── ProtectionPipeServer (scan_path / set_policy admin ; scan_buffer fermé sans AMSI)
+    ├── ProtectionPipeServer (set_policy admin ; recent_detections ; scan_path et scan_buffer fermés)
     └── clamd en AppContainer, alimenté en flux (zINSTREAM) par l'hôte
 ```
 
 | Composant | Rôle |
 |---|---|
-| `optiSCAN.Platform` | Contrats JSON IPC (`ping`, `scan_path`, `scan_buffer` — fermé par le serveur tant qu’AMSI n’est pas livré —, `status`, `shutdown`, `set_policy`) |
+| `optiSCAN.Platform` | Contrats JSON IPC (`ping`, `status`, `shutdown`, `set_policy`, `recent_detections` ; `scan_path` et `scan_buffer` existent dans le contrat mais le serveur les refuse : `scan_path` n’est ouvert que par un paramètre explicite des tests, `scan_buffer` tant qu’AMSI n’est pas livré) |
 | `optiSCAN.Service` | Service Windows qui supervise `optiSCAN.exe --service-host` |
 | `--service-host` | Moteur sans UI : RTP, IPC. Refusé hors compte SYSTEM |
 | `ThreatRepairService` | Quarantaine + recours Defender (`MpCmdRun`) |
@@ -109,7 +109,7 @@ Le service v3 s’appelle `optiSCANProtection` et le pipe `optiSCAN_Protection` 
 │   ├── DIAGNOSTIC_INTEGRATION_WINDOWS.md ← Profil install allégé façon version 2 (2 moteurs)
 │   ├── POLITIQUE_CONFIDENTIALITE.md   ← Politique utilisateur v3.1 candidate
 │   └── CONFORMITE_RGPD.md             ← Note traitements / RGPD
-├── AUDIT_optiSCAN_360.md              ← Audit 360 unique du 2 octobre 2026 (constats, traitement, réserves)
+├── AUDIT_optiSCAN_360.md              ← Audit 360 (révision du 13 octobre 2026) : note, décision de release, registre des risques
 ├── ROADMAP.md                        ← Feuille de route produit de l’antivirus après la v3.1
 ├── RELEASE_PLAN_v3.1.md              ← Critères de validation de la candidate v3.1
 ├── SECURITY.md                        ← Signalement + architecture sécurité
@@ -184,7 +184,7 @@ Le service v3 s’appelle `optiSCANProtection` et le pipe `optiSCAN_Protection` 
     │   ├── FreshclamUpdater.cs        ← Mise à jour signatures via freshclam.exe
     │   ├── ThemeManager.cs            ← Bascule Donaby + MaterialDesign (UserPreferences)
     │   ├── ExclusionSettings.cs       ← Exclusions DPAPI (exclusions.dat) + dossiers protégés
-    │   ├── OptiscanProtectedPaths.cs  ← Install (entière si réservée aux admins) + bases/règles/quarantaine de %LocalAppData%\optiSCAN : anti-autophagie scan/RTP
+    │   ├── OptiscanProtectedPaths.cs  ← Install (entière si réservée aux admins) + fichiers de données (bases, règles, quarantaine) de %LocalAppData%\optiSCAN : anti-autophagie scan/RTP, exécutables déposés là analysés
     │   ├── WindowsDefenderExclusionService.cs ← Exclusions Defender (opt-in Options / script)
     │   ├── AppInstallPaths.cs         ← Façade racine install + motifs clamscan --exclude
     │   ├── YaraEngine.cs              ← YARA + cache _compiled.yarc / _compiled.stamp
@@ -221,7 +221,9 @@ Le service v3 s’appelle `optiSCANProtection` et le pipe `optiSCAN_Protection` 
     │   ├── ScheduledScanService.cs    ← schtasks (async côté Options)
     │   ├── IpcManager.cs              ← Instance unique : WM_SHOWME
     │   ├── HtmlExportService.cs       ← Rapport HTML
-    │   ├── NotificationService.cs     ← Toasts Windows natifs
+    │   ├── NotificationService.cs     ← Toasts Windows natifs (alertes différées en mode jeu)
+    │   ├── ServiceDetectionLog.cs     ← Détections de l'hôte SYSTEM (200 dernières, %ProgramData%\optiSCAN\detections.json)
+    │   ├── ServiceDetectionWatcher.cs ← Interface : relève ces détections (30 s), historique + notification
     │   ├── RiskScoringService.cs      ← Score, sévérités i18n, PDF
     │   ├── PdfReportGenerator.cs      ← Export PDF (QuestPDF)
     │   ├── WingetUpdateService.cs     ← Liste / mise à jour apps (winget) ; --uninstall-previous + nettoyage des versions empilées
@@ -382,7 +384,7 @@ Les vues sont empilées dans un seul `Grid` (`MainWindow.xaml`) : une seule est 
 |---|---|---|---|
 | `Overview` | Vue d'ensemble | `OverviewControl` | Cartes d'action (boutons), bandeau UAC, statut protection, recommandations |
 | `Antivirus` | Antivirus | `AntivirusView` | Scans ; onglets **Analyse en cours** / **Quarantaine** / **Historique** / **Signatures** (`ScanViewModel`) |
-| `Clean` | Optimiser | `CleanControl` | Trois sous-onglets : **Nettoyage** (caches navigateurs, temp, corbeille, cache Windows Update, DNS), **Mises à jour** (applications via winget avec `--uninstall-previous` et retrait des versions empilées du même programme + lien Windows Update, `WingetUpdateService`), **Tweaks** (performance, confidentialité, interface, DISM — `SystemTweaksService`, actions admin regroupées en une invite UAC et exécutées par appel direct des outils système, sans `cmd /c`) + **historique local** du nettoyage (colonne **Libéré** = `BytesDisplay`). Le nettoyage ne suit ni jonction ni lien et supprime chaque fichier par une descente nom par nom (`SafeDirectoryCleaner`) |
+| `Clean` | Optimiser | `CleanControl` | Trois sous-onglets : **Nettoyage** (caches navigateurs, temp, corbeille, cache Windows Update, DNS), **Mises à jour** (applications via winget avec `--uninstall-previous` et retrait des versions empilées du même programme + lien Windows Update, `WingetUpdateService` ; tableau de winget lu dans toutes les langues, requêtes bornées à 2 min, mise à niveau à 30 min par paquet et 2 h pour « tout », winget et l’installateur arrêtés au délai), **Tweaks** (performance, confidentialité, interface, DISM — `SystemTweaksService`, actions admin regroupées en une invite UAC et exécutées par appel direct des outils système, sans `cmd /c` ; bouton **Rétablir l'origine** : valeurs d'origine gardées à la première modification par `TweakUndoStore`, télémétrie rendue aux réglages de Windows, DISM non réversible) + **historique local** du nettoyage (colonne **Libéré** = `BytesDisplay`). Le nettoyage ne suit ni jonction ni lien et supprime chaque fichier par une descente nom par nom (`SafeDirectoryCleaner`) |
 | `History` | Historique | `HistoryControl` + `HistoryViewModel` | Timeline `ActivityLogService.GetActivityFeed` ; 5 filtres (puces) ; traitement menaces ; exports **HTML** / **PDF** |
 | `Options` | Options | `OptionsControl` | **Langue** (fr/en, redémarrage), thème / `SyncWindowsTheme`, scan favori, RTP, **scan USB/SD** (auto à l'insertion, mode complet, inclure dans analyse complète), quarantaine auto, planif. (`ServiceContainer.ScheduledScan`, prochaine exécution, **Lancer maintenant**), exclusions |
 
@@ -424,9 +426,9 @@ En bas du tableau, le bouton **Tout mettre en quarantaine** (`BtnQuarantineAll_C
 
 ### 4.5 Pipeline de détection en parallèle
 
-Les scans interactifs passent par `ScanViewModel.StartScanAsync` → `ScanOrchestrator` : pour chaque cible, **ClamAV** (daemon **clamd** ou repli **clamscan.exe**) et **YARA** tournent en parallèle (`Task.WhenAll`), puis fusion. Les scans **multi-dossiers** passent par `MultiTargetScanAggregator`. Les **périmètres protégés** optiSCAN sont exclus (`OptiscanProtectedPaths` + `ExclusionSettings`) : le dossier d'installation entier s'il est réservé aux administrateurs (sinon ses seuls `clamav`, `rules` et `yara`), et dans `%LOCALAPPDATA%\optiSCAN` les seuls sous-dossiers `clamav`, `clamd`, `rules`, `Quarantine` et `SafetyBackups` ; le reste de ce dossier, inscriptible par la session, est analysé. **`RiskScoringService`** alimente la colonne **Risque**, les toasts et le PDF.
+Les scans interactifs passent par `ScanViewModel.StartScanAsync` → `ScanOrchestrator` : pour chaque cible, **ClamAV** (daemon **clamd** ou repli **clamscan.exe**) et **YARA** tournent en parallèle (`Task.WhenAll`), puis fusion. Les scans **multi-dossiers** passent par `MultiTargetScanAggregator`. Les **périmètres protégés** optiSCAN sont exclus (`OptiscanProtectedPaths` + `ExclusionSettings`) : le dossier d'installation entier s'il est réservé aux administrateurs (sinon ses seuls `clamav`, `rules` et `yara`), et dans `%LOCALAPPDATA%\optiSCAN`, sous `clamav`, `clamd`, `rules`, `Quarantine` et `SafetyBackups`, les seuls fichiers de données connus (signatures `.cvd`/`.cld`…, règles `.yar`/`.yarc`, configuration, journaux, quarantaine `.quar`, copies `.optibak`). Ces dossiers sont inscriptibles par la session : un exécutable ou un script qui y est déposé est analysé, comme le reste du dossier. **`RiskScoringService`** alimente la colonne **Risque**, les toasts et le PDF.
 
-> **clamd** — si `clamd.exe` est présent et l’option **Moteur clamd** est activée (Options), clamd est lancé dans un **AppContainer** sans accès direct aux fichiers des utilisateurs. L’hôte ouvre chaque fichier avec ses propres droits et l’envoie en flux (`zINSTREAM`) : aucune ACL n’est modifiée. Le client optiSCAN utilise un tube nommé réservé au compte; le port TCP aléatoire écoute sur `127.0.0.1`. Le protocole TCP de clamd n’authentifie pas ses clients : selon les filtres AppContainer/loopback de Windows, un processus local peut potentiellement l’atteindre. Ce port ne constitue pas une frontière d’identité. Les commandes d’arrêt et de rechargement sont désactivées. Un fichier non lu par clamd repasse par **`clamscan.exe`** ; si clamd est indisponible, tout le scan passe par clamscan. Note posture Accueil : [§13 Sécurité](#13-sécurité-posture-et-menaces).
+> **clamd** — si `clamd.exe` est présent et l’option **Moteur clamd** est activée (Options), clamd est lancé dans un **AppContainer** sans accès direct aux fichiers des utilisateurs. L’hôte ouvre chaque fichier avec ses propres droits et l’envoie en flux (`zINSTREAM`) : aucune ACL n’est modifiée. Le client optiSCAN utilise un tube nommé réservé au compte; le port TCP aléatoire écoute sur `127.0.0.1`. Le protocole TCP de clamd n’authentifie pas ses clients : selon les filtres AppContainer/loopback de Windows, un processus local peut potentiellement l’atteindre. Ce port ne constitue pas une frontière d’identité. Les commandes d’arrêt et de rechargement sont désactivées. clamd reçoit jusqu’à **4 fichiers en parallèle** (la moitié des cœurs, au moins 2) ; un dossier est parcouru au fil de l’eau, sans liste complète en mémoire. Un fichier non lu par clamd repasse par **`clamscan.exe`** ; si clamd est indisponible ou tombe pendant l’analyse, tout le dossier passe par clamscan. Note posture Accueil : [§13 Sécurité](#13-sécurité-posture-et-menaces).
 
 ```
 ScanViewModel → ScanOrchestrator
@@ -437,7 +439,7 @@ ScanViewModel → ScanOrchestrator
 
 **Délais maximaux globaux** — fichier : **10 min** ; dossier ou lecteur amovible : **2 h** ; scan rapide : **4 h** ; scan complet : **12 h**. Le délai est transmis aux moteurs pour arrêter leurs processus. À l'échéance, le scan est signalé en erreur avec une couverture incomplète ; les détections déjà obtenues sont conservées. Le scan USB garde aussi ses limites plus courtes (10 min en mode rapide, 45 min en mode complet).
 
-La **version 2** ajoute aussi : note de **posture sécurité** (Accueil), **réputation VirusTotal** (hash SHA-256, clé API Options), **mode jeu** (toasts / scans headless atténués).
+La **version 2** ajoute aussi : note de **posture sécurité** (Accueil), **réputation VirusTotal** (hash SHA-256, clé API Options), **mode jeu** (toasts / scans headless atténués ; les alertes de menace sont gardées pendant la partie et montrées à la sortie du mode, jamais abandonnées).
 
 **Identifiant menace** — `ThreatInfo.Id` : hash **SHA-256** déterministe (`FilePath|VirusName|DetectedAt`) — stable entre redémarrages (pas `string.GetHashCode()`).
 
@@ -477,7 +479,7 @@ La **version 2** ajoute aussi : note de **posture sécurité** (Accueil), **rép
 | **Options** | Bouton « Réappliquer les exclusions Defender » |
 | **Manuel** | `.\scripts\add-defender-exclusions.ps1` (élévation) ou `optiSCAN.exe --defender-exclusions` |
 
-Chemins : dossier d’installation uniquement, et seulement s’il est réservé aux administrateurs (`InstallLocationTrust`) ; jamais `%LOCALAPPDATA%\optiSCAN`, inscriptible par l’utilisateur. Hors d’un tel dossier (build de développement, copie portable), aucune exclusion n’est ajoutée et celles d’une version antérieure sont retirées. Processus : **chemins complets** des binaires installés (`optiSCAN.exe`, `optiSCAN.Service.exe`, `clamav\x64\clamscan.exe`, `freshclam.exe`, `clamd.exe`, `yara\yara64.exe`), jamais un simple nom d’image. L’installeur retire à chaque mise à jour les exclusions posées par la 3.0.0, et toutes les exclusions à la désinstallation. Si la **protection contre la falsification** Defender est active, ajout manuel dans *Sécurité Windows → Exclusions* — voir [§7](#exclusion-windows-defender).
+Chemins : dossier d’installation uniquement, et seulement s’il est réservé aux administrateurs (`InstallLocationTrust`) ; jamais `%LOCALAPPDATA%\optiSCAN`, inscriptible par l’utilisateur. Hors d’un tel dossier (build de développement, copie portable), aucune exclusion n’est ajoutée et celles d’une version antérieure sont retirées. `%ProgramData%\optiSCAN` est aussi exclu, aux mêmes conditions. Processus : **seuls les moteurs**, par chemin complet (`clamav\x64\clamscan.exe`, `freshclam.exe`, `clamd.exe`, `yara\yara64.exe`), jamais un simple nom d’image. `optiSCAN.exe` et `optiSCAN.Service.exe` ne sont plus exclus comme processus (une exclusion de processus aveugle Defender sur tout ce que le processus ouvre) ; ils restent couverts par l’exclusion du dossier d’installation, qui évite la détection heuristique du binaire non signé. Les anciennes exclusions de processus sont retirées automatiquement par l’hôte SYSTEM, une fois par version. L’installeur retire à chaque mise à jour les exclusions posées par la 3.0.0, et toutes les exclusions à la désinstallation. Si la **protection contre la falsification** Defender est active, ajout manuel dans *Sécurité Windows → Exclusions* — voir [§7](#exclusion-windows-defender).
 
 Configurable depuis **Options → EXCLUSIONS** (exclusions internes optiSCAN uniquement).
 
@@ -488,7 +490,10 @@ Les fichiers en quarantaine sont stockés en **AES-256-GCM** (format binaire `OP
 - Clé maîtresse 256 bits, **DPAPI CurrentUser** (fichier `.key`).
 - Manifeste `manifest.json` signé **HMAC-SHA256** (intégrité).
 
-Stockage : `%LOCALAPPDATA%\optiSCAN\Quarantine\` — `{guid}.quar` + `manifest.json`. Restauration par défaut ou vers un dossier choisi : `IThreatStore.RestoreTo(quarantineId, destinationFolder)`.
+Stockage : `%LOCALAPPDATA%\optiSCAN\Quarantine\` — `{guid}.quar` + `manifest.json`. Restauration par défaut ou vers un dossier choisi : `IThreatStore.RestoreTo(quarantineId, destinationFolder)`, après confirmation qui nomme la menace. Le temps réel de la session épargne 15 minutes le fichier restauré (même chemin, même contenu : `RestoredContentGrace`) au lieu de le remettre aussitôt en quarantaine.
+
+- Clé ou manifeste illisibles (DPAPI indisponible un instant) : ils sont mis de côté (`PreserveAside`, `.rejected-…`) avant toute nouvelle écriture, jamais écrasés.
+- **Copie de sécurité** (option *Sauvegarder avant quarantaine*) : copie DPAPI dans `%LOCALAPPDATA%\optiSCAN\SafetyBackups`, nommée d’après le SHA-256 du contenu, 32 Mo max. par fichier. Conservée **30 jours** et **256 Mo** au total (purge à chaque écriture et au démarrage), supprimée avec l’entrée de quarantaine. Si le fichier `.quar` est absent, illisible ou altéré, la restauration repart de cette copie, vérifiée par la même empreinte.
 
 - Si la **suppression du fichier original** échoue après écriture du blob `.quar`, le blob est **supprimé** (rollback) et la quarantaine est annulée.
 - Si la **persistance du manifeste** échoue après écriture du blob, l’entrée est retirée et le blob est supprimé.
@@ -534,13 +539,13 @@ Le panneau **Vue d'ensemble** (`OverviewControl`, clé `Overview`) regroupe :
 
 ### RealTimeProtection — surveillance temps réel
 
-`RealTimeProtection.cs` : `FileSystemWatcher` sur les dossiers configurés, filtrage par extension à risque (`RiskyFileExtensions` : exécutables, scripts, raccourcis `.lnk`, documents à macros anciens et récents, `.pdf`, `.rtf`, `.one`, `.chm`, archives, images disque) ou, pour toute autre extension, par contenu : un exécutable PE déposé en `.dat` ou `.tmp` est reconnu à son en-tête (`ExecutableSniffer`), lu une fois après le délai de stabilisation par une ouverture partagée qui ne gêne pas l’auteur du fichier ; délai de 500 ms, vérification de stabilité pendant au plus 20 s, **128 événements en attente au maximum** et **3 scans simultanés**. Le cache de déduplication est limité à 8 192 chemins. Une saturation de la file ou du cache est journalisée et déclenche un rattrapage du dossier, limité à un par dossier toutes les 30 s ; une lacune temporaire reste possible. Avant le scan, le fichier est ouvert sans suivre le dernier lien, son chemin réel est vérifié et le contenu complet est copié depuis cette poignée vers `ScanStaging` ; le scan ne rouvre pas le chemin d'origine. Le staging conserve une réserve disque de 128 Mio. Si une copie complète est impossible, le résultat est une erreur avec une lacune de couverture, sans repli par chemin. La quarantaine chiffrée a sa propre limite de 256 Mio par fichier : une détection plus grande est signalée mais ne peut pas être mise en quarantaine automatiquement. Après une perte d’événements, le watcher est recréé et un parcours de rattrapage analyse les fichiers à risque (extension listée ou en-tête PE) déjà présents. Les chemins via lien, les entrées inaccessibles et les fichiers cloud hors ligne ne sont pas suivis ou hydratés ; une analyse de dossier les signale comme incomplète. Si le rattrapage du temps réel échoue ou si un fichier ne se stabilise pas, l’état est écrit dans le journal local, sans indicateur de santé dédié dans l’interface.
+`RealTimeProtection.cs` : `FileSystemWatcher` sur les dossiers configurés, filtrage par extension à risque (`RiskyFileExtensions` : exécutables, scripts, raccourcis `.lnk`, documents à macros anciens et récents, `.xlsb`, `.iqy`, `.slk`, `.pdf`, `.rtf`, `.one`, `.chm`, pages HTML/SVG et `.mht`, raccourcis `.url`, `.inf`, archives dont `.gz`, `.tar`, `.xz`, `.bz2`, images disque) ou, pour toute autre extension, par contenu : un exécutable PE déposé en `.dat` ou `.tmp` est reconnu à son en-tête (`ExecutableSniffer`), lu une fois après le délai de stabilisation par une ouverture partagée qui ne gêne pas l’auteur du fichier ; délai de 500 ms, vérification de stabilité pendant au plus 20 s, **128 événements en attente au maximum** et **3 scans simultanés**. Le cache de déduplication est limité à 8 192 chemins. Une saturation de la file ou du cache est journalisée et déclenche un rattrapage du dossier, limité à un par dossier toutes les 30 s ; une lacune temporaire reste possible. Avant le scan, le fichier est ouvert sans suivre le dernier lien, son chemin réel est vérifié et le contenu complet est copié depuis cette poignée vers `ScanStaging` ; le scan ne rouvre pas le chemin d'origine. Le staging conserve une réserve disque de 128 Mio. Si une copie complète est impossible, le résultat est une erreur avec une lacune de couverture, sans repli par chemin. La quarantaine chiffrée a sa propre limite de 256 Mio par fichier : une détection plus grande est signalée mais ne peut pas être mise en quarantaine automatiquement. Après une perte d’événements, le watcher est recréé et un parcours de rattrapage analyse les fichiers à risque (extension listée ou en-tête PE) déjà présents. Les chemins via lien, les entrées inaccessibles et les fichiers cloud hors ligne ne sont pas suivis ou hydratés ; une analyse de dossier les signale comme incomplète. Si le rattrapage du temps réel échoue ou si un fichier ne se stabilise pas, l’état est écrit dans le journal local, sans indicateur de santé dédié dans l’interface.
 
 En mode interface, une menace détectée remonte à l’UI et est inscrite dans l’historique. Les scans temps réel sans menace, y compris ceux incomplets, ne créent pas de session d’historique. En mode service SYSTEM, les menaces sont journalisées et peuvent être mises en quarantaine automatiquement selon la politique de l’hôte ; elles ne remontent pas à l’historique de la session interactive. La quarantaine de ce processus est rangée dans `%ProgramData%\optiSCAN\Quarantine` et chiffrée avec la clé DPAPI SYSTEM. L’onglet Quarantaine en affiche le résumé ; le bouton **Gérer (administrateur)** ouvre, après UAC, une fenêtre de restauration et de suppression servie par le service. Conservation : 90 jours.
 
 ### ProcessStartMonitor — scan au démarrage d’un processus
 
-Le moniteur WMI examine au lancement l’image du processus (extension listée ou en-tête PE, quelle que soit l’extension) et, pour les hôtes de scripts ainsi que `rundll32` et `regsvr32`, les fichiers cités dans la ligne de commande (`x.dat,Entry` compris). Il ouvre le fichier avec le jeton du processus déclencheur et scanne une copie temporaire limitée à 256 Mio. Avant une quarantaine automatique, le contenu actuellement présent au chemin doit avoir le même SHA-256 que la copie analysée ; sinon l’action est refusée. Si le processus a déjà quitté, si le fichier est inaccessible avec son identité ou s’il dépasse la limite, ce scan de démarrage est sauté.
+Le moniteur WMI examine, **après** le lancement, l’image du processus (extension listée ou en-tête PE, quelle que soit l’extension) et, pour les hôtes de scripts ainsi que `rundll32` et `regsvr32`, les fichiers cités dans la ligne de commande (`x.dat,Entry` compris). Il ouvre le fichier avec le jeton du processus déclencheur et scanne une copie temporaire limitée à 256 Mio. Avant une quarantaine automatique, le contenu actuellement présent au chemin doit avoir le même SHA-256 que la copie analysée ; sinon l’action est refusée. Si le processus a déjà quitté, si le fichier est inaccessible avec son identité ou s’il dépasse la limite, ce scan de démarrage est sauté. Dans l’hôte SYSTEM ou une interface élevée, le moniteur s’abonne à `Win32_ProcessStartTrace` (événement du noyau, sans interrogation) ; sans droits d’administrateur, il se replie sur `__InstanceCreationEvent WITHIN 1`, qui ne voit pas un processus de moins d’une seconde. Seuls les chemins d’un lecteur local sont examinés : un chemin UNC, WebDAV ou de périphérique cité dans une ligne de commande est ignoré avant tout accès, pour que le service ne se connecte jamais, sous le compte ordinateur, vers un hôte choisi par un utilisateur.
 
 ### RemovableDriveScanService — clés USB et cartes SD
 
@@ -555,13 +560,13 @@ Le moniteur WMI examine au lancement l’image du processus (extension listée o
 | Taille max. | **64 Go** par défaut (`RemovableDriveMaxSizeGb` ; `0` = illimité) |
 | Analyse complète manuelle | Option **Inclure les lecteurs amovibles** → `ScanTargets.FullScanTargets(includeRemovable: true)` |
 | UI / notifications | Toasts début/fin (`ShowRemovableDriveScanStarted` / `ShowRemovableDriveScanCompleted`) si notifications activées ; barre de statut **Démarré** / **Terminé** / **Échec** via `ScanStatusChanged` (`MainWindow`) |
-| Menace détectée | Historique (`ScanType.RemovableDrive`), quarantaine auto si activée, liste **Analyser** via `ThreatDetected` (même handler que la RTP) ; RTP **suspendue** pendant le scan |
+| Menace détectée | Historique (`ScanType.RemovableDrive`), quarantaine auto si activée, liste **Analyser** via `ThreatDetected` (même handler que la RTP) ; la RTP et la surveillance des processus **restent actives** pendant le scan |
 
 Un seul scan USB à la fois (**SemaphoreSlim(1)**). `ServiceContainer.ApplyRemovableDriveScan` / `ApplyPreferencesOnStartup` démarrent ou arrêtent le service.
 
 ### ScheduledScanService — tâche planifiée Windows
 
-Instance unique : **`ServiceContainer.Default.ScheduledScan`** (partagée avec **Options**, pas d’instance locale isolée). Enveloppe **`schtasks.exe`** pour **`optiSCAN_DailyScan`** (`optiSCAN.exe --fullscan --quiet`, **`/RL LIMITED`**, heure configurable). **Options** : case planification, sélecteur d’heure, libellé **prochaine exécution** (`GetNextRunTime`), bouton **Lancer maintenant** (`RunNow`). **`App.xaml.cs`** : `--fullscan` / `--quickscan` / `--quiet` en headless (quarantaine auto si activée) — les résultats ne remontent pas dans la grille menaces de la session UI ouverte.
+Instance unique : **`ServiceContainer.Default.ScheduledScan`** (partagée avec **Options**, pas d’instance locale isolée). Enveloppe **`schtasks.exe`** pour **`optiSCAN_DailyScan`** (`optiSCAN.exe --fullscan --quiet`, moindre privilège, session interactive, heure configurable). La tâche est créée depuis une définition XML avec **`StartWhenAvailable`** : un scan manqué (PC en veille ou éteint à l’heure prévue) est lancé au réveil. Une tâche créée par une version antérieure est recréée à la même heure au démarrage de l’interface ; si `/XML` échoue, l’ancienne création `/SC DAILY` sert de repli. **Options** : case planification, sélecteur d’heure, libellé **prochaine exécution** (`GetNextRunTime`), bouton **Lancer maintenant** (`RunNow`). **`App.xaml.cs`** : `--fullscan` / `--quickscan` / `--quiet` en headless (quarantaine auto si activée) — les résultats ne remontent pas dans la grille menaces de la session UI ouverte.
 
 ### NotificationService — toasts Windows natifs
 
@@ -569,7 +574,9 @@ Instance unique : **`ServiceContainer.Default.ScheduledScan`** (partagée avec *
 
 | Méthode | Contenu |
 |---|---|
-| `ShowThreatDetected(threat)` | Alerte longue avec boutons Quarantaine / Ignorer / Ouvrir |
+| `ShowThreatDetected(threat)` | Alerte longue avec boutons Quarantaine / Exclure… / Ouvrir. « Exclure… » ouvre la fenêtre et demande une confirmation (fichier, menace, chemin ; « Non » par défaut) : sans elle, rien n’est exclu. En mode jeu, l’alerte est différée (50 gardées, compte total) puis montrée ou résumée à la sortie du mode |
+| `ShowRealTimeDegraded(n)` | Temps réel dégradé (dossiers non surveillés, rattrapage en cours), dans la session ou le service ; détail en infobulle du badge de protection |
+| `ShowServiceThreat(threat)` / `ShowServiceThreatsSummary(n)` | Détections du service SYSTEM, relevées toutes les 30 s par `ServiceDetectionWatcher` (opération `recent_detections`) et inscrites dans l’historique ; au-delà de 3, un seul récapitulatif |
 | `ShowQuarantined(threat)` | Confirmation de mise en quarantaine |
 | `ShowScanCompleted(files, threats)` | Résumé de fin de scan |
 | `ShowUpdateAvailable(version)` | Nouvelle mise à jour disponible |
@@ -660,7 +667,7 @@ L’application est publiée en **`asInvoker`** (`app.manifest`) : exécution av
 | Règles pré-compilées (_compiled.yarc) | Scan comportemental accéléré |
 | SemaphoreSlim(3) RTP | `RealTimeProtection` (activable depuis Options) |
 | SemaphoreSlim(1) scan USB | `RemovableDriveScanService` (un lecteur à la fois) |
-| Scan rapide limité aux dossiers critiques | `ScanTargets.QuickScanTargets()` |
+| Scan rapide limité aux dossiers critiques | `ScanTargets.QuickScanTargets()` : temporaires, Téléchargements, Bureau, Récents, **%APPDATA%** (Roaming, qui contient Démarrage), dossier **Public**, Démarrage commun, Temp/Prefetch/pilotes de Windows ; dossiers contenus dans une autre cible retirés (`RemoveNested`) |
 | ExclusionSettings.Current (singleton lazy) | Pas de rechargement JSON par fichier |
 | ServiceContainer (singleton services) | Une instance ClamAV/YARA/orchestrateur pour toute l’app |
 | ThemeManager + UserPreferences | Bascule de thème sans redémarrage |
@@ -677,7 +684,7 @@ L’application est publiée en **`asInvoker`** (`app.manifest`) : exécution av
 Voir aussi [§4.7](#47-système-dexclusions) (détail technique). Résumé :
 
 - **Opt-in** : Options → « Réappliquer les exclusions Defender », ou script admin `.\scripts\add-defender-exclusions.ps1`.
-- Chemin : `Program Files\optiSCAN` ; processus par **chemin complet** sous ce dossier (jamais par simple nom).
+- Chemins : `Program Files\optiSCAN` et `%ProgramData%\optiSCAN`, seulement s’ils sont réservés aux administrateurs ; processus : les moteurs seulement, par **chemin complet** (jamais par simple nom). `optiSCAN.exe` reste couvert par l’exclusion du dossier.
 - L’installeur **ne lance plus** le script automatiquement (profil allégé façon version 2).
 
 Si la **protection contre la falsification** de Defender est active, l’ajout peut échouer — ajoutez les chemins dans *Sécurité Windows → Protection contre les virus et menaces → Exclusions*.
@@ -853,11 +860,11 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 
 | Composant | Version | Licence | Notes |
 |---|---|---|---|
-| ClamAV | 1.4.6 épinglé | GPLv2 | Inclure la licence dans l'installateur ; archive vérifiée (signature Talos + SHA-256) le 4 octobre 2026 |
-| YARA | 4.5.5 épinglé | BSD-3-Clause | Dernier binaire Windows officiel. Les versions 4.5.6 à 4.5.8 sont publiées en sources seulement ; les adopter suppose de compiler YARA en CI |
+| ClamAV | 1.4.6 épinglé | GPLv2 | Licence et avis des bibliothèques livrés dans `clamav\x64\licenses` (copiés par `fetch-runtime-deps.ps1`, exigés par l'installeur) ; archive vérifiée (signature Talos + SHA-256) le 4 octobre 2026 |
+| YARA | 4.5.5 épinglé | BSD-3-Clause | Licence livrée (`licenses\YARA-COPYING.txt`). Dernier binaire Windows officiel. Les versions 4.5.6 à 4.5.8 sont publiées en sources seulement ; les adopter suppose de compiler YARA en CI |
 | .NET 10 WPF | 10.x (LTS) | MIT | Runtime publié avec l'application (self-contained) ; support Microsoft annoncé jusqu'au 14 novembre 2028 |
 | MaterialDesignThemes | 5.3.1 | MIT | Bibliothèque UI (PackIcon, styles) |
-| QuestPDF | 2024.12.2 | Community | Rapport PDF — licence gratuite projets open-source |
+| QuestPDF | 2024.12.2 | Licence QuestPDF (Community) | Rapport PDF — gratuit sous conditions (chiffre d'affaires annuel < 1 M USD) ; voir `installer/licenses/THIRD-PARTY-NOTICES.md` |
 | Mise à jour binaire optiSCAN (`UpdateService`) | — | — | Canal OTA non configuré ; staging `%LocalAppData%\optiSCAN\Updates` ; signatures via Antivirus |
 | Planificateur de tâches (`schtasks.exe`) | — | — | Natif Windows — voir `ScheduledScanService` |
 | Microsoft.Toolkit.Uwp.Notifications | 7.1.3 | MIT | Toasts Windows natifs |
@@ -868,6 +875,21 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 ---
 
 ## 11. Historique des versions produit
+
+### v3.1 candidate — corrections du 13 octobre 2026 (audit indépendant)
+
+- **Hôte SYSTEM** — ne coupe plus son propre temps réel au démarrage quand Defender est actif ; l’interface affiche l’état réel du service ; quand le service protège, l’interface ne relance ni scan USB, ni surveillance des processus, ni clamd
+- **Données protégées** — clé de quarantaine, clé HMAC et manifeste illisibles mis de côté au lieu d’être écrasés ; copies d’analyse orphelines purgées au démarrage ; `optiSCAN.log` en rotation à 10 Mo
+- **Defender** — exclusions de processus limitées aux moteurs ; `%ProgramData%\optiSCAN` exclu s’il est réservé aux administrateurs ; anciennes exclusions de `optiSCAN.exe` retirées automatiquement ; dossier d’installation toujours exclu
+- **Service** — actions de récupération (`sc failure`, `sc failureflag`) posées par l’installeur et par l’application ; `scan_path` fermé ; détections du service notifiées et inscrites dans l’historique de l’utilisateur (`recent_detections`)
+- **Détection** — exécutables déposés dans les dossiers de données de `%LOCALAPPDATA%\optiSCAN` analysés ; fichiers OneDrive présents sur le disque analysés par clamd ; corbeilles des clés USB analysées ; fichier encore ouvert par son auteur réessayé ; analyse rapide étendue à `%APPDATA%` et au dossier Public ; sept hôtes de scripts ajoutés à la surveillance des processus
+- **Alertes** — bouton « Exclure… » des notifications avec confirmation ; alertes gardées pendant le mode jeu ; badge « dégradé » et notification quand le temps réel perd un dossier ; fichier restauré épargné 15 min par le temps réel de la session
+- **Instance élevée** — freshclam et winget refusés (configuration dans le profil, modifiable sans élévation) ; l'installeur lance optiSCAN avec le jeton de l'utilisateur d'origine
+- **Optimiser → Tweaks** — « Rétablir l'origine » ; option « Relance automatique de la protection » (ex-« anti-manipulation », `ProtectionWatchdogService`)
+- **Performances** — clamd en parallèle sans liste complète du disque en mémoire ; fin de message du tube repérée en un passage
+- **Tâche planifiée** — scan manqué rattrapé au réveil (`StartWhenAvailable`)
+- **Optimiser → Mises à jour** — winget lu dans toutes les langues (un nom qui commence par un chiffre n’arrête plus la liste), délais et arrêt de winget à l’annulation
+- **CI** — ClamAV et YARA récupérés avant les tests ; un moteur absent fait échouer le test de détection (`OPTISCAN_REQUIRE_ENGINES=1`)
 
 ### v3.0 — 30 septembre 2026
 
@@ -989,13 +1011,13 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 ### v3.1 — candidate en préparation
 
 - Version de build préparée : **3.1.0** ; la candidate n'est ni publiée ni taguée.
-- Les constats de l'[audit 360 du 2 octobre 2026](AUDIT_optiSCAN_360.md) et leur traitement sont suivis dans l'audit et dans le [plan de release v3.1](RELEASE_PLAN_v3.1.md).
+- L'[audit 360](AUDIT_optiSCAN_360.md), révisé le 13 octobre 2026, donne la note (6,5/10 ; 7,0 hors distribution), la décision de release et le registre des risques ouverts ; les constats et corrections antérieurs sont dans son [journal archivé](docs/archive/AUDIT_optiSCAN_360_journal_2026-10.md). Les validations sont suivies dans le [plan de release v3.1](RELEASE_PLAN_v3.1.md).
 - Validations de release encore requises : tests Windows, parcours service/quarantaine installé et premier succès CodeQL C/C++ sur GitHub.
-- Relectures du 7 octobre 2026 : séries **Y1–Y5** et **Z1–Z9** (publication du service, nettoyeur et jonctions, noms de périphériques, tube clamd, couverture de détection…) et corrections de robustesse — [audit, sections 4.6, 4.7 et 12](AUDIT_optiSCAN_360.md#46-relecture-du-7-octobre-2026--y1-à-y5).
+- Relectures du 7 octobre 2026 : séries **Y1–Y5** et **Z1–Z9** (publication du service, nettoyeur et jonctions, noms de périphériques, tube clamd, couverture de détection…) et corrections de robustesse — [audit, sections 4.6, 4.7 et 12](docs/archive/AUDIT_optiSCAN_360_journal_2026-10.md#46-relecture-du-7-octobre-2026--y1-à-y5).
 
 **Réévaluation du 2 octobre 2026** — base `main` (`0e8161f`, release 3.0.0) + branche `refactor/protection-identifiers`. Revue statique du dépôt, compilation Release de toute la solution (analyseurs actifs, avertissements = erreurs) et contrôles automatisés ; tests non exécutés ici (runtime WPF requis, voir Tests & CI).
 
-**Portée de cette note** : résultats historiques de la revue du 2 octobre 2026 sur les sources indiquées ci-dessus. Ils ne décrivent pas l’arbre de travail corrigé depuis ; voir l'[audit 360](AUDIT_optiSCAN_360.md) et ses [réserves ouvertes](AUDIT_optiSCAN_360.md#9-réserves-ouvertes-et-conditions-de-clôture). Les vérifications de compilation et de test ci-dessous ne couvrent pas les modifications locales plus récentes.
+**Portée de cette note** : résultats historiques de la revue du 2 octobre 2026 sur les sources indiquées ci-dessus. Ils ne décrivent pas l’arbre de travail corrigé depuis ; voir l'[audit 360](AUDIT_optiSCAN_360.md) et ses [réserves ouvertes](AUDIT_optiSCAN_360.md#5-registre-des-risques-ouverts). Les vérifications de compilation et de test ci-dessous ne couvrent pas les modifications locales plus récentes.
 
 | Domaine | Note | Évolution | Commentaire |
 |---------|:----:|:---------:|-------------|

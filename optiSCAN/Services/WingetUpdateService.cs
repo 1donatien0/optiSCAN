@@ -59,6 +59,9 @@ namespace optiSCAN.Services
     {
         private string? _wingetPath;
 
+        /// <summary>Vrai si winget est refusé parce que cette instance d'optiSCAN est élevée.</summary>
+        public static bool IsRefusedInElevatedSession => ElevatedSessionGuard.IsElevatedUserSession;
+
         /// <summary>
         /// Localise winget.exe. Ordre : alias utilisateur (fonctionne sans
         /// élévation), PATH, puis dossier WindowsApps machine (lisible seulement
@@ -66,6 +69,11 @@ namespace optiSCAN.Services
         /// </summary>
         public string? ResolveWingetPath()
         {
+            // Instance élevée : winget.exe serait cherché dans des dossiers que l'utilisateur
+            // non élevé peut modifier (alias de %LOCALAPPDATA%, PATH du compte). Refusé.
+            if (IsRefusedInElevatedSession)
+                return null;
+
             if (!string.IsNullOrEmpty(_wingetPath) && File.Exists(_wingetPath))
                 return _wingetPath;
 
@@ -142,20 +150,118 @@ namespace optiSCAN.Services
             psi.ArgumentList.Add("upgrade");
             psi.ArgumentList.Add("--include-unknown");
             psi.ArgumentList.Add("--accept-source-agreements");
+            psi.ArgumentList.Add("--disable-interactivity");
 
-            using var process = Process.Start(psi);
-            if (process == null)
-                return Array.Empty<WingetPackageUpdate>();
-
-            // Lecture concurrente stdout/stderr pour éviter tout blocage de tampon.
-            var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-            var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-            await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-            var stdout = await stdoutTask.ConfigureAwait(false);
-            _ = await stderrTask.ConfigureAwait(false);
-
+            var stdout = await RunBoundedCaptureAsync(psi, QueryTimeout, cancellationToken).ConfigureAwait(false);
             return ParseUpgradeOutput(stdout);
         }
+
+        /// <summary>Délai d'une requête winget (liste, recherche) : une source bloquée ne fige plus le panneau.</summary>
+        internal static readonly TimeSpan QueryTimeout = TimeSpan.FromMinutes(2);
+
+        /// <summary>Délai d'une mise à niveau : un installateur bloqué (fenêtre cachée) est arrêté.</summary>
+        internal static readonly TimeSpan UpgradeTimeout = TimeSpan.FromMinutes(30);
+
+        /// <summary>Délai de « winget upgrade --all », qui enchaîne tous les installateurs.</summary>
+        internal static readonly TimeSpan UpgradeAllTimeout = TimeSpan.FromHours(2);
+
+        /// <summary>
+        /// Lance winget, lit sa sortie et l'arrête (arbre de processus compris) au délai ou à
+        /// l'annulation. Avant, une annulation laissait winget tourner et rien ne bornait la durée.
+        /// </summary>
+        private static async Task<string> RunBoundedCaptureAsync(
+            ProcessStartInfo psi, TimeSpan timeout, CancellationToken cancellationToken)
+        {
+            using var process = Process.Start(psi);
+            if (process == null)
+                return string.Empty;
+
+            using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+            limit.CancelAfter(timeout);
+            // Lecture concurrente stdout/stderr pour éviter tout blocage de tampon.
+            var stdoutTask = process.StandardOutput.ReadToEndAsync(limit.Token);
+            var stderrTask = process.StandardError.ReadToEndAsync(limit.Token);
+            try
+            {
+                await process.WaitForExitAsync(limit.Token).ConfigureAwait(false);
+                var stdout = await stdoutTask.ConfigureAwait(false);
+                _ = await stderrTask.ConfigureAwait(false);
+                return stdout;
+            }
+            catch (OperationCanceledException)
+            {
+                KillTree(process);
+                cancellationToken.ThrowIfCancellationRequested();
+                AppLogger.Warn("WingetUpdateService", $"winget arrêté après {timeout.TotalMinutes:0} min sans réponse");
+                // Une liste vide se lirait « aucune mise à jour » : l'échec est signalé comme tel.
+                throw new TimeoutException(LocalizationService.Format("Upd_WingetTimeout", (int)timeout.TotalMinutes));
+            }
+        }
+
+        private static void KillTree(Process process)
+        {
+            try
+            {
+                if (!process.HasExited)
+                    process.Kill(entireProcessTree: true);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("WingetUpdateService", "Arrêt winget : " + ex.Message);
+            }
+        }
+
+        /// <summary>Code renvoyé quand winget a été arrêté au délai.</summary>
+        internal const int TimedOutExitCode = unchecked((int)0x800705B4); // ERROR_TIMEOUT
+
+        /// <summary>
+        /// Repère le tableau de winget sans dépendre de la langue : l'en-tête est la ligne qui
+        /// précède la ligne de tirets, et les colonnes commencent là où commence chaque mot de
+        /// l'en-tête (Name/Nom/Nombre/Name…, Id/ID, Version/Versión, Available/Disponible/Verfügbar…, Source/Quelle…).
+        /// </summary>
+        internal static bool TryLocateTable(string[] lines, out int headerIndex, out List<int> columns)
+        {
+            headerIndex = -1;
+            columns = new List<int>();
+            for (var i = 1; i < lines.Length; i++)
+            {
+                var sep = lines[i].Trim();
+                if (sep.Length < 10 || sep.Any(c => c != '-'))
+                    continue;
+                var header = lines[i - 1];
+                var starts = new List<int>();
+                for (var c = 0; c < header.Length; c++)
+                {
+                    if (!char.IsWhiteSpace(header[c]) && (c == 0 || char.IsWhiteSpace(header[c - 1])))
+                        starts.Add(c);
+                }
+                if (starts.Count < 3)
+                    continue;
+                headerIndex = i - 1;
+                columns = starts;
+                return true;
+            }
+
+            return false;
+        }
+
+        /// <summary>
+        /// Lignes de sortie telles qu'affichées : winget réécrit sa ligne de progression avec
+        /// des retours chariot, seule la dernière réécriture compte.
+        /// </summary>
+        internal static string[] SplitDisplayedLines(string output) =>
+            output.Split('\n')
+                .Select(l =>
+                {
+                    var t = l.TrimEnd('\r');
+                    var cr = t.LastIndexOf('\r');
+                    return cr >= 0 ? t[(cr + 1)..] : t;
+                })
+                .ToArray();
+
+        /// <summary>Un identifiant winget est un seul mot (Editeur.Produit, ou ID du Store).</summary>
+        private static bool LooksLikePackageId(string id) =>
+            id.Length > 0 && !id.Any(char.IsWhiteSpace) && id.Any(char.IsLetterOrDigit);
 
         /// <summary>
         /// Parse la sortie en colonnes de « winget upgrade » (fr ou en).
@@ -167,37 +273,14 @@ namespace optiSCAN.Services
             if (string.IsNullOrWhiteSpace(output))
                 return Array.Empty<WingetPackageUpdate>();
 
-            var lines = output
-                .Replace("\r", string.Empty)
-                .Split('\n');
-
-            int headerIndex = -1;
-            for (int i = 0; i < lines.Length; i++)
-            {
-                var l = lines[i];
-                if ((l.StartsWith("Nom ", StringComparison.Ordinal) ||
-                     l.StartsWith("Name ", StringComparison.Ordinal)) &&
-                    l.Contains(" Id", StringComparison.Ordinal))
-                {
-                    headerIndex = i;
-                    break;
-                }
-            }
-            if (headerIndex < 0)
+            var lines = SplitDisplayedLines(output);
+            if (!TryLocateTable(lines, out var headerIndex, out var cols) || cols.Count < 4)
                 return Array.Empty<WingetPackageUpdate>();
 
-            var header = lines[headerIndex];
-            int idxId = header.IndexOf("Id", StringComparison.Ordinal);
-            int idxVersion = header.IndexOf("Version", StringComparison.Ordinal);
-            int idxAvailable = header.IndexOf("Disponible", StringComparison.Ordinal);
-            if (idxAvailable < 0)
-                idxAvailable = header.IndexOf("Available", StringComparison.Ordinal);
-            int idxSource = header.IndexOf("Source", StringComparison.Ordinal);
-            if (idxSource < 0)
-                idxSource = int.MaxValue;
-
-            if (idxId <= 0 || idxVersion <= idxId || idxAvailable <= idxVersion)
-                return Array.Empty<WingetPackageUpdate>();
+            int idxId = cols[1];
+            int idxVersion = cols[2];
+            int idxAvailable = cols[3];
+            int idxSource = cols.Count > 4 ? cols[4] : int.MaxValue;
 
             var result = new List<WingetPackageUpdate>();
             for (int i = headerIndex + 2; i < lines.Length; i++)
@@ -205,14 +288,17 @@ namespace optiSCAN.Services
                 var l = lines[i];
                 if (string.IsNullOrWhiteSpace(l))
                     break;
-                // Ligne de bilan finale : « 12 mises à niveau disponibles. »
-                if (char.IsDigit(l.TrimStart().FirstOrDefault()))
-                    break;
-                if (l.Length <= idxVersion)
+                // Ligne de bilan (« 12 mises à niveau disponibles. », toutes langues) : elle n'a
+                // pas d'identifiant d'un seul mot dans la colonne Id. Un nom qui commence par un
+                // chiffre (7-Zip) n'arrête plus la lecture.
+                var id = l.Length > idxId ? SafeColumn(l, idxId, idxVersion) : string.Empty;
+                if (!LooksLikePackageId(id))
+                {
+                    if (char.IsDigit(l.TrimStart().FirstOrDefault()))
+                        break;
                     continue;
-
-                var id = SafeColumn(l, idxId, idxVersion);
-                if (string.IsNullOrEmpty(id))
+                }
+                if (l.Length <= idxVersion)
                     continue;
 
                 result.Add(new WingetPackageUpdate
@@ -398,41 +484,14 @@ namespace optiSCAN.Services
             if (string.IsNullOrWhiteSpace(output))
                 return Array.Empty<(string, string)>();
 
-            var lines = output
-                .Replace("\r", string.Empty)
-                .Split('\n');
-
-            int headerIndex = -1;
-            for (int i = 0; i < lines.Length; i++)
-            {
-                var l = lines[i];
-                if ((l.StartsWith("Nom ", StringComparison.Ordinal) ||
-                     l.StartsWith("Name ", StringComparison.Ordinal)) &&
-                    l.Contains(" Id", StringComparison.Ordinal))
-                {
-                    headerIndex = i;
-                    break;
-                }
-            }
-            if (headerIndex < 0)
+            var lines = SplitDisplayedLines(output);
+            if (!TryLocateTable(lines, out var headerIndex, out var cols))
                 return Array.Empty<(string, string)>();
 
-            var header = lines[headerIndex];
-            int idxId = header.IndexOf("Id", StringComparison.Ordinal);
-            int idxVersion = header.IndexOf("Version", StringComparison.Ordinal);
-            int idxAvailable = header.IndexOf("Disponible", StringComparison.Ordinal);
-            if (idxAvailable < 0)
-                idxAvailable = header.IndexOf("Available", StringComparison.Ordinal);
-            int idxSource = header.IndexOf("Source", StringComparison.Ordinal);
-
-            if (idxId <= 0 || idxVersion <= idxId)
-                return Array.Empty<(string, string)>();
-
-            int idxVersionEnd = int.MaxValue;
-            if (idxAvailable > idxVersion)
-                idxVersionEnd = idxAvailable;
-            else if (idxSource > idxVersion)
-                idxVersionEnd = idxSource;
+            int idxId = cols[1];
+            int idxVersion = cols[2];
+            // Colonne suivante : Disponible si présente, sinon Source.
+            int idxVersionEnd = cols.Count > 3 ? cols[3] : int.MaxValue;
 
             var result = new List<(string Id, string Version)>();
             for (int i = headerIndex + 2; i < lines.Length; i++)
@@ -440,13 +499,14 @@ namespace optiSCAN.Services
                 var l = lines[i];
                 if (string.IsNullOrWhiteSpace(l))
                     break;
-                if (LooksLikeTableFooter(l))
-                    break;
-                if (l.Length <= idxVersion)
+                var id = l.Length > idxId ? SafeColumn(l, idxId, idxVersion) : string.Empty;
+                if (!LooksLikePackageId(id))
+                {
+                    if (LooksLikeTableFooter(l))
+                        break;
                     continue;
-
-                var id = SafeColumn(l, idxId, idxVersion);
-                if (string.IsNullOrEmpty(id))
+                }
+                if (l.Length <= idxVersion)
                     continue;
 
                 result.Add((id, SafeColumn(l, idxVersion, idxVersionEnd)));
@@ -459,14 +519,9 @@ namespace optiSCAN.Services
             var t = line.TrimStart();
             if (t.Length == 0)
                 return true;
-            if (!char.IsDigit(t[0]))
-                return false;
-            return t.Contains("disponible", StringComparison.OrdinalIgnoreCase)
-                || t.Contains("available", StringComparison.OrdinalIgnoreCase)
-                || t.Contains("installé", StringComparison.OrdinalIgnoreCase)
-                || t.Contains("installed", StringComparison.OrdinalIgnoreCase)
-                || t.Contains("package", StringComparison.OrdinalIgnoreCase)
-                || t.Contains("paquet", StringComparison.OrdinalIgnoreCase);
+            // Appelée seulement pour une ligne sans identifiant valable : un nombre en tête
+            // suffit à reconnaître le bilan, quelle que soit la langue.
+            return char.IsDigit(t[0]);
         }
 
         /// <summary>
@@ -653,18 +708,9 @@ namespace optiSCAN.Services
 
             try
             {
-                using var process = Process.Start(psi);
-                if (process == null)
-                    return string.Empty;
-
-                var stdoutTask = process.StandardOutput.ReadToEndAsync(cancellationToken);
-                var stderrTask = process.StandardError.ReadToEndAsync(cancellationToken);
-                await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
-                var stdout = await stdoutTask.ConfigureAwait(false);
-                _ = await stderrTask.ConfigureAwait(false);
-                return stdout;
+                return await RunBoundedCaptureAsync(psi, QueryTimeout, cancellationToken).ConfigureAwait(false);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 AppLogger.Warn("WingetUpdateService", "Lecture winget list", ex);
                 return string.Empty;
@@ -708,10 +754,26 @@ namespace optiSCAN.Services
                     return -1;
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
-                await process.WaitForExitAsync(cancellationToken).ConfigureAwait(false);
+                var timeout = arguments.Contains("--all") ? UpgradeAllTimeout : UpgradeTimeout;
+                using var limit = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                limit.CancelAfter(timeout);
+                try
+                {
+                    await process.WaitForExitAsync(limit.Token).ConfigureAwait(false);
+                }
+                catch (OperationCanceledException)
+                {
+                    // Annulé ou bloqué : winget et l'installateur lancé sont arrêtés, au lieu
+                    // de continuer en arrière-plan après la fermeture du panneau.
+                    KillTree(process);
+                    cancellationToken.ThrowIfCancellationRequested();
+                    AppLogger.Warn("WingetUpdateService", $"Mise à niveau arrêtée après {timeout.TotalMinutes:0} min");
+                    onOutputLine(LocalizationService.Format("Upd_WingetTimeout", (int)timeout.TotalMinutes));
+                    return TimedOutExitCode;
+                }
                 return process.ExitCode;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
                 AppLogger.Error("WingetUpdateService", "Exécution winget", ex);
                 return -1;

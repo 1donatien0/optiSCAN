@@ -6,10 +6,13 @@ using System.Threading;
 namespace optiSCAN.Services
 {
     /// <summary>
-    /// Anti-manipulation : tâche planifiée de surveillance et relance de la protection.
+    /// Relance d'optiSCAN par une tâche planifiée quand la protection temps réel est attendue
+    /// mais que l'application est arrêtée. Ce n'est pas une protection contre la manipulation :
+    /// un processus du même compte peut supprimer la tâche (ancien nom, trompeur :
+    /// <c>TamperProtectionService</c>, audit A11).
     /// </summary>
     [SupportedOSPlatform("windows")]
-    public sealed class TamperProtectionService
+    public sealed class ProtectionWatchdogService
     {
         private const string WatchdogTaskName = "optiSCAN_Watchdog";
 
@@ -17,7 +20,7 @@ namespace optiSCAN.Services
         private readonly IUserPreferencesAccessor _prefs;
         private readonly IExclusionSettingsAccessor _exclusions;
 
-        public TamperProtectionService(
+        public ProtectionWatchdogService(
             IUserPreferencesAccessor? preferences = null,
             IExclusionSettingsAccessor? exclusions = null)
         {

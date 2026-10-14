@@ -19,6 +19,13 @@ namespace optiSCAN.Services
         private const int DosHeaderSize = 64;
         private const int LfanewOffset = 0x3C;
 
+        /// <summary>
+        /// Plus petit <c>e_lfanew</c> accepté. Le chargeur Windows admet un en-tête PE qui
+        /// chevauche l'en-tête DOS (au-delà de la signature <c>MZ</c> et de ses deux octets) :
+        /// exiger 64 laissait passer ces binaires renommés en <c>.dat</c> (audit V10).
+        /// </summary>
+        internal const int MinPeHeaderOffset = 4;
+
         /// <summary>Au-delà, <c>e_lfanew</c> est jugé invalide (les PE réels le placent bien avant).</summary>
         internal const int MaxPeHeaderOffset = 64 * 1024;
 
@@ -80,7 +87,7 @@ namespace optiSCAN.Services
                 return false;
 
             var lfanew = BinaryPrimitives.ReadInt32LittleEndian(dos[LfanewOffset..]);
-            if (lfanew < DosHeaderSize || lfanew > MaxPeHeaderOffset)
+            if (lfanew < MinPeHeaderOffset || lfanew > MaxPeHeaderOffset)
                 return false;
 
             Span<byte> signature = stackalloc byte[4];

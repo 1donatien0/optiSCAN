@@ -14,14 +14,19 @@ namespace optiSCAN.Services
                 ".msix", ".msixbundle", ".appx", ".appxbundle", ".appinstaller", ".application",
                 // Scripts et hôtes de scripts
                 ".bat", ".cmd", ".ps1", ".psm1", ".vbs", ".vbe", ".js", ".jse", ".wsf", ".wsh",
-                ".wsc", ".hta", ".py", ".pyw", ".reg", ".scf",
+                ".wsc", ".hta", ".py", ".pyw", ".reg", ".scf", ".inf",
                 // Raccourcis et fichiers qui lancent une commande
-                ".lnk", ".settingcontent-ms", ".library-ms",
+                ".lnk", ".settingcontent-ms", ".library-ms", ".url",
+                // Pages et images actives : contrebande HTML, pages d'hameçonnage (audit V8)
+                ".html", ".htm", ".xhtml", ".shtml", ".svg", ".mht", ".mhtml",
                 // Documents à macros ou à contenu actif (formats anciens compris)
                 ".docm", ".xlsm", ".pptm", ".dotm", ".xltm", ".potm", ".xlam", ".ppam", ".xll",
                 ".doc", ".xls", ".ppt", ".rtf", ".one", ".chm", ".pdf",
+                // Classeurs binaires et requêtes/formules Excel exécutées à l'ouverture
+                ".xlsb", ".iqy", ".slk",
                 // Archives et images disque (ClamAV les ouvre)
                 ".zip", ".rar", ".7z", ".cab",
+                ".gz", ".tgz", ".tar", ".xz", ".bz2", ".lzh", ".arj",
                 ".iso", ".img", ".vhd", ".vhdx",
             },
             StringComparer.OrdinalIgnoreCase);
@@ -32,6 +37,8 @@ namespace optiSCAN.Services
                 "powershell.exe", "pwsh.exe", "wscript.exe", "cscript.exe", "mshta.exe", "cmd.exe", "msbuild.exe",
                 // Chargent une DLL de n'importe quelle extension : rundll32 x.dat,Entry / regsvr32 /s x.tmp
                 "rundll32.exe", "regsvr32.exe",
+                // Autres hôtes détournés pour lancer un fichier cité en argument.
+                "msiexec.exe", "hh.exe", "cmstp.exe", "installutil.exe", "regasm.exe", "regsvcs.exe", "wmic.exe",
             },
             StringComparer.OrdinalIgnoreCase);
 
@@ -44,6 +51,10 @@ namespace optiSCAN.Services
         /// </summary>
         public static bool IsRiskyOrExecutable(string filePath) =>
             IsRisky(filePath) || ExecutableSniffer.IsPortableExecutable(filePath);
+
+        /// <summary>Extension ou en-tête PE, lus depuis un flux déjà ouvert par l'appelant.</summary>
+        public static bool IsRiskyOrExecutable(string filePath, Stream stream) =>
+            IsRisky(filePath) || ExecutableSniffer.IsPortableExecutable(stream);
 
         public static bool IsExecutable(string filePath)
         {

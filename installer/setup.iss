@@ -130,7 +130,7 @@ Name: "platformservice"; Description: "Installer le service Windows de protectio
 ; Avant de compiler : Build > Publish (Release) ou : dotnet publish -c Release
 ; Le chemin exact est résolu par le préprocesseur (AppPublishSource).
 ; clamav\*, rules\* et yara\* sont exclus ici — gérés séparément ci-dessous.
-Source: "{#AppPublishSource}"; DestDir: "{app}"; Excludes: "clamav\*,rules\*,yara\*"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#AppPublishSource}"; DestDir: "{app}"; Excludes: "clamav\*,rules\*,yara\*,bin\*,*.pdb"; Flags: ignoreversion recursesubdirs createallsubdirs
 ; ── ClamAV x64 — outils développeur exclus (sigtool/clambc & co : ~47 Mo
 ; inutiles au scan et à la mise à jour ; le code n'y fait jamais appel) ──────
 #if DirExists(AddBackslash(SourcePath) + "..\optiSCAN\clamav\x64")
@@ -153,6 +153,12 @@ Source: "..\optiSCAN\clamav\database\*"; DestDir: "{app}\clamav\database"; Exclu
 ; ── YARA : binaire et règles locales. YARA-Forge les complète dans le dossier inscriptible.
 Source: "..\optiSCAN\rules\*"; DestDir: "{app}\rules"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
 Source: "..\optiSCAN\yara\*"; DestDir: "{app}\yara"; Flags: ignoreversion recursesubdirs createallsubdirs skipifsourcedoesntexist
+; ── Licences des composants tiers (YARA, avis généraux). Celles de ClamAV arrivent avec
+; clamav\x64\licenses (fetch-runtime-deps.ps1) ; l'installeur refuse de se compiler sans elles.
+Source: "licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion
+#if !FileExists(AddBackslash(SourcePath) + "..\optiSCAN\clamav\x64\licenses\COPYING.txt")
+  #error Licence ClamAV absente (optiSCAN\clamav\x64\licenses\COPYING.txt) : relancer scripts\fetch-runtime-deps.ps1.
+#endif
 ; ── Service Windows (pour tâche platformservice opt-in) ───────────────────────
 ; optiSCAN.Service.exe, sa DLL et ses dépendances arrivent par AppPublishSource : le service est
 ; publié dans le même dossier que l'application (CI, prepare-release-v3, publish-release).
@@ -175,7 +181,10 @@ Name: "{userstartup}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: startu
 ; HKCU est écrit dans CurStepChanged via ExecAsOriginalUser, pas dans le profil de l'administrateur élevé.
 
 [Run]
-Filename: "{app}\{#AppExeName}"; Description: "Lancer {#AppName} maintenant"; Flags: nowait postinstall skipifsilent runascurrentuser
+; Lancé avec le jeton de l'utilisateur qui a démarré l'installation, pas celui de l'installeur
+; élevé : une instance élevée refuse freshclam et winget (configuration dans le profil, modifiable
+; sans élévation) et écrirait ses données dans le profil de l'administrateur.
+Filename: "{app}\{#AppExeName}"; Description: "Lancer {#AppName} maintenant"; Flags: nowait postinstall skipifsilent runasoriginaluser
 
 ; =============================================================================
 ; CLEAN INSTALL — exécuté AVANT la copie des nouveaux fichiers
@@ -276,6 +285,16 @@ begin
   if not Exec(ExpandConstant('{sys}\sc.exe'), 'description {#ProtectionServiceName} "{#ProtectionServiceDescription}"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
      or (ResultCode <> 0) then
     Log(Format('sc description a échoué (code %d)', [ResultCode]));
+
+  // Récupération par le gestionnaire de services : sans elle, un plantage du service, ou son
+  // arrêt volontaire en erreur (StopWithError), laisse la machine sans protection jusqu'au
+  // prochain redémarrage. failureflag 1 applique aussi ces actions à un arrêt avec code non nul.
+  if not Exec(ExpandConstant('{sys}\sc.exe'), 'failure {#ProtectionServiceName} reset= 86400 actions= restart/5000/restart/60000/restart/300000', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
+     or (ResultCode <> 0) then
+    Log(Format('sc failure a échoué (code %d)', [ResultCode]));
+  if not Exec(ExpandConstant('{sys}\sc.exe'), 'failureflag {#ProtectionServiceName} 1', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
+     or (ResultCode <> 0) then
+    Log(Format('sc failureflag a échoué (code %d)', [ResultCode]));
 
   // 1056 : service déjà démarré.
   if not Exec(ExpandConstant('{sys}\sc.exe'), 'start {#ProtectionServiceName}', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)

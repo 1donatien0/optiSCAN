@@ -1,3 +1,4 @@
+using System.Runtime.InteropServices;
 using optiSCAN.Platform;
 using optiSCAN.Services;
 
@@ -65,6 +66,37 @@ public sealed class LinkAndPolicyGuardTests
             Cleanup(root, outside);
         }
     }
+
+    [Fact]
+    public void A_hard_link_inside_a_watched_folder_is_not_scanned()
+    {
+        if (!OperatingSystem.IsWindows())
+            return;
+
+        var root = NewDir("hardwatch");
+        var outside = NewDir("hardout");
+        var target = Path.Combine(outside, "secret.exe");
+        File.WriteAllBytes(target, new byte[] { 0x4D, 0x5A, 1 });
+        var alias = Path.Combine(root, "alias.exe");
+        try
+        {
+            Assert.True(CreateHardLink(alias, target, IntPtr.Zero),
+                "CreateHardLink a échoué : " + Marshal.GetLastWin32Error());
+
+            Assert.Null(RealTimePathGuard.PinWithinRoot(root, alias, out var refusal));
+            Assert.Equal("lien physique", refusal);
+            Assert.False(RealTimePathGuard.IsExecutableWithinRoot(root, alias));
+            Assert.Equal(new byte[] { 0x4D, 0x5A, 1 }, File.ReadAllBytes(target));
+            Assert.True(File.Exists(alias));
+        }
+        finally
+        {
+            Cleanup(root, outside);
+        }
+    }
+
+    [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+    private static extern bool CreateHardLink(string fileName, string existingFileName, IntPtr securityAttributes);
 
     [Fact]
     public void While_pinned_for_a_scan_the_file_cannot_be_swapped()

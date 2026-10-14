@@ -21,7 +21,8 @@ namespace optiSCAN.Services
             bool yaraAvailable,
             int yaraRulesCount,
             bool realTimeProtectionEnabled,
-            bool realTimeProtectionRunning)
+            bool realTimeProtectionRunning,
+            bool realTimeProtectionHealthy = true)
         {
             if (!clamAvInstalled)
                 return ProtectionBadgeLevel.Inactive;
@@ -30,7 +31,7 @@ namespace optiSCAN.Services
             if (!yaraOk)
                 return ProtectionBadgeLevel.Degraded;
 
-            if (!realTimeProtectionEnabled || !realTimeProtectionRunning)
+            if (!realTimeProtectionEnabled || !realTimeProtectionRunning || !realTimeProtectionHealthy)
                 return ProtectionBadgeLevel.Degraded;
 
             return ProtectionBadgeLevel.Active;

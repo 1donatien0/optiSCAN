@@ -202,12 +202,18 @@ namespace optiSCAN.Services
             }
         }
 
-        /// <summary>Clé aléatoire 256 bits persistée sous DPAPI.</summary>
+        /// <summary>
+        /// Clé aléatoire 256 bits persistée sous DPAPI. Une clé présente mais illisible est
+        /// conservée à part avant d'être remplacée : les fichiers qu'elle signait restent
+        /// récupérables après une panne DPAPI passagère.
+        /// </summary>
         private static byte[] GetOrCreateDpapiHmacKeyMaterial()
         {
             var existing = TryLoadDpapiHmacKey();
             if (existing != null)
                 return existing;
+            if (File.Exists(HmacKeyPath))
+                AtomicFile.PreserveAside(HmacKeyPath, "unreadable");
 
             var key = RandomNumberGenerator.GetBytes(32);
             try

@@ -36,6 +36,9 @@ public sealed class ProtectionPipeServer : IDisposable
     private readonly string? _shutdownTokenOverride;
     private readonly Action? _onShutdown;
     private readonly ServiceQuarantineAdmin? _quarantineAdmin;
+    private readonly bool _scanPathEnabled;
+    private readonly ServiceDetectionLog? _detections;
+    private readonly Func<int?>? _realTimeDegradedFolders;
     private string? _shutdownToken;
     private CancellationTokenSource? _cts;
     private Task? _listenTask;
@@ -46,8 +49,17 @@ public sealed class ProtectionPipeServer : IDisposable
         string? shutdownToken = null,
         Action? onShutdown = null,
         IpcScanRateLimiter? scanRateLimiter = null,
-        QuarantineManager? serviceQuarantine = null)
+        QuarantineManager? serviceQuarantine = null,
+        bool enableScanPath = false,
+        ServiceDetectionLog? detections = null,
+        Func<int?>? realTimeDegradedFolders = null)
     {
+        _detections = detections;
+        _realTimeDegradedFolders = realTimeDegradedFolders;
+        // scan_path : aucun client livré ne l'appelle (l'interface scanne elle-même, AMSI n'est pas
+        // livré). Ouverte à tout compte authentifié, l'opération ferait analyser en SYSTEM des
+        // contenus choisis par n'importe qui. Fermée par défaut, comme scan_buffer (audit Z4, A5).
+        _scanPathEnabled = enableScanPath;
         _quarantineAdmin = serviceQuarantine == null ? null : new ServiceQuarantineAdmin(serviceQuarantine);
         _orchestrator = orchestrator;
         _scanRateLimiter = scanRateLimiter ?? new IpcScanRateLimiter();
@@ -205,7 +217,9 @@ public sealed class ProtectionPipeServer : IDisposable
         lock (_slotsByAccount)
         {
             _slotsByAccount.TryGetValue(account, out var used);
-            var exempt = account is NamedPipeClientAccess.SystemAccount or NamedPipeClientAccess.SelfAccount;
+            // Compte lu sur le PID client avant toute lecture : un PID réutilisé pourrait le
+            // faire passer pour SYSTEM. Seul l'hôte lui-même (même PID que le serveur) est exempté.
+            var exempt = account is NamedPipeClientAccess.SelfAccount;
             if (!exempt && used >= MaxConcurrentPerAccount)
                 return false;
             _slotsByAccount[account] = used + 1;
@@ -264,7 +278,13 @@ public sealed class ProtectionPipeServer : IDisposable
             var text = await ProtectionPipeJsonFraming.ReadJsonPayloadAsync(pipe, deadline.Token).ConfigureAwait(false);
             var request = JsonSerializer.Deserialize<ProtectionPipeRequest>(text, JsonOptions)
                 ?? throw new InvalidOperationException("Requête IPC vide");
-            response = Dispatch(request, pipe, account);
+            // Pour la requête elle-même, le compte est relu sur le jeton usurpé du client (pas sur
+            // son PID, réutilisable) : il décide du débit de scan et des chemins rendus.
+            // L'hôte lui-même (même PID que le serveur, non réutilisable tant qu'il tourne) garde son statut.
+            var verified = account == NamedPipeClientAccess.SelfAccount
+                ? account
+                : NamedPipeClientAccess.GetImpersonatedClientSid(pipe) ?? NamedPipeClientAccess.UnknownAccount;
+            response = Dispatch(request, pipe, verified);
         }
         catch (Exception ex)
         {
@@ -338,6 +358,8 @@ public sealed class ProtectionPipeServer : IDisposable
                 return ProtectionPipeResponse.SuccessClean();
 
             case ProtectionPipeOperations.ScanPath:
+                if (!_scanPathEnabled)
+                    return ProtectionPipeResponse.Error("Opération non disponible");
                 if (string.IsNullOrWhiteSpace(request.Path))
                     return ProtectionPipeResponse.Error("Chemin invalide");
                 string fullPath;
@@ -361,6 +383,26 @@ public sealed class ProtectionPipeServer : IDisposable
                     return ProtectionPipeResponse.Error("Buffer trop volumineux");
                 return ExecuteScanWithRateLimit(account, () =>
                     ScanBuffer(request.BufferBase64, request.ContentName ?? "amsi_buffer"));
+
+            case ProtectionPipeOperations.RecentDetections:
+            {
+                var log = _detections ?? ServiceDetectionLog.Shared;
+                var elevated = NamedPipeClientAccess.IsElevatedAdministrator(pipe);
+                var items = log.Since(request.SinceSequence ?? 0, account, elevated);
+                // Réponse bornée par le cadrage du pipe : les plus récentes seulement.
+                if (items.Count > 100)
+                    items = items.GetRange(items.Count - 100, 100);
+                int? degraded = null;
+                try { degraded = _realTimeDegradedFolders?.Invoke(); }
+                catch (Exception ex) { AppLogger.Debug("ProtectionPipeServer", "Santé du temps réel : " + ex.Message); }
+                return new ProtectionPipeResponse
+                {
+                    Ok = true,
+                    Detections = items,
+                    LatestSequence = log.LatestSequence,
+                    RealTimeDegradedFolders = degraded,
+                };
+            }
 
             case ProtectionPipeOperations.QuarantineSummary:
                 // Nombre et taille seulement : aucun chemin ni nom de fichier d'un autre compte.

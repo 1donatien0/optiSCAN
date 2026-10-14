@@ -124,7 +124,11 @@ namespace optiSCAN.Views
                             sel.Telemetry, sel.Dism, waitForExit: true);
                         if (elevatedOk)
                         {
-                            if (sel.Telemetry) LogTweakResult("Twk_Telemetry", true);
+                            if (sel.Telemetry)
+                            {
+                                TweakUndoStore.RecordTelemetryApplied();
+                                LogTweakResult("Twk_Telemetry", true);
+                            }
                             if (sel.Dism) LogTweakResult("Twk_Dism", true);
                         }
                         else
@@ -152,6 +156,77 @@ namespace optiSCAN.Views
             {
                 _tweaksRunning = false;
                 btnTwkApply.IsEnabled = true;
+                RefreshTweakUndoButton();
+            }
+        }
+
+        // ── Rétablir les réglages d'origine (audit A11) ──────────────────────
+        private void btnTwkUndo_Loaded(object sender, RoutedEventArgs e) => RefreshTweakUndoButton();
+
+        private void RefreshTweakUndoButton()
+        {
+            if (btnTwkUndo != null)
+                btnTwkUndo.IsEnabled = !_tweaksRunning && TweakUndoStore.HasPendingUndo;
+        }
+
+        private async void btnTwkUndo_Click(object sender, RoutedEventArgs e)
+        {
+            if (_tweaksRunning) return;
+            if (!TweakUndoStore.HasPendingUndo)
+            {
+                AppendTweaksLog(LocalizationService.GetString("Twk_UndoNothing"));
+                RefreshTweakUndoButton();
+                return;
+            }
+
+            var confirm = System.Windows.MessageBox.Show(
+                LocalizationService.GetString("Twk_UndoConfirm"),
+                OptiscanStrings.Confirmations.Title,
+                MessageBoxButton.OKCancel,
+                MessageBoxImage.Question);
+            if (confirm != MessageBoxResult.OK)
+                return;
+
+            _tweaksRunning = true;
+            btnTwkApply.IsEnabled = false;
+            btnTwkUndo.IsEnabled = false;
+            SetTweaksLog(LocalizationService.GetString("Twk_UndoStart"));
+            try
+            {
+                await Task.Run(() =>
+                {
+                    var ok = SystemTweaksService.UndoAll(out var telemetryUndo, out var explorerRestart);
+                    if (telemetryUndo)
+                    {
+                        AppendTweaksLog(LocalizationService.GetString("Twk_LogElevStart"));
+                        if (SystemTweaksService.RunElevatedKnown("telemetry-undo", waitForExit: true))
+                            SystemTweaksService.MarkTelemetryRestored();
+                        else
+                        {
+                            ok = false;
+                            AppendTweaksLog(LocalizationService.GetString("Twk_LogElevDenied"));
+                        }
+                    }
+
+                    if (explorerRestart)
+                    {
+                        SystemTweaksService.RestartExplorer();
+                        AppendTweaksLog(LocalizationService.GetString("Twk_LogExplorerRestart"));
+                    }
+
+                    AppendTweaksLog(LocalizationService.GetString(ok ? "Twk_UndoDone" : "Twk_UndoPartial"));
+                });
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("CleanControl", "Rétablissement des tweaks", ex);
+                AppendTweaksLog(LocalizationService.Format("Twk_LogError", ex.Message));
+            }
+            finally
+            {
+                _tweaksRunning = false;
+                btnTwkApply.IsEnabled = true;
+                RefreshTweakUndoButton();
             }
         }
 

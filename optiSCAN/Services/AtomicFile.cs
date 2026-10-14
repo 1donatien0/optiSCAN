@@ -84,6 +84,30 @@ namespace optiSCAN.Services
         }
 
         /// <summary>
+        /// Met de côté un fichier illisible (clé, manifeste) sous un nom horodaté au lieu de
+        /// l'écraser : une panne passagère (DPAPI indisponible, fichier verrouillé) ne doit pas
+        /// détruire la seule copie d'une clé ou d'un index. Rend le chemin de la copie, ou null.
+        /// </summary>
+        public static string? PreserveAside(string path, string reason)
+        {
+            try
+            {
+                if (!File.Exists(path))
+                    return null;
+                var aside = path + "." + reason + "-" + DateTime.UtcNow.ToString("yyyyMMddHHmmss", System.Globalization.CultureInfo.InvariantCulture)
+                    + "-" + Guid.NewGuid().ToString("N")[..8];
+                File.Copy(path, aside, overwrite: false);
+                AppLogger.Error("AtomicFile", $"Fichier illisible conservé à part : {Path.GetFileName(aside)}");
+                return aside;
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Error("AtomicFile", $"Copie de sauvegarde impossible ({Path.GetFileName(path)})", ex);
+                return null;
+            }
+        }
+
+        /// <summary>
         /// Lit un fichier en tentant la version courante, puis le .bak en repli
         /// si la version courante est corrompue ou inexistante.
         ///

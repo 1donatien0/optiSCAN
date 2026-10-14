@@ -8,8 +8,16 @@ using System.Text.Json;
 namespace optiSCAN.Services
 {
     /// <summary>
-    /// Enregistre les chemins et processus optiSCAN dans les exclusions Windows Defender
-    /// pour éviter les blocages sur ClamAV, YARA, freshclam et les binaires de l'app.
+    /// Enregistre les dossiers d'optiSCAN réservés aux administrateurs (installation,
+    /// <c>%ProgramData%\optiSCAN</c>) et les moteurs (ClamAV, YARA) dans les exclusions
+    /// Windows Defender.
+    /// <para>
+    /// Jamais d'exclusion de processus sur <c>optiSCAN.exe</c> ni <c>optiSCAN.Service.exe</c> :
+    /// Defender ne verrait plus aucun fichier ouvert par eux, dont les copies d'analyse de
+    /// l'hôte SYSTEM et les fichiers restaurés de la quarantaine (audit A3). Les données
+    /// qu'ils produisent et qui ressemblent à des menaces (bases, copies, quarantaine) sont
+    /// couvertes par l'exclusion du dossier <c>%ProgramData%\optiSCAN</c>.
+    /// </para>
     /// </summary>
     [SupportedOSPlatform("windows")]
     internal static class WindowsDefenderExclusionService
@@ -35,6 +43,25 @@ namespace optiSCAN.Services
         };
 
         private static string[] LegacyProcessNames => LegacyOwnProcessNames.Concat(LegacyEngineProcessNames).ToArray();
+
+        /// <summary>Moteurs exclus par chemin complet : ils écrivent bases et extractions temporaires.</summary>
+        internal static readonly string[] EngineProcessRelativePaths =
+        {
+            Path.Combine("clamav", "x64", "clamscan.exe"),
+            Path.Combine("clamav", "x64", "freshclam.exe"),
+            Path.Combine("clamav", "x64", "clamd.exe"),
+            Path.Combine("yara", "yara64.exe"),
+        };
+
+        /// <summary>
+        /// Binaires d'optiSCAN exclus par chemin complet jusqu'à la 3.1 candidate : retirés à chaque
+        /// application ou retrait des exclusions.
+        /// </summary>
+        internal static readonly string[] RetiredAppProcessRelativePaths =
+        {
+            "optiSCAN.exe",
+            "optiSCAN.Service.exe",
+        };
 
         private static int _ensureInFlight;
 
@@ -94,6 +121,7 @@ namespace optiSCAN.Services
                 processes,
                 own = LegacyOwnProcessNames,
                 engine = LegacyEngineProcessNames,
+                retired = CollectRetiredProcessExclusionPaths(),
             })));
 
             const string script = """
@@ -157,6 +185,10 @@ namespace optiSCAN.Services
                 foreach ($name in $legacyTargets) {
                     try { Remove-MpPreference -ExclusionProcess ([string]$name) -ErrorAction Stop } catch { Write-Output "FAILED:$name" }
                 }
+                # optiSCAN.exe / optiSCAN.Service.exe par chemin complet : plus jamais exclus.
+                foreach ($proc in @($data.retired | Where-Object { $procNow -contains [string]$_ })) {
+                    try { Remove-MpPreference -ExclusionProcess ([string]$proc) -ErrorAction Stop } catch { Write-Output "FAILED:$proc" }
+                }
                 if ($failures.Count -gt 0) {
                     Write-Output ('PARTIAL:' + ($failures -join ';') + ';ADDED=' + $added)
                     exit 4
@@ -195,10 +227,23 @@ namespace optiSCAN.Services
                 }
             }
 
+            // Bases ClamAV du service, copies d'analyse et quarantaine de l'hôte SYSTEM. Le dossier
+            // n'est exclu que s'il est réservé aux administrateurs, comme l'installation.
+            try
+            {
+                var programData = Path.GetFullPath(OptiScanProgramData.DirectoryPath);
+                if (Directory.Exists(programData) && InstallLocationTrust.IsAdminOnlyInstall(programData, out _))
+                    paths.Add(programData);
+            }
+            catch
+            {
+                /* ProgramData illisible : pas d'exclusion */
+            }
+
             return paths.OrderBy(p => p, StringComparer.OrdinalIgnoreCase).ToList();
         }
 
-        /// <summary>Chemins complets des binaires, jamais un simple nom d'image.</summary>
+        /// <summary>Chemins complets des moteurs, jamais un simple nom d'image ni un binaire d'optiSCAN.</summary>
         internal static IReadOnlyList<string> CollectProcessExclusionPaths(bool requireTrustedInstall = true)
         {
             // Hors d'un dossier réservé aux administrateurs, un binaire remplacé hériterait de
@@ -208,18 +253,8 @@ namespace optiSCAN.Services
                 return Array.Empty<string>();
 
             var root = AppContext.BaseDirectory;
-            string[] relative =
-            {
-                "optiSCAN.exe",
-                "optiSCAN.Service.exe",
-                Path.Combine("clamav", "x64", "clamscan.exe"),
-                Path.Combine("clamav", "x64", "freshclam.exe"),
-                Path.Combine("clamav", "x64", "clamd.exe"),
-                Path.Combine("yara", "yara64.exe"),
-            };
-
             var list = new List<string>();
-            foreach (var name in relative)
+            foreach (var name in EngineProcessRelativePaths)
             {
                 var path = Path.GetFullPath(Path.Combine(root, name));
                 if (File.Exists(path))
@@ -229,7 +264,63 @@ namespace optiSCAN.Services
             return list;
         }
 
+        /// <summary>Chemins complets d'optiSCAN.exe et d'optiSCAN.Service.exe, à retirer des exclusions.</summary>
+        internal static IReadOnlyList<string> CollectRetiredProcessExclusionPaths()
+        {
+            var roots = new HashSet<string>(StringComparer.OrdinalIgnoreCase) { AppContext.BaseDirectory };
+            foreach (var install in OptiscanProtectedPaths.ResolveInstallRoots())
+                roots.Add(install);
+
+            var list = new List<string>();
+            foreach (var root in roots)
+            {
+                foreach (var name in RetiredAppProcessRelativePaths)
+                {
+                    try { list.Add(Path.GetFullPath(Path.Combine(root, name))); }
+                    catch { /* chemin invalide */ }
+                }
+            }
+
+            return list.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        }
+
         internal static IReadOnlyList<string> LegacyBareProcessNames => LegacyProcessNames;
+
+        /// <summary>
+        /// Retire les exclusions de processus sur optiSCAN.exe et optiSCAN.Service.exe posées
+        /// jusqu'à la 3.1 candidate. Appelé une fois par version par l'hôte SYSTEM ou une instance
+        /// élevée (<see cref="DefenderLegacyCleanup"/>) : une installation existante est nettoyée
+        /// sans que l'utilisateur ait à rouvrir les Options.
+        /// </summary>
+        public static DefenderExclusionResult RemoveRetiredProcessExclusions()
+        {
+            if (!OperatingSystem.IsWindows())
+                return DefenderExclusionResult.NotApplicable();
+            if (!IsWindowsDefenderPresent())
+                return DefenderExclusionResult.Unavailable("Windows Defender introuvable");
+
+            var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
+            {
+                retired = CollectRetiredProcessExclusionPaths(),
+            })));
+
+            const string script = """
+                $ErrorActionPreference = 'Continue'
+                $payload = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__PAYLOAD__'))
+                $data = $payload | ConvertFrom-Json
+                try { $procNow = @((Get-MpPreference -ErrorAction Stop).ExclusionProcess) } catch { Write-Output 'PREF_READ_FAILED'; exit 3 }
+                $removed = 0
+                foreach ($proc in @($data.retired | Where-Object { $procNow -contains [string]$_ })) {
+                    try { Remove-MpPreference -ExclusionProcess ([string]$proc) -ErrorAction Stop; $removed++ } catch { Write-Output "FAILED:$proc" }
+                }
+                Write-Output ('OK:' + $removed)
+                exit 0
+                """;
+
+            var run = RunPowerShell(script.Replace("__PAYLOAD__", payload, StringComparison.Ordinal));
+            AppLogger.Info("DefenderExclusion", "Exclusions de processus retirées (optiSCAN.exe, service) : " + run.Output.Trim());
+            return ParseResult(run.ExitCode, run.Output);
+        }
 
         private static bool IsUnderRoot(string full, string root)
         {
@@ -246,9 +337,12 @@ namespace optiSCAN.Services
 
             // Retrait large : tout ce qu'une version antérieure a pu exclure, y compris un dossier
             // d'installation que l'on n'exclurait plus aujourd'hui.
+            // ProgramData\optiSCAN toujours retiré, même déjà supprimé : une exclusion restée sur
+            // ce chemin deviendrait une cachette, un compte standard pouvant le recréer.
             var paths = CollectExclusionPaths()
                 .Concat(OptiscanProtectedPaths.ResolveInstallRoots())
                 .Append(OptiscanProtectedPaths.GetLocalAppDataRoot())
+                .Append(Path.GetFullPath(OptiScanProgramData.DirectoryPath))
                 .Distinct(StringComparer.OrdinalIgnoreCase);
             var processes = CollectProcessExclusionPaths(requireTrustedInstall: false);
             var payload = Convert.ToBase64String(Encoding.UTF8.GetBytes(JsonSerializer.Serialize(new
@@ -257,6 +351,7 @@ namespace optiSCAN.Services
                 processes,
                 own = LegacyOwnProcessNames,
                 engine = LegacyEngineProcessNames,
+                retired = CollectRetiredProcessExclusionPaths(),
             })));
 
             const string script = """
@@ -267,7 +362,7 @@ namespace optiSCAN.Services
                 foreach ($p in $data.paths) {
                     try { Remove-MpPreference -ExclusionPath ([string]$p) -ErrorAction Stop; $removed++ } catch { Write-Output "FAILED:$p" }
                 }
-                foreach ($proc in $data.processes) {
+                foreach ($proc in @($data.processes) + @($data.retired)) {
                     try { Remove-MpPreference -ExclusionProcess ([string]$proc) -ErrorAction Stop; $removed++ } catch { Write-Output "FAILED:$proc" }
                 }
                 # Noms nus de la 3.0.0 : ceux d'optiSCAN sont retirés ; ceux des moteurs
@@ -304,6 +399,7 @@ namespace optiSCAN.Services
             {
                 own = LegacyOwnProcessNames,
                 engine = LegacyEngineProcessNames,
+                retired = CollectRetiredProcessExclusionPaths(),
             })));
 
             const string script = """

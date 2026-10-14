@@ -1,6 +1,6 @@
 # Guide de distribution — optiSCAN
 
-Ce guide couvre la mise en production d'optiSCAN chez des utilisateurs tiers : **signature de code**, **cohabitation avec d'autres antivirus** et **chaîne de publication**. Il complète l'[audit 360](../AUDIT_optiSCAN_360.md) et le [diagnostic d'intégration](DIAGNOSTIC_INTEGRATION_WINDOWS.md). L'état courant du code et ses limites sont résumés dans les [réserves de l'audit](../AUDIT_optiSCAN_360.md#9-réserves-ouvertes-et-conditions-de-clôture).
+Ce guide couvre la mise en production d'optiSCAN chez des utilisateurs tiers : **signature de code**, **cohabitation avec d'autres antivirus** et **chaîne de publication**. Il complète l'[audit 360](../AUDIT_optiSCAN_360.md) et le [diagnostic d'intégration](DIAGNOSTIC_INTEGRATION_WINDOWS.md). L'état courant du code et ses limites sont résumés dans les [réserves de l'audit](../AUDIT_optiSCAN_360.md#5-registre-des-risques-ouverts).
 
 ---
 
@@ -39,7 +39,7 @@ optiSCAN analyse à la demande, surveille les changements de fichiers avec `File
 - **Risque concret** : un **Kaspersky / Bitdefender / Avast** (très répandus en Europe) peut **mettre en quarantaine ou terminer** `optiSCAN.exe` — symptôme « se lance quelques secondes puis disparaît ».
 - **Mesures** :
   1. **Signer** l'application et l'installeur (améliore l'identification de l'éditeur ; n'assure pas à lui seul l'absence de faux positifs).
-  2. Documenter pour l'utilisateur comment **ajouter une exclusion** dans son AV existant (dossier d'installation + `optiSCAN.exe`, `optiSCAN.Service.exe`).
+  2. Documenter pour l'utilisateur comment **ajouter une exclusion** dans son AV existant (dossier d'installation ; éviter une exclusion de processus sur `optiSCAN.exe` ou `optiSCAN.Service.exe`, qui ferait ignorer par cet antivirus tout ce que ces processus lisent, y compris les fichiers analysés).
   3. Tester optiSCAN sur des postes équipés de Kaspersky/Bitdefender/Defender **avant** diffusion.
   4. Côté Defender, le projet gère déjà l'ajout d'exclusions (`scripts/add-defender-exclusions.ps1`).
 - **Avertissement** : faire tourner **deux moteurs temps réel** simultanément peut dégrader les performances et provoquer des conflits de verrous. Le recommander uniquement en complément (scan à la demande), pas comme second RTP permanent. Voir aussi [SECURITY.md](../SECURITY.md).

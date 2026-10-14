@@ -57,14 +57,14 @@ public sealed class RiskScoringServiceTests
     }
 }
 
-public sealed class TamperProtectionServiceTests
+public sealed class ProtectionWatchdogServiceTests
 {
     [Fact]
     public void EnsureWatchdogTask_when_disabled_attempts_cleanup()
     {
         var prefs = new UserPreferences { TamperProtectionEnabled = false };
         var accessor = new FixedUserPreferencesAccessor(prefs);
-        var service = new TamperProtectionService(accessor);
+        var service = new ProtectionWatchdogService(accessor);
 
         var result = service.EnsureWatchdogTask();
 

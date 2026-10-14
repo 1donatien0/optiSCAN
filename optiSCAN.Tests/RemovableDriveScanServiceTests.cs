@@ -93,9 +93,8 @@ public sealed class RemovableDriveScanServiceTests
         var qDir = Path.Combine(Path.GetTempPath(), "optiscan_usb_q_" + Guid.NewGuid().ToString("N"));
         var q = new QuarantineManager(qDir);
         logger = new ScanLogManager(Path.Combine(Path.GetTempPath(), "optiscan_usb_log_" + Guid.NewGuid().ToString("N")));
-        var rtp = new RealTimeProtection(orch, q, new NotificationService());
         ui ??= new UiEventBus();
-        return new RemovableDriveScanService(orch, q, new NotificationService(), logger, rtp, ui);
+        return new RemovableDriveScanService(orch, q, new NotificationService(), logger, ui);
     }
 
     private static async Task InvokeRunScanAsync(RemovableDriveScanService service, string root)

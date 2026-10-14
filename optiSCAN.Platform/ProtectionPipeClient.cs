@@ -65,6 +65,9 @@ public sealed class ProtectionPipeClient : IDisposable
     public Task<ProtectionPipeResponse> DeleteServiceQuarantineAsync(string id, CancellationToken ct = default) =>
         SendAsync(new ProtectionPipeRequest { Operation = ProtectionPipeOperations.QuarantineDelete, QuarantineId = id }, ct);
 
+    public Task<ProtectionPipeResponse> GetRecentDetectionsAsync(long sinceSequence, CancellationToken ct = default) =>
+        SendAsync(new ProtectionPipeRequest { Operation = ProtectionPipeOperations.RecentDetections, SinceSequence = sinceSequence }, ct);
+
     public Task<ProtectionPipeResponse> PurgeServiceQuarantineAsync(CancellationToken ct = default) =>
         SendAsync(new ProtectionPipeRequest { Operation = ProtectionPipeOperations.QuarantinePurge }, ct);
 

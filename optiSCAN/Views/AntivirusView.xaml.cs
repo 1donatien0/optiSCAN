@@ -353,6 +353,17 @@ namespace optiSCAN.Views
             if (sender is not System.Windows.Controls.Button btn || btn.Tag is not string quarantineId)
                 return;
 
+            // Restaurer remet un fichier détecté à sa place : confirmation, comme pour la
+            // quarantaine du service (la suppression en demandait une, pas la restauration).
+            var entry = _services?.Quarantine.FindEntry(quarantineId);
+            if (entry != null && System.Windows.MessageBox.Show(
+                    LocalizationService.Format("SvcQ_ConfirmRestore", entry.FileName, entry.VirusName),
+                    OptiscanStrings.Confirmations.Title,
+                    MessageBoxButton.YesNo,
+                    MessageBoxImage.Warning,
+                    MessageBoxResult.No) != MessageBoxResult.Yes)
+                return;
+
             var result = Actions.RestoreFromQuarantine(quarantineId);
             if (result.Success)
                 RefreshAllData();

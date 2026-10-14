@@ -68,6 +68,19 @@ public static class PlatformProtectionBootstrap
         return active;
     }
 
+    /// <summary>
+    /// Dernier résultat connu du ping, sans nouveau ping (pour un affichage sur le fil de
+    /// l'interface). Faux si le service n'a encore jamais été joint.
+    /// </summary>
+    public static bool LastKnownRemoteProtectionActive
+    {
+        get
+        {
+            lock (ReachabilityGate)
+                return _reachability == true;
+        }
+    }
+
     /// <summary>Force le prochain <see cref="IsRemoteProtectionActive()"/> à re-pinger le service.</summary>
     public static void InvalidateReachabilityCache()
     {
@@ -115,6 +128,14 @@ public static class PlatformProtectionBootstrap
             if (IsServiceInstalled())
                 return true;
 
+            // Créer un service exige un administrateur élevé : inutile de lancer sc.exe pour
+            // un refus certain (deux processus de plus au démarrage de l'interface).
+            if (!ElevationHelper.IsRunningElevated())
+            {
+                AppLogger.Info("PlatformProtection", "Service absent : son enregistrement demande les droits administrateur.");
+                return false;
+            }
+
             // Un service SYSTEM sur un binaire qu'un utilisateur peut remplacer serait une
             // élévation de privilèges persistante (build de développement, copie portable,
             // installation hors Program Files).
@@ -135,6 +156,12 @@ public static class PlatformProtectionBootstrap
             var described = RunSc($"description {ServiceName} \"{ProtectionIdentifiers.ServiceDescription}\"");
             if (described != 0)
                 AppLogger.Debug("PlatformProtection", $"Description du service non appliquée (sc.exe code {described})");
+            // Mêmes actions de récupération que l'installateur : relance après un plantage ou un
+            // arrêt en erreur, au lieu d'une machine sans protection jusqu'au redémarrage.
+            var recovery = RunSc($"failure {ServiceName} reset= 86400 actions= restart/5000/restart/60000/restart/300000");
+            var flag = RunSc($"failureflag {ServiceName} 1");
+            if (recovery != 0 || flag != 0)
+                AppLogger.Warn("PlatformProtection", $"Actions de récupération non appliquées (sc.exe {recovery}/{flag})");
             AppLogger.Info("PlatformProtection", "Service Windows enregistré");
             return true;
         }
@@ -156,7 +183,12 @@ public static class PlatformProtectionBootstrap
             var started = RunSc($"start {ServiceName}");
             // 1056 = ERROR_SERVICE_ALREADY_RUNNING : pas une erreur.
             if (started != 0 && started != 1056)
+            {
+                // Refus (droits, service désactivé) : attendre 5 s qu'il réponde figeait
+                // l'interface au démarrage pour un résultat connu.
                 AppLogger.Warn("PlatformProtection", $"Démarrage du service refusé (sc.exe code {started})");
+                return IsRemoteProtectionActive(useCache: false);
+            }
             for (var i = 0; i < 10; i++)
             {
                 if (IsRemoteProtectionActive(useCache: false))

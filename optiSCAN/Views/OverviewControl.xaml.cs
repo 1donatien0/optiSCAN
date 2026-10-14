@@ -348,12 +348,24 @@ namespace optiSCAN.Views
             return true;
         }
 
+        /// <summary>
+        /// Outil Windows désigné par son seul nom (control.exe, WF.msc…) : résolu dans System32,
+        /// jamais par l'ordre de recherche (dossier courant compris) de ShellExecute.
+        /// </summary>
+        private static string ResolveSystemTool(string file)
+        {
+            if (System.IO.Path.IsPathRooted(file) || file.Contains('\\') || file.Contains('/'))
+                return file;
+            var candidate = SystemExecutables.System32(file);
+            return System.IO.File.Exists(candidate) ? candidate : file;
+        }
+
         private static void LaunchFixUri(string uri)
         {
             if (uri.StartsWith("control.exe", StringComparison.OrdinalIgnoreCase))
             {
                 var parts = uri.Split(' ', 2);
-                Process.Start(new ProcessStartInfo(parts[0])
+                Process.Start(new ProcessStartInfo(ResolveSystemTool(parts[0]))
                 {
                     UseShellExecute = true,
                     Arguments = parts.Length > 1 ? parts[1] : string.Empty,
@@ -364,7 +376,7 @@ namespace optiSCAN.Views
             if (uri.EndsWith(".exe", StringComparison.OrdinalIgnoreCase))
             {
                 var space = uri.IndexOf(' ', StringComparison.Ordinal);
-                var file = space >= 0 ? uri[..space] : uri;
+                var file = ResolveSystemTool(space >= 0 ? uri[..space] : uri);
                 var args = space >= 0 ? uri[(space + 1)..] : string.Empty;
                 Process.Start(new ProcessStartInfo(file)
                 {
@@ -374,7 +386,8 @@ namespace optiSCAN.Views
                 return;
             }
 
-            Process.Start(new ProcessStartInfo(uri) { UseShellExecute = true });
+            var target = uri.EndsWith(".msc", StringComparison.OrdinalIgnoreCase) ? ResolveSystemTool(uri) : uri;
+            Process.Start(new ProcessStartInfo(target) { UseShellExecute = true });
         }
 
         private void RecHygieneSigUpdate_Click(object sender, System.Windows.Input.MouseButtonEventArgs e)

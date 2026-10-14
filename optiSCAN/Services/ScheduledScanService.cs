@@ -31,18 +31,163 @@ namespace optiSCAN.Services
             try
             {
                 _scheduledTime = time ?? TimeSpan.FromHours(2);
-                var startTime = $"{_scheduledTime.Hours:D2}:{_scheduledTime.Minutes:D2}";
 
                 DeleteTask();
 
-                var psi = new ProcessStartInfo
+                // Définition XML plutôt que /SC DAILY : seule elle permet StartWhenAvailable.
+                // Sans ce réglage, un PC en veille ou éteint à l'heure prévue sautait le scan
+                // jusqu'au lendemain, indéfiniment pour un portable fermé chaque nuit.
+                string? user = null;
+                try { user = System.Security.Principal.WindowsIdentity.GetCurrent().Name; }
+                catch (Exception ex) { AppLogger.Debug("ScheduledScanService", "Compte courant : " + ex.Message); }
+
+                var xml = BuildTaskXml(_exePath, _scheduledTime, DateTime.Today, user);
+                var xmlPath = Path.Combine(Path.GetTempPath(), "optiSCAN_task_" + Guid.NewGuid().ToString("N") + ".xml");
+                try
                 {
-                    FileName = SystemExecutables.System32("schtasks.exe"),
-                    UseShellExecute = false,
-                    CreateNoWindow = true,
-                    RedirectStandardOutput = true,
-                    RedirectStandardError = true
-                };
+                    // schtasks /XML attend de l'UTF-16 avec BOM.
+                    File.WriteAllText(xmlPath, xml, Encoding.Unicode);
+                    var psi = NewSchtasks();
+                    psi.ArgumentList.Add("/Create");
+                    psi.ArgumentList.Add("/TN");
+                    psi.ArgumentList.Add(TaskName);
+                    psi.ArgumentList.Add("/XML");
+                    psi.ArgumentList.Add(xmlPath);
+                    psi.ArgumentList.Add("/F");
+                    var res = RunSchtasksCapture(psi);
+                    if (res.ExitCode == 0)
+                        return true;
+                    AppLogger.Warn("ScheduledScanService", "Création XML refusée, repli /SC DAILY : " + res.CombinedOutput.Trim());
+                }
+                finally
+                {
+                    try { File.Delete(xmlPath); } catch { /* fichier temporaire */ }
+                }
+
+                return CreateDailyScanLegacy();
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ScheduledScanService", "Erreur création tâche planifiée", ex);
+                return false;
+            }
+        }
+
+        /// <summary>
+        /// Recrée à la même heure une tâche existante qui n'a pas <c>StartWhenAvailable</c>
+        /// (créée avant le passage à la définition XML). Sans effet si la tâche est absente.
+        /// </summary>
+        public bool UpgradeLegacyTask()
+        {
+            try
+            {
+                var psi = NewSchtasks();
+                psi.ArgumentList.Add("/Query");
+                psi.ArgumentList.Add("/TN");
+                psi.ArgumentList.Add(TaskName);
+                psi.ArgumentList.Add("/XML");
+                var res = RunSchtasksCapture(psi);
+                if (res.ExitCode != 0 || !NeedsCatchUpUpgrade(res.StdOut, out var time))
+                    return false;
+                AppLogger.Info("ScheduledScanService", "Tâche planifiée mise à niveau (rattrapage au réveil)");
+                return CreateDailyScan(time);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Warn("ScheduledScanService", "UpgradeLegacyTask", ex);
+                return false;
+            }
+        }
+
+        /// <summary>Vrai si la définition n'active pas StartWhenAvailable ; renvoie l'heure prévue.</summary>
+        internal static bool NeedsCatchUpUpgrade(string xml, out TimeSpan time)
+        {
+            time = TimeSpan.FromHours(2);
+            try
+            {
+                var doc = XDocument.Parse(xml);
+                var startWhenAvailable = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "StartWhenAvailable");
+                if (startWhenAvailable != null && string.Equals(startWhenAvailable.Value.Trim(), "true", StringComparison.OrdinalIgnoreCase))
+                    return false;
+                var boundary = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "StartBoundary");
+                if (boundary != null && DateTime.TryParse(boundary.Value.Trim(), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var anchor))
+                    time = new TimeSpan(anchor.Hour, anchor.Minute, 0);
+                return true;
+            }
+            catch
+            {
+                return false;
+            }
+        }
+
+        private static ProcessStartInfo NewSchtasks() => new()
+        {
+            FileName = SystemExecutables.System32("schtasks.exe"),
+            UseShellExecute = false,
+            CreateNoWindow = true,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        };
+
+        /// <summary>
+        /// Tâche quotidienne, moindre privilège, session interactive, rattrapée au réveil
+        /// (<c>StartWhenAvailable</c>) si l'heure prévue a été manquée.
+        /// </summary>
+        internal static string BuildTaskXml(string exePath, TimeSpan time, DateTime today, string? userId)
+        {
+            XNamespace ns = "http://schemas.microsoft.com/windows/2004/02/mit/task";
+            var boundary = (today.Date + new TimeSpan(time.Hours, time.Minutes, 0))
+                .ToString("yyyy-MM-dd'T'HH:mm:ss", CultureInfo.InvariantCulture);
+
+            var principal = new XElement(ns + "Principal", new XAttribute("id", "Author"));
+            if (!string.IsNullOrWhiteSpace(userId))
+                principal.Add(new XElement(ns + "UserId", userId));
+            principal.Add(
+                new XElement(ns + "LogonType", "InteractiveToken"),
+                new XElement(ns + "RunLevel", "LeastPrivilege"));
+
+            var doc = new XDocument(
+                new XElement(ns + "Task",
+                    new XAttribute("version", "1.2"),
+                    new XElement(ns + "RegistrationInfo",
+                        new XElement(ns + "Description", "optiSCAN — analyse complète quotidienne")),
+                    new XElement(ns + "Triggers",
+                        new XElement(ns + "CalendarTrigger",
+                            new XElement(ns + "StartBoundary", boundary),
+                            new XElement(ns + "Enabled", "true"),
+                            new XElement(ns + "ScheduleByDay",
+                                new XElement(ns + "DaysInterval", "1")))),
+                    new XElement(ns + "Principals", principal),
+                    new XElement(ns + "Settings",
+                        new XElement(ns + "MultipleInstancesPolicy", "IgnoreNew"),
+                        new XElement(ns + "DisallowStartIfOnBatteries", "true"),
+                        new XElement(ns + "StopIfGoingOnBatteries", "false"),
+                        new XElement(ns + "AllowHardTerminate", "true"),
+                        new XElement(ns + "StartWhenAvailable", "true"),
+                        new XElement(ns + "RunOnlyIfNetworkAvailable", "false"),
+                        new XElement(ns + "AllowStartOnDemand", "true"),
+                        new XElement(ns + "Enabled", "true"),
+                        new XElement(ns + "Hidden", "false"),
+                        new XElement(ns + "RunOnlyIfIdle", "false"),
+                        new XElement(ns + "WakeToRun", "false"),
+                        new XElement(ns + "ExecutionTimeLimit", "PT12H"),
+                        new XElement(ns + "Priority", "7")),
+                    new XElement(ns + "Actions",
+                        new XAttribute("Context", "Author"),
+                        new XElement(ns + "Exec",
+                            new XElement(ns + "Command", exePath),
+                            new XElement(ns + "Arguments", "--fullscan --quiet")))));
+
+            return "<?xml version=\"1.0\" encoding=\"UTF-16\"?>" + Environment.NewLine + doc.Root!.ToString();
+        }
+
+        /// <summary>Ancienne création en ligne de commande, sans rattrapage, si /XML échoue.</summary>
+        private bool CreateDailyScanLegacy()
+        {
+            try
+            {
+                var startTime = $"{_scheduledTime.Hours:D2}:{_scheduledTime.Minutes:D2}";
+                var psi = NewSchtasks();
                 psi.ArgumentList.Add("/Create");
                 psi.ArgumentList.Add("/TN");
                 psi.ArgumentList.Add(TaskName);
@@ -53,10 +198,7 @@ namespace optiSCAN.Services
                 psi.ArgumentList.Add("DAILY");
                 psi.ArgumentList.Add("/ST");
                 psi.ArgumentList.Add(startTime);
-                // Moindre privilège : /RL LIMITED évite d'exécuter la tâche
-                // avec le niveau « le plus élevé » du compte utilisateur (HIGHEST).
-                // Si un scan planifié doit accéder à des chemins protégés, préférer
-                // une élévation ponctuelle (ElevationHelper) plutôt qu'une tâche HIGHEST.
+                // Moindre privilège : /RL LIMITED (jamais HIGHEST).
                 psi.ArgumentList.Add("/RL");
                 psi.ArgumentList.Add("LIMITED");
                 psi.ArgumentList.Add("/F");

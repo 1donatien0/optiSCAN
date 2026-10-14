@@ -26,6 +26,28 @@ public sealed class WindowsDefenderExclusionServiceTests
     }
 
     [Fact]
+    public void OptiSCAN_binaries_are_never_process_exclusions()
+    {
+        var processes = WindowsDefenderExclusionService.CollectProcessExclusionPaths(requireTrustedInstall: false);
+
+        Assert.DoesNotContain(processes, p =>
+            Path.GetFileName(p).Equals("optiSCAN.exe", StringComparison.OrdinalIgnoreCase)
+            || Path.GetFileName(p).Equals("optiSCAN.Service.exe", StringComparison.OrdinalIgnoreCase));
+        Assert.All(WindowsDefenderExclusionService.EngineProcessRelativePaths, rel =>
+            Assert.DoesNotContain("optiSCAN", Path.GetFileName(rel), StringComparison.OrdinalIgnoreCase));
+    }
+
+    [Fact]
+    public void Retired_app_process_exclusions_are_full_paths_for_removal()
+    {
+        var retired = WindowsDefenderExclusionService.CollectRetiredProcessExclusionPaths();
+
+        Assert.Contains(retired, p => Path.GetFileName(p).Equals("optiSCAN.exe", StringComparison.OrdinalIgnoreCase));
+        Assert.Contains(retired, p => Path.GetFileName(p).Equals("optiSCAN.Service.exe", StringComparison.OrdinalIgnoreCase));
+        Assert.All(retired, p => Assert.True(Path.IsPathFullyQualified(p), p));
+    }
+
+    [Fact]
     public void IsWindowsDefenderPresent_matches_mpcmdrun_on_windows()
     {
         var mpcmd = Path.Combine(

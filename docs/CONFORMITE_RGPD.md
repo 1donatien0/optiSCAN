@@ -10,9 +10,11 @@ Note d'analyse des traitements de données d'optiSCAN, destinée à préparer un
 |---|---|---|
 | Historique / préférences / exclusions de l'interface | `%LOCALAPPDATA%\optiSCAN` du compte connecté | Jusqu'à suppression ou purge choisie à la désinstallation |
 | Quarantaine de l'interface | `%LOCALAPPDATA%\optiSCAN\Quarantine` du compte connecté, chiffrée AES-GCM avec clé DPAPI CurrentUser | Jusqu'à restauration, suppression ou purge choisie |
-| Journaux interactifs | `%LOCALAPPDATA%\optiSCAN\Logs` du compte connecté | Rotation AppLogger après 30 jours |
+| Copies de sécurité avant quarantaine (option, désactivable) | `%LOCALAPPDATA%\optiSCAN\SafetyBackups` du compte connecté, chiffrées DPAPI CurrentUser | **30 jours** et 256 Mo au total ; supprimées avec l'entrée de quarantaine |
+| Journaux interactifs | `%LOCALAPPDATA%\optiSCAN\Logs` du compte connecté | Rotation AppLogger après 30 jours ; `optiSCAN.log` limité à 10 Mo |
 | État et staging du service | `%ProgramData%\optiSCAN` | Supprimés par l'installeur à la désinstallation |
 | Quarantaine du service SYSTEM | `%ProgramData%\optiSCAN\Quarantine` (SYSTEM et Administrateurs uniquement), chiffrée AES-GCM avec clé DPAPI SYSTEM | Suppression automatique après **90 jours** ; consultation, restauration et suppression par un administrateur depuis l'onglet Quarantaine ; supprimée à la désinstallation |
+| Détections du service SYSTEM | `%ProgramData%\optiSCAN\detections.json` (SYSTEM et Administrateurs uniquement) : date, menace, moteur, nom et chemin du fichier, état de quarantaine | Les **200** dernières ; supprimé à la désinstallation. Chaque session n'en reçoit le chemin complet que pour les fichiers de son profil (administrateur élevé : tous) |
 | Journaux du service SYSTEM | `%LOCALAPPDATA%\optiSCAN` résolu sous SYSTEM (généralement `systemprofile`) | Rotation AppLogger ; supprimés à la désinstallation |
 
 - Les journaux ne sont **pas chiffrés**. `PathRedaction` masque les segments de profils Windows standard (`C:\Users\…`) dans les messages et exceptions ; les profils personnalisés et d'autres détails de diagnostic peuvent encore contenir des chemins.

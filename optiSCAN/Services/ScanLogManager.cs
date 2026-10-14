@@ -226,6 +226,7 @@ namespace optiSCAN.Services
                 // une ligne d'audit n'est plus perdue sur une simple collision.
                 lock (TextLogGate)
                 {
+                    RotateTextLogIfNeeded();
                     for (var attempt = 0; ; attempt++)
                     {
                         try
@@ -244,6 +245,28 @@ namespace optiSCAN.Services
             catch (Exception ex)
             {
                 AppLogger.Warn("ScanLogManager", "WriteToLog", ex);
+            }
+        }
+
+        /// <summary>Taille au-delà de laquelle optiSCAN.log est archivé en optiSCAN.log.1.</summary>
+        internal const long MaxTextLogBytes = 10L * 1024 * 1024;
+
+        /// <summary>
+        /// Le journal texte n'avait aucune limite : le service tourne des semaines et le temps réel
+        /// y écrit à chaque fichier ignoré. Une génération précédente est gardée.
+        /// </summary>
+        private void RotateTextLogIfNeeded()
+        {
+            try
+            {
+                var info = new FileInfo(_textLogPath);
+                if (!info.Exists || info.Length < MaxTextLogBytes)
+                    return;
+                File.Move(_textLogPath, _textLogPath + ".1", overwrite: true);
+            }
+            catch (Exception ex)
+            {
+                AppLogger.Debug("ScanLogManager", "Rotation du journal : " + ex.Message);
             }
         }
 

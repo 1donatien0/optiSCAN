@@ -60,8 +60,12 @@ public sealed class HardeningFollowUpTests
         server.ReleaseClientSlot(user);
         Assert.True(server.TryReserveClientSlot(user));
 
+        // Seul l'hôte lui-même est exempté : un compte lu sur un PID (réutilisable) ne l'est pas.
         for (var i = 0; i < 10; i++)
+            Assert.True(server.TryReserveClientSlot(NamedPipeClientAccess.SelfAccount));
+        for (var i = 0; i < ProtectionPipeServer.MaxConcurrentPerAccount; i++)
             Assert.True(server.TryReserveClientSlot(NamedPipeClientAccess.SystemAccount));
+        Assert.False(server.TryReserveClientSlot(NamedPipeClientAccess.SystemAccount));
     }
 
     [Theory]

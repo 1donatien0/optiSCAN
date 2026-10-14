@@ -63,19 +63,49 @@ namespace optiSCAN.Services
             if (_enabled)
                 return;
 
+            // Win32_ProcessStartTrace : événement émis par le noyau à chaque création, sans
+            // interrogation, donc aussi pour un processus qui ne vit qu'une fraction de seconde
+            // (audit V3). Réservé aux administrateurs : disponible dans l'hôte SYSTEM et une
+            // interface élevée. Sinon, repli sur __InstanceCreationEvent, qui interroge la liste
+            // des processus chaque seconde et ne voit pas les processus plus courts.
+            if (TryStartWatcher(TraceQuery, "événements de démarrage du noyau")
+                || TryStartWatcher(PollingQuery, "interrogation WMI chaque seconde ; processus courts non vus"))
+            {
+                _enabled = true;
+            }
+        }
+
+        internal const string TraceQuery = "SELECT * FROM Win32_ProcessStartTrace";
+
+        internal const string PollingQuery =
+            "SELECT * FROM __InstanceCreationEvent WITHIN 1 WHERE TargetInstance ISA 'Win32_Process'";
+
+        /// <summary>Vrai si l'abonnement sans interrogation (<see cref="TraceQuery"/>) est actif.</summary>
+        internal bool UsesStartTrace { get; private set; }
+
+        private bool TryStartWatcher(string wql, string description)
+        {
+            ManagementEventWatcher? watcher = null;
             try
             {
-                var query = new WqlEventQuery(
-                    "SELECT * FROM __InstanceCreationEvent WITHIN 1 WHERE TargetInstance ISA 'Win32_Process'");
-                _watcher = new ManagementEventWatcher(query);
-                _watcher.EventArrived += SurProcessDemarre;
-                _watcher.Start();
-                _enabled = true;
-                AppLogger.Info("ProcessStartMonitor", "Surveillance des processus activée");
+                watcher = new ManagementEventWatcher(new WqlEventQuery(wql));
+                watcher.EventArrived += SurProcessDemarre;
+                watcher.Start();
+                _watcher = watcher;
+                UsesStartTrace = string.Equals(wql, TraceQuery, StringComparison.Ordinal);
+                AppLogger.Info("ProcessStartMonitor", "Surveillance des processus activée (" + description + ")");
+                return true;
             }
             catch (Exception ex)
             {
-                AppLogger.Warn("ProcessStartMonitor", "Start", ex);
+                if (watcher != null)
+                {
+                    watcher.EventArrived -= SurProcessDemarre;
+                    try { watcher.Dispose(); }
+                    catch (Exception disposeEx) { AppLogger.Debug("ProcessStartMonitor", "Dispose : " + disposeEx.Message); }
+                }
+                AppLogger.Warn("ProcessStartMonitor", "Abonnement refusé (" + description + ")", ex);
+                return false;
             }
         }
 
@@ -111,15 +141,39 @@ namespace optiSCAN.Services
 
             try
             {
-                if (e.NewEvent?["TargetInstance"] is not ManagementBaseObject target)
+                var ev = e.NewEvent;
+                if (ev == null)
                     return;
 
-                var processName = target["Name"]?.ToString();
+                string? processName;
+                int pid;
+                string? commandLine;
+                string? image;
+                if (string.Equals(ev.ClassPath?.ClassName, "Win32_ProcessStartTrace", StringComparison.OrdinalIgnoreCase))
+                {
+                    // L'événement du noyau ne porte ni l'image complète ni la ligne de commande.
+                    processName = ev["ProcessName"]?.ToString();
+                    pid = Convert.ToInt32(ev["ProcessID"], System.Globalization.CultureInfo.InvariantCulture);
+                    (image, commandLine) = TryGetProcessDetails(pid);
+                    // Processus déjà terminé (ou protégé) : son image n'est plus lisible. Il est vu,
+                    // mais pas analysé ; la trace rend cette lacune visible.
+                    if (image == null && RiskyFileExtensions.IsScriptHostProcess(processName ?? string.Empty))
+                        AppLogger.Debug("ProcessStartMonitor", $"Hôte {processName} ({pid}) terminé avant lecture de sa ligne de commande : non analysé");
+                }
+                else
+                {
+                    if (ev["TargetInstance"] is not ManagementBaseObject target)
+                        return;
+                    processName = target["Name"]?.ToString();
+                    pid = Convert.ToInt32(target["ProcessId"], System.Globalization.CultureInfo.InvariantCulture);
+                    commandLine = target["CommandLine"]?.ToString();
+                    image = target["ExecutablePath"]?.ToString();
+                }
+
                 if (string.IsNullOrWhiteSpace(processName))
                     return;
 
-                var pid = Convert.ToInt32(target["ProcessId"]);
-                var paths = ResolvePathsToScan(processName, pid, target["CommandLine"]?.ToString());
+                var paths = ResolvePathsToScan(processName, image, commandLine);
                 foreach (var path in paths)
                     Track(HandlePathAsync(path, pid));
             }
@@ -129,26 +183,27 @@ namespace optiSCAN.Services
             }
         }
 
-        private IEnumerable<string> ResolvePathsToScan(string processName, int pid, string? commandLine)
+        private static IEnumerable<string> ResolvePathsToScan(string processName, string? image, string? commandLine)
         {
             var results = new List<string>();
 
-            var image = TryGetExecutablePath(pid);
             // L'image d'un processus lancé est un exécutable, quelle que soit son extension
             // (un PE renommé en .dat se lance par CreateProcess) : extension listée ou en-tête PE.
-            if (!string.IsNullOrWhiteSpace(image) && File.Exists(image) && RiskyFileExtensions.IsRiskyOrExecutable(image))
+            // Le filtre lexical refuse les chemins réseau avant accès. L'existence et l'en-tête
+            // sont vérifiés ensuite sur le flux ouvert sous le jeton du processus, jamais SYSTEM.
+            if (!string.IsNullOrWhiteSpace(image) && IsLocalCandidatePath(image))
                 results.Add(image);
 
             if (RiskyFileExtensions.IsScriptHostProcess(processName) && !string.IsNullOrWhiteSpace(commandLine))
             {
                 foreach (var candidate in ExtractCommandLineCandidates(commandLine))
                 {
-                    if (File.Exists(candidate) && RiskyFileExtensions.IsRiskyOrExecutable(candidate))
+                    if (IsLocalCandidatePath(candidate))
                         results.Add(candidate);
                 }
             }
 
-            return results.Distinct(StringComparer.OrdinalIgnoreCase);
+            return results.Distinct(StringComparer.OrdinalIgnoreCase).Take(MaxCandidatesPerProcess);
         }
 
         /// <summary>
@@ -176,25 +231,59 @@ namespace optiSCAN.Services
             return candidates.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
 
-        private static string? TryGetExecutablePath(int processId)
+        /// <summary>
+        /// Chemin absolu sur un lecteur local (<c>C:\…</c>) : jamais UNC (<c>\\hôte\…</c>,
+        /// <c>\\hôte@80\…</c> en WebDAV), chemin de périphérique (<c>\\?\</c>, <c>\\.\</c>) ni lecteur
+        /// réseau. Décidé sans accès disque ni réseau.
+        /// </summary>
+        internal static bool IsLocalCandidatePath(string? path)
+        {
+            if (string.IsNullOrWhiteSpace(path) || path.Length < 3)
+                return false;
+            if (!char.IsAsciiLetter(path[0]) || path[1] != ':' || (path[2] != '\\' && path[2] != '/'))
+                return false;
+            // Pas de second chemin glissé plus loin (« C:\x\..\\hôte » n'existe pas, mais « : » ou
+            // un préfixe de périphérique au milieu signale un jeton mal découpé).
+            if (path.IndexOf(':', 2) >= 0 || path.Contains(@"\\", StringComparison.Ordinal)
+                || path.Contains("//", StringComparison.Ordinal))
+                return false;
+            if (!OperatingSystem.IsWindows())
+                return true;
+            try
+            {
+                var type = new DriveInfo(path[..3]).DriveType;
+                return type is DriveType.Fixed or DriveType.Removable or DriveType.CDRom or DriveType.Ram;
+            }
+            catch (Exception ex) when (ex is ArgumentException or IOException or UnauthorizedAccessException)
+            {
+                return false;
+            }
+        }
+
+        /// <summary>Image et ligne de commande d'un processus encore vivant (une seule requête WMI).</summary>
+        private static (string? Image, string? CommandLine) TryGetProcessDetails(int processId)
         {
             try
             {
                 using var searcher = new ManagementObjectSearcher(
-                    $"SELECT ExecutablePath FROM Win32_Process WHERE ProcessId = {processId}");
+                    $"SELECT ExecutablePath, CommandLine FROM Win32_Process WHERE ProcessId = {processId}");
                 foreach (ManagementObject obj in searcher.Get())
-                    return obj["ExecutablePath"]?.ToString();
+                {
+                    using (obj)
+                        return (obj["ExecutablePath"]?.ToString(), obj["CommandLine"]?.ToString());
+                }
             }
             catch
             {
                 /* accès refusé ou processus terminé */
             }
 
-            return null;
+            return (null, null);
         }
 
         private static readonly TimeSpan DedupWindow = TimeSpan.FromSeconds(45);
         private const long MaxProcessImageScanBytes = 256L * 1024 * 1024;
+        private const int MaxCandidatesPerProcess = 32;
 
         /// <summary>Au-delà, les entrées expirées sont purgées (le service tourne des semaines).</summary>
         internal const int RecentScansPruneThreshold = 512;
@@ -278,6 +367,12 @@ namespace optiSCAN.Services
                         AppLogger.Info("ProcessStartMonitor", "Fichier trop volumineux pour le scan depuis le processus : " + PathRedaction.RedactPath(filePath));
                         return;
                     }
+
+                    // Extension ou en-tête PE : le flux est ouvert sous le jeton du processus
+                    // déclencheur, jamais sous SYSTEM, avant toute lecture de contenu.
+                    if (!RiskyFileExtensions.IsRiskyOrExecutable(filePath, source))
+                        return;
+                    source.Position = 0;
 
                     using var staged = ScanStaging.Stage(source, Path.GetFileName(filePath));
                     analyzedSha256 = staged.Sha256;
