@@ -13,7 +13,7 @@ namespace optiSCAN.Services;
 /// clamd.conf. Son accessibilité locale dépend des filtres AppContainer/loopback
 /// de Windows; les clients optiSCAN passent par le tube nommé avec ACL.
 /// </summary>
-internal static class ClamdIsolation
+internal static partial class ClamdIsolation
 {
     private const uint ExtendedStartupInfoPresent = 0x00080000;
     private const uint CreateNoWindow = 0x08000000;
@@ -21,6 +21,8 @@ internal static class ClamdIsolation
     private const int ProcThreadAttributeSecurityCapabilities = 0x00020009;
     private const int AlreadyExists = unchecked((int)0x800700B7);
     private const uint SeGroupEnabled = 0x00000004;
+    private const int ProcThreadAttributeHandleList = 0x00020002;
+    private const int StartfUseStdHandles = 0x00000100;
     private static readonly Dictionary<int, IntPtr> ProcessHandles = new();
 
     internal static Process? Start(
@@ -75,9 +77,44 @@ internal static class ClamdIsolation
         IntPtr containerSid,
         IReadOnlyList<IntPtr> capabilitySids)
     {
+        var line = "\"" + exe + "\"" + (string.IsNullOrWhiteSpace(arguments) ? string.Empty : " " + arguments);
+        try
+        {
+            var info = CreateContained(exe, line, workingDirectory, containerSid, capabilitySids, stdio: null, ownJob: IntPtr.Zero);
+            lock (ProcessHandles)
+                ProcessHandles[info.ProcessId] = info.Process;
+            return Process.GetProcessById(info.ProcessId);
+        }
+        catch (Exception ex)
+        {
+            AppLogger.Warn("ClamdIsolation", "Lancement isolé refusé", ex);
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Crée le processus dans le conteneur, suspendu, le rattache à la durée de vie de l'hôte
+    /// (et à <paramref name="ownJob"/> s'il est fourni), puis le reprend. Rend la poignée du
+    /// processus, ouverte ; celle du fil est fermée.
+    /// </summary>
+    /// <param name="stdio">
+    /// Sorties standard et d'erreur à transmettre. Seules ces deux poignées sont héritées
+    /// (<c>PROC_THREAD_ATTRIBUTE_HANDLE_LIST</c>) : le service tient des poignées héritables
+    /// (tubes, fichiers) qu'un analyseur compromis ne doit pas recevoir.
+    /// </param>
+    private static ProcessInformation CreateContained(
+        string exe,
+        string commandLine,
+        string workingDirectory,
+        IntPtr containerSid,
+        IReadOnlyList<IntPtr> capabilitySids,
+        (IntPtr Output, IntPtr Error)? stdio,
+        IntPtr ownJob)
+    {
         var capArray = IntPtr.Zero;
         var capStruct = IntPtr.Zero;
         var attributeList = IntPtr.Zero;
+        var handleList = IntPtr.Zero;
         try
         {
             if (capabilitySids.Count > 0)
@@ -100,7 +137,7 @@ internal static class ClamdIsolation
             capStruct = Marshal.AllocHGlobal(Marshal.SizeOf<SecurityCapabilities>());
             Marshal.StructureToPtr(caps, capStruct, false);
 
-            var attributeCount = 1;
+            var attributeCount = stdio.HasValue ? 2 : 1;
             var size = IntPtr.Zero;
             InitializeProcThreadAttributeList(IntPtr.Zero, attributeCount, 0, ref size);
             attributeList = Marshal.AllocHGlobal(size);
@@ -118,17 +155,37 @@ internal static class ClamdIsolation
                 throw new Win32Exception(Marshal.GetLastWin32Error());
 
             var startup = new StartupInfoEx { StartupInfo = { cb = Marshal.SizeOf<StartupInfoEx>() }, AttributeList = attributeList };
-            var line = "\"" + exe + "\"" + (string.IsNullOrWhiteSpace(arguments) ? string.Empty : " " + arguments);
+            if (stdio is { } handles)
+            {
+                handleList = Marshal.AllocHGlobal(IntPtr.Size * 2);
+                Marshal.WriteIntPtr(handleList, 0, handles.Output);
+                Marshal.WriteIntPtr(handleList, IntPtr.Size, handles.Error);
+                if (!UpdateProcThreadAttribute(
+                        attributeList,
+                        0,
+                        (IntPtr)ProcThreadAttributeHandleList,
+                        handleList,
+                        (IntPtr)(IntPtr.Size * 2),
+                        IntPtr.Zero,
+                        IntPtr.Zero))
+                    throw new Win32Exception(Marshal.GetLastWin32Error());
+
+                startup.StartupInfo.Flags = StartfUseStdHandles;
+                startup.StartupInfo.StdInput = IntPtr.Zero;
+                startup.StartupInfo.StdOutput = handles.Output;
+                startup.StartupInfo.StdError = handles.Error;
+            }
+
             // CreateProcessW peut écrire dans la ligne de commande : tampon modifiable, terminé par NUL.
-            var command = new char[line.Length + 1];
-            line.CopyTo(0, command, 0, line.Length);
+            var command = new char[commandLine.Length + 1];
+            commandLine.CopyTo(0, command, 0, commandLine.Length);
 
             if (!CreateProcess(
                     exe,
                     command,
                     IntPtr.Zero,
                     IntPtr.Zero,
-                    false,
+                    stdio.HasValue,
                     // Suspendu : rattaché à l'objet job avant d'exécuter la moindre instruction.
                     ExtendedStartupInfoPresent | CreateNoWindow | CreateSuspended,
                     IntPtr.Zero,
@@ -140,6 +197,13 @@ internal static class ClamdIsolation
             try
             {
                 AttachToHostLifetime(info.Process);
+                if (ownJob != IntPtr.Zero && !AssignProcessToJobObject(ownJob, info.Process))
+                {
+                    var error = Marshal.GetLastWin32Error();
+                    TerminateProcess(info.Process, 1);
+                    CloseHandle(info.Process);
+                    throw new Win32Exception(error);
+                }
                 if (ResumeThread(info.Thread) == uint.MaxValue)
                 {
                     var error = Marshal.GetLastWin32Error();
@@ -153,14 +217,7 @@ internal static class ClamdIsolation
                 CloseHandle(info.Thread);
             }
 
-            lock (ProcessHandles)
-                ProcessHandles[info.ProcessId] = info.Process;
-            return Process.GetProcessById(info.ProcessId);
-        }
-        catch (Exception ex)
-        {
-            AppLogger.Warn("ClamdIsolation", "Lancement isolé refusé", ex);
-            return null;
+            return info;
         }
         finally
         {
@@ -169,6 +226,8 @@ internal static class ClamdIsolation
                 DeleteProcThreadAttributeList(attributeList);
                 Marshal.FreeHGlobal(attributeList);
             }
+            if (handleList != IntPtr.Zero)
+                Marshal.FreeHGlobal(handleList);
             if (capStruct != IntPtr.Zero)
                 Marshal.FreeHGlobal(capStruct);
             if (capArray != IntPtr.Zero)
@@ -351,7 +410,7 @@ internal static class ClamdIsolation
         }
     }
 
-    private static bool TryGrant(string directory, bool readOnly)
+    internal static bool TryGrant(string directory, bool readOnly)
     {
         try
         {

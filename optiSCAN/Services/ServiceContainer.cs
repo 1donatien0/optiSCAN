@@ -272,7 +272,9 @@ namespace optiSCAN.Services
             // le temps réel du service à chaque démarrage dès que Defender était actif, contre la
             // politique de l'administrateur. L'hôte suit la politique et rien d'autre.
             ApplySignatureAutoUpdate(_userPreferences.Current.SignatureAutoUpdateEnabled);
-            SignatureUpdatePolicy.NotifyAndScheduleStartupRefresh(this, _userPreferences);
+            SignatureUpdatePolicy.NotifyAndScheduleStartupRefresh(
+                FreshclamUpdater, RulesUpdater, _userPreferences,
+                Notifications.ShowSignatureDownloadStarted, Notifications.ShowSignatureUpdateNeeded);
 
             if (_exclusionSettings.Current.RealTimeEnabled)
             {
@@ -335,7 +337,9 @@ namespace optiSCAN.Services
             DefenderCoexistenceService.EnsureFirstLaunchExclusionSettings(_exclusionSettings, _userPreferences);
 
             ApplySignatureAutoUpdate(_userPreferences.Current.SignatureAutoUpdateEnabled);
-            SignatureUpdatePolicy.NotifyAndScheduleStartupRefresh(this, _userPreferences);
+            SignatureUpdatePolicy.NotifyAndScheduleStartupRefresh(
+                FreshclamUpdater, RulesUpdater, _userPreferences,
+                Notifications.ShowSignatureDownloadStarted, Notifications.ShowSignatureUpdateNeeded);
 
             if (_userPreferences.Current.UsePlatformProtectionService)
             {
@@ -515,7 +519,9 @@ namespace optiSCAN.Services
             Logger.BindActivityLog(ActivityLog);
             Quarantine.BindActivityLog(ActivityLog);
             ActivityLog.EnsureMigrated(Quarantine);
-            Actions = new AntivirusActions(this);
+            Actions = new AntivirusActions(
+                Quarantine, FreshclamUpdater, RulesUpdater, FindKnownThreat,
+                ((IProtectionServiceHostDependencies)this).ExclusionSettingsAccessor);
 
             AppLogger.Info("ServiceContainer", "Services initialisés (DI)");
 

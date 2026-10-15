@@ -124,6 +124,8 @@ namespace optiSCAN.Services
         {
             if (!File.Exists(filePath))
                 throw new FileNotFoundException("Fichier introuvable.", filePath);
+            if (SandboxStaging.NeedsStaging(filePath))
+                return RunStagedAsync(ScanType.File, filePath, new[] { filePath }, progress, ct);
             return RunScanAsync(ScanType.File, filePath, recursive: false, progress, ct);
         }
 
@@ -138,6 +140,13 @@ namespace optiSCAN.Services
         {
             if (!Directory.Exists(folderPath))
                 throw new DirectoryNotFoundException($"Dossier introuvable : {folderPath}");
+            if (SandboxStaging.NeedsStaging(folderPath))
+            {
+                var files = AppInstallPaths.IsUnderInstallRoot(folderPath)
+                    ? SandboxStaging.EnumerateFolder(folderPath)
+                    : SandboxStaging.EnumerateFolder(folderPath).Where(f => !AppInstallPaths.IsUnderInstallRoot(f));
+                return RunStagedAsync(ScanType.Folder, folderPath, files, progress, ct);
+            }
             return RunScanAsync(ScanType.Folder, folderPath, recursive: true, progress, ct);
         }
 
@@ -165,7 +174,87 @@ namespace optiSCAN.Services
                 });
             }
 
+            if (files.Any(SandboxStaging.NeedsStaging))
+                return RunStagedAsync(ScanType.Folder, targetPath, files.Where(File.Exists), progress, ct);
             return RunFileListScanAsync(files, targetPath, progress, ct);
+        }
+
+        /// <summary>
+        /// Analyse confinée de fichiers que le conteneur ne peut pas lire : copie par lots,
+        /// analyse des copies par liste, menaces rapportées aux chemins d'origine.
+        /// </summary>
+        private async Task<ScanResult> RunStagedAsync(
+            ScanType type,
+            string targetPath,
+            IEnumerable<string> files,
+            IProgress<ScanProgress>? progress,
+            CancellationToken ct)
+        {
+            var total = new ScanResult
+            {
+                Type = type,
+                TargetPath = targetPath,
+                StartedAt = DateTime.Now,
+                Status = ScanStatus.Completed,
+            };
+
+            try
+            {
+                foreach (var chunk in SandboxStaging.Batches(files))
+                {
+                    ct.ThrowIfCancellationRequested();
+                    using var batch = SandboxStaging.Stage(chunk, ct);
+                    foreach (var missed in batch.Skipped.Concat(batch.TooLarge))
+                    {
+                        total.FilesSkipped++;
+                        total.HasCoverageGaps = true;
+                        total.UnscannedFiles.Add(missed);
+                    }
+
+                    var staged = batch.StagedPaths;
+                    if (staged.Count == 0)
+                        continue;
+
+                    // Un fichier seul garde le délai propre aux fichiers (archive piégée).
+                    var part = type == ScanType.File && staged.Count == 1
+                        ? await RunScanAsync(ScanType.File, staged[0], recursive: false, progress, ct).ConfigureAwait(false)
+                        : await RunFileListScanAsync(staged, targetPath, progress, ct).ConfigureAwait(false);
+                    total.FilesScanned += part.FilesScanned;
+                    total.TotalBytesScanned += part.TotalBytesScanned;
+                    foreach (var threat in part.Threats)
+                    {
+                        threat.FilePath = batch.OriginalOf(threat.FilePath);
+                        total.Threats.Add(threat);
+                    }
+                    foreach (var unscanned in part.UnscannedFiles)
+                        total.UnscannedFiles.Add(batch.OriginalOf(unscanned));
+                    total.FilesSkipped += part.FilesSkipped;
+                    total.HasCoverageGaps |= part.HasCoverageGaps;
+
+                    if (part.Status == ScanStatus.Cancelled)
+                    {
+                        total.Status = ScanStatus.Cancelled;
+                        break;
+                    }
+                    if (part.Status == ScanStatus.Error)
+                    {
+                        total.Status = ScanStatus.Error;
+                        total.ErrorMessage ??= part.ErrorMessage;
+                    }
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                total.Status = ScanStatus.Cancelled;
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidOperationException)
+            {
+                total.Status = ScanStatus.Error;
+                total.ErrorMessage = ex.Message;
+            }
+
+            total.FinishedAt = DateTime.Now;
+            return total;
         }
 
         /// <summary>Analyse rapide sur les dossiers système prioritaires (chemins définis dans <see cref="ScanTargets"/>).</summary>
@@ -193,7 +282,7 @@ namespace optiSCAN.Services
             CancellationToken ct) =>
             RunScanCoreAsync(ScanType.Folder, targetPath, progress, ct, args =>
             {
-                var listPath = Path.Combine(Path.GetTempPath(), "optiscan_clam_" + Guid.NewGuid().ToString("N") + ".lst");
+                var listPath = ScannerSandbox.NewWorkFile("optiscan_clam_", ".lst");
                 var existing = files.Where(File.Exists).ToList();
                 if (existing.Count == 0)
                     throw new InvalidOperationException("Aucun fichier accessible dans la liste de scan.");
@@ -237,27 +326,26 @@ namespace optiSCAN.Services
             });
 
             string? tempFileList = null;
+            ScannerProcess? proc = null;
             try
             {
-                var startInfo = BuildStartInfo(_clamscanExe);
-                tempFileList = configureArgs(startInfo.ArgumentList);
+                var args = new Collection<string>();
+                tempFileList = configureArgs(args);
 
-                using var proc = new Process { StartInfo = startInfo };
-
-                proc.OutputDataReceived += (_, e) =>
+                proc = ScannerProcess.Start(new ScannerLaunch(_clamscanExe, args)
                 {
-                    if (!string.IsNullOrWhiteSpace(e.Data))
-                        ParseScanLine(e.Data, result, progress);
-                };
-                proc.ErrorDataReceived += (_, e) =>
-                {
-                    if (!string.IsNullOrWhiteSpace(e.Data))
-                        AppLogger.Warn("ClamAV", $"stderr: {PathRedaction.RedactPath(e.Data)}");
-                };
-
-                proc.Start();
-                proc.BeginOutputReadLine();
-                proc.BeginErrorReadLine();
+                    OnOutput = line =>
+                    {
+                        if (!string.IsNullOrWhiteSpace(line))
+                            ParseScanLine(line, result, progress);
+                    },
+                    OnError = line =>
+                    {
+                        if (!string.IsNullOrWhiteSpace(line))
+                            AppLogger.Warn("ClamAV", $"stderr: {PathRedaction.RedactPath(line)}");
+                    },
+                    ReadableDirectories = ScanReadableDirectories(),
+                });
 
                 // Un fichier seul a un délai : un clamscan bloqué (archive piégée) est arrêté et le
                 // résultat marqué en erreur, au lieu d'attendre indéfiniment. Les scans de dossier
@@ -266,8 +354,6 @@ namespace optiSCAN.Services
                 if (type == ScanType.File)
                     deadline.CancelAfter(SingleFileScanTimeout);
                 await WaitForProcessAsync(proc, deadline.Token);
-
-                try { proc.WaitForExit(); } catch { /* déjà terminé */ }
 
                 result.FinishedAt = DateTime.Now;
                 var timedOut = deadline.IsCancellationRequested && !ct.IsCancellationRequested;
@@ -282,7 +368,7 @@ namespace optiSCAN.Services
                 }
 
                 if (ct.IsCancellationRequested && !proc.HasExited)
-                    proc.Kill(entireProcessTree: true);
+                    proc.Kill();
             }
             catch (OperationCanceledException)
             {
@@ -297,6 +383,7 @@ namespace optiSCAN.Services
             }
             finally
             {
+                proc?.Dispose();
                 if (!string.IsNullOrEmpty(tempFileList))
                 {
                     try { File.Delete(tempFileList); } catch { /* ignore */ }
@@ -362,6 +449,7 @@ namespace optiSCAN.Services
             }
 
             args.Add("--stdout");
+            AddSandboxTempDir(args);
             // NB: --no-summary supprimé. Le résumé "Scanned files: N" en fin
             // d'output est notre source de vérité pour le compteur final
             // (cf. ParseStats), à la place de l'incrément ligne par ligne.
@@ -376,6 +464,7 @@ namespace optiSCAN.Services
         private void BuildFileListScanArgs(Collection<string> args, string listPath)
         {
             args.Add("--stdout");
+            AddSandboxTempDir(args);
             var dbDir = DatabaseDir;
             if (!string.IsNullOrEmpty(dbDir))
                 args.Add($"--database={dbDir}");
@@ -383,74 +472,65 @@ namespace optiSCAN.Services
         }
 
         /// <summary>
-        /// Crée un ProcessStartInfo avec les bons drapeaux I/O. L'appelant doit
-        /// remplir <c>ArgumentList</c> via une surcharge dédiée (BuildScanArgs).
-        /// On ne définit jamais Arguments en chaîne — pour un échappement sûr.
+        /// Sous SYSTEM, clamscan est confiné : ses fichiers temporaires (archives décompressées)
+        /// vont dans le dossier de travail du conteneur, le seul où il peut écrire.
         /// </summary>
-        private static ProcessStartInfo BuildStartInfo(string exe) =>
-            new ProcessStartInfo
-            {
-                FileName = exe,
-                UseShellExecute = false,
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                CreateNoWindow = true,
-                StandardOutputEncoding = System.Text.Encoding.UTF8
-            };
-
-        /// <summary>Surcharge pour les commandes simples (--version) avec un seul argument.</summary>
-        private static ProcessStartInfo BuildStartInfo(string exe, string singleArg)
+        private static void AddSandboxTempDir(Collection<string> args)
         {
-            var psi = BuildStartInfo(exe);
-            psi.ArgumentList.Add(singleArg);
-            return psi;
+            if (ScannerSandbox.IsRequired)
+                args.Add($"--tempdir={ScannerSandbox.WorkDirectory}");
+        }
+
+        /// <summary>Dossiers que clamscan doit lire : signatures et, sous SYSTEM, copies d'analyse.</summary>
+        private IReadOnlyList<string> ScanReadableDirectories()
+        {
+            var directories = new List<string>();
+            var db = DatabaseDir;
+            if (!string.IsNullOrEmpty(db))
+                directories.Add(db);
+            directories.AddRange(ScannerSandbox.StagingDirectories());
+            return directories;
         }
 
         /// <summary>Délai maximal de clamscan sur un fichier seul.</summary>
         internal static readonly TimeSpan SingleFileScanTimeout = TimeSpan.FromMinutes(10);
 
-        private static async Task WaitForProcessAsync(Process proc, CancellationToken ct)
+        private static async Task WaitForProcessAsync(ScannerProcess proc, CancellationToken ct)
         {
-            var tcs = new TaskCompletionSource<bool>();
-            proc.EnableRaisingEvents = true;
-            proc.Exited += (_, _) => tcs.TrySetResult(true);
-
-            using (ct.Register(() =>
+            using (ct.Register(proc.Kill))
             {
-                try { if (!proc.HasExited) proc.Kill(entireProcessTree: true); }
-                catch (Exception ex)
+                try
                 {
-                    AppLogger.Warn("ClamAvEngine", "Annulation — arrêt clamscan", ex);
+                    await proc.WaitForExitAsync(ct).ConfigureAwait(false);
                 }
-                tcs.TrySetCanceled();
-            }))
-            {
-                try { await tcs.Task; }
-                catch (TaskCanceledException)
+                catch (OperationCanceledException)
                 {
-                    // Attendu lors de l'annulation
+                    // Attendu lors de l'annulation : la sortie déjà lue reste exploitable.
+                    proc.WaitForExit(TimeSpan.FromSeconds(5));
                 }
             }
         }
 
         private async Task<(string stdout, string stderr)> RunProcessAsync(string exe, string args)
         {
-            using var proc = new Process { StartInfo = BuildStartInfo(exe, args) };
-            proc.Start();
-            var stdoutTask = proc.StandardOutput.ReadToEndAsync();
-            var stderrTask = proc.StandardError.ReadToEndAsync();
+            var stdout = new System.Text.StringBuilder();
+            var stderr = new System.Text.StringBuilder();
+            using var proc = ScannerProcess.Start(new ScannerLaunch(exe, new[] { args })
+            {
+                OnOutput = line => { if (line != null) stdout.AppendLine(line); },
+                OnError = line => { if (line != null) stderr.AppendLine(line); },
+            });
             using var deadline = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             try
             {
-                await proc.WaitForExitAsync(deadline.Token);
+                await proc.WaitForExitAsync(deadline.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException)
             {
-                try { proc.Kill(entireProcessTree: true); }
-                catch (Exception ex) { AppLogger.Debug("ClamAvEngine", "Arrêt de " + Path.GetFileName(exe) + " : " + ex.Message); }
+                proc.Kill();
                 return (string.Empty, "délai dépassé");
             }
-            return (await stdoutTask, await stderrTask);
+            return (stdout.ToString(), stderr.ToString());
         }
 
         private void ValidateInstallation()

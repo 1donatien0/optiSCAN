@@ -93,9 +93,14 @@ namespace optiSCAN.Services
             int h = rect.Bottom - rect.Top;
             if (w < 100 || h < 100) return false;
 
-            var screen = System.Windows.Forms.Screen.FromHandle(hwnd);
-            var bounds = screen.Bounds;
-            return w >= bounds.Width - 8 && h >= bounds.Height - 8;
+            // Écran qui contient la fenêtre (le plus proche si elle déborde).
+            var monitor = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
+            var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
+            if (monitor == IntPtr.Zero || !GetMonitorInfo(monitor, ref info))
+                return false;
+            int screenW = info.rcMonitor.Right - info.rcMonitor.Left;
+            int screenH = info.rcMonitor.Bottom - info.rcMonitor.Top;
+            return w >= screenW - 8 && h >= screenH - 8;
         }
 
         private static bool IsKnownGameProcessRunning()
@@ -133,10 +138,28 @@ namespace optiSCAN.Services
         [DllImport("user32.dll")]
         private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 
+        private const uint MonitorDefaultToNearest = 2;
+
+        [DllImport("user32.dll")]
+        private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO info);
+
         [StructLayout(LayoutKind.Sequential)]
         private struct RECT
         {
             public int Left, Top, Right, Bottom;
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct MONITORINFO
+        {
+            public int cbSize;
+            public RECT rcMonitor;
+            public RECT rcWork;
+            public uint dwFlags;
         }
     }
 }

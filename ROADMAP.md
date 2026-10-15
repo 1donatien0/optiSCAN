@@ -1,12 +1,12 @@
 # Feuille de route produit — optiSCAN Antivirus
 
-**Mise à jour :** 13 octobre 2026
+**Mise à jour :** 15 octobre 2026
 
 **Horizon :** évolutions envisagées après la validation et la publication de la v3.1.
 
 **Périmètre :** le produit antivirus optiSCAN pour Windows.
 
-Cette feuille décrit des priorités et des critères de décision, sans calendrier ni promesse de livraison. Elle ne remplace pas le [plan de release v3.1](RELEASE_PLAN_v3.1.md) : la v3.1 est encore une candidate et doit franchir ses validations Windows et GitHub avant publication.
+Cette feuille décrit des priorités et des critères de décision, sans calendrier ni promesse de livraison. Elle ne remplace pas le [plan de release v3.1](RELEASE_PLAN_v3.1.md) : la v3.1 est encore une candidate (audit **7,4/10**, 7,9 hors distribution, 8,0 exigé pour publier). Les contrôles en machine jetable, la signature SignPath et le premier passage CodeQL C/C++ mènent à 7,9 ; le seuil de 8,0 demande ensuite une distribution à 8,0.
 
 ## Direction produit
 
@@ -59,14 +59,14 @@ Rendre les erreurs compréhensibles sans exposer davantage de données privées.
 
 ### 6. Suites de l'audit indépendant du 13 octobre 2026
 
-Corrigés dans la candidate : A3, A4, A5 (fermeture de `scan_path`), A6 (moteurs exigés en CI), A9, A10 et les points de la revue ligne à ligne ([audit, section 6](AUDIT_optiSCAN_360.md#6-relecture-des-corrections--défauts-trouvés-et-corrigés)). Restent à planifier :
+Corrigés dans la candidate : A1 (candidate sur `dev`), A3, A4, A5 (fermeture de `scan_path`), A6 (moteurs exigés en CI), A9, A10, L7 (purge pendant la migration de quarantaine) et les points de la revue ligne à ligne ([audit, section 6](AUDIT_optiSCAN_360.md#6-relecture-des-corrections--défauts-trouvés-et-corrigés)). La suite Release sous Windows du 15 octobre 2026 est verte (715/715). Restent à planifier :
 
-- **A1, A2** — commiter la candidate, produire l'installateur depuis la CI seulement, rendre la signature Authenticode obligatoire au job de publication (avant toute diffusion publique) ;
-- **A5 (suite)** — exécuter YARA et clamscan dans l'AppContainer de clamd, YARA 4.5.8 compilé en CI ;
-- **A7, A8** — moteur dans une bibliothèque sans WPF, hébergé directement par `optiSCAN.Service` ; appels natifs centralisés, fin du singleton `ServiceContainer` ;
+- **A2** — produire l'installateur depuis la CI seulement, rendre la signature Authenticode obligatoire au job de publication (avant toute diffusion publique) ;
+- **A5 (suite)** — YARA 4.5.8 compilé en CI (YARA, yarac et clamscan sont confinés depuis le 15 octobre au soir) ;
+- **A7, A8** — appels natifs centralisés, fin du singleton `ServiceContainer` de l'interface, `catch` filtrés (moteur et hôte SYSTEM sans WPF depuis le 15 octobre au soir) ;
 - **A12** — purger l'historique Git avant un passage du dépôt en public ;
 - **A14** — scinder le README (utilisateur, développeur, CHANGELOG) ; remplacer l'audit-journal par un registre des risques ouverts ;
-- **A13** — monter QuestPDF et xUnit sur un poste Windows, en comparant les PDF produits et en exécutant la suite.
+- **A13** — fait : xUnit v3 et Test SDK 18.11 ; QuestPDF remplacé par PDFsharp/MigraDoc 6.2.4 (MIT) lors du passage en GPL v3.
 
 A11 (retour arrière d'Optimiser, nom de la relance automatique) et A15 (santé du temps réel dans l'interface) sont corrigés dans la candidate.
 

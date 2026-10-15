@@ -21,11 +21,6 @@ public sealed class ProtectionServiceHost : IDisposable
     /// Appelé quand le service Windows demande l'arrêt par le pipe (jeton vérifié) : l'appelant
     /// arrête alors l'hôte proprement (<see cref="StopAsync"/>) puis quitte le processus.
     /// </param>
-    public ProtectionServiceHost(ServiceContainer container, Action? onShutdownRequested = null)
-        : this((IProtectionServiceHostDependencies)container, onShutdownRequested)
-    {
-    }
-
     public ProtectionServiceHost(IProtectionServiceHostDependencies container, Action? onShutdownRequested = null)
     {
         _container = container;

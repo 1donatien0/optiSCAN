@@ -18,16 +18,6 @@ namespace optiSCAN.Services
         private readonly Func<string, ThreatInfo?>? _threatLookup;
         private readonly IExclusionSettingsAccessor _exclusions;
 
-        public AntivirusActions(ServiceContainer container)
-            : this(
-                container.Quarantine,
-                container.FreshclamUpdater,
-                container.RulesUpdater,
-                container.FindKnownThreat,
-                ((IProtectionServiceHostDependencies)container).ExclusionSettingsAccessor)
-        {
-        }
-
         /// <summary>Constructeur de test (répertoire quarantaine isolé via <see cref="InternalsVisibleTo"/>).</summary>
         internal AntivirusActions(
             QuarantineManager quarantine,

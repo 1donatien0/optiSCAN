@@ -43,15 +43,16 @@ public sealed class ProtectionWindowsService : BackgroundService
     {
         RemoveLegacyEventSources();
 
-        var exe = Path.Combine(AppContext.BaseDirectory, "optiSCAN.exe");
+        // Hôte console sans WPF (3.1) : l'interface optiSCAN.exe ne tourne plus sous SYSTEM.
+        var exe = Path.Combine(AppContext.BaseDirectory, "optiSCAN.Host.exe");
         if (!File.Exists(exe))
         {
-            StopWithError("optiSCAN.exe introuvable dans " + AppContext.BaseDirectory);
+            StopWithError("optiSCAN.Host.exe introuvable dans " + AppContext.BaseDirectory);
             return;
         }
 
         // L'hôte tourne en SYSTEM : un dossier modifiable par un utilisateur lui donnerait
-        // une exécution SYSTEM en remplaçant optiSCAN.exe. Refus tant que le dossier n'est pas
+        // une exécution SYSTEM en remplaçant optiSCAN.Host.exe. Refus tant que le dossier n'est pas
         // réservé aux administrateurs (installation sous Program Files).
         if (!InstallLocationTrust.IsCurrentInstallTrusted(out var reason))
         {

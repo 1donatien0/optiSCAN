@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Hôte SYSTEM de la protection (lancé par optiSCAN.Service) et relais clamd. Exécutable
+       console sans WPF : le code qui tourne sous SYSTEM ne charge aucune bibliothèque
+       d'interface (audit R10). -->
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0-windows10.0.17763.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>optiSCAN.Host</AssemblyName>
+    <RootNamespace>optiSCAN.Host</RootNamespace>
+    <Product>optiSCAN</Product>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(_IsPublishing)' != 'true' And '$(OptiscanShipping)' != 'true'">
+    <DefineConstants>$(DefineConstants);OPTISCAN_TEST_HOOKS</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\optiSCAN.Engine\optiSCAN.Engine.csproj" />
+  </ItemGroup>
+
+</Project>

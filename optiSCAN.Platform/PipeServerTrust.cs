@@ -38,7 +38,9 @@ public static class PipeServerTrust
             return false;
 
         var name = Path.GetFileName(image);
-        if (!name.Equals("optiSCAN.exe", StringComparison.OrdinalIgnoreCase)
+        // Serveur du tube : l'hôte console (3.1) ou le service. L'interface optiSCAN.exe ne
+        // sert plus le tube depuis la session 0.
+        if (!name.Equals("optiSCAN.Host.exe", StringComparison.OrdinalIgnoreCase)
             && !name.Equals("optiSCAN.Service.exe", StringComparison.OrdinalIgnoreCase))
             return false;
 

@@ -23,7 +23,7 @@ namespace optiSCAN.Services
 
         private readonly ScanOrchestrator _orchestrator;
         private readonly QuarantineManager _quarantine;
-        private readonly NotificationService _notifications;
+        private readonly INotificationSink _notifications;
         private readonly ScanLogManager _logger;
         private readonly IUiEventBus _uiEvents;
         private readonly IUserPreferencesAccessor _prefs;
@@ -45,7 +45,7 @@ namespace optiSCAN.Services
         public RemovableDriveScanService(
             ScanOrchestrator orchestrator,
             QuarantineManager quarantine,
-            NotificationService notifications,
+            INotificationSink notifications,
             ScanLogManager logger,
             IUiEventBus uiEvents,
             IUserPreferencesAccessor? preferences = null,
