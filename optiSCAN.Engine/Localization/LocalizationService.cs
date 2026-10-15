@@ -101,9 +101,14 @@ namespace optiSCAN.Localization
                 });
             }
 
-            if (System.Windows.Application.Current != null)
-                System.Windows.Application.Current.Shutdown();
+            ShutdownRequested?.Invoke();
         }
+
+        /// <summary>
+        /// Arrêt de l'interface après relance (branché par l'application WPF) : le moteur ne
+        /// dépend d'aucune bibliothèque d'interface.
+        /// </summary>
+        public static Action? ShutdownRequested { get; set; }
 
         private static void WriteRegistryCulture(string normalized)
         {

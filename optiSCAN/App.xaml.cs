@@ -17,19 +17,6 @@ namespace optiSCAN
         private static Mutex? _instanceMutex;
         private const string MutexName = AppInstanceGate.MutexName;
 
-        private static bool IsServiceHostIdentity()
-        {
-            try
-            {
-                using var identity = WindowsIdentity.GetCurrent();
-                return identity.IsSystem;
-            }
-            catch
-            {
-                return false;
-            }
-        }
-
         /// <summary>
         /// Vrai dans les modes sans fenêtre (hôte SYSTEM, scans planifiés, actions élevées) :
         /// aucune boîte de dialogue d'erreur. Dans l'hôte, en session 0, personne ne peut la
@@ -51,6 +38,7 @@ namespace optiSCAN
         /// </summary>
         protected override async void OnStartup(StartupEventArgs e)
         {
+            LocalizationService.ShutdownRequested = () => Current?.Shutdown();
             var earlyMode = HeadlessScanArguments.ParseMode(e.Args);
             _noInteractiveUi = !Environment.UserInteractive
                 || earlyMode is not (HeadlessScanArguments.Mode.None
@@ -209,29 +197,8 @@ namespace optiSCAN
 
             if (headlessMode == HeadlessScanArguments.Mode.ServiceHost)
             {
-                if (!IsServiceHostIdentity())
-                {
-                    AppLogger.Warn("App", "Refus de --service-host : réservé au service Windows");
-                    Shutdown();
-                    return;
-                }
-
-                if (!optiSCAN.Platform.InstallLocationTrust.IsCurrentInstallTrusted(out var installReason))
-                {
-                    AppLogger.Warn("App", "Hôte de service refusé : dossier d'installation modifiable par un utilisateur (" + installReason + ")");
-                    Shutdown();
-                    return;
-                }
-
-                if (!ServiceHostLock.TryAcquire())
-                {
-                    AppLogger.Warn("App", "Hôte de service refusé : verrou occupé ou ProgramData non fiable");
-                    Shutdown();
-                    return;
-                }
-
-                ShutdownMode = ShutdownMode.OnExplicitShutdown;
-                await RunServiceHostAsync();
+                // Depuis 3.1, l'hôte SYSTEM est optiSCAN.Host.exe (sans WPF). L'interface refuse ce mode.
+                AppLogger.Warn("App", "--service-host refusé : l'hôte de protection est optiSCAN.Host.exe");
                 Shutdown();
                 return;
             }
@@ -468,33 +435,6 @@ namespace optiSCAN
                 // En mode headless, pas d'UI pour afficher l'erreur — log only.
                 try { new ScanLogManager().WriteToLog($"[Headless] FATAL: {ex}"); }
                 catch { /* dernier recours */ }
-            }
-        }
-
-        private static async Task RunServiceHostAsync()
-        {
-            try
-            {
-                // Arrêt demandé par le service (pipe, jeton vérifié), fin du processus ou Ctrl+C :
-                // dans tous les cas, l'hôte s'arrête proprement avant que le processus ne quitte.
-                var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                using var host = new ProtectionServiceHost(ServiceContainer.Default, () => tcs.TrySetResult());
-                host.Start();
-                new ScanLogManager().WriteToLog("[ServiceHost] Protection système active (IPC + RTP + processus)");
-
-                AppDomain.CurrentDomain.ProcessExit += (_, _) => tcs.TrySetResult();
-                Console.CancelKeyPress += (_, e) =>
-                {
-                    e.Cancel = true;
-                    tcs.TrySetResult();
-                };
-                await tcs.Task.ConfigureAwait(false);
-                await host.StopAsync().ConfigureAwait(false);
-            }
-            catch (Exception ex)
-            {
-                try { new ScanLogManager().WriteToLog($"[ServiceHost] FATAL: {ex}"); }
-                catch { /* ignore */ }
             }
         }
 

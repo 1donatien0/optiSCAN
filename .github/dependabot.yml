@@ -5,6 +5,11 @@ updates:
     schedule:
       interval: weekly
     open-pull-requests-limit: 5
+    ignore:
+      # PDFsharp/MigraDoc passent en AGPL + licence commerciale à partir de 6.3 :
+      # rester sur la dernière version MIT (licence libre sans double licence commerciale).
+      - dependency-name: "PDFsharp*"
+        versions: [">= 6.3.0"]
 
   - package-ecosystem: github-actions
     directory: /

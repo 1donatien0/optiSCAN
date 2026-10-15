@@ -50,8 +50,8 @@ public sealed class Review360Tests
         foreach (var relative in new[]
                  {
                      Path.Combine("optiSCAN", "ViewModels", "ScanViewModel.ScanRun.cs"),
-                     Path.Combine("optiSCAN", "Services", "RemovableDriveScanService.cs"),
-                     Path.Combine("optiSCAN", "Services", "ScanOrchestrator.cs"),
+                     Path.Combine("optiSCAN.Engine", "Services", "RemovableDriveScanService.cs"),
+                     Path.Combine("optiSCAN.Engine", "Services", "ScanOrchestrator.cs"),
                  })
         {
             var code = File.ReadAllText(Path.Combine(root, relative));

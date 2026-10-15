@@ -515,7 +515,7 @@ It will never be scanned or reported again. Only accept if you are sure it is sa
   <data name="Opt_AboutUpdates" xml:space="preserve"><value>Version information…</value></data>
   <data name="Opt_SourceForge" xml:space="preserve"><value>SourceForge page</value></data>
   <data name="Opt_PrivacyPolicy" xml:space="preserve"><value>Privacy policy</value></data>
-  <data name="Opt_License" xml:space="preserve"><value>License agreement (EULA)</value></data>
+  <data name="Opt_License" xml:space="preserve"><value>License (GNU GPL v3)</value></data>
   <data name="Opt_LegalHint" xml:space="preserve"><value>Legal documents shipped with optiSCAN.</value></data>
   <data name="Opt_OpenDocError" xml:space="preserve"><value>Could not open document: {0}</value></data>
   <data name="Opt_Exclusions" xml:space="preserve"><value>Exclusions</value></data>

@@ -217,7 +217,7 @@ public sealed class DeepReviewOctober7Tests : IDisposable
 
         foreach (var file in new[] { "ClamdClient.cs", "ClamdBroker.cs" })
         {
-            var text = File.ReadAllText(Path.Combine(root, "optiSCAN", "Services", file));
+            var text = File.ReadAllText(Path.Combine(root, "optiSCAN.Engine", "Services", file));
             var creations = System.Text.RegularExpressions.Regex.Matches(text, @"new NamedPipeClientStream\(\s*""\.""[^;]*;");
             Assert.All(creations, m => Assert.Contains("PipeServerAccount.ClientImpersonation", m.Value));
         }

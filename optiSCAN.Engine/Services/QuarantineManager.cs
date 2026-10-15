@@ -696,7 +696,10 @@ namespace optiSCAN.Services
         {
             // Une seule ouverture, sans partage d'écriture : la taille contrôlée est celle du
             // fichier lu (pas de remplacement ni de croissance entre le contrôle et l'allocation).
-            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
+            // Le partage en suppression est nécessaire : cette lecture tourne au démarrage, en
+            // arrière-plan, et une purge ou une suppression du même fichier doit pouvoir aboutir
+            // pendant qu'elle tient encore la poignée.
+            using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
             var length = fs.Length;
             if (length > MaxQuarantinePlaintextBytes + HeaderSize)
                 throw new InvalidDataException($"Fichier de quarantaine trop volumineux ({length} octets)");

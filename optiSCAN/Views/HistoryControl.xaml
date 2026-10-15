@@ -4,7 +4,7 @@
              xmlns:md="http://materialdesigninxaml.net/winfx/xaml/themes"
              xmlns:loc="clr-namespace:optiSCAN.Localization"
              xmlns:c="clr-namespace:optiSCAN.Converters"
-             xmlns:services="clr-namespace:optiSCAN.Services">
+             xmlns:services="clr-namespace:optiSCAN.Services;assembly=optiSCAN.Engine">
 
     <UserControl.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis"/>

@@ -22,7 +22,7 @@ namespace optiSCAN.Services
 
         private readonly ScanOrchestrator _orchestrator;
         private readonly QuarantineManager _quarantineManager;
-        private readonly NotificationService _notifications;
+        private readonly INotificationSink _notifications;
         private readonly ConcurrentDictionary<string, DateTime> _recentScans = new(StringComparer.OrdinalIgnoreCase);
         private readonly SemaphoreSlim _scanSemaphore = new(2, 2);
         private readonly Func<bool> _isSuspended;
@@ -41,7 +41,7 @@ namespace optiSCAN.Services
         public ProcessStartMonitor(
             ScanOrchestrator orchestrator,
             QuarantineManager quarantineManager,
-            NotificationService notifications,
+            INotificationSink notifications,
             Func<bool>? isSuspended = null,
             IUserPreferencesAccessor? preferences = null,
             IExclusionSettingsAccessor? exclusions = null,

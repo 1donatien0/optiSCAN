@@ -21,7 +21,7 @@ public sealed class ServiceDetectionWatcher : IDisposable
     internal const int MaxIndividualToasts = 3;
 
     private readonly IUserPreferencesAccessor _prefs;
-    private readonly NotificationService _notifications;
+    private readonly INotificationSink _notifications;
     private readonly ScanLogManager _logger;
     private readonly IUiEventBus? _uiEvents;
     private readonly Func<long, ProtectionPipeResponse> _query;
@@ -31,7 +31,7 @@ public sealed class ServiceDetectionWatcher : IDisposable
 
     public ServiceDetectionWatcher(
         IUserPreferencesAccessor preferences,
-        NotificationService notifications,
+        INotificationSink notifications,
         ScanLogManager logger,
         IUiEventBus? uiEvents,
         Func<long, ProtectionPipeResponse>? query = null)

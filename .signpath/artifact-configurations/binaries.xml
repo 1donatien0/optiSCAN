@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Configuration d'artefact SignPath « binaries » : l'archive envoyée par release.yml contient le
+     dossier de publication win-x64. Seuls les binaires construits depuis ce dépôt sont signés ;
+     les moteurs tiers (clamav\, yara\) et le runtime .NET restent tels que publiés en amont. -->
+<artifact-configuration xmlns="http://signpath.io/artifact-configuration/v1">
+  <zip-file>
+    <pe-file path="optiSCAN.exe" product-name="optiSCAN">
+      <authenticode-sign />
+    </pe-file>
+    <pe-file path="optiSCAN.dll" product-name="optiSCAN">
+      <authenticode-sign />
+    </pe-file>
+    <pe-file path="optiSCAN.Service.exe" product-name="optiSCAN Protection Service">
+      <authenticode-sign />
+    </pe-file>
+    <pe-file path="optiSCAN.Service.dll" product-name="optiSCAN Protection Service">
+      <authenticode-sign />
+    </pe-file>
+    <pe-file path="optiSCAN.Platform.dll" product-name="optiSCAN">
+      <authenticode-sign />
+    </pe-file>
+    <pe-file path="optiSCAN.Engine.dll" product-name="optiSCAN">
+      <authenticode-sign />
+    </pe-file>
+    <pe-file path="optiSCAN.Host.exe" product-name="optiSCAN">
+      <authenticode-sign />
+    </pe-file>
+    <pe-file path="optiSCAN.Host.dll" product-name="optiSCAN">
+      <authenticode-sign />
+    </pe-file>
+  </zip-file>
+</artifact-configuration>

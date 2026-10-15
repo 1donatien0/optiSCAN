@@ -8,7 +8,7 @@ namespace optiSCAN.Services
     /// Notifications toast Windows natives.
     /// Les actions (quarantaine, ignorer, navigation…) sont traitées via <see cref="ToastActivated"/>.
     /// </summary>
-    public class NotificationService
+    public class NotificationService : INotificationSink
     {
         private static NotificationService? _activationTarget;
 

@@ -25,8 +25,9 @@
 |----------|------|
 | [../README.md](../README.md) | Guide unique (architecture, modules, release, langues, sécurité) |
 | [../SECURITY.md](../SECURITY.md) | Politique de sécurité, signalement, composants v3.1 candidate |
-| [../LICENSE.txt](../LICENSE.txt) | CLUF v3.1 |
-| [../AUDIT_optiSCAN_360.md](../AUDIT_optiSCAN_360.md) | Audit 360, révision du 13 octobre 2026 : note, décision de release, registre des risques ouverts |
+| [../LICENSE.txt](../LICENSE.txt) | Licence GNU GPL v3 |
+| [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md) | Politique de signature du code (SignPath) |
+| [../AUDIT_optiSCAN_360.md](../AUDIT_optiSCAN_360.md) | Audit 360, révision du 15 octobre 2026 au soir (7,4/10 ; 7,9 hors distribution ; 8,0 exigé pour publier) : note, décision de release, registre des risques ouverts |
 | [archive/AUDIT_optiSCAN_360_journal_2026-10.md](archive/AUDIT_optiSCAN_360_journal_2026-10.md) | Journal des audits du 2 au 13 octobre 2026 (séries N à D, traitement détaillé) |
 | [../installer/redist/LISEZMOI.md](../installer/redist/LISEZMOI.md) | Modes runtime .NET et limite actuelle du dossier redist |
 

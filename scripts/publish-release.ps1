@@ -85,7 +85,11 @@ if (-not (Test-Path $exe)) { throw "optiSCAN.exe introuvable après publish : $e
 $svcProj = Join-Path $repo 'optiSCAN.Service\optiSCAN.Service.csproj'
 dotnet publish $svcProj -p:OptiscanShipping=true -c $Configuration -r $Runtime --self-contained true -p:PublishSingleFile=false -o $publishDir
 if ($LASTEXITCODE -ne 0) { throw "dotnet publish du service a échoué (code $LASTEXITCODE)." }
-foreach ($f in 'optiSCAN.Service.exe', 'optiSCAN.Service.dll') {
+# Hôte SYSTEM sans WPF, lancé par le service.
+$hostProj = Join-Path $repo 'optiSCAN.Host\optiSCAN.Host.csproj'
+dotnet publish $hostProj -p:OptiscanShipping=true -c $Configuration -r $Runtime --self-contained true -p:PublishSingleFile=false -o $publishDir
+if ($LASTEXITCODE -ne 0) { throw "dotnet publish de l'hôte a échoué (code $LASTEXITCODE)." }
+foreach ($f in 'optiSCAN.Service.exe', 'optiSCAN.Service.dll', 'optiSCAN.Host.exe', 'optiSCAN.Host.dll', 'optiSCAN.Engine.dll') {
     if (-not (Test-Path (Join-Path $publishDir $f))) { throw "$f introuvable après publish : $publishDir" }
 }
 Write-Host "Publié : $exe" -ForegroundColor Green
@@ -95,7 +99,8 @@ if ($CertSubject) {
     Write-Step 'Signature Authenticode des binaires optiSCAN'
     $st = if ($SignToolPath) { $SignToolPath } else { 'signtool.exe' }
     # Mêmes fichiers que la CI : le service tourne en SYSTEM, il doit être signé comme l'interface.
-    $toSign = 'optiSCAN.exe', 'optiSCAN.dll', 'optiSCAN.Service.exe', 'optiSCAN.Service.dll', 'optiSCAN.Platform.dll' |
+    $toSign = 'optiSCAN.exe', 'optiSCAN.dll', 'optiSCAN.Service.exe', 'optiSCAN.Service.dll', 'optiSCAN.Platform.dll',
+        'optiSCAN.Engine.dll', 'optiSCAN.Host.exe', 'optiSCAN.Host.dll' |
         ForEach-Object { Join-Path $publishDir $_ }
     & $st sign /n $CertSubject /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 @toSign
     if ($LASTEXITCODE -ne 0) { throw "signtool a échoué (code $LASTEXITCODE)." }

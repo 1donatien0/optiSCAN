@@ -58,24 +58,29 @@ namespace optiSCAN.Services
         /// Informe l'utilisateur (toast, non bloquant) puis lance le téléchargement
         /// silencieux si la MAJ auto est activée.
         /// </summary>
+        /// <param name="onDownloadStarted">Toast « téléchargement lancé » (interface).</param>
+        /// <param name="onUpdateNeeded">Toast « mise à jour nécessaire » (interface).</param>
         public static void NotifyAndScheduleStartupRefresh(
-            ServiceContainer container,
-            IUserPreferencesAccessor preferences)
+            FreshclamUpdater freshclam,
+            YaraForgeUpdater rules,
+            IUserPreferencesAccessor preferences,
+            Action? onDownloadStarted = null,
+            Action? onUpdateNeeded = null)
         {
             var need = EvaluateStartupNeed(
-                container.FreshclamUpdater.GetLastSignatureUpdateTime(),
-                container.RulesUpdater.HasLocalRulesFiles(),
+                freshclam.GetLastSignatureUpdateTime(),
+                rules.HasLocalRulesFiles(),
                 preferences.Current.SignatureStaleThresholdDays);
 
             if (need.Needed)
             {
                 if (preferences.Current.SignatureAutoUpdateEnabled)
-                    container.Notifications.ShowSignatureDownloadStarted();
+                    onDownloadStarted?.Invoke();
                 else
-                    container.Notifications.ShowSignatureUpdateNeeded();
+                    onUpdateNeeded?.Invoke();
             }
 
-            ScheduleStartupRefreshIfStale(container, preferences);
+            ScheduleStartupRefreshIfStale(freshclam, rules, preferences);
         }
 
         public static void ApplyAutoUpdateTimers(
@@ -96,7 +101,7 @@ namespace optiSCAN.Services
             rules.EnableAutoUpdate(aggressive ? AggressiveYaraInterval : StandardYaraInterval);
         }
 
-        public static void ScheduleStartupRefreshIfStale(ServiceContainer container, IUserPreferencesAccessor preferences)
+        public static void ScheduleStartupRefreshIfStale(FreshclamUpdater freshclam, YaraForgeUpdater rulesUpdater, IUserPreferencesAccessor preferences)
         {
             if (!preferences.Current.SignatureAutoUpdateEnabled)
                 return;
@@ -105,8 +110,8 @@ namespace optiSCAN.Services
             {
                 try
                 {
-                    var fresh = container.FreshclamUpdater;
-                    var rules = container.RulesUpdater;
+                    var fresh = freshclam;
+                    var rules = rulesUpdater;
                     var need = EvaluateStartupNeed(
                         fresh.GetLastSignatureUpdateTime(),
                         rules.HasLocalRulesFiles(),

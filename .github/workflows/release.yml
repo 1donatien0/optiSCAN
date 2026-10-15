@@ -1,0 +1,157 @@
+name: Release — Build, sign (SignPath) & draft
+
+# Release signée : déclenchée par un tag vX.Y.Z poussé sur main.
+# 1. Compilation et tests sous Windows, moteurs vérifiés (GPG Talos + SHA-256).
+# 2. Publication win-x64 autonome, envoyée à SignPath (configuration « binaries »).
+# 3. Installeur Inno compilé avec les binaires signés, puis signé (configuration « installer »).
+# 4. Brouillon de release GitHub avec l'installeur signé, les empreintes et le SBOM.
+# Chaque demande de signature attend l'approbation manuelle d'un approbateur SignPath
+# (docs/CODE_SIGNING_POLICY.md).
+#
+# Réglages du dépôt (Settings > Secrets and variables > Actions) :
+#   secret   SIGNPATH_API_TOKEN          jeton d'un utilisateur CI SignPath (soumetteur)
+#   variable SIGNPATH_ORGANIZATION_ID    identifiant de l'organisation SignPath
+#   variable SIGNPATH_PROJECT_SLUG       ex. optiSCAN
+#   variable SIGNPATH_SIGNING_POLICY     release-signing (test-signing pour un essai)
+
+on:
+  push:
+    tags: [ 'v*.*.*' ]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build, sign & draft (windows-latest)
+    runs-on: windows-latest
+    permissions:
+      contents: write   # brouillon de release
+      actions: read     # lecture des artefacts par SignPath
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@a98b56852c35b8e3190ac28c8c2271da59106c68 # v6
+        with:
+          global-json-file: global.json
+
+      - name: Version from Directory.Build.props matches the tag
+        id: version
+        shell: pwsh
+        run: |
+          [xml]$props = Get-Content Directory.Build.props
+          $version = ($props.Project.PropertyGroup.Version | Select-Object -First 1).'#text'
+          if ([string]::IsNullOrWhiteSpace($version)) { throw 'Version absente de Directory.Build.props.' }
+          if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") {
+            throw "Le tag $env:GITHUB_REF_NAME ne correspond pas à la version $version."
+          }
+          "version=$version" >> $env:GITHUB_OUTPUT
+
+      - name: Fetch ClamAV and YARA engines (signature required)
+        shell: pwsh
+        run: pwsh -File scripts/fetch-runtime-deps.ps1 -RequireSignature
+
+      - name: Build and test (Release)
+        env:
+          OPTISCAN_REQUIRE_ENGINES: '1'
+        run: |
+          dotnet build optiSCAN.sln --configuration Release
+          dotnet test optiSCAN.Tests/optiSCAN.Tests.csproj --configuration Release --no-build
+
+      - name: Publish win-x64 (self-contained)
+        shell: pwsh
+        run: |
+          pwsh -File scripts/publish-release.ps1 -SelfContained -SkipInstaller
+          pwsh -File scripts/verify-runtime-deps.ps1 -AllowMissingSignatures
+
+      - name: Upload unsigned binaries
+        id: unsigned
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: optiSCAN-unsigned-${{ steps.version.outputs.version }}
+          path: optiSCAN/bin/Release/net10.0-windows10.0.17763.0/publish/win-x64/
+          retention-days: 3
+
+      - name: Sign binaries (SignPath)
+        uses: signpath/github-action-submit-signing-request@c92b958760219087e01f8d67a1669ed57afe2627 # v2.3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY }}
+          artifact-configuration-slug: binaries
+          github-artifact-id: ${{ steps.unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 86400
+          output-artifact-directory: optiSCAN/bin/Release/net10.0-windows10.0.17763.0/publish/win-x64
+
+      - name: Verify binary signatures
+        shell: pwsh
+        run: |
+          $dir = 'optiSCAN/bin/Release/net10.0-windows10.0.17763.0/publish/win-x64'
+          foreach ($f in 'optiSCAN.exe','optiSCAN.dll','optiSCAN.Service.exe','optiSCAN.Service.dll','optiSCAN.Platform.dll','optiSCAN.Engine.dll','optiSCAN.Host.exe','optiSCAN.Host.dll') {
+            $sig = Get-AuthenticodeSignature (Join-Path $dir $f)
+            if ($sig.Status -ne 'Valid') { throw "$f : signature $($sig.Status)" }
+            Write-Host "$f : $($sig.SignerCertificate.Subject)"
+          }
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --no-progress -y
+
+      - name: Build installer from signed binaries
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          & $iscc installer\setup.iss "/DAppVersion=${{ steps.version.outputs.version }}"
+          if ($LASTEXITCODE -ne 0) { throw "ISCC a échoué ($LASTEXITCODE)." }
+
+      - name: Upload unsigned installer
+        id: unsigned_installer
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: optiSCAN-installer-unsigned-${{ steps.version.outputs.version }}
+          path: installer/output/optiSCAN_Setup_v${{ steps.version.outputs.version }}.exe
+          retention-days: 3
+
+      - name: Sign installer (SignPath)
+        uses: signpath/github-action-submit-signing-request@c92b958760219087e01f8d67a1669ed57afe2627 # v2.3
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: ${{ vars.SIGNPATH_PROJECT_SLUG }}
+          signing-policy-slug: ${{ vars.SIGNPATH_SIGNING_POLICY }}
+          artifact-configuration-slug: installer
+          github-artifact-id: ${{ steps.unsigned_installer.outputs.artifact-id }}
+          wait-for-completion: true
+          wait-for-completion-timeout-in-seconds: 86400
+          output-artifact-directory: release
+
+      - name: Verify installer signature, hashes and SBOM
+        shell: pwsh
+        run: |
+          $setup = Get-ChildItem release -Filter 'optiSCAN_Setup_v*.exe' | Select-Object -First 1
+          if (-not $setup) { throw 'Installeur signé introuvable.' }
+          $sig = Get-AuthenticodeSignature $setup.FullName
+          if ($sig.Status -ne 'Valid') { throw "Installeur : signature $($sig.Status)" }
+          (Get-FileHash $setup.FullName -Algorithm SHA256).Hash + '  ' + $setup.Name |
+            Set-Content -Encoding ascii (Join-Path release 'SHA256SUMS.txt')
+          pwsh -File scripts/generate-sbom.ps1 -OutputDir sbom
+          Copy-Item sbom/*.json -Destination release
+
+      - name: Draft GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: pwsh
+        run: |
+          gh release create $env:GITHUB_REF_NAME release/* --draft --verify-tag `
+            --title "optiSCAN ${{ steps.version.outputs.version }}" `
+            --notes "Installeur signé (SignPath Foundation). Empreintes : SHA256SUMS.txt."

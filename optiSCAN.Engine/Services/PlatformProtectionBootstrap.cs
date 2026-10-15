@@ -209,7 +209,7 @@ public static class PlatformProtectionBootstrap
     {
         try
         {
-            var exe = Path.Combine(AppContext.BaseDirectory, "optiSCAN.exe");
+            var exe = Path.Combine(AppContext.BaseDirectory, "optiSCAN.Host.exe");
             if (!File.Exists(exe))
                 return;
 

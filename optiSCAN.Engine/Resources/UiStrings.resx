@@ -515,7 +515,7 @@ Il ne sera plus jamais analysé ni signalé. N'acceptez que si vous êtes certai
   <data name="Opt_AboutUpdates" xml:space="preserve"><value>Informations de version…</value></data>
   <data name="Opt_SourceForge" xml:space="preserve"><value>Page SourceForge</value></data>
   <data name="Opt_PrivacyPolicy" xml:space="preserve"><value>Politique de confidentialité</value></data>
-  <data name="Opt_License" xml:space="preserve"><value>Contrat de licence (EULA)</value></data>
+  <data name="Opt_License" xml:space="preserve"><value>Licence (GNU GPL v3)</value></data>
   <data name="Opt_LegalHint" xml:space="preserve"><value>Documents légaux fournis avec optiSCAN.</value></data>
   <data name="Opt_OpenDocError" xml:space="preserve"><value>Impossible d'ouvrir le document : {0}</value></data>
   <data name="Opt_Exclusions" xml:space="preserve"><value>Exclusions</value></data>

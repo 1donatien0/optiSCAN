@@ -11,7 +11,7 @@ namespace optiSCAN.Services
     {
         private readonly ScanOrchestrator _orchestrator;
         private readonly QuarantineManager _quarantineManager;
-        private readonly NotificationService _notifications;
+        private readonly INotificationSink _notifications;
         private readonly ConcurrentDictionary<string, DateTime> _recentlyScanned;
         private readonly Dictionary<string, WatcherRecoveryState> _watcherRecoveryStates = new(StringComparer.OrdinalIgnoreCase);
         private readonly List<FileSystemWatcher> _watchers;
@@ -137,7 +137,7 @@ namespace optiSCAN.Services
         public RealTimeProtection(
             ScanOrchestrator orchestrator,
             QuarantineManager quarantineManager,
-            NotificationService notifications,
+            INotificationSink notifications,
             IUserPreferencesAccessor? preferences = null,
             IExclusionSettingsAccessor? exclusions = null,
             ScanLogManager? logger = null,
@@ -150,7 +150,7 @@ namespace optiSCAN.Services
         internal RealTimeProtection(
             ScanOrchestrator orchestrator,
             QuarantineManager quarantineManager,
-            NotificationService notifications,
+            INotificationSink notifications,
             int watcherRecoveryCooldownMilliseconds)
             : this(orchestrator, quarantineManager, notifications, null, null, null, null, watcherRecoveryCooldownMilliseconds)
         {
@@ -159,7 +159,7 @@ namespace optiSCAN.Services
         private RealTimeProtection(
             ScanOrchestrator orchestrator,
             QuarantineManager quarantineManager,
-            NotificationService notifications,
+            INotificationSink notifications,
             IUserPreferencesAccessor? preferences,
             IExclusionSettingsAccessor? exclusions,
             ScanLogManager? logger,
