@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Reflection;
 using optiSCAN.Services;
 
@@ -56,5 +57,30 @@ public sealed class EngineArchitectureTests
         sink.ShowRealTimeDegraded(1);
         sink.ShowRemovableDriveScanStarted("USB");
         sink.ShowRemovableDriveScanCompleted("USB", 0, 3);
+    }
+
+    [Fact]
+    public void Engine_declares_platform_calls_only_in_its_native_modules()
+    {
+        var allowed = new HashSet<string>(StringComparer.Ordinal)
+        {
+            "NativeMethods", "ClamdIsolation", "SafePathDelete", "RealTimePathGuard", "NamedPipeClientAccess",
+            "PipeServerAccount", "ProtectionPipeAcl", "MinifilterUserBridge", "ClamdPipeAcl",
+        };
+        var declaring = typeof(ScanOrchestrator).Assembly.GetTypes()
+            .SelectMany(t => t.GetMethods(BindingFlags.Static | BindingFlags.Public | BindingFlags.NonPublic | BindingFlags.DeclaredOnly))
+            .Where(m => (m.Attributes & MethodAttributes.PinvokeImpl) != 0)
+            .Select(m => OuterName(m.DeclaringType!))
+            .Distinct()
+            .ToList();
+        Assert.NotEmpty(declaring);
+        Assert.All(declaring, name => Assert.Contains(name, allowed));
+    }
+
+    private static string OuterName(Type type)
+    {
+        while (type.DeclaringType != null)
+            type = type.DeclaringType;
+        return type.Name;
     }
 }

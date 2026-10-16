@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Localization;
 using System.Diagnostics;
 using System.IO;
@@ -94,7 +95,7 @@ namespace optiSCAN.Services
                     if (File.Exists(candidate))
                         return _wingetPath = candidate;
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Warn("WingetUpdateService", $"Entrée PATH ignorée : {dir}", ex);
                 }
@@ -117,7 +118,7 @@ namespace optiSCAN.Services
                         return _wingetPath = candidate;
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("WingetUpdateService", "Énumération WindowsApps impossible", ex);
             }
@@ -205,7 +206,7 @@ namespace optiSCAN.Services
                 if (!process.HasExited)
                     process.Kill(entireProcessTree: true);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Debug("WingetUpdateService", "Arrêt winget : " + ex.Message);
             }

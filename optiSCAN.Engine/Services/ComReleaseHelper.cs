@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Runtime.InteropServices;
 
 namespace optiSCAN.Services
@@ -15,7 +16,7 @@ namespace optiSCAN.Services
                 if (Marshal.IsComObject(comObject))
                     Marshal.ReleaseComObject(comObject);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ComReleaseHelper", "ReleaseComObject", ex);
             }

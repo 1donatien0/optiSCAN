@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO;
 using System.Security.Principal;
 
@@ -49,7 +50,7 @@ namespace optiSCAN.Services
                 using var identity = WindowsIdentity.GetCurrent();
                 return identity.IsSystem;
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return false;
             }
@@ -76,7 +77,7 @@ namespace optiSCAN.Services
                     if ((File.GetAttributes(userDir) & FileAttributes.ReparsePoint) != 0)
                         continue;
                 }
-                catch
+                catch (Exception ignored) when (!ignored.IsFatal())
                 {
                     continue;
                 }
@@ -107,7 +108,7 @@ namespace optiSCAN.Services
                 if (Directory.Exists(path) && RealTimePathGuard.IsDirectPath(path))
                     folders.Add(Path.GetFullPath(path));
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 /* chemin invalide */
             }

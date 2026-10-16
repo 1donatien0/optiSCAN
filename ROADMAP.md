@@ -6,7 +6,7 @@
 
 **Périmètre :** le produit antivirus optiSCAN pour Windows.
 
-Cette feuille décrit des priorités et des critères de décision, sans calendrier ni promesse de livraison. Elle ne remplace pas le [plan de release v3.1](RELEASE_PLAN_v3.1.md) : la v3.1 est encore une candidate (audit **7,4/10**, 7,9 hors distribution, 8,0 exigé pour publier). Les contrôles en machine jetable, la signature SignPath et le premier passage CodeQL C/C++ mènent à 7,9 ; le seuil de 8,0 demande ensuite une distribution à 8,0.
+Cette feuille décrit des priorités et des critères de décision, sans calendrier ni promesse de livraison. Elle ne remplace pas le [plan de release v3.1](RELEASE_PLAN_v3.1.md) : la v3.1 est encore une candidate (audit **7,6/10**, 8,0 exigé pour publier). Les contrôles en machine jetable, la signature SignPath et le premier passage CodeQL C/C++ restent à franchir avant publication.
 
 ## Direction produit
 
@@ -16,7 +16,7 @@ Faire d’optiSCAN un antivirus Windows dont les résultats sont compréhensible
 
 optiSCAN réunit une application WPF, un service Windows, les analyses à la demande et planifiées, la surveillance de fichiers après écriture, ClamAV et YARA, l’historique et une quarantaine chiffrée. Le code et les audits décrivent également des limites qui doivent guider la suite :
 
-- AMSI et le minifiltre Windows sont des prototypes et ne sont pas livrés. La surveillance actuelle ne doit donc pas être présentée comme une interception préventive avant écriture ou exécution.
+- AMSI est livré en 3.1 (scripts et contenus dynamiques analysés avant exécution, en fail-open). Le minifiltre n'est pas livré : la surveillance des fichiers reste postérieure à l'écriture et ne doit pas être présentée comme une interception préventive.
 - Un scan peut se terminer avec des erreurs ou une couverture incomplète ; ces états doivent rester distincts d’un résultat sain.
 - La release v3.1 et ses validations Windows restent régies par le [plan de release](RELEASE_PLAN_v3.1.md). L’[audit 360](AUDIT_optiSCAN_360.md) documente la base technique et ses [réserves](AUDIT_optiSCAN_360.md#5-registre-des-risques-ouverts).
 
@@ -43,7 +43,7 @@ Tester la création et la reprise des watchers, les débordements d’événemen
 
 **Critères de sortie :** une perte de surveillance ou un rattrapage incomplet est signalé et inscrit dans l’historique ; les scénarios Windows d’installation, de mise à niveau, de restauration et de purge de quarantaine passent sur une machine de test.
 
-Toute évolution vers AMSI ou un minifiltre est une décision distincte. Elle demande une architecture, une revue de sécurité et une validation de signature propres. Les coûts de certificats Authenticode/EV et de signature WHQL sont reportés par décision du projet ; aucun pilote ni calendrier de signature n’est promis dans cette feuille.
+Le minifiltre est une décision distincte : pilote noyau, revue de sécurité, compte Microsoft Partner Center, certificat EV et signature d'attestation (voir `native/optiSCAN.Minifilter/README.md`). Aucun calendrier de pilote n'est promis dans cette feuille.
 
 ### 4. Pérenniser les moteurs et la chaîne de publication
 

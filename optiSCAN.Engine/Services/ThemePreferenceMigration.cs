@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 namespace optiSCAN.Services;
 
 /// <summary>Migration des préférences thème (logique UI-agnostique).</summary>

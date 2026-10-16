@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -39,7 +40,7 @@ namespace optiSCAN.Services
                 // jusqu'au lendemain, indéfiniment pour un portable fermé chaque nuit.
                 string? user = null;
                 try { user = System.Security.Principal.WindowsIdentity.GetCurrent().Name; }
-                catch (Exception ex) { AppLogger.Debug("ScheduledScanService", "Compte courant : " + ex.Message); }
+                catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Debug("ScheduledScanService", "Compte courant : " + ex.Message); }
 
                 var xml = BuildTaskXml(_exePath, _scheduledTime, DateTime.Today, user);
                 var xmlPath = Path.Combine(Path.GetTempPath(), "optiSCAN_task_" + Guid.NewGuid().ToString("N") + ".xml");
@@ -61,12 +62,12 @@ namespace optiSCAN.Services
                 }
                 finally
                 {
-                    try { File.Delete(xmlPath); } catch { /* fichier temporaire */ }
+                    try { File.Delete(xmlPath); } catch (Exception ignored) when (!ignored.IsFatal()) { /* fichier temporaire */ }
                 }
 
                 return CreateDailyScanLegacy();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ScheduledScanService", "Erreur création tâche planifiée", ex);
                 return false;
@@ -92,7 +93,7 @@ namespace optiSCAN.Services
                 AppLogger.Info("ScheduledScanService", "Tâche planifiée mise à niveau (rattrapage au réveil)");
                 return CreateDailyScan(time);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ScheduledScanService", "UpgradeLegacyTask", ex);
                 return false;
@@ -114,7 +115,7 @@ namespace optiSCAN.Services
                     time = new TimeSpan(anchor.Hour, anchor.Minute, 0);
                 return true;
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return false;
             }
@@ -205,7 +206,7 @@ namespace optiSCAN.Services
 
                 return RunSchtasksCapture(psi).ExitCode == 0;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ScheduledScanService", "Erreur création tâche planifiée", ex);
                 return false;
@@ -234,7 +235,7 @@ namespace optiSCAN.Services
                 RunSchtasksCapture(psi);
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ScheduledScanService", "DeleteTask", ex);
                 return false;
@@ -261,7 +262,7 @@ namespace optiSCAN.Services
                 psi.ArgumentList.Add(TaskName);
                 return RunSchtasksCapture(psi).ExitCode == 0;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ScheduledScanService", "IsTaskExists", ex);
                 return false;
@@ -317,7 +318,7 @@ namespace optiSCAN.Services
                 if (listRes.ExitCode == 0 && TryParseNextRunFromListOutput(listRes.CombinedOutput, out var fromList))
                     return fromList;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ScheduledScanService", "GetNextRunTime — repli sur heure mémoire", ex);
             }
@@ -345,7 +346,7 @@ namespace optiSCAN.Services
                 psi.ArgumentList.Add(TaskName);
                 return RunSchtasksCapture(psi).ExitCode == 0;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ScheduledScanService", "RunNow", ex);
                 return false;
@@ -386,7 +387,7 @@ namespace optiSCAN.Services
                     return true;
                 }
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return false;
             }
@@ -460,7 +461,7 @@ namespace optiSCAN.Services
             if (!finished)
             {
                 try { p.Kill(entireProcessTree: true); }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Warn("ScheduledScanService", "schtasks timeout — Kill", ex);
                 }

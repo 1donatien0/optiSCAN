@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Security.Principal;
 using Microsoft.Win32;
 
@@ -28,7 +29,7 @@ internal static class DefenderLegacyCleanup
         _ = Task.Run(() =>
         {
             try { RunAndMark(); }
-            catch (Exception ex) { AppLogger.Error("DefenderLegacyCleanup", "RunAndMark failed", ex); }
+            catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Error("DefenderLegacyCleanup", "RunAndMark failed", ex); }
         });
     }
 
@@ -59,7 +60,7 @@ internal static class DefenderLegacyCleanup
                     or DefenderExclusionStatus.DefenderUnavailable))
                 WriteMarker(ProductVersionInfo.SemVer);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("DefenderLegacyCleanup", "Nettoyage des exclusions 3.0.0", ex);
         }
@@ -72,7 +73,7 @@ internal static class DefenderLegacyCleanup
             using var identity = WindowsIdentity.GetCurrent();
             return identity.IsSystem || ElevationHelper.IsRunningElevated();
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return false;
         }
@@ -85,7 +86,7 @@ internal static class DefenderLegacyCleanup
             using var key = Registry.LocalMachine.OpenSubKey(MachineKey);
             return key?.GetValue(MarkerValue) as string;
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return null;
         }
@@ -98,7 +99,7 @@ internal static class DefenderLegacyCleanup
             using var key = Registry.LocalMachine.CreateSubKey(MachineKey);
             key?.SetValue(MarkerValue, version, RegistryValueKind.String);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Debug("DefenderLegacyCleanup", "Marqueur non écrit : " + ex.Message);
         }

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 namespace optiSCAN.Services
 {
     /// <summary>Couleurs sévérité pour exports PDF/HTML — palette fixe indépendante du thème UI.</summary>

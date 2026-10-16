@@ -1,3 +1,4 @@
+; SPDX-License-Identifier: GPL-3.0-or-later
 ; =============================================================================
 ; Identifiants techniques de la protection système (inclus par setup.iss)
 ; =============================================================================

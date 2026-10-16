@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Localization;
 using optiSCAN.Models;
 using Microsoft.Win32;
@@ -193,7 +194,7 @@ namespace optiSCAN.Services
 
                     SecureStore.Save(FilePath, this);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Warn("UserPreferences", "Save", ex);
                 }
@@ -241,7 +242,7 @@ namespace optiSCAN.Services
 
                 AppLogger.Info("UserPreferences", $"Valeurs Inno appliquées : AutoUpdateSignatures={prefs.SignatureAutoUpdateEnabled}");
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("UserPreferences", "ApplyInnoSetupDefaults", ex);
             }
@@ -259,7 +260,7 @@ namespace optiSCAN.Services
                         Directory.CreateDirectory(dir);
                     SecureStore.Save(securePath, prefs);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Warn("UserPreferences", "SaveToStorage", ex);
                 }

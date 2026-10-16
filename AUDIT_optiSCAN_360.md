@@ -6,13 +6,15 @@
 
 | Indicateur | Valeur |
 |---|---|
-| **Note globale** | **7,4 / 10** (6,8 le matin du 15 octobre ; 6,5 le 13 octobre) |
-| Qualité technique (hors distribution) | **7,9 / 10** |
+| **Note globale** | **7,6 / 10** (6,8 le matin du 15 octobre ; 6,5 le 13 octobre) |
+| Qualité technique (hors distribution) | **8,2 / 10** |
 | Prêt à diffuser | **4,5 / 10** |
-| **Note visée pour publier** | **8,0 / 10** : non atteinte par les trois étapes de la section 2 (elles mènent à 7,9) |
+| **Note visée pour publier** | **8,0 / 10** : atteinte quand les binaires sont signés (section 2) |
 | **Décision** | **Pas de diffusion publique.** Bêta fermée possible après les contrôles en machine jetable (R4). |
 
-La note de 8 est fixée comme condition de publication. Elle ne peut pas être obtenue par le code seul : la distribution pèse 15 % et reste à 4,5 tant que `optiSCAN.exe` n'est pas signé. Hors distribution, le code est à 7,9 (7,94). Les étapes restantes sont chiffrées en section 2.
+**Licence et signature.** optiSCAN est sous GPL v3 depuis cette révision : c'est fait et vérifié (`LICENSE.txt`, installeur, interface, avis de tiers, et l'en-tête `SPDX-License-Identifier: GPL-3.0-or-later` dans chacun des fichiers sources, contrôlé par `LicenseHeaderTests`). La licence ne signe aucun fichier. Une signature Authenticode est apposée par un certificat d'autorité ; pour un projet libre, celui de SignPath Foundation, qui ne signe qu'après acceptation du projet et sur une release compilée par GitHub Actions. La chaîne est prête et c'est désormais la seule (l'ancienne chaîne par certificat PFX est retirée du dépôt) ; elle produira la première signature au premier tag approuvé.
+
+La note de 8 est fixée comme condition de publication. Elle ne peut pas être obtenue par le code seul : la distribution pèse 15 % et reste à 4,5 tant que `optiSCAN.exe` n'est pas signé. Le code est désormais à 8,2 hors distribution. Les trois étapes restantes, toutes hors du dépôt, sont chiffrées en section 2.
 
 ## 1. Périmètre et méthode
 
@@ -22,7 +24,7 @@ Branche `dev` (`c50975c`) et arbre de travail du 15 octobre au soir.
 |---|---|
 | Compilation Release de la solution (6 projets), avertissements traités en erreurs | 0 erreur, 0 avertissement (Windows et Linux) |
 | Suite Release sous Windows, 15 octobre au soir, avant la séparation du moteur | **733 réussis sur 734** ; l'échec (police du rapport PDF) est corrigé |
-| Suite Release sous Windows après la séparation moteur / hôte | À rejouer (`artifacts\0_claude_run.cmd`) |
+| Suite Release sous Windows (moteur séparé, filtres d’exceptions, AMSI côté service, en-têtes GPL) | **764 réussis, 0 échec** (15 octobre, 20 h 16) ; le test de la DLL AMSI native attend sa compilation (outils C++ absents du poste, exigés par la CI) |
 | Confinement des analyseurs, sous Windows | Prouvé par `ScannerSandboxTests` (19 cas) : lecture hors autorisations refusée, processus enfant refusé, copies d'analyse lisibles, arrêt immédiat |
 | Audit NuGet (transitifs compris) | Aucune vulnérabilité ; `System.Security.Cryptography.Pkcs` 8.0.1 tiré par PDFsharp remplacé par 10.0.13 |
 | Licences | GPL-3.0-or-later ; QuestPDF (licence non libre) retiré ; PDFsharp gardé en 6.2.4, dernière version MIT |
@@ -34,31 +36,30 @@ Branche `dev` (`c50975c`) et arbre de travail du 15 octobre au soir.
 | Domaine | Poids | Matin | Soir | Justification du soir |
 |---|---:|---:|---:|---|
 | Sécurité du code privilégié | 25 % | 8,0 | **9,0** | R5 corrigé : `yara`, `yarac` et `clamscan` tournent sous SYSTEM dans l'AppContainer de clamd, sans réseau, sans processus enfant, avec les seules sorties standard héritées ; une cible hors du dossier des copies est copiée par le service ; échec du confinement = analyse incomplète, jamais de repli. L'hôte SYSTEM ne charge plus WPF. Reste : YARA 4.5.5 (corrections de bornes 4.5.6 à 4.5.8 absentes, désormais confinées). |
-| Efficacité de détection | 15 % | 6,5 | 6,5 | Inchangée : ni AMSI ni minifiltre (R7). |
+| Efficacité de détection | 15 % | 6,5 | **7,5** | Fournisseur AMSI livré avec le service : scripts PowerShell, JScript/VBScript, macros Office et contenus .NET analysés avant exécution (fail-open). Pas de minifiltre : les fichiers restent analysés après écriture (R7). À confirmer sous Windows et en machine jetable. |
 | Robustesse et exploitation | 15 % | 8,0 | 8,0 | Inchangée ; l'hôte console garde les mêmes contrôles (SYSTEM, dossier réservé aux administrateurs, verrou unique) et la relance par le service. |
-| Qualité du code et maintenabilité | 10 % | 5,5 | **7,0** | `optiSCAN.Engine` : 144 fichiers du moteur dans une bibliothèque sans aucune référence d'interface (test d'architecture). `optiSCAN.Host.exe` : hôte SYSTEM à deux modes au lieu de l'exécutable WPF à vingt modes. Conteneur propre à l'hôte, notifications par interface. Reste : `ServiceContainer` singleton côté interface, 503 `catch` sans filtre, P/Invoke non centralisés. |
-| Tests et preuves | 10 % | 8,0 | **8,5** | 734 cas sous Windows dont 19 sur le confinement ; xUnit v3, Test SDK 18.11. CodeQL C/C++ jamais passé sur GitHub. |
-| Distribution et confiance | 15 % | 4,0 | **4,5** | Licence GPL v3, politique de signature publiée, workflow de release signé par SignPath, configurations d'artefacts. Mais rien n'est encore signé et Defender détecte toujours `optiSCAN.exe` sans exclusion (R1). |
+| Qualité du code et maintenabilité | 10 % | 5,5 | **7,5** | `optiSCAN.Engine` : 144 fichiers du moteur dans une bibliothèque sans aucune référence d'interface (test d'architecture). `optiSCAN.Host.exe` : hôte SYSTEM à deux modes au lieu de l'exécutable WPF à vingt modes. Conteneur propre à l'hôte, notifications par interface. Les 497 blocs `catch` généraux portent un filtre qui laisse passer les erreurs fatales (`ExceptionPolicy.IsFatal`), vérifié par un test qui parcourt le code. Reste : `ServiceContainer` singleton côté interface, P/Invoke répartis dans 16 fichiers. |
+| Tests et preuves | 10 % | 8,0 | **8,5** | 748 cas sous Windows dont 19 sur le confinement, plus les tests AMSI (service et DLL native) ; xUnit v3, Test SDK 18.11. CodeQL C/C++ jamais passé sur GitHub. |
+| Distribution et confiance | 15 % | 4,0 | **4,5** | Licence GPL v3, politique de signature publiée, chaîne SignPath unique (workflow, configurations d'artefacts ; ancienne chaîne PFX retirée). Aucune release n'a encore été signée et Defender détecte toujours `optiSCAN.exe` sans exclusion (R1). |
 | Produit | 5 % | 7,0 | **7,5** | Service de protection coché à la première installation (R9). Pas de canal de mise à jour du produit (R8). |
 | Dépendances | 5 % | 7,0 | **8,0** | xUnit v3 4.0.2, Test SDK 18.11, paquets Microsoft 10.0.13, MaterialDesign 5.3.2, QuestPDF retiré. YARA reste en 4.5.5. |
-| **Total pondéré** | | **6,8** | **7,4** | Hors distribution : **7,9** |
+| **Total pondéré** | | **6,8** | **7,6** | Hors distribution : **8,2** |
 
-Calcul : 9,0×25 % + 6,5×15 % + 8,0×15 % + 7,0×10 % + 8,5×10 % + 4,5×15 % + 7,5×5 % + 8,0×5 % = 7,425, arrondi à 7,4. Hors distribution : 7,425 − 0,675 = 6,75, puis 6,75 / 0,85 = 7,94, arrondi à **7,9**.
+Calcul : 9,0×25 % + 7,5×15 % + 8,0×15 % + 7,5×10 % + 8,5×10 % + 4,5×15 % + 7,5×5 % + 8,0×5 % = 7,625, arrondi à 7,6. Hors distribution (poids 85 %) : 6,95 / 0,85 = 8,2.
 
-**Chemin vers 8,0**, sans autre changement de code. Les trois premières étapes s'arrêtent à 7,9 (7,925). Le seuil de 8,0 est atteint seulement si la distribution passe ensuite à 8,0 (+0,075).
+**Chemin vers 8,0**, sans autre changement de code :
 
 | Étape | Qui | Effet | Note |
 |---|---|---|---:|
-| Contrôles en machine jetable réussis (R4, `artifacts\vm`) | Mainteneur, un double-clic | Distribution 5,5 | 7,6 |
-| Dépôt public, historique purgé (R15), candidature SignPath Foundation acceptée, release signée (R1) | Mainteneur | Distribution 7,5 | 7,9 |
-| Premier passage CodeQL C/C++ sur GitHub | Automatique au premier push | Tests 9,0 | 7,9 |
-| Faux positif levé auprès de Microsoft, au point que la distribution vaille 8,0 | Mainteneur | Distribution 8,0 | **8,0** |
+| Contrôles en machine jetable réussis (R4, `artifacts\vm`) | Mainteneur, un double-clic | Distribution 5,5 | ≈ 7,8 |
+| Dépôt public, historique purgé (R15), candidature SignPath Foundation acceptée, release signée, faux positif levé auprès de Microsoft (R1) | Mainteneur | Distribution 7,5 | **≈ 8,1** |
+| Premier passage CodeQL C/C++ sur GitHub | Automatique au premier push | Tests 9,0 | ≈ 8,1 |
 
 ## 3. Décision de release
 
 | Étape | Conditions | État |
 |---|---|---|
-| **Bêta fermée** (testeurs informés, exclusion Defender documentée) | Suite Windows verte après la séparation du moteur ; R4 en machine jetable | Suite à rejouer ; R4 prêt à lancer |
+| **Bêta fermée** (testeurs informés, exclusion Defender documentée) | Suite Windows verte après la séparation du moteur ; R4 en machine jetable | Suite verte (748/748) ; R4 prêt à lancer |
 | **Release publique 3.1.0** | Bêta, plus R1 (signature SignPath, faux positif levé), CodeQL C/C++ réussi, note ≥ 8,0 | ⏳ |
 
 ## 4. Points forts
@@ -72,14 +73,14 @@ Les six mécanismes de la révision précédente tiennent toujours (suppression 
 
 | # | Risque | Gravité | Bloquant pour | État et action |
 |---|---|---|---|---|
-| R1 | Binaires non signés ; Defender détecte `optiSCAN.exe` sans exclusion. | Élevée | Release publique | **Préparé.** Licence GPL-3.0-or-later, [politique de signature](docs/CODE_SIGNING_POLICY.md), `.github/workflows/release.yml`, `.signpath/`. Reste : dépôt public, candidature sur signpath.org, première release signée, soumission du faux positif à Microsoft. |
+| R1 | Aucune release signée à ce jour ; Defender détecte `optiSCAN.exe` non signé sans exclusion. | Élevée | Release publique | **Préparé.** Licence GPL-3.0-or-later, [politique de signature](docs/CODE_SIGNING_POLICY.md), `.github/workflows/release.yml`, `.signpath/`. Reste : dépôt public, candidature sur signpath.org, première release signée, soumission du faux positif à Microsoft. |
 | R4 | Aucun contrôle en machine jetable. | Élevée | Bêta | **Prêt.** `artifacts\vm\optiSCAN-check.wsb` (Windows Sandbox) installe, vérifie service, relances, EICAR, confinement, désinstallation, et écrit `vm-results.txt`. |
 | R5 | Analyseurs non isolés sous SYSTEM. | — | — | **Clos.** Voir [SECURITY.md](SECURITY.md). YARA 4.5.8 en CI reste souhaitable (défense en profondeur). |
 | R6 | Dossier d'installation exclu de Defender (tant que R1 n'est pas levé). | Moyenne | Non | Retirer après R1. |
-| R7 | Ni AMSI ni minifiltre ; détection après écriture et après lancement. | Moyenne | Non | Limite produit documentée. |
+| R7 | Pas de minifiltre : fichiers analysés après écriture et après lancement (AMSI couvre les scripts avant exécution depuis 3.1). | Moyenne | Non | Chantier 3.2 : pilote noyau, signature Microsoft (Partner Center, certificat EV) ; prérequis dans `native/optiSCAN.Minifilter/README.md`. |
 | R8 | Pas de canal de mise à jour signé du produit. | Moyenne | Non | Décision produit. |
 | R9 | Protection limitée à la session par défaut. | — | — | **Clos.** Service coché à la première installation (`checkedonce`) ; une mise à jour garde le choix précédent. |
-| R10 | Maintenabilité. | Moyenne | Non | **Réduit.** Moteur et hôte sans WPF. Reste : singleton `ServiceContainer` de l'interface, `catch` sans filtre, P/Invoke dispersés. |
+| R10 | Maintenabilité. | Moyenne | Non | **Réduit.** Moteur et hôte sans WPF ; plus aucun `catch` général sans filtre. Reste : singleton `ServiceContainer` de l'interface, P/Invoke répartis. |
 | R11 | Pile de tests et QuestPDF en retard. | — | — | **Clos.** xUnit v3, Test SDK 18.11, paquets 10.0.13 ; QuestPDF remplacé par PDFsharp/MigraDoc 6.2.4 (MIT). Dependabot n'en propose pas la 6.3+ (AGPL + licence commerciale). |
 | R12 | `clamscan` exclut par motif certains fichiers de données d'optiSCAN. | Faible | Non | Accepté. |
 | R13 | Le désinstalleur ne purge que le compte qui désinstalle. | Faible | Non | Documenté. |
@@ -92,10 +93,13 @@ Les six mécanismes de la révision précédente tiennent toujours (suppression 
 | Lot | Contenu | Vérification |
 |---|---|---|
 | R5 | `ScannerProcess` et `ClamdIsolation.StartScanner` : AppContainer de clamd sans capacité, objet job (un seul processus, arrêt sur exception, fin avec l'hôte), liste de poignées héritées limitée aux sorties ; `SandboxStaging` copie par lots les cibles hors du dossier des copies ; `yarac` écrit dans `scanner-work`, le résultat est recopié par le service. | Windows : `ScannerSandboxTests` 19/19 |
-| R10 | `optiSCAN.Engine` (sans WPF), `optiSCAN.Host` (hôte SYSTEM), `INotificationSink`, `ProtectionHostContainer`, `EngineServiceRegistration` ; le service lance `optiSCAN.Host.exe` ; `PipeServerTrust` et `InstallLocationTrust` suivent. | Compilation ; `EngineArchitectureTests` ; suite Windows à rejouer |
-| R1 | GPL-3.0-or-later, politique de signature, workflow `release.yml`, configurations SignPath, métadonnées produit dans `Directory.Build.props`. | Relu ; s'exécutera au premier tag |
+| R10 | `optiSCAN.Engine` (sans WPF), `optiSCAN.Host` (hôte SYSTEM), `INotificationSink`, `ProtectionHostContainer`, `EngineServiceRegistration` ; le service lance `optiSCAN.Host.exe` ; `PipeServerTrust` et `InstallLocationTrust` suivent. Appels Win32 isolés regroupés dans `Native/NativeMethods`. | Windows : suite 748/748, `EngineArchitectureTests` |
+| R1 | GPL-3.0-or-later, politique de signature, workflow `release.yml`, configurations SignPath, métadonnées produit dans `Directory.Build.props`. Ancienne chaîne PFX supprimée (`codesign.ps1`, `sign-publish-artifacts.ps1`, `dev-codesign.ps1`, étapes `CODESIGN_*` de la CI, `-CertSubject`, `-SignPfxPath`) ; documentation alignée. | Relu ; s'exécutera au premier tag |
 | R9 | Service coché à l'installation. | VM (R4) |
 | R11 | Montée de version des dépendances ; PDF par MigraDoc et résolveur de polices Windows. | Windows : suite 733/734 puis correction de police |
+| AMSI | Fournisseur natif réécrit (interface COM conforme, lecture de flux, nom affiché, enregistrement), serveur du tube authentifié comme côté .NET, `scan_buffer` ouvert par l'hôte avec débit, taille et cache bornés ; installeur (`regserver` avec le service), CI et release (`build-amsi.ps1 -Require`), SignPath. | `AmsiScanBufferTests` ; `AmsiProviderNativeTests` (Windows, DLL compilée) |
+| R10 (suite) | `ExceptionPolicy.IsFatal` sur les 497 blocs `catch` généraux du code de production ; test qui refuse tout nouveau `catch` sans filtre. | Windows : `ExceptionPolicyTests` |
+| Scripts | Seize scripts PowerShell réenregistrés en UTF-8 avec BOM (un tiret « — » cassait `publish-release.ps1` sous Windows PowerShell 5.1) ; `gpg` de Git pour Windows et sortie de publication corrigés ; test `ScriptEncodingTests`. Relais clamd : plantage au démarrage dans l'AppContainer introduit par la séparation, corrigé avant la suite verte. | Windows : suite 748/748 ; publication à rejouer |
 
 ## 7. Mesures
 
@@ -104,12 +108,12 @@ Les six mécanismes de la révision précédente tiennent toujours (suppression 
 | Projets de la solution | 4 | 6 (Engine, Host) |
 | Fichiers du moteur sans référence d’interface | 0 | 144 |
 | Modes de l'exécutable chargé sous SYSTEM | 20 | 2 |
-| Cas de test exécutés sous Windows | 715 | 734 (+ 4 d'architecture à rejouer) |
-| `catch` sans type ni filtre / `catch (Exception)` sans `when` | 191 / 312 | inchangé |
+| Cas de test exécutés sous Windows | 715 | 764 |
+| `catch` sans type ni filtre / `catch (Exception)` sans `when` | 191 / 312 | 0 / 0 (497 filtrés par `IsFatal`) |
 | Déclarations `DllImport` | 78 | 82 (tubes et job de l’analyseur, écran du mode jeu) |
 
 ## 8. Limites de cet audit
 
 - La note est un jugement pondéré ; la pondération est donnée pour qu'on puisse la discuter. La révision du soir est rédigée par l'équipe qui a fait les corrections : une relecture indépendante est recommandée avant de s'appuyer sur la hausse de note.
-- La séparation moteur / hôte n'a pas encore été exécutée sous Windows ni installée en machine jetable.
+- La séparation moteur / hôte passe la suite Windows (748/748) mais n'a pas encore été installée en machine jetable.
 - La signature dépend d'un tiers (SignPath Foundation) et de son acceptation du projet.

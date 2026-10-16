@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using Microsoft.Extensions.DependencyInjection;
 using optiSCAN.Localization;
 using optiSCAN.Services.DependencyInjection;
@@ -47,7 +48,7 @@ namespace optiSCAN.Services
             _ = Task.Run(async () =>
             {
                 try { await yara.CompileRulesAsync().ConfigureAwait(false); }
-                catch (Exception ex) { AppLogger.Warn("ProtectionHostContainer", "Précompilation YARA", ex); }
+                catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("ProtectionHostContainer", "Précompilation YARA", ex); }
             });
             AppLogger.Info("ProtectionHostContainer", "Services de l'hôte initialisés (sans interface)");
         }
@@ -126,7 +127,7 @@ namespace optiSCAN.Services
                 _ = Task.Run(async () =>
                 {
                     try { await ClamdHost.Shared.EnsureRunningAsync().ConfigureAwait(false); }
-                    catch (Exception ex) { AppLogger.Warn("ProtectionHostContainer", "Préchauffage clamd", ex); }
+                    catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("ProtectionHostContainer", "Préchauffage clamd", ex); }
                 });
             }
 

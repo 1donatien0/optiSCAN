@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Security.Principal;
 using optiSCAN.Models;
 using optiSCAN.Platform;
@@ -69,7 +70,7 @@ public sealed class ServiceDetectionWatcher : IDisposable
             {
                 response = _query(since);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Debug("ServiceDetectionWatcher", "Service injoignable : " + ex.Message);
                 return 0;
@@ -171,7 +172,7 @@ public sealed class ServiceDetectionWatcher : IDisposable
             using var identity = WindowsIdentity.GetCurrent();
             return identity.IsSystem;
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return false;
         }

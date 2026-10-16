@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 namespace optiSCAN.Services
 {
     /// <summary>Seuils des recommandations affichées sur l'accueil (vue d'ensemble).</summary>

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Models;
 using System.Collections.Concurrent;
 using System.IO;
@@ -96,13 +97,13 @@ namespace optiSCAN.Services
                 AppLogger.Info("ProcessStartMonitor", "Surveillance des processus activée (" + description + ")");
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 if (watcher != null)
                 {
                     watcher.EventArrived -= SurProcessDemarre;
                     try { watcher.Dispose(); }
-                    catch (Exception disposeEx) { AppLogger.Debug("ProcessStartMonitor", "Dispose : " + disposeEx.Message); }
+                    catch (Exception disposeEx) when (!disposeEx.IsFatal()) { AppLogger.Debug("ProcessStartMonitor", "Dispose : " + disposeEx.Message); }
                 }
                 AppLogger.Warn("ProcessStartMonitor", "Abonnement refusé (" + description + ")", ex);
                 return false;
@@ -124,7 +125,7 @@ namespace optiSCAN.Services
                     _watcher = null;
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ProcessStartMonitor", "Stop", ex);
             }
@@ -177,7 +178,7 @@ namespace optiSCAN.Services
                 foreach (var path in paths)
                     Track(HandlePathAsync(path, pid));
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ProcessStartMonitor", "SurProcessDemarre", ex);
             }
@@ -273,7 +274,7 @@ namespace optiSCAN.Services
                         return (obj["ExecutablePath"]?.ToString(), obj["CommandLine"]?.ToString());
                 }
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 /* accès refusé ou processus terminé */
             }
@@ -399,7 +400,7 @@ namespace optiSCAN.Services
                     ThreatDetected?.Invoke(this, threat);
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ProcessStartMonitor", $"Scan {PathRedaction.RedactPath(filePath)}", ex);
             }

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 namespace optiSCAN.Services;
 
 /// <summary>Planifie du travail sur le thread UI (WPF Dispatcher ou WinUI DispatcherQueue).</summary>

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Models;
 
 namespace optiSCAN.Services;
@@ -48,7 +49,7 @@ internal sealed class ServiceHostThreatHandler
             if (threat.Status != ThreatStatus.Quarantined)
                 _ = EnrichCloudAsync(threat);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("ServiceHostThreatHandler", "OnThreatDetected", ex);
         }
@@ -66,7 +67,7 @@ internal sealed class ServiceHostThreatHandler
                     $"[ServiceHost] Réputation cloud — {PathRedaction.RedactPath(threat.FilePath)}: {summary}");
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("ServiceHostThreatHandler", "EnrichCloudAsync", ex);
         }

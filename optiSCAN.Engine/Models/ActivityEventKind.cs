@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 namespace optiSCAN.Models
 {
     /// <summary>Type d'événement immuable enregistré dans <see cref="Services.ActivityLogService"/>.</summary>

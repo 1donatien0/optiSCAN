@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Windows.Threading;
 using optiSCAN.Services;
 using WpfApp = System.Windows.Application;

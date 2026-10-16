@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Globalization;
 using System.IO;
 using System.IO.Compression;
@@ -77,7 +78,7 @@ namespace optiSCAN.Services
                 return Directory.Exists(_rulesDirectory)
                     && Directory.GetFiles(_rulesDirectory, "*.yar").Length > 0;
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return false;
             }
@@ -105,7 +106,7 @@ namespace optiSCAN.Services
                     && DateTime.TryParse(lines[1], CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var utc))
                     LastUpdateTime = utc.ToLocalTime();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("YaraForgeUpdater", "LoadPersistedMeta", ex);
             }
@@ -120,7 +121,7 @@ namespace optiSCAN.Services
                 var line2 = LastUpdateTime?.ToUniversalTime().ToString("o", CultureInfo.InvariantCulture) ?? "";
                 File.WriteAllText(_rulesMetaPath, LastVersion + "\n" + line2);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("YaraForgeUpdater", "SavePersistedMeta", ex);
             }
@@ -144,7 +145,7 @@ namespace optiSCAN.Services
                     {
                         try { await UpdateAsync().ConfigureAwait(false); }
                         catch (OperationCanceledException) { /* annulé */ }
-                        catch (Exception ex) { AppLogger.Warn("YaraForgeUpdater", "Auto-update", ex); }
+                        catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("YaraForgeUpdater", "Auto-update", ex); }
                     });
                 },
                 null,
@@ -210,7 +211,7 @@ namespace optiSCAN.Services
                 {
                     releaseJson = await _http.GetStringAsync(ApiUrl, token);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     result.Success = false;
                     result.Message = LocalizationService.Format("YaraForge_ContactError", ex.Message);
@@ -280,7 +281,7 @@ namespace optiSCAN.Services
                     zipBytes = await YaraForgePackageIntegrity.ReadBoundedAsync(
                         body, YaraForgePackageIntegrity.MaxPackageBytes, token);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     result.Success = false;
                     result.Message = LocalizationService.Format("YaraForge_DownloadError", ex.Message);
@@ -328,7 +329,7 @@ namespace optiSCAN.Services
                 result.Success = false;
                 result.Message = LocalizationService.GetString("YaraForge_Cancelled");
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 result.Success = false;
                 result.Message = LocalizationService.Format("YaraForge_Error", ex.Message);
@@ -380,7 +381,7 @@ namespace optiSCAN.Services
                         File.Move(file, dest, overwrite: true);
                         installed++;
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (!ex.IsFatal())
                     {
                         AppLogger.Warn("YaraForgeUpdater", $"Installation ignorée : {Path.GetFileName(file)}", ex);
                     }
@@ -389,7 +390,7 @@ namespace optiSCAN.Services
             finally
             {
                 try { Directory.Delete(staging, recursive: true); }
-                catch (Exception ex) { AppLogger.Debug("YaraForgeUpdater", "Nettoyage du dossier temporaire : " + ex.Message); }
+                catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Debug("YaraForgeUpdater", "Nettoyage du dossier temporaire : " + ex.Message); }
             }
 
             try
@@ -397,7 +398,7 @@ namespace optiSCAN.Services
                 if (File.Exists(compiledRulesPath))
                     File.Delete(compiledRulesPath);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("YaraForgeUpdater", "Suppression du cache .yarc compilé", ex);
             }

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Localization;
 using optiSCAN.Models;
 using System.IO;
@@ -159,7 +160,7 @@ namespace optiSCAN.Services
                 return Complete(false,
                     LocalizationService.Format("Av_Action_DeleteMissing", Path.GetFileName(filePath)));
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("AntivirusActions", $"DeleteThreatFile {filePath}", ex);
                 return Complete(false,
@@ -191,13 +192,13 @@ namespace optiSCAN.Services
             if (_freshclam != null)
             {
                 try { _freshclam.CancelUpdate(); }
-                catch (Exception ex) { AppLogger.Warn("AntivirusActions", "Cancel freshclam", ex); }
+                catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("AntivirusActions", "Cancel freshclam", ex); }
             }
 
             if (_rules != null)
             {
                 try { _rules.CancelUpdate(); }
-                catch (Exception ex) { AppLogger.Warn("AntivirusActions", "Cancel rules", ex); }
+                catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("AntivirusActions", "Cancel rules", ex); }
             }
 
             Complete(true, LocalizationService.GetString("Av_Action_UpdateStopped"));
@@ -206,7 +207,7 @@ namespace optiSCAN.Services
         private static long SafeFileSize(string path)
         {
             try { return new FileInfo(path).Length; }
-            catch { return 0; }
+            catch (Exception ignored) when (!ignored.IsFatal()) { return 0; }
         }
 
         private ActionResult Complete(bool success, string message, bool isError = false, bool isWarning = false)

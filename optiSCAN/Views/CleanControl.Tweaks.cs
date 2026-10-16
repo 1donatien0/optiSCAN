@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Localization;
 using optiSCAN.Services;
 using optiSCAN.Strings;
@@ -147,7 +148,7 @@ namespace optiSCAN.Views
 
                 AppendTweaksLog(LocalizationService.GetString("Twk_LogEnd"));
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("CleanControl", "Application des tweaks", ex);
                 AppendTweaksLog(LocalizationService.Format("Twk_LogError", ex.Message));
@@ -217,7 +218,7 @@ namespace optiSCAN.Views
                     AppendTweaksLog(LocalizationService.GetString(ok ? "Twk_UndoDone" : "Twk_UndoPartial"));
                 });
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("CleanControl", "Rétablissement des tweaks", ex);
                 AppendTweaksLog(LocalizationService.Format("Twk_LogError", ex.Message));

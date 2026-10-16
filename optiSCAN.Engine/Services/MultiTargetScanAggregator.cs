@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Localization;
 using optiSCAN.Models;
 using System.IO;
@@ -63,7 +64,7 @@ namespace optiSCAN.Services
                 {
                     throw;
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     // Une cible en échec ne doit pas interrompre les autres : elle est signalée
                     // et le scan global sera marqué incomplet.

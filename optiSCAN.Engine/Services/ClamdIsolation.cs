@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.ComponentModel;
 using System.IO;
 using System.Diagnostics;
@@ -49,7 +50,7 @@ internal static partial class ClamdIsolation
         foreach (var dir in writableDirectories)
         {
             try { Directory.CreateDirectory(dir); }
-            catch { return null; }
+            catch (Exception ignored) when (!ignored.IsFatal()) { return null; }
             if (!TryGrant(dir, readOnly: false))
                 return null;
         }
@@ -85,7 +86,7 @@ internal static partial class ClamdIsolation
                 ProcessHandles[info.ProcessId] = info.Process;
             return Process.GetProcessById(info.ProcessId);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("ClamdIsolation", "Lancement isolé refusé", ex);
             return null;
@@ -403,7 +404,7 @@ internal static partial class ClamdIsolation
                 FreeSid(sidPtr);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("ClamdIsolation", "ACL du conteneur refusée sur " + path, ex);
             return false;
@@ -443,7 +444,7 @@ internal static partial class ClamdIsolation
                 FreeSid(sidPtr);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("ClamdIsolation", "ACL du conteneur refusée sur " + directory, ex);
             return false;

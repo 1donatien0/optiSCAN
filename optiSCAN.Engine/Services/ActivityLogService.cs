@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Models;
 using System.IO;
 using System.Runtime.Versioning;
@@ -177,7 +178,7 @@ namespace optiSCAN.Services
             {
                 SecureStore.Save(_logPath, _events);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ActivityLogService", "Persist", ex);
             }

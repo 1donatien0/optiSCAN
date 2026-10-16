@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 namespace optiSCAN.Services
 {
     /// <summary>Masque les chemins sensibles dans exports et journaux.</summary>

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 namespace optiSCAN.Models
 {
     /// <summary>Événement persisté du journal d'activité unifié (Historique).</summary>

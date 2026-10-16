@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Runtime.Versioning;
 
 namespace optiSCAN.Services;
@@ -150,7 +151,7 @@ public static class DefenderCoexistenceService
             using var sc = new System.ServiceProcess.ServiceController("WinDefend");
             return sc.Status == System.ServiceProcess.ServiceControllerStatus.Running;
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return false;
         }

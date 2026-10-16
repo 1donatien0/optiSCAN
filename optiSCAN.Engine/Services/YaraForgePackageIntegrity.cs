@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO;
 using System.IO.Compression;
 using System.Security.Cryptography;
@@ -47,7 +48,7 @@ internal static class YaraForgePackageIntegrity
 
         string? reportedName;
         try { reportedName = asset["name"]?.GetValue<string>(); }
-        catch { reportedName = null; }
+        catch (Exception ignored) when (!ignored.IsFatal()) { reportedName = null; }
         if (!string.Equals(reportedName, TrustedAssetName, StringComparison.Ordinal))
             return false;
 
@@ -77,14 +78,14 @@ internal static class YaraForgePackageIntegrity
         {
             size = asset["size"]?.GetValue<long>();
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             size = null;
         }
 
         string? digest;
         try { digest = asset["digest"]?.GetValue<string>(); }
-        catch { digest = null; }
+        catch (Exception ignored) when (!ignored.IsFatal()) { digest = null; }
 
         const string prefix = "sha256:";
         if (string.IsNullOrWhiteSpace(digest) || !digest.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))

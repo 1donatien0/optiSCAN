@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 namespace optiSCAN.Services;
 
 /// <summary>Dépendances de <see cref="ProtectionServiceHost"/> (testable par injection).</summary>

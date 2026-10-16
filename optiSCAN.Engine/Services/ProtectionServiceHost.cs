@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Models;
 using optiSCAN.Platform;
 
@@ -51,7 +52,9 @@ public sealed class ProtectionServiceHost : IDisposable
             serviceQuarantine: _container.Quarantine,
             realTimeDegradedFolders: () => _container.RealTimeProtection.IsEnabled
                 ? _container.RealTimeProtection.DegradedFolderCount
-                : null);
+                : null,
+            // Client : le fournisseur AMSI, enregistré par l'installeur avec le service.
+            enableScanBuffer: true);
         // Le service n'a personne à qui l'afficher : il journalise, les sessions le relèvent.
         _container.RealTimeProtection.HealthChanged += (_, _) =>
         {
@@ -111,7 +114,7 @@ public sealed class ProtectionServiceHost : IDisposable
                     $"Quarantaine du service : {removed} élément(s) de plus de {ServiceQuarantineStore.RetentionDays} jours supprimé(s).");
             return removed;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("ProtectionServiceHost", "Conservation de la quarantaine", ex);
             return 0;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Models;
 using System.IO;
 using System.Runtime.Versioning;
@@ -70,7 +71,7 @@ namespace optiSCAN.Services
             _ = Task.Run(() =>
             {
                 try { EnsureQuarantineBlobLayout(); }
-                catch (Exception ex) { AppLogger.Error("QuarantineManager", "EnsureQuarantineBlobLayout failed", ex); }
+                catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Error("QuarantineManager", "EnsureQuarantineBlobLayout failed", ex); }
             });
         }
 
@@ -172,7 +173,7 @@ namespace optiSCAN.Services
                     return ProtectedData.Unprotect(encrypted, optionalEntropy: null, DataProtectionScope.CurrentUser);
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 // Clé illisible (DPAPI indisponible un instant, profil chargé sans ses secrets,
                 // fichier verrouillé) : une nouvelle clé est créée, mais l'ancienne est d'abord
@@ -193,9 +194,9 @@ namespace optiSCAN.Services
                 // Sur Windows, on tente de marquer le fichier comme caché + system
                 // pour éviter la curiosité utilisateur (best effort).
                 try { File.SetAttributes(_keyPath, FileAttributes.Hidden | FileAttributes.System); }
-                catch { /* best effort */ }
+                catch (Exception ignored) when (!ignored.IsFatal()) { /* best effort */ }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("QuarantineManager", "Persistance clé maîtresse échouée", ex);
             }
@@ -297,7 +298,7 @@ namespace optiSCAN.Services
                 {
                     AppLogger.Warn("QuarantineManager",
                         $"Suppression originale refusée après quarantaine ({threat.FilePath})");
-                    try { File.Delete(qPath); } catch { /* rollback blob */ }
+                    try { File.Delete(qPath); } catch (Exception ignored) when (!ignored.IsFatal()) { /* rollback blob */ }
                     return false;
                 }
 
@@ -319,7 +320,7 @@ namespace optiSCAN.Services
                     {
                         _doc.Entries.Remove(entry);
                         source.CancelDelete();
-                        try { File.Delete(qPath); } catch { /* best effort */ }
+                        try { File.Delete(qPath); } catch (Exception ignored) when (!ignored.IsFatal()) { /* best effort */ }
                         return false;
                     }
                     _activityLog?.RecordThreatQuarantined(entry, sourceSessionId);
@@ -336,7 +337,7 @@ namespace optiSCAN.Services
 
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("QuarantineManager", $"Quarantine échec ({threat.FilePath})", ex);
                 return false;
@@ -388,7 +389,7 @@ namespace optiSCAN.Services
 
                 return RestoreToPath(entry, destPath);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("QuarantineManager", $"RestoreTo: {ex.Message}", ex);
                 return false;
@@ -410,7 +411,7 @@ namespace optiSCAN.Services
                     return false;
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("QuarantineManager", $"Résolution chemin restauration: {destination}", ex);
                 return false;
@@ -448,7 +449,7 @@ namespace optiSCAN.Services
                         target.Stream.Write(plaintext, 0, plaintext.Length);
                         target.Stream.Flush();
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (!ex.IsFatal())
                     {
                         // Fichier partiel supprimé par la même poignée ; l'entrée reste en quarantaine.
                         AppLogger.Warn("QuarantineManager", $"Écriture de la restauration ({entry.Id})", ex);
@@ -573,20 +574,17 @@ namespace optiSCAN.Services
                     return full;
 
                 var buffer = new char[32768];
-                var length = GetLongPathName(existing, buffer, buffer.Length);
+                var length = optiSCAN.Native.NativeMethods.GetLongPathName(existing, buffer, buffer.Length);
                 if (length == 0 || length > buffer.Length)
                     return full;
                 var expanded = new string(buffer, 0, (int)length);
                 return tail.Length == 0 ? expanded : Path.Combine(expanded, tail);
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return full;
             }
         }
-
-        [System.Runtime.InteropServices.DllImport("kernel32.dll", CharSet = System.Runtime.InteropServices.CharSet.Unicode, SetLastError = true)]
-        private static extern uint GetLongPathName(string shortPath, char[] longPath, int bufferLength);
 
         /// <summary>Déchiffre un fichier .quar en contenu clair.</summary>
         private byte[] DecryptQuarantineFile(string path)
@@ -669,7 +667,7 @@ namespace optiSCAN.Services
                         }
                         filesUpdated++;
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (!ex.IsFatal())
                     {
                         AppLogger.Warn("QuarantineManager", $"Fichier quarantaine ({entry.Id})", ex);
                     }
@@ -685,7 +683,7 @@ namespace optiSCAN.Services
                         $"Quarantaine : {filesUpdated} fichier(s) mis à jour.");
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("QuarantineManager", "Alignement stockage quarantaine", ex);
             }
@@ -780,7 +778,7 @@ namespace optiSCAN.Services
                     ThreatRemediationService.DeleteSafetyCopies(entry.Sha256);
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("QuarantineManager", $"DeletePermanently ({quarantineId})", ex);
                 return false;
@@ -826,7 +824,7 @@ namespace optiSCAN.Services
                     CryptographicOperations.ZeroMemory(plaintext);
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("QuarantineManager", $"Lecture de l'entrée {entry.Id}", ex);
             }
@@ -854,7 +852,7 @@ namespace optiSCAN.Services
                 }
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("QuarantineManager", $"Fin de restauration ({entry.Id})", ex);
                 return false;
@@ -972,7 +970,7 @@ namespace optiSCAN.Services
                     + "-" + Guid.NewGuid().ToString("N")[..8];
                 File.WriteAllText(aside, json);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("QuarantineManager", "Copie du manifeste refusé impossible", ex);
             }
@@ -992,7 +990,7 @@ namespace optiSCAN.Services
                 AtomicFile.WriteAllText(_manifestPath, json);
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("QuarantineManager", "SaveManifest", ex);
                 return false;

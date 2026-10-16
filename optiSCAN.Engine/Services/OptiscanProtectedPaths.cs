@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using Microsoft.Win32;
 using System.IO;
 using System.Text.RegularExpressions;
@@ -65,7 +66,7 @@ namespace optiSCAN.Services
             {
                 fullPath = Path.GetFullPath(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return false;
             }
@@ -95,7 +96,7 @@ namespace optiSCAN.Services
                 var norm = Path.GetFullPath(folder.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
                 return CachedDataRoots.Value.Any(r => string.Equals(r, norm, StringComparison.OrdinalIgnoreCase));
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return false;
             }
@@ -125,7 +126,7 @@ namespace optiSCAN.Services
             {
                 return File.Exists(fullPath) && ExecutableSniffer.IsPortableExecutable(fullPath);
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return false;
             }
@@ -167,7 +168,7 @@ namespace optiSCAN.Services
             {
                 norm = Path.GetFullPath(folderPath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return false;
             }
@@ -294,7 +295,7 @@ namespace optiSCAN.Services
                     if (key?.GetValue("InstallLocation") is string location && !string.IsNullOrWhiteSpace(location))
                         AddInstallRoot(roots, location.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
                 }
-                catch
+                catch (Exception ignored) when (!ignored.IsFatal())
                 {
                     /* registre inaccessible */
                 }
@@ -310,7 +311,7 @@ namespace optiSCAN.Services
             {
                 roots.Add(Path.GetFullPath(path.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar)));
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 /* chemin invalide */
             }

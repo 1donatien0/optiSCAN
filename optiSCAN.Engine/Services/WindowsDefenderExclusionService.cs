@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Platform;
 using System.Diagnostics;
 using System.IO;
@@ -93,7 +94,7 @@ namespace optiSCAN.Services
                     else if (result.Status is DefenderExclusionStatus.PartialFailure or DefenderExclusionStatus.AccessDenied)
                         TryElevatedDefenderExclusionRetry();
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Warn("DefenderExclusion", "EnsureOptiscanExclusionsAsync", ex);
                 }
@@ -131,13 +132,13 @@ namespace optiSCAN.Services
                 try {
                     $status = Get-MpComputerStatus -ErrorAction Stop
                     if (-not $status.AMServiceEnabled) { Write-Output 'DEFENDER_DISABLED'; exit 2 }
-                } catch {
+                } catch (Exception ignored) when (!ignored.IsFatal()) {
                     Write-Output 'DEFENDER_UNAVAILABLE'
                     exit 2
                 }
                 try {
                     $pref = Get-MpPreference -ErrorAction Stop
-                } catch {
+                } catch (Exception ignored) when (!ignored.IsFatal()) {
                     Write-Output 'PREF_READ_FAILED'
                     exit 3
                 }
@@ -157,7 +158,7 @@ namespace optiSCAN.Services
                         Add-MpPreference -ExclusionPath $norm -ErrorAction Stop
                         $pathExisting += $norm
                         $added++
-                    } catch {
+                    } catch (Exception ignored) when (!ignored.IsFatal()) {
                         $failures += "PATH:$norm"
                     }
                 }
@@ -171,7 +172,7 @@ namespace optiSCAN.Services
                         Add-MpPreference -ExclusionProcess ([string]$proc) -ErrorAction Stop
                         $procExisting += [string]$proc
                         $added++
-                    } catch {
+                    } catch (Exception ignored) when (!ignored.IsFatal()) {
                         $failures += "PROC:$proc"
                     }
                 }
@@ -183,11 +184,11 @@ namespace optiSCAN.Services
                 $legacyTargets = @($ours)
                 if ($ours.Count -gt 0) { $legacyTargets += @($data.engine | Where-Object { $procNow -contains [string]$_ }) }
                 foreach ($name in $legacyTargets) {
-                    try { Remove-MpPreference -ExclusionProcess ([string]$name) -ErrorAction Stop } catch { Write-Output "FAILED:$name" }
+                    try { Remove-MpPreference -ExclusionProcess ([string]$name) -ErrorAction Stop } catch (Exception ignored) when (!ignored.IsFatal()) { Write-Output "FAILED:$name" }
                 }
                 # optiSCAN.exe / optiSCAN.Service.exe par chemin complet : plus jamais exclus.
                 foreach ($proc in @($data.retired | Where-Object { $procNow -contains [string]$_ })) {
-                    try { Remove-MpPreference -ExclusionProcess ([string]$proc) -ErrorAction Stop } catch { Write-Output "FAILED:$proc" }
+                    try { Remove-MpPreference -ExclusionProcess ([string]$proc) -ErrorAction Stop } catch (Exception ignored) when (!ignored.IsFatal()) { Write-Output "FAILED:$proc" }
                 }
                 if ($failures.Count -gt 0) {
                     Write-Output ('PARTIAL:' + ($failures -join ';') + ';ADDED=' + $added)
@@ -221,7 +222,7 @@ namespace optiSCAN.Services
                         continue;
                     paths.Add(full);
                 }
-                catch
+                catch (Exception ignored) when (!ignored.IsFatal())
                 {
                     /* chemin invalide */
                 }
@@ -235,7 +236,7 @@ namespace optiSCAN.Services
                 if (Directory.Exists(programData) && InstallLocationTrust.IsAdminOnlyInstall(programData, out _))
                     paths.Add(programData);
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 /* ProgramData illisible : pas d'exclusion */
             }
@@ -277,7 +278,7 @@ namespace optiSCAN.Services
                 foreach (var name in RetiredAppProcessRelativePaths)
                 {
                     try { list.Add(Path.GetFullPath(Path.Combine(root, name))); }
-                    catch { /* chemin invalide */ }
+                    catch (Exception ignored) when (!ignored.IsFatal()) { /* chemin invalide */ }
                 }
             }
 
@@ -308,10 +309,10 @@ namespace optiSCAN.Services
                 $ErrorActionPreference = 'Continue'
                 $payload = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String('__PAYLOAD__'))
                 $data = $payload | ConvertFrom-Json
-                try { $procNow = @((Get-MpPreference -ErrorAction Stop).ExclusionProcess) } catch { Write-Output 'PREF_READ_FAILED'; exit 3 }
+                try { $procNow = @((Get-MpPreference -ErrorAction Stop).ExclusionProcess) } catch (Exception ignored) when (!ignored.IsFatal()) { Write-Output 'PREF_READ_FAILED'; exit 3 }
                 $removed = 0
                 foreach ($proc in @($data.retired | Where-Object { $procNow -contains [string]$_ })) {
-                    try { Remove-MpPreference -ExclusionProcess ([string]$proc) -ErrorAction Stop; $removed++ } catch { Write-Output "FAILED:$proc" }
+                    try { Remove-MpPreference -ExclusionProcess ([string]$proc) -ErrorAction Stop; $removed++ } catch (Exception ignored) when (!ignored.IsFatal()) { Write-Output "FAILED:$proc" }
                 }
                 Write-Output ('OK:' + $removed)
                 exit 0
@@ -360,10 +361,10 @@ namespace optiSCAN.Services
                 $data = $payload | ConvertFrom-Json
                 $removed = 0
                 foreach ($p in $data.paths) {
-                    try { Remove-MpPreference -ExclusionPath ([string]$p) -ErrorAction Stop; $removed++ } catch { Write-Output "FAILED:$p" }
+                    try { Remove-MpPreference -ExclusionPath ([string]$p) -ErrorAction Stop; $removed++ } catch (Exception ignored) when (!ignored.IsFatal()) { Write-Output "FAILED:$p" }
                 }
                 foreach ($proc in @($data.processes) + @($data.retired)) {
-                    try { Remove-MpPreference -ExclusionProcess ([string]$proc) -ErrorAction Stop; $removed++ } catch { Write-Output "FAILED:$proc" }
+                    try { Remove-MpPreference -ExclusionProcess ([string]$proc) -ErrorAction Stop; $removed++ } catch (Exception ignored) when (!ignored.IsFatal()) { Write-Output "FAILED:$proc" }
                 }
                 # Noms nus de la 3.0.0 : ceux d'optiSCAN sont retirés ; ceux des moteurs
                 # (clamscan.exe...) peuvent appartenir à une autre installation, ils ne sont
@@ -373,7 +374,7 @@ namespace optiSCAN.Services
                 $legacyTargets = @($ours)
                 if ($ours.Count -gt 0) { $legacyTargets += @($data.engine | Where-Object { $procNow -contains [string]$_ }) }
                 foreach ($name in $legacyTargets) {
-                    try { Remove-MpPreference -ExclusionProcess ([string]$name) -ErrorAction Stop; $removed++ } catch { Write-Output "FAILED:$name" }
+                    try { Remove-MpPreference -ExclusionProcess ([string]$name) -ErrorAction Stop; $removed++ } catch (Exception ignored) when (!ignored.IsFatal()) { Write-Output "FAILED:$name" }
                 }
                 Write-Output ('OK:' + $removed)
                 exit 0
@@ -416,11 +417,11 @@ namespace optiSCAN.Services
                 $legacyTargets = @($ours)
                 if ($ours.Count -gt 0) { $legacyTargets += @($data.engine | Where-Object { $procNow -contains [string]$_ }) }
                 foreach ($name in $legacyTargets) {
-                    try { Remove-MpPreference -ExclusionProcess ([string]$name) -ErrorAction Stop; $removed++ } catch { Write-Output "FAILED:$name" }
+                    try { Remove-MpPreference -ExclusionProcess ([string]$name) -ErrorAction Stop; $removed++ } catch (Exception ignored) when (!ignored.IsFatal()) { Write-Output "FAILED:$name" }
                 }
                 foreach ($p in @($pref.ExclusionPath)) {
                     if ([string]$p -match '\\AppData\\Local\\optiSCAN\\?$') {
-                        try { Remove-MpPreference -ExclusionPath ([string]$p) -ErrorAction Stop; $removed++ } catch { Write-Output "FAILED:$p" }
+                        try { Remove-MpPreference -ExclusionPath ([string]$p) -ErrorAction Stop; $removed++ } catch (Exception ignored) when (!ignored.IsFatal()) { Write-Output "FAILED:$p" }
                     }
                 }
                 Write-Output ('OK:' + $removed)
@@ -511,7 +512,7 @@ namespace optiSCAN.Services
             if (!proc.WaitForExit(60_000))
             {
                 try { proc.Kill(entireProcessTree: true); }
-                catch (Exception ex) { AppLogger.Debug("DefenderExclusion", "Arrêt PowerShell : " + ex.Message); }
+                catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Debug("DefenderExclusion", "Arrêt PowerShell : " + ex.Message); }
                 return (-1, "PowerShell : délai dépassé");
             }
             proc.WaitForExit();
@@ -557,7 +558,7 @@ namespace optiSCAN.Services
                 var written = File.GetLastWriteTimeUtc(marker);
                 return DateTime.UtcNow - written > TimeSpan.FromHours(24);
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return true;
             }
@@ -572,7 +573,7 @@ namespace optiSCAN.Services
                 var marker = Path.Combine(dir, "defender-exclusion-uac.marker");
                 File.WriteAllText(marker, DateTime.UtcNow.ToString("O"));
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 /* non bloquant */
             }

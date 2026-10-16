@@ -1,3 +1,4 @@
+﻿# SPDX-License-Identifier: GPL-3.0-or-later
 # Ajoute optiSCAN aux exclusions Windows Defender : dossiers réservés aux administrateurs
 # (installation, %ProgramData%\optiSCAN) et moteurs par chemin complet. Jamais optiSCAN.exe
 # ni optiSCAN.Service.exe en exclusion de processus (audit A3) : ils sont retirés s'ils y sont.

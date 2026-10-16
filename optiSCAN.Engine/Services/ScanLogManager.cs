@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Models;
 using System.Linq;
 using System.IO;
@@ -242,7 +243,7 @@ namespace optiSCAN.Services
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ScanLogManager", "WriteToLog", ex);
             }
@@ -264,7 +265,7 @@ namespace optiSCAN.Services
                     return;
                 File.Move(_textLogPath, _textLogPath + ".1", overwrite: true);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Debug("ScanLogManager", "Rotation du journal : " + ex.Message);
             }
@@ -284,7 +285,7 @@ namespace optiSCAN.Services
                 Array.Copy(lines, start, result, 0, result.Length);
                 return result;
             }
-            catch { return Array.Empty<string>(); }
+            catch (Exception ignored) when (!ignored.IsFatal()) { return Array.Empty<string>(); }
         }
 
         /// <summary>Chemin du fichier journal texte.</summary>
@@ -388,7 +389,7 @@ namespace optiSCAN.Services
             {
                 SecureStore.Save(_historyPath, _history);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ScanLogManager", "PersistHistory", ex);
             }
@@ -424,7 +425,7 @@ namespace optiSCAN.Services
             {
                 SecureStore.Save(_cleanHistoryPath, _cleanHistory);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ScanLogManager", "PersistCleanHistory", ex);
             }

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO;
 using System.Security.Principal;
 using System.Text.Json;
@@ -45,7 +46,7 @@ public sealed class ServiceDetectionLog
                 return null;
             return Path.Combine(OptiScanProgramData.DirectoryPath, "detections.json");
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return null;
         }
@@ -141,7 +142,7 @@ public sealed class ServiceDetectionLog
                 ? Environment.ExpandEnvironmentVariables(p)
                 : null;
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return null;
         }
@@ -169,7 +170,7 @@ public sealed class ServiceDetectionLog
             _paths.AddRange(stored.Paths.Skip(skip));
             _lastSequence = _items.Count > 0 ? _items[^1].Sequence : 0;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("ServiceDetectionLog", "Lecture des détections", ex);
         }
@@ -184,7 +185,7 @@ public sealed class ServiceDetectionLog
             AtomicFile.WriteAllText(_storePath, JsonSerializer.Serialize(
                 new Stored { Items = _items.ToList(), Paths = _paths.ToList() }, JsonOptions));
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("ServiceDetectionLog", "Écriture des détections", ex);
         }

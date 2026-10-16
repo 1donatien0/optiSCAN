@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Runtime.Versioning;
 using System.Security.AccessControl;
 using System.Security.Principal;
@@ -106,7 +107,7 @@ public static class InstallLocationTrust
 
             return true;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             reason = "droits illisibles (" + ex.GetType().Name + ")";
             return false;

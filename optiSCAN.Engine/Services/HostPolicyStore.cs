@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO;
 using System.Security.Principal;
 using System.Text.Json;
@@ -46,7 +47,7 @@ internal static class HostPolicyStore
             policy = read;
             return true;
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return false;
         }
@@ -211,7 +212,7 @@ internal static class HostPolicyStore
 
             AppLogger.Warn("HostPolicy", "Le service a refusé la politique : " + response.Message);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Debug("HostPolicy", $"Service injoignable : {ex.Message}");
         }
@@ -243,7 +244,7 @@ internal static class HostPolicyStore
                 AppLogger.Warn("HostPolicy", "Politique refusée par le service : " + response.Message);
             return response.Ok;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("HostPolicy", "Envoi de la politique", ex);
             return false;

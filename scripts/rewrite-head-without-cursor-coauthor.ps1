@@ -1,3 +1,4 @@
+﻿# SPDX-License-Identifier: GPL-3.0-or-later
 # Réécrit le commit HEAD sans ligne Co-authored-by: Cursor (contourne les hooks Cursor).
 # Usage : pwsh -File scripts/rewrite-head-without-cursor-coauthor.ps1 [-Branch win] [-Push]
 param(

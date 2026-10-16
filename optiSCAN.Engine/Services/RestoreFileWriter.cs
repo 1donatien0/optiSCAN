@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO;
 using Microsoft.Win32.SafeHandles;
 
@@ -46,7 +47,7 @@ internal static class RestoreFileWriter
                 Directory.CreateDirectory(dir);
             return SafePathDelete.CreateNew(fullPath);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Debug("RestoreFileWriter", "Création refusée : " + ex.Message);
             return null;
@@ -60,7 +61,7 @@ internal static class RestoreFileWriter
         var normalized = final == null ? null : RealTimePathGuard.NormalizeFinalPath(final);
         string requested;
         try { requested = Path.GetFullPath(requestedPath); }
-        catch { requested = string.Empty; }
+        catch (Exception ignored) when (!ignored.IsFatal()) { requested = string.Empty; }
 
         if (normalized == null
             || QuarantineManager.IsSensitivePath(normalized)
@@ -94,7 +95,7 @@ internal static class RestoreFileWriter
 
         public void Discard()
         {
-            try { _stream.Flush(); } catch { /* fichier abandonné */ }
+            try { _stream.Flush(); } catch (Exception ignored) when (!ignored.IsFatal()) { /* fichier abandonné */ }
             SafePathDelete.SetDeleteDisposition(_handle, true);
         }
 

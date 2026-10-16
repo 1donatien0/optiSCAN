@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Localization;
 using optiSCAN.Models;
 using System.IO;
@@ -46,7 +47,7 @@ namespace optiSCAN.Services
 
                 return TryCreateSafetyCopy(content);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ThreatRemediation", "TryCreateSafetyCopy", ex);
                 return false;
@@ -77,7 +78,7 @@ namespace optiSCAN.Services
                 PurgeSafetyCopies(root);
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ThreatRemediation", "TryCreateSafetyCopy", ex);
                 return false;
@@ -111,7 +112,7 @@ namespace optiSCAN.Services
                         return plaintext;
                     CryptographicOperations.ZeroMemory(plaintext);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Debug("ThreatRemediation", "Copie de sécurité illisible : " + ex.Message);
                 }
@@ -131,7 +132,7 @@ namespace optiSCAN.Services
             foreach (var file in FindSafetyCopies(root, sha256Hex))
             {
                 try { File.Delete(file); count++; }
-                catch (Exception ex) { AppLogger.Debug("ThreatRemediation", "Suppression copie : " + ex.Message); }
+                catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Debug("ThreatRemediation", "Suppression copie : " + ex.Message); }
             }
             return count;
         }
@@ -172,7 +173,7 @@ namespace optiSCAN.Services
                         total -= length;
                         removed++;
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (!ex.IsFatal())
                     {
                         AppLogger.Debug("ThreatRemediation", "Purge copie : " + ex.Message);
                     }
@@ -182,7 +183,7 @@ namespace optiSCAN.Services
                     AppLogger.Info("ThreatRemediation", $"{removed} copie(s) de sécurité supprimée(s) (conservation)");
                 return removed;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ThreatRemediation", "PurgeSafetyCopies", ex);
                 return 0;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Collections.Concurrent;
 using System.IO;
 
@@ -102,7 +103,7 @@ namespace optiSCAN.Services
         private void RaiseHealthChanged()
         {
             try { HealthChanged?.Invoke(this, EventArgs.Empty); }
-            catch (Exception ex) { AppLogger.Warn("RealTimeProtection", "HealthChanged", ex); }
+            catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("RealTimeProtection", "HealthChanged", ex); }
         }
         internal int PendingWatcherEvents => Volatile.Read(ref _pendingWatcherEvents);
         internal int MaxPendingWatcherEventsObserved => Volatile.Read(ref _maxPendingWatcherEventsObserved);
@@ -209,7 +210,7 @@ namespace optiSCAN.Services
             // entrées de plus de 5 min. Indépendant de l'arrivée d'événements,
             // ce qui évite la croissance silencieuse du cache si la machine reste inactive.
             _cacheCleanupTimer = new System.Threading.Timer(
-                _ => { try { CleanupRecentCache(); } catch { /* swallow */ } },
+                _ => { try { CleanupRecentCache(); } catch (Exception ignored) when (!ignored.IsFatal()) { /* swallow */ } },
                 state: null,
                 dueTime: TimeSpan.FromMinutes(5),
                 period: TimeSpan.FromMinutes(5));
@@ -305,7 +306,7 @@ namespace optiSCAN.Services
                     {
                         watcher.EnableRaisingEvents = true;
                     }
-                    catch
+                    catch (Exception ignored) when (!ignored.IsFatal())
                     {
                         _watchers.Remove(watcher);
                         throw;
@@ -313,7 +314,7 @@ namespace optiSCAN.Services
                 }
                 return watcher;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 watcher?.Dispose();
                 WriteLog($"Impossible de surveiller {PathRedaction.RedactPath(path)} : {PathRedaction.RedactPath(ex.Message)}");
@@ -381,7 +382,7 @@ namespace optiSCAN.Services
                 }
 
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 // Logger sans propager — protection temps réel ne doit JAMAIS crasher.
                 WriteLog($"[RTP] SurFichierModifie exception ({PathRedaction.RedactPath(e.FullPath)}): {PathRedaction.RedactPath(ex.Message)}");
@@ -440,7 +441,7 @@ namespace optiSCAN.Services
                 }
 
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 WriteLog($"[RTP] SurFichierRenomme exception ({PathRedaction.RedactPath(e.FullPath)}): {PathRedaction.RedactPath(ex.Message)}");
             }
@@ -466,7 +467,7 @@ namespace optiSCAN.Services
 
             Interlocked.Increment(ref _watcherQueueOverflowCount);
             try { HandleWatcherQueueOverflow(sender, filePath); }
-            catch (Exception ex) { AppLogger.Error("RealTimeProtection", "Could not schedule watcher overflow recovery", ex); }
+            catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Error("RealTimeProtection", "Could not schedule watcher overflow recovery", ex); }
             return false;
         }
 
@@ -571,7 +572,7 @@ namespace optiSCAN.Services
                 _ = Task.Run(() => RunWatcherRecoveryLoopAsync(state, token));
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 lock (_watcherEventGate)
                     FinishWatcherRecoveryWorkerUnderLock(state);
@@ -633,7 +634,7 @@ namespace optiSCAN.Services
                 lock (_watcherEventGate)
                     FinishWatcherRecoveryWorkerUnderLock(state);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 lock (_watcherEventGate)
                     FinishWatcherRecoveryWorkerUnderLock(state);
@@ -717,7 +718,7 @@ namespace optiSCAN.Services
                         stableSamples = 0;
                     }
                 }
-                catch
+                catch (Exception ignored) when (!ignored.IsFatal())
                 {
                     stableSamples = 0;
                 }
@@ -792,7 +793,7 @@ namespace optiSCAN.Services
                 // Arrêt demandé : le worker est terminé par le coordinateur.
                 return null;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 WriteLog($"Récupération du watcher impossible ({PathRedaction.RedactPath(path)}) : {PathRedaction.RedactPath(ex.Message)}");
                 return null;
@@ -895,7 +896,7 @@ namespace optiSCAN.Services
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 WriteLog($"[RTP] Erreur scan {PathRedaction.RedactPath(filePath)} : {PathRedaction.RedactPath(ex.Message)}");
             }
@@ -921,7 +922,7 @@ namespace optiSCAN.Services
                 using var stream = new FileStream(handle, FileAccess.Read, bufferSize: 0);
                 staged = ScanStaging.Stage(stream, Path.GetFileName(filePath), sourceLength);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 return (CreateStagingFailure(filePath, ex.Message), null);
             }

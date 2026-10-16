@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Models;
 using optiSCAN.Platform;
 using System.Diagnostics;
@@ -54,7 +55,7 @@ public static class PlatformProtectionBootstrap
             using var client = new Platform.ProtectionPipeClient(timeout: ReachabilityTimeout);
             active = client.IsServiceReachable();
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             active = false;
         }
@@ -165,7 +166,7 @@ public static class PlatformProtectionBootstrap
             AppLogger.Info("PlatformProtection", "Service Windows enregistré");
             return true;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("PlatformProtection", "TryInstallWindowsService", ex);
             return false;
@@ -198,7 +199,7 @@ public static class PlatformProtectionBootstrap
 
             return IsRemoteProtectionActive(useCache: false);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("PlatformProtection", "TryStartWindowsService", ex);
             return false;
@@ -223,7 +224,7 @@ public static class PlatformProtectionBootstrap
             Process.Start(psi);
             AppLogger.Info("PlatformProtection", "Processus --service-host lancé (secours)");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("PlatformProtection", "TryLaunchServiceHostProcess", ex);
         }
@@ -236,7 +237,7 @@ public static class PlatformProtectionBootstrap
             if (IsServiceInstalled())
                 RunSc($"stop {ServiceName}");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("PlatformProtection", "TryStopWindowsService", ex);
         }
@@ -250,7 +251,7 @@ public static class PlatformProtectionBootstrap
             if (IsServiceInstalled())
                 RunSc($"delete {ServiceName}");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("PlatformProtection", "TryUninstallWindowsService", ex);
         }
@@ -276,7 +277,7 @@ public static class PlatformProtectionBootstrap
             proc.WaitForExit(5_000);
             return proc.ExitCode == 0 && output.Contains("SERVICE_NAME", StringComparison.OrdinalIgnoreCase);
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return false;
         }
@@ -296,7 +297,7 @@ public static class PlatformProtectionBootstrap
             return -1;
         if (!proc.WaitForExit(30_000))
         {
-            try { proc.Kill(); } catch { /* déjà terminé */ }
+            try { proc.Kill(); } catch (Exception ignored) when (!ignored.IsFatal()) { /* déjà terminé */ }
             return -1;
         }
         return proc.ExitCode;

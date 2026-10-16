@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Models;
 using System.IO;
 
@@ -20,7 +21,7 @@ public sealed class CloudThreatIntelService
             var report = await _reputation.LookupFileAsync(threat.FilePath, ct).ConfigureAwait(false);
             return report.Success ? report.Summary : null;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("CloudThreatIntel", "EnrichThreatAsync", ex);
             return null;

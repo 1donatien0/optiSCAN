@@ -1,9 +1,26 @@
-# Prototype AMSI — non livré
+# Fournisseur AMSI — optiSCAN
 
-`optiSCAN.AmsiProvider` est un prototype natif conservé dans le dépôt. Il ne fait pas partie de la candidate v3.1 : le projet n'est pas compilé par la CI, la DLL n'est pas copiée au publish/installeur et Windows ne charge pas le fournisseur.
+Licence : GPL-3.0-or-later.
 
-`PlatformRegistration.TryRegisterAmsiProvider()` est volontairement un no-op qui journalise que le fournisseur n'est pas signé et n'est pas chargé. `TryUnregisterAmsiProvider()` ne fait que nettoyer une éventuelle ancienne entrée AMSI laissée par une version antérieure.
+`optiSCAN.AmsiProvider.dll` est livré avec le service de protection (3.1). Windows le charge dans les processus qui exécutent des scripts ou du contenu dynamique (PowerShell, hôte de scripts JScript/VBScript, macros Office, chargement d'assemblages .NET) et lui soumet ce contenu avant exécution.
 
-Le fichier `protection_identifiers.h` est le miroir des identifiants définis dans `optiSCAN.Platform/ProtectionIdentifiers.cs`. Les tests vérifient qu'ils restent synchronisés ; ce partage de constantes ne signifie pas que le prototype fonctionne.
+## Fonctionnement
 
-Ne pas copier ni enregistrer cette DLL pour une installation courante. Une éventuelle reprise exige une implémentation complète, une revue de sécurité, la chaîne de signature correspondante et une validation spécifique sous Windows avant toute intégration au produit.
+1. Le fournisseur lit au plus 512 Kio du contenu et le nom de l'application.
+2. Il vérifie que le serveur du tube `\\.\pipe\optiSCAN_Protection` est bien l'hôte du service : session 0, image `optiSCAN.Host.exe` ou `optiSCAN.Service.exe`, processus du service `optiSCANProtection` ou enfant direct créé après lui.
+3. Il envoie `scan_buffer` ; l'hôte copie le contenu dans `scan-staging` et l'analyse avec ClamAV et YARA dans leur AppContainer. Les résultats sont gardés 10 minutes par empreinte SHA-256.
+4. Menace : `AMSI_RESULT_DETECTED` ; Windows bloque l'exécution.
+
+**Fail-open** : service arrêté, tube absent, délai dépassé (250 ms de connexion, 3 s d'analyse), limite de débit atteinte ou erreur : le contenu passe. Le fournisseur ne doit jamais bloquer une application à cause d'un défaut d'optiSCAN. Aucune exception C++ ne sort d'une méthode COM.
+
+## Compilation et livraison
+
+- `scripts/build-amsi.ps1` (Visual Studio 2022, outils C++ v143, x64) ; `-Require` en CI et en release.
+- `scripts/stage-amsi.ps1` copie la DLL dans le dossier publié ; l'installeur l'enregistre (`regserver`) avec la tâche « service de protection » et la retire à la désinstallation.
+- CRT statique (`/MT`), CFG et CET activés, avertissements traités en erreurs.
+- Signée par SignPath avec les autres binaires (`.signpath/artifact-configurations/binaries.xml`). Windows peut exiger une signature Authenticode des fournisseurs (`HKLM\SOFTWARE\Microsoft\AMSI\FeatureBits` = 0x2) ; par défaut la vérification est désactivée.
+
+## Tests
+
+- `AmsiScanBufferTests` : côté service (désactivé par défaut, détection, cache, tailles, noms de copie).
+- `AmsiProviderNativeTests` : charge la DLL compilée par la fabrique COM, vérifie le nom affiché, l'analyse d'un flux et le fail-open sans service.

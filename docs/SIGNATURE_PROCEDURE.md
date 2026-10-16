@@ -1,59 +1,100 @@
 # Procédure de signature de code — optiSCAN
 
-**État : 5 octobre 2026 — v3.1 candidate.** Cette procédure décrit la chaîne actuellement configurée. La signature Authenticode est facultative : sans certificat configuré, la publication continue et les artefacts optiSCAN restent non signés.
+**État : 15 octobre 2026 — v3.1 candidate.** optiSCAN est un logiciel libre (GNU GPL v3 ou ultérieure). Une seule chaîne de signature existe : **SignPath Foundation**, qui signe gratuitement les projets open source acceptés. L'ancienne chaîne par certificat PFX (`codesign.ps1`, `sign-publish-artifacts.ps1`, `dev-codesign.ps1`, secrets `CODESIGN_*`, option `-CertSubject`) est retirée.
 
-## Artefacts de la version courante
+## Licence et signature : deux choses distinctes
 
-Quand le secret de signature est configuré, la CI signe les binaires applicatifs publiés (`optiSCAN.exe`, DLL de l'application, service et plateforme), puis l'installeur Inno et son désinstalleur. Le PFX est importé temporairement dans le magasin utilisateur et `signtool` sélectionne le certificat par empreinte. Le mot de passe ne passe pas en argument de processus ; le PFX temporaire et la clé importée sont retirés à la fin du job.
+- La **licence GPL v3** dit ce que chacun a le droit de faire du code. Elle est en place (`LICENSE.txt`).
+- La **signature Authenticode** prouve qu'un binaire vient bien du projet. Elle est apposée par un certificat délivré par une autorité, ici celui de SignPath Foundation, sur des binaires compilés par GitHub Actions.
 
-Les moteurs ne suivent pas cette chaîne Authenticode : l'archive ClamAV est vérifiée par signature GPG Talos et SHA-256 ; le moteur YARA par SHA-256 épinglé. **AMSI et le minifiltre ne sont pas livrés** : leurs prototypes sous `native/` ne sont ni compilés par la CI, ni inclus dans le publish/installeur, ni enregistrés/chargés. Il ne faut pas suivre les anciennes étapes de signature et d'installation de ces prototypes pour une release v3.1.
+Tant que SignPath n'a pas accepté le projet et qu'aucun tag de release n'a été poussé, **aucun binaire n'est signé**. La chaîne est prête ; elle produit sa première signature à la première release approuvée.
 
-## Signature dans GitHub Actions
+## Ce qui est signé
 
-Dans les secrets du dépôt, configurer :
+Voir la [politique de signature](CODE_SIGNING_POLICY.md) : `optiSCAN.exe`, `optiSCAN.Service.exe`, `optiSCAN.Host.exe` et leurs DLL (`optiSCAN.dll`, `optiSCAN.Service.dll`, `optiSCAN.Host.dll`, `optiSCAN.Engine.dll`, `optiSCAN.Platform.dll`), puis l'installeur `optiSCAN_Setup_vX.Y.Z.exe`. Le désinstalleur Inno, enfermé dans l'installeur à la compilation, n'est pas signé : Inno ne le signe que si `signtool` est disponible pendant la compilation, ce que la chaîne SignPath exclut.
 
-| Secret | Valeur |
-|---|---|
-| `CODESIGN_PFX` | Contenu base64 du certificat PFX |
-| `CODESIGN_PASSWORD` | Mot de passe du PFX |
+Les moteurs tiers ne passent pas par cette chaîne : archive ClamAV vérifiée par signature GPG Talos et SHA-256, YARA par SHA-256 épinglé. **AMSI et le minifiltre ne sont pas livrés** (prototypes sous `native/`, hors v3.1).
 
-Le job `publish` de [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) appelle `scripts/codesign.ps1 -Prepare`. Si `CODESIGN_PFX` est absent, il saute les étapes de signature et poursuit le build. Sinon, le job signe les binaires de l'application, puis appelle `installer/build-release-setup.ps1 -SignPfxPath` pour l'installeur et le désinstalleur. L'étape de nettoyage retire le PFX temporaire.
+## Mise en place (une seule fois)
 
-Le timestamp RFC 3161 est demandé à `http://timestamp.digicert.com`. `scripts/codesign.ps1` vérifie ensuite la signature des fichiers signés.
+### Étape 1 — Committer et pousser la candidate
 
-## Signature locale
+Tout le travail de la v3.1 est dans l'arbre de travail : le committer sur `dev` (découpage du [plan de release](../RELEASE_PLAN_v3.1.md#1-préparer-lhistorique-git-local)), vérifier la CI, puis fusionner dans `main`.
 
-Prérequis : Windows, Windows SDK (`signtool.exe`), un PFX autorisé à signer les fichiers, et le publish Release win-x64. Fournir `CODESIGN_PASSWORD` dans l'environnement du processus PowerShell depuis un gestionnaire de secrets ; ne pas écrire le mot de passe dans la commande ou dans un fichier versionné.
+### Étape 2 — Purger l'historique (303 Mo, audit R15)
+
+L'historique contient d'anciens installeurs et les binaires ClamAV/YARA (dont UnRAR). Sur une copie fraîche, jamais sur le dossier de travail :
 
 ```powershell
-$publish = (Resolve-Path .\publish\win-x64).Path
-$files = @(
-    (Join-Path $publish 'optiSCAN.exe'),
-    (Join-Path $publish 'optiSCAN.dll'),
-    (Join-Path $publish 'optiSCAN.Service.exe'),
-    (Join-Path $publish 'optiSCAN.Service.dll'),
-    (Join-Path $publish 'optiSCAN.Platform.dll')
-)
-
-pwsh -File scripts\codesign.ps1 -Sign -PfxPath .\cert.pfx -Files $files
-pwsh -File installer\build-release-setup.ps1 -SkipPublish `
-    -PublishDir $publish -SignPfxPath .\cert.pfx
+git clone --mirror https://github.com/1donatien0/optiSCAN.git optiSCAN-sauvegarde.git   # sauvegarde intacte
+pip install git-filter-repo
+git clone https://github.com/1donatien0/optiSCAN.git optiSCAN-propre
+cd optiSCAN-propre
+git filter-repo --invert-paths --path installer/output `
+  --path-glob 'optiSCAN/clamav/*/*.exe' --path-glob 'optiSCAN/clamav/*/*.dll' `
+  --path-glob 'optiSCAN/yara/*.exe'
+git count-objects -vH                                  # vérifier la taille
+git remote add origin https://github.com/1donatien0/optiSCAN.git
+git push --force --all origin; git push --force --tags origin
 ```
 
-`codesign.ps1` importe le certificat dans `CurrentUser\My`, le sélectionne par empreinte, signe les binaires listés, les vérifie, puis retire la clé importée. `build-release-setup.ps1 -SignPfxPath` applique la même méthode à l'installeur et au désinstalleur Inno. Sans certificat, lancer la chaîne de publication sans ces options.
+Puis recloner le dépôt sur chaque poste : les anciens clones ne doivent plus être poussés.
 
-L'option `scripts/publish-release.ps1 -CertSubject` signe l'application, le service et les DLL plateforme publiés, mais pas l'installeur ni son désinstalleur. Utiliser la procédure ci-dessus pour une publication entièrement signée.
+### Étape 3 — Rendre le dépôt public
+
+GitHub > dépôt > *Settings* > *General* > *Danger Zone* > *Change repository visibility* > *Public*. Activer l'authentification à deux facteurs du compte GitHub (exigence SignPath). La GPL v3 impose aussi que le code source soit disponible dès qu'on distribue les binaires : le dépôt public le satisfait.
+
+### Étape 4 — Publier une première version non signée
+
+SignPath Foundation exige un projet déjà publié. Récupérer l'installeur produit par la CI (artefact `optiSCAN-win-x64-<sha>` ou installeur du job *Publish*), créer une release GitHub `v3.1.0-beta.1` marquée *pre-release*, et y mettre le lien vers la [politique de signature](CODE_SIGNING_POLICY.md) (la page de téléchargement doit la citer).
+
+### Étape 5 — Candidater
+
+Formulaire : <https://signpath.org/apply>. Indiquer : dépôt GitHub public, licence GPL-3.0-or-later, build GitHub Actions (`.github/workflows/release.yml`), lien de la politique de signature, mainteneur et approbateur (Dona By). Signaler d'emblée UnRAR (livré par ClamAV, licence non libre ; on peut livrer ClamAV sans `libclamunrar`) et les licences par règle de YARA-Forge (audit R16). Attendre la réponse.
+
+### Étape 6 — Configurer SignPath après acceptation
+
+Dans l'interface SignPath (connexion avec double authentification) :
+
+1. Ajouter le système de build de confiance *GitHub.com* à l'organisation et le lier au projet.
+2. Installer l'application GitHub de SignPath et lui donner accès au dépôt `optiSCAN`.
+3. Projet `optiSCAN` : créer les configurations d'artefacts `binaries` et `installer` en collant le contenu de [`.signpath/artifact-configurations/`](../.signpath/artifact-configurations).
+4. Politiques de signature `test-signing` puis `release-signing` (approbateur : Dona By).
+5. Créer un utilisateur CI avec le rôle de soumetteur et générer son jeton d'API.
+
+### Étape 7 — Renseigner GitHub
+
+*Settings* > *Secrets and variables* > *Actions* :
+
+| Type | Nom | Valeur |
+|---|---|---|
+| Secret | `SIGNPATH_API_TOKEN` | Jeton de l'utilisateur CI SignPath |
+| Variable | `SIGNPATH_ORGANIZATION_ID` | Identifiant de l'organisation SignPath |
+| Variable | `SIGNPATH_PROJECT_SLUG` | `optiSCAN` |
+| Variable | `SIGNPATH_SIGNING_POLICY` | `test-signing` pour le premier essai, puis `release-signing` |
+
+### Étape 8 — Essai avec la politique de test
+
+Lancer *Actions* > *Release — Build, sign (SignPath) & draft* > *Run workflow* sur `main`, approuver la demande dans SignPath, vérifier que le brouillon contient un installeur signé (certificat de test). Supprimer ce brouillon.
+
+## Publier une release signée
+
+1. Passer `SIGNPATH_SIGNING_POLICY` à `release-signing`, mettre à jour `<Version>` dans `Directory.Build.props`.
+2. Pousser le tag `vX.Y.Z` correspondant sur `main` (`git tag v3.1.0` puis `git push origin v3.1.0`).
+3. [`release.yml`](../.github/workflows/release.yml) compile, teste, publie, envoie les binaires à SignPath, attend l'**approbation manuelle** de l'approbateur, vérifie les signatures, compile l'installeur, le fait signer, calcule les empreintes et crée un brouillon de release.
+4. Relire le brouillon et le publier.
+5. Soumettre les binaires signés à Microsoft comme faux positif (Defender détectait `optiSCAN.exe` non signé), puis retirer l'exclusion du dossier d'installation (audit R1, R6).
 
 ## Vérification manuelle
 
 ```powershell
-signtool verify /v /pa .\publish\win-x64\optiSCAN.exe
-signtool verify /v /pa .\installer\output\optiSCAN_Setup_v3.1.0.exe
+Get-AuthenticodeSignature .\optiSCAN.exe | Format-List Status, SignerCertificate
+signtool verify /v /pa .\optiSCAN_Setup_v3.1.0.exe
 ```
 
-## Références de la chaîne
+## Références
 
-- [`scripts/codesign.ps1`](../scripts/codesign.ps1) — signature des binaires applicatifs
-- [`installer/build-release-setup.ps1`](../installer/build-release-setup.ps1) — signature Inno
-- [`.github/workflows/ci.yml`](../.github/workflows/ci.yml) — publication et nettoyage du certificat
+- [`docs/CODE_SIGNING_POLICY.md`](CODE_SIGNING_POLICY.md) — politique publiée (exigée par SignPath Foundation)
+- [`.github/workflows/release.yml`](../.github/workflows/release.yml) — chaîne de release signée
+- [`.signpath/artifact-configurations/`](../.signpath/artifact-configurations) — fichiers signés et noms de produit attendus
 - [`SECURITY.md`](../SECURITY.md) — posture et chaîne d'approvisionnement

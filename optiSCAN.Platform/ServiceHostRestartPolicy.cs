@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 namespace optiSCAN.Platform;
 
 /// <summary>Backoff et limites de relance pour le superviseur --service-host.</summary>

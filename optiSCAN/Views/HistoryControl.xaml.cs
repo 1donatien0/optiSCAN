@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Coordinators;
 using optiSCAN.Localization;
 
@@ -462,7 +463,7 @@ namespace optiSCAN.Views
 
             try { return TryFindResource(key) as Brush; }
 
-            catch { return null; }
+            catch (Exception ignored) when (!ignored.IsFatal()) { return null; }
 
         }
 

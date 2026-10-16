@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 namespace optiSCAN.Services;
 
 /// <summary>Accès testable aux exclusions / RTP (remplace <see cref="ExclusionSettings.Current"/> direct).</summary>

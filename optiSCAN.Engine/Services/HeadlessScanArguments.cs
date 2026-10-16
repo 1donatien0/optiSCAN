@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 namespace optiSCAN.Services
 {
     /// <summary>Arguments de ligne de commande pour scans sans interface (tâche planifiée).</summary>

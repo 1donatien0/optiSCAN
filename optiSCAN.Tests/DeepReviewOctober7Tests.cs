@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Services;
 
 namespace optiSCAN.Tests;
@@ -223,9 +224,6 @@ public sealed class DeepReviewOctober7Tests : IDisposable
         }
     }
 
-    // ── Z4 : scan_buffer fermé ────────────────────────────────────────────────────
-
-    [Fact]
-    public void Scan_buffer_stays_closed_while_amsi_is_not_shipped() =>
-        Assert.False(ProtectionPipeServer.ScanBufferEnabled);
+    // ── Z4 : scan_buffer fermé par défaut, ouvert seulement par l'hôte (AMSI) ─────────
+    // Voir AmsiScanBufferTests.
 }

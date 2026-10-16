@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Windows.Input;
 
 namespace optiSCAN
@@ -54,7 +55,7 @@ namespace optiSCAN
             {
                 await _execute(parameter); // contexte UI conservé : la suite touche CommandManager
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 // Logguer l'exception pour éviter un crash silencieux du process
                 // Les async void crashent le process si une exception n'est pas gérée

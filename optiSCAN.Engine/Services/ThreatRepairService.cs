@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Models;
 using System.Diagnostics;
 using System.IO;
@@ -91,7 +92,7 @@ public static class ThreatRepairService
             if (!proc.WaitForExit(DefenderScanTimeoutMs))
             {
                 try { proc.Kill(entireProcessTree: true); }
-                catch (Exception killEx) { AppLogger.Debug("ThreatRepairService", "Arrêt MpCmdRun : " + killEx.Message); }
+                catch (Exception killEx) when (!killEx.IsFatal()) { AppLogger.Debug("ThreatRepairService", "Arrêt MpCmdRun : " + killEx.Message); }
                 return new RepairResult { Success = false, UsedDefenderFallback = true, Message = "Defender MpCmdRun : délai dépassé" };
             }
 
@@ -102,7 +103,7 @@ public static class ThreatRepairService
                 Message = $"Defender MpCmdRun exit={proc.ExitCode}",
             };
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("ThreatRepairService", "TryDefenderTargetedScan", ex);
             return new RepairResult { Success = false, Message = ex.Message };

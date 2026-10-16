@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 namespace optiSCAN.Services;
 
 /// <summary>Limite le débit des opérations de scan IPC (anti-DoS local sur le pipe).</summary>

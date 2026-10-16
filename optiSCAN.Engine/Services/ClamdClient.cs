@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Buffers.Binary;
 using System.IO;
 using System.IO.Pipes;
@@ -234,9 +235,9 @@ namespace optiSCAN.Services
 
         private void DisposeSocket()
         {
-            try { _reader?.Dispose(); } catch (Exception ex) { AppLogger.Warn("ClamdClient", "Dispose reader failed", ex); }
-            try { _stream?.Dispose(); } catch (Exception ex) { AppLogger.Warn("ClamdClient", "Dispose stream failed", ex); }
-            try { _client?.Dispose(); } catch (Exception ex) { AppLogger.Warn("ClamdClient", "Dispose client failed", ex); }
+            try { _reader?.Dispose(); } catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("ClamdClient", "Dispose reader failed", ex); }
+            try { _stream?.Dispose(); } catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("ClamdClient", "Dispose stream failed", ex); }
+            try { _client?.Dispose(); } catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("ClamdClient", "Dispose client failed", ex); }
             _reader = null;
             _stream = null;
             _client = null;

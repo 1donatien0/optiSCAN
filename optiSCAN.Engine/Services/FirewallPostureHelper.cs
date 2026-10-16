@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using Microsoft.Win32;
 using System.Runtime.Versioning;
 
@@ -39,7 +40,7 @@ namespace optiSCAN.Services
                     if (key.GetValue("EnableFirewall") is not int enabled || enabled == 0)
                         return false;
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Warn("FirewallPosture", profile, ex);
                     return false;

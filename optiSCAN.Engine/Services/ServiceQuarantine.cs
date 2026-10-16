@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO;
 using System.Security.Cryptography;
 using System.Security.Principal;
@@ -37,7 +38,7 @@ internal static class ServiceQuarantineStore
             using var identity = WindowsIdentity.GetCurrent();
             return identity.IsSystem;
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return false;
         }
@@ -95,7 +96,7 @@ internal static class ServiceQuarantineStore
             AppLogger.Info("ServiceQuarantine", "Quarantaine du service déplacée du profil SYSTEM vers ProgramData.");
             return true;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("ServiceQuarantine", "Migration de la quarantaine du service", ex);
             return false;
@@ -194,7 +195,7 @@ internal sealed class ServiceQuarantineAdmin
                 target = Path.GetFullPath(entry.OriginalPath);
             }
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return ProtectionPipeResponse.Error("Chemin de restauration invalide");
         }
@@ -226,7 +227,7 @@ internal sealed class ServiceQuarantineAdmin
                     file.Stream.Write(plaintext, 0, plaintext.Length);
                     file.Stream.Flush();
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Warn("ServiceQuarantine", $"Écriture de la restauration ({entry.Id})", ex);
                     file.Discard();

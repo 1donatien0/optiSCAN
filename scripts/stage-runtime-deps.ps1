@@ -1,3 +1,4 @@
+﻿# SPDX-License-Identifier: GPL-3.0-or-later
 <#
 .SYNOPSIS
     Copie clamav / yara / rules / certificats du projet vers un dossier de publication.

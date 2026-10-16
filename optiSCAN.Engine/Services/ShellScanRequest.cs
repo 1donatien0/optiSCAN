@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO;
 
 namespace optiSCAN.Services;
@@ -40,7 +41,7 @@ public static class ShellScanRequest
             }
             return string.IsNullOrWhiteSpace(path) ? null : path;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("ShellScanRequest", "TryConsume", ex);
             return null;

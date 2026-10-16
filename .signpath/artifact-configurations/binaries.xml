@@ -28,5 +28,9 @@
     <pe-file path="optiSCAN.Host.dll" product-name="optiSCAN">
       <authenticode-sign />
     </pe-file>
+    <!-- Fournisseur AMSI (C++) : chargé par Windows dans les processus qui exécutent des scripts. -->
+    <pe-file path="optiSCAN.AmsiProvider.dll" product-name="optiSCAN">
+      <authenticode-sign />
+    </pe-file>
   </zip-file>
 </artifact-configuration>

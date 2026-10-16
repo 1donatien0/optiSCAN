@@ -1,3 +1,4 @@
+﻿# SPDX-License-Identifier: GPL-3.0-or-later
 <#
 .SYNOPSIS
     Chaîne de préparation des releases v3.x (dépôt -> installateur testé).

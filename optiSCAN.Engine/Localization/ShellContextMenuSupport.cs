@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using Microsoft.Win32;
 using optiSCAN.Services;
 
@@ -50,7 +51,7 @@ namespace optiSCAN.Localization
                 foreach (var shellKey in ShellKeys)
                     RegisterMenu(shellKey, StableMenuKey, displayName, exe);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ShellContextMenu", "ApplyForCurrentCulture", ex);
             }
@@ -89,7 +90,7 @@ namespace optiSCAN.Localization
                 using var shell = Registry.CurrentUser.OpenSubKey(shellKey, writable: true);
                 shell?.DeleteSubKeyTree(name, throwOnMissingSubKey: false);
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 /* menu absent */
             }

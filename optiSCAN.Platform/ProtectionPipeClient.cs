@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO.Pipes;
 using System.Text;
 using System.Text.Json;
@@ -25,7 +26,7 @@ public sealed class ProtectionPipeClient : IDisposable
                 .GetAwaiter().GetResult();
             return response.Ok;
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return false;
         }
@@ -84,7 +85,7 @@ public sealed class ProtectionPipeClient : IDisposable
                 AuthToken = token,
             }, ct).ConfigureAwait(false);
         }
-        catch { /* service en cours d'arrêt */ }
+        catch (Exception ignored) when (!ignored.IsFatal()) { /* service en cours d'arrêt */ }
     }
 
     public async Task<ProtectionPipeResponse> SendAsync(ProtectionPipeRequest request, CancellationToken ct = default)
