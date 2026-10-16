@@ -43,7 +43,7 @@ $srcX64Certs = Join-Path $src 'clamav\x64\certs'
 $pubX64Certs = Join-Path $pub 'clamav\x64\certs'
 if (Test-Path -LiteralPath $srcX64Certs) {
     New-Item -ItemType Directory -Force -Path $pubX64Certs | Out-Null
-    Copy-Item -LiteralPath (Join-Path $srcX64Certs '*') -Destination $pubX64Certs -Recurse -Force
+    Copy-Item -Path (Join-Path ([WildcardPattern]::Escape($srcX64Certs)) '*') -Destination $pubX64Certs -Recurse -Force
     Write-Host "  Copie clamav\x64\certs" -ForegroundColor DarkGray
 }
 Copy-Tree 'yara'
