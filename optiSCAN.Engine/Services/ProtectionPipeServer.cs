@@ -210,6 +210,7 @@ public sealed class ProtectionPipeServer : IDisposable
             using var deadline = CancellationTokenSource.CreateLinkedTokenSource(ct);
             deadline.CancelAfter(TimeSpan.FromSeconds(1));
             await pipe.WriteAsync(busy, deadline.Token).ConfigureAwait(false);
+            await WaitForClientReadAsync(pipe, deadline.Token).ConfigureAwait(false);
         }
         catch (Exception ex) when (!ex.IsFatal())
         {
@@ -319,10 +320,34 @@ public sealed class ProtectionPipeServer : IDisposable
         {
             await pipe.WriteAsync(outBytes, writeDeadline.Token).ConfigureAwait(false);
             await pipe.FlushAsync(writeDeadline.Token).ConfigureAwait(false);
+            await WaitForClientReadAsync(pipe, writeDeadline.Token).ConfigureAwait(false);
         }
         catch (OperationCanceledException) when (!ct.IsCancellationRequested)
         {
             AppLogger.Debug("ProtectionPipeServer", "Réponse abandonnée : le client ne lit pas");
+        }
+    }
+
+    /// <summary>
+    /// <c>Disconnect</c> (DisconnectNamedPipe) jette ce que le client n'a pas encore lu, et
+    /// <c>FlushAsync</c> n'attend pas sa lecture : sans cette attente, un client lent recevait
+    /// une réponse vide. L'attente reste bornée par <paramref name="ct"/> ; passé ce délai, la
+    /// déconnexion débloque <c>WaitForPipeDrain</c>.
+    /// </summary>
+    private static async Task WaitForClientReadAsync(NamedPipeServerStream pipe, CancellationToken ct)
+    {
+        var drain = Task.Run(pipe.WaitForPipeDrain, CancellationToken.None);
+        _ = drain.ContinueWith(t => _ = t.Exception, TaskContinuationOptions.OnlyOnFaulted);
+        var finished = await Task.WhenAny(drain, Task.Delay(Timeout.Infinite, ct)).ConfigureAwait(false);
+        if (finished != drain)
+            throw new OperationCanceledException(ct);
+        try
+        {
+            await drain.ConfigureAwait(false);
+        }
+        catch (IOException)
+        {
+            // Client déjà parti : rien à attendre.
         }
     }
 
