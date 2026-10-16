@@ -40,13 +40,22 @@ jobs:
         env:
           OPTISCAN_REQUIRE_ENGINES: '1'
         run: >
-          dotnet test optiSCAN.Tests/optiSCAN.Tests.csproj
+          dotnet test
+          --project optiSCAN.Tests/optiSCAN.Tests.csproj
           --configuration Release
           --no-build
-          --settings optiSCAN.Tests/coverlet.runsettings
-          --logger "trx;LogFileName=test-results.trx"
           --results-directory TestResults
-          --collect:"XPlat Code Coverage"
+          --
+          --report-xunit-trx
+          --report-xunit-trx-filename test-results.trx
+          --coverlet
+          --coverlet-output-format cobertura
+          --coverlet-exclude "[*.Tests]*"
+          --coverlet-exclude "[*]optiSCAN.App*"
+          --coverlet-exclude-by-file "**/obj/**"
+          --coverlet-exclude-by-file "**/*g.cs"
+          --coverlet-exclude-by-file "**/*g.i.cs"
+          --coverlet-exclude-by-file "**/Migrations/**"
 
       - name: Upload test results
         if: always()
@@ -60,7 +69,7 @@ jobs:
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
         with:
           name: coverage-report
-          path: TestResults/**/coverage.cobertura.xml
+          path: TestResults/**/coverage.cobertura*.xml
           retention-days: 14
 
       - name: Code coverage summary and threshold
@@ -69,7 +78,7 @@ jobs:
         run: |
           $floor = 0.40
           $target = 0.50
-          $file = Get-ChildItem -Path TestResults -Recurse -Filter coverage.cobertura.xml -ErrorAction SilentlyContinue | Select-Object -First 1
+          $file = Get-ChildItem -Path TestResults -Recurse -Filter 'coverage.cobertura*.xml' -ErrorAction SilentlyContinue | Select-Object -First 1
           if (-not $file) {
             Write-Error "No coverage file found."
             exit 1

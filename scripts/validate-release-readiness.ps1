@@ -29,7 +29,7 @@ Write-Host ""
 Push-Location $repo
 try {
     Write-Host "[ Tests Release ]" -ForegroundColor Cyan
-    dotnet test optiSCAN.Tests\optiSCAN.Tests.csproj -c Release
+    dotnet test --project optiSCAN.Tests\optiSCAN.Tests.csproj -c Release
     if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 
     if ($WithPublishCheck) {

@@ -852,7 +852,7 @@ Les deux langues sont **incluses dans le même binaire** (pas de pack de langue 
 Ajouter une clé : même nom dans les deux `.resx` → XAML `{loc:Loc Key=...}` ou C# `LocalizationService.GetString` / `Format`.
 
 ```powershell
-dotnet test optiSCAN.Tests\optiSCAN.Tests.csproj -c Release --filter Localization
+dotnet test --project optiSCAN.Tests\optiSCAN.Tests.csproj -c Release -- --filter-class '*Localization*'
 ```
 
 Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de menaces, chemins, marques ClamAV/YARA. L’UI **Historique** n’affiche pas le libellé moteur (`DetectedBy`) — réservé au pipeline interne.
@@ -1068,7 +1068,7 @@ optiSCAN est un logiciel libre : Copyright 2026 Dona By, distribué sous la [GNU
 
 ```powershell
 dotnet build optiSCAN.sln -c Release
-dotnet test optiSCAN.Tests\optiSCAN.Tests.csproj -c Release
+dotnet test --project optiSCAN.Tests\optiSCAN.Tests.csproj -c Release
 ```
 
 ### 12.1 Maintenabilité et choix volontaires (non bloquants, v3.0)

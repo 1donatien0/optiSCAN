@@ -57,7 +57,7 @@ if (-not $SkipFetch) {
 
 if (-not $SkipTests) {
     Invoke-Step 'Tests Release' {
-        dotnet test (Join-Path $root 'optiSCAN.Tests\optiSCAN.Tests.csproj') -c Release
+        dotnet test --project (Join-Path $root 'optiSCAN.Tests\optiSCAN.Tests.csproj') -c Release
     }
 }
 
