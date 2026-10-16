@@ -140,6 +140,19 @@ function Assert-TalosSignature([string] $ZipPath, [string] $ZipUrl) {
     }
 }
 
+# UnRAR (libclamunrar, COPYING.unrar) n'est pas sous licence libre : il n'est pas livré.
+# Sans lui, libclamav démarre normalement mais n'ouvre pas les archives RAR.
+$unrarPattern = '(?i)unrar'
+
+function Remove-ClamUnrar {
+    $leftovers = @(Get-ChildItem -LiteralPath (Split-Path -Parent $clamX64) -Recurse -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match $unrarPattern })
+    foreach ($f in $leftovers) {
+        Remove-Item -LiteralPath $f.FullName -Force
+        Write-Host "  retire $($f.Name) (UnRAR non livre)" -ForegroundColor DarkGray
+    }
+}
+
 function Test-ClamReady {
     $missing = @('clamscan.exe', 'freshclam.exe', 'clamd.exe', 'libclamav.dll', 'libfreshclam.dll') |
         ForEach-Object { Test-Path (Join-Path $clamX64 $_) } | Where-Object { $_ -eq $false } | Measure-Object |
@@ -183,7 +196,8 @@ function Copy-ClamAvRuntime([string] $srcDir, [string] $destDir) {
     Get-ChildItem -Path $srcDir -Recurse -File -ErrorAction SilentlyContinue |
         Where-Object {
             $_.Extension -in '.exe', '.dll' -and
-            $_.Name -notmatch '^(sigtool|clamdtop|clamsubmit|clamconf)\.exe$'
+            $_.Name -notmatch '^(sigtool|clamdtop|clamsubmit|clamconf)\.exe$' -and
+            $_.Name -notmatch $unrarPattern
         } |
         ForEach-Object {
             if ($copied.ContainsKey($_.Name)) { return }
@@ -202,7 +216,7 @@ function Copy-ClamAvRuntime([string] $srcDir, [string] $destDir) {
     $licDir = Join-Path $destDir 'licenses'
     New-Item -ItemType Directory -Force -Path $licDir | Out-Null
     $licenses = @(Get-ChildItem -Path $srcDir -Recurse -File -Filter 'COPYING*' -ErrorAction SilentlyContinue |
-        Where-Object { $_.FullName -notmatch '[\\/]UserManual[\\/]' })
+        Where-Object { $_.FullName -notmatch '[\\/]UserManual[\\/]' -and $_.Name -notmatch $unrarPattern })
     foreach ($lic in $licenses) {
         Copy-Item -LiteralPath $lic.FullName -Destination (Join-Path $licDir $lic.Name) -Force
     }
@@ -290,6 +304,7 @@ if ($Force -or (Test-ClamReady) -gt 0) {
 } else {
     Write-Host "[ ClamAV ] deja present dans optiSCAN\clamav\x64" -ForegroundColor DarkGray
 }
+Remove-ClamUnrar
 
 $certsSource = Join-Path $root 'optiSCAN\clamav\certs'
 if ((Test-Path (Join-Path $clamX64 'clamscan.exe')) -and (Test-Path (Join-Path $certsSource 'clamav.crt'))) {

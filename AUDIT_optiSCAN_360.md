@@ -86,7 +86,7 @@ Les six mécanismes de la révision précédente tiennent toujours (suppression 
 | R13 | Le désinstalleur ne purge que le compte qui désinstalle. | Faible | Non | Documenté. |
 | R14 | « Rétablir l'origine » ne restaure pas une stratégie d'entreprise préexistante. | Faible | Non | Accepté. |
 | R15 | Historique Git de 303 Mo. | Faible | Dépôt public (donc R1) | Purge avant publication du dépôt. |
-| R16 | Licences tierces à faire valider par SignPath : UnRAR (livré par ClamAV, non libre), règles YARA-Forge (licences par règle, dont DRL 1.1). | Moyenne | R1 | À exposer dans la candidature ; UnRAR peut être retiré en livrant ClamAV sans `libclamunrar`. |
+| R16 | Licences tierces à faire valider par SignPath : UnRAR (livré par ClamAV, non libre), règles YARA-Forge (licences par règle, dont DRL 1.1). | Moyenne | R1 | UnRAR retiré le 16 octobre 2026 après la réponse de SignPath (composants tiers sous licence acceptée) : `fetch-runtime-deps.ps1` ne copie plus `libclamunrar*`, `verify-runtime-deps.ps1` refuse une publication qui en contient, l'installeur les exclut et les supprime à la mise à jour. Reste : licences par règle de YARA-Forge (téléchargées après installation). |
 
 ## 6. Corrections du 15 octobre au soir
 

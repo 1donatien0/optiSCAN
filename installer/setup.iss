@@ -146,8 +146,9 @@ Source: "{#AppPublishDir}optiSCAN.AmsiProvider.dll"; DestDir: "{app}"; Tasks: pl
 #endif
 ; ── ClamAV x64 — outils développeur exclus (sigtool/clambc & co : ~47 Mo
 ; inutiles au scan et à la mise à jour ; le code n'y fait jamais appel) ──────
+; UnRAR (libclamunrar*, COPYING.unrar) n'est pas sous licence libre : jamais livré.
 #if DirExists(AddBackslash(SourcePath) + "..\optiSCAN\clamav\x64")
-Source: "..\optiSCAN\clamav\x64\*"; DestDir: "{app}\clamav\x64"; Excludes: "sigtool.exe,clambc.exe,clamdtop.exe,clamsubmit.exe,clamconf.exe"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "..\optiSCAN\clamav\x64\*"; DestDir: "{app}\clamav\x64"; Excludes: "sigtool.exe,clambc.exe,clamdtop.exe,clamsubmit.exe,clamconf.exe,*unrar*"; Flags: ignoreversion recursesubdirs createallsubdirs
 #endif
 ; Certificat CVD (freshclam ≥ 1.5) — skip si absent (évite l'échec de compilation ISCC)
 Source: "..\optiSCAN\clamav\certs\clamav.crt"; DestDir: "{app}\clamav\x64\certs"; Flags: ignoreversion skipifsourcedoesntexist
@@ -219,6 +220,11 @@ Type: files; Name: "{app}\clamav\x86\freshclam.conf.broken.bak"
 ; --- clamd.conf legacy (peut avoir un BOM ou un path absolu de dev) ---
 Type: files; Name: "{app}\clamav\x64\clamd.conf"
 Type: files; Name: "{app}\clamav\x86\clamd.conf"
+
+; --- UnRAR livré par les versions antérieures (licence non libre) ---
+Type: files; Name: "{app}\clamav\x64\libclamunrar.dll"
+Type: files; Name: "{app}\clamav\x64\libclamunrar_iface.dll"
+Type: files; Name: "{app}\clamav\x64\licenses\COPYING.unrar"
 
 ; freshclam.conf utilisateur : nettoyé après copie, dans le profil d'origine
 ; (pas celui de l'administrateur qui a élevé l'installation).

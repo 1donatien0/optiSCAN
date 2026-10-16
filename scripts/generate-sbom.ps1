@@ -31,7 +31,7 @@ foreach ($proj in $Projects) {
 
     $baseName = [System.IO.Path]::GetFileNameWithoutExtension($proj)
     Write-Host "SBOM: $proj -> $OutputDir\$baseName-bom.json"
-    dotnet-CycloneDX $proj -o $OutputDir -json --filename "$baseName-bom"
+    dotnet-CycloneDX $proj --output $OutputDir --output-format Json --filename "$baseName-bom.json"
     if ($LASTEXITCODE -ne 0) {
         throw "CycloneDX failed for $proj (exit $LASTEXITCODE)"
     }
@@ -49,7 +49,7 @@ $clamLibs = @(
     (New-Lib 'openssl' 'Apache-2.0'), (New-Lib 'libcurl' 'curl'), (New-Lib 'libxml2' 'MIT'),
     (New-Lib 'pcre2' 'BSD-3-Clause'), (New-Lib 'json-c' 'MIT'), (New-Lib 'bzip2' 'bzip2-1.0.6'),
     (New-Lib 'libssh2' 'BSD-3-Clause'), (New-Lib 'nghttp2' 'MIT'), (New-Lib 'zlib' 'Zlib'),
-    (New-Lib 'unrar' 'LicenseRef-UnRAR'), (New-Lib 'pthreads4w' 'Apache-2.0')
+    (New-Lib 'pthreads4w' 'Apache-2.0')
 )
 $native = [ordered]@{
     bomFormat    = 'CycloneDX'

@@ -58,6 +58,13 @@ if (Test-Path $clambc) {
 }
 Check "clamav\certs\clamav.crt"  "Certificat CA Cisco-Talos"
 Check "clamav\x64\licenses\COPYING.txt" "Licence GPLv2 de ClamAV (obligatoire avec les binaires)"
+$unrar = @(Get-ChildItem -Path (Join-Path $PublishDir "clamav") -Recurse -File -ErrorAction SilentlyContinue |
+    Where-Object { $_.Name -match '(?i)unrar' })
+foreach ($u in $unrar) {
+    Write-Host "  INTERDIT  $($u.FullName.Substring($PublishDir.Length + 1))  (UnRAR, licence non libre : relancer fetch-runtime-deps.ps1)" -ForegroundColor Red
+    $failed += $u.Name
+}
+if ($unrar.Count -eq 0) { Write-Host "  OK        aucun composant UnRAR" -ForegroundColor Green }
 
 Write-Host "`n[ Signatures ClamAV ]"
 $sigFiles = Get-ChildItem -Path (Join-Path $PublishDir "clamav\database") -Filter "*.cvd" -ErrorAction SilentlyContinue

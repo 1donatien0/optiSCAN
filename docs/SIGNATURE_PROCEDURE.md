@@ -50,7 +50,7 @@ SignPath Foundation exige un projet déjà publié. Récupérer l'installeur pro
 
 ### Étape 5 — Candidater
 
-Formulaire : <https://signpath.org/apply>. Indiquer : dépôt GitHub public, licence GPL-3.0-or-later, build GitHub Actions (`.github/workflows/release.yml`), lien de la politique de signature, mainteneur et approbateur (Dona By). Signaler d'emblée UnRAR (livré par ClamAV, licence non libre ; on peut livrer ClamAV sans `libclamunrar`) et les licences par règle de YARA-Forge (audit R16). Attendre la réponse.
+Formulaire : <https://signpath.org/apply>. Indiquer : dépôt GitHub public, licence GPL-3.0-or-later, build GitHub Actions (`.github/workflows/release.yml`), lien de la politique de signature, mainteneur et approbateur (Dona By). Signaler d'emblée UnRAR (livré par ClamAV, licence non libre ; on peut livrer ClamAV sans `libclamunrar`) et les licences par règle de YARA-Forge (audit R16). Attendre la réponse. Fait le 15 octobre 2026 ; SignPath a demandé que tous les composants tiers respectent ses exigences de licence, UnRAR a donc été retiré le 16 octobre 2026.
 
 ### Étape 6 — Configurer SignPath après acceptation
 

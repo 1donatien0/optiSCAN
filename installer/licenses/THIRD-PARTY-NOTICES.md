@@ -13,7 +13,6 @@ Les textes de licence sont installés avec le logiciel :
 | Composant | Version | Licence | Texte |
 |---|---|---|---|
 | ClamAV (`clamscan`, `clamd`, `freshclam`, `libclamav`, `libfreshclam`) | 1.4.6 | GNU GPL v2 | `clamav\x64\licenses\COPYING.txt` |
-| UnRAR (`libclamunrar`) | livré avec ClamAV | Licence UnRAR (restrictive : interdit de recréer l'algorithme de compression RAR) | `clamav\x64\licenses\COPYING.unrar` |
 | libcurl | livré avec ClamAV | Licence curl (type MIT) | `clamav\x64\licenses\COPYING.curl` |
 | bzip2 | livré avec ClamAV | Licence bzip2 | `clamav\x64\licenses\COPYING.bzip2` |
 | PCRE2 | livré avec ClamAV | BSD-3-Clause | `clamav\x64\licenses\COPYING.pcre` |
@@ -27,6 +26,9 @@ Les textes de licence sont installés avec le logiciel :
 | PDCurses | livré avec ClamAV | Domaine public | https://pdcurses.org/ |
 | Redistribuable Visual C++ (`vcruntime140`, `msvcp140*`, `concrt140`) | livré avec ClamAV | Termes de licence Microsoft Visual C++ Redistributable | — |
 | YARA (`yara64`, `yarac64`) | 4.5.5 | BSD-3-Clause | `licenses\YARA-COPYING.txt` |
+
+Le module UnRAR de l'archive ClamAV (`libclamunrar`, `libclamunrar_iface`) n'est pas livré : sa licence
+n'est pas libre. Sans lui, ClamAV n'ouvre pas les archives RAR ; le reste de l'analyse est inchangé.
 
 Le code source de ClamAV 1.4.6 est publié par Cisco-Talos : https://github.com/Cisco-Talos/clamav/tree/clamav-1.4.6
 (archive : https://www.clamav.net/downloads). Sur demande écrite à l'auteur d'optiSCAN (voir le dépôt du projet),
