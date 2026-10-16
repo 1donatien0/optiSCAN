@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Windows;
 using System.Windows.Input;
 
@@ -22,7 +23,7 @@ namespace optiSCAN.Services
                 if (e.Parameter is string panel)
                 {
                     try { onActivate(panel); }
-                    catch (Exception ex) { AppLogger.Warn("KeyboardShortcuts", $"onActivate {panel}", ex); }
+                    catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("KeyboardShortcuts", $"onActivate {panel}", ex); }
                 }
             }));
 

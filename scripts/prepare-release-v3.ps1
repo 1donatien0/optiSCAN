@@ -1,3 +1,4 @@
+﻿# SPDX-License-Identifier: GPL-3.0-or-later
 <#
 .SYNOPSIS
     Chaîne de préparation des releases v3.x (dépôt -> installateur testé).
@@ -63,11 +64,15 @@ if (-not $SkipTests) {
 Invoke-Step 'dotnet publish' {
     $csproj = Join-Path $root 'optiSCAN\optiSCAN.csproj'
     $svc = Join-Path $root 'optiSCAN.Service\optiSCAN.Service.csproj'
+    $hostProj = Join-Path $root 'optiSCAN.Host\optiSCAN.Host.csproj'
     if ($SelfContained) {
         dotnet publish $csproj -p:OptiscanShipping=true -c Release -r win-x64 --self-contained true `
             -p:PublishSingleFile=false -o $pubDir
         if ($LASTEXITCODE -ne 0) { return }
         dotnet publish $svc -p:OptiscanShipping=true -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=false -o $pubDir
+        if ($LASTEXITCODE -ne 0) { return }
+        dotnet publish $hostProj -p:OptiscanShipping=true -c Release -r win-x64 --self-contained true `
             -p:PublishSingleFile=false -o $pubDir
     } else {
         # Le profil FolderProfile publie l'application en autonome : le service est publié
@@ -76,6 +81,9 @@ Invoke-Step 'dotnet publish' {
         dotnet publish $csproj -p:OptiscanShipping=true -c Release /p:PublishProfile=FolderProfile
         if ($LASTEXITCODE -ne 0) { return }
         dotnet publish $svc -p:OptiscanShipping=true -c Release -r win-x64 --self-contained true `
+            -p:PublishSingleFile=false -o $pubDir
+        if ($LASTEXITCODE -ne 0) { return }
+        dotnet publish $hostProj -p:OptiscanShipping=true -c Release -r win-x64 --self-contained true `
             -p:PublishSingleFile=false -o $pubDir
     }
 }

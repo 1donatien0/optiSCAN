@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 <#
 .SYNOPSIS
     Validation automatisee avant release (tests Release + dependances publish optionnelles).

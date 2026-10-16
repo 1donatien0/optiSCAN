@@ -1,5 +1,7 @@
 # Audit 360 — optiSCAN v3 — 2 octobre 2026
 
+Journal archivé. La note en vigueur est dans [`AUDIT_optiSCAN_360.md`](../../AUDIT_optiSCAN_360.md) : **7,4/10** au soir du 15 octobre 2026 (7,9 hors distribution ; 6,8 le matin ; 6,5 le 13 octobre ; 6,4 à l'audit indépendant).
+
 Cet audit remplace l'audit précédent (`AUDIT_optiSCAN_360.md` au commit `43da273`, noté 8,6/10), repris sans en adopter les conclusions. Il couvre l'arbre `optiSCAN-stable` (branche `dev`, point de départ `43da273 release: optiSCAN 3`), puis l'arbre de travail au fil des corrections : chaque constat est donné avec son traitement et son état final. L'ensemble prépare la candidate **v3.1 / 3.1.0**, qui reste non publiée jusqu'aux contrôles Windows et GitHub du [plan de release](RELEASE_PLAN_v3.1.md). Les évolutions prévues après 3.1 figurent dans [ROADMAP.md](ROADMAP.md).
 
 La **revue 360 du produit** ([série V](#48-revue-360-du-produit--v1-à-v13)) réexamine ensuite l'ensemble du produit sur l'arbre courant, sans reprendre les conclusions des séries précédentes. Ses treize constats révisent la note ([section 7](#7-notation)) et s'ajoutent aux [réserves](#9-réserves-ouvertes-et-conditions-de-clôture) ; neuf sont depuis corrigés dans le code, en attente de validation Windows.
@@ -1056,3 +1058,175 @@ Non corrigés, avec raison :
 - **V6, V7** : décisions produit (service par défaut, canal de mise à jour signé).
 
 Vérification : Release, Debug et publication compilent sans erreur ni avertissement ; `FollowUpFixesTests` et le cas modifié de `HardeningFollowUpTests` restent à exécuter sous Windows.
+
+---
+
+## Révision du 15 octobre 2026 (matin) — 6,8/10
+
+Texte de la révision remplacée le 15 octobre au soir, conservé tel quel ; ses liens internes renvoient au document de l'époque.
+
+
+**Révision du 15 octobre 2026.** Elle reprend l'audit du 13 octobre au soir et le met à jour après la suite Release sous Windows. L'ancien document, qui mêlait constats, corrections et journal de travail, est conservé dans [`docs/archive/AUDIT_optiSCAN_360_journal_2026-10.md`](docs/archive/AUDIT_optiSCAN_360_journal_2026-10.md). Le présent document ne garde que l'état actuel et un registre des risques ouverts.
+
+### En bref
+
+| Indicateur | Valeur |
+|---|---|
+| **Note globale** | **6,8 / 10** (6,5 le 13 octobre ; 6,4 à l'audit indépendant du matin) |
+| Qualité technique (hors distribution) | **7,3 / 10** |
+| Prêt à diffuser | **4 / 10** |
+| **Décision** | **Pas de diffusion publique.** La suite Windows est verte et la candidate est sur `dev`. La bêta fermée attend encore les contrôles sur machine virtuelle. |
+
+Le 13 octobre, 37 défauts avaient été corrigés, dont deux plus graves que tous ceux de l'audit indépendant du matin (le service coupait son propre temps réel ; une lecture DPAPI ratée détruisait la quarantaine). La relecture de ces corrections en avait trouvé six de plus. La suite du 15 octobre en a trouvé un septième : la migration de démarrage tenait un fichier de quarantaine ouvert, et la purge échouait. Il est corrigé (section 6). La suite Release a ensuite donné 715 réussites, 0 échec, 0 ignoré.
+
+Ce qui tire encore la note vers le bas n'est plus la suite : les binaires ne sont pas signés, Defender détecte `optiSCAN.exe` dès qu'il n'est plus exclu, et aucun contrôle n'a été fait sur machine virtuelle. Une fois ces points levés, la note atteint environ 7,4 (section 2).
+
+### 1. Périmètre et méthode
+
+L'examen porte sur la branche `dev` (commit `c50975c`, qui contient la candidate du 13 octobre) plus la correction de quarantaine du 15 octobre.
+
+| Contrôle | Résultat |
+|---|---|
+| Relecture ligne à ligne du diff du code non commité (5 100 lignes) et des 15 fichiers C# nouveaux | Six défauts trouvés et corrigés le 13 octobre (section 6) |
+| Compilation Release, Debug et publication (`OptiscanShipping=true`), SDK 10.0.401, avertissements traités en erreurs | 0 erreur, 0 avertissement (13 octobre) ; rebuild Release des tests le 15 octobre, 0 avertissement |
+| Suite Release sous Windows, 15 octobre 2026 | **715 réussis, 0 échec, 0 ignoré** (section 7) |
+| Audit NuGet (vulnérables, dépréciés, obsolètes, transitifs compris) | Aucune vulnérabilité connue ; xUnit 2 « legacy » ; QuestPDF 2024.12 (2026.9 disponible) |
+| Mesures sur le code de production | Section 8 |
+
+**Non fait :** installation sur machine virtuelle, essais avec privilèges (jonctions, usurpation du tube, arrêt brutal du service), comportement de Defender. R4 reste ouvert et décide de la bêta. R2 (candidate non commitée) et R3 (suite Windows) sont clos.
+
+### 2. Notation
+
+| Domaine | Poids | Note | Justification |
+|---|---:|---:|---|
+| Sécurité du code privilégié (service, tube, quarantaine, chemins) | 25 % | 8,0 | Usurpation du client, parcours sans jonction, serveur identifié par le gestionnaire de services, `scan_path` fermé, compte du client lu sur son jeton, instance élevée qui ne lance plus d'outil configuré par l'utilisateur. Reste : YARA et clamscan non isolés sous SYSTEM (R5). |
+| Efficacité de détection | 15 % | 6,5 | ClamAV et YARA, temps réel après écriture, surveillance des processus après lancement. Couverture élargie aujourd'hui (dossiers de données, corbeilles USB, `%APPDATA%`, détections du service visibles). Ni AMSI ni minifiltre (R7). |
+| Robustesse et exploitation | 15 % | 8,0 | Relance automatique du service, clés mises de côté au lieu d'être écrasées, santé du temps réel visible, tâche planifiée rattrapée. Suite Windows verte ; la purge n'est plus bloquée par la lecture de migration (L7). |
+| Qualité du code et maintenabilité | 10 % | 5,5 | Exécutable WPF unique à 20 modes, conteneur singleton, 503 blocs `catch` sans filtre, 78 déclarations P/Invoke (R10). |
+| Tests et preuves | 10 % | 8,0 | 715 cas exécutés sous Windows le 15 octobre, 0 échec. La CI exige les moteurs pour EICAR. CodeQL C/C++ jamais passé sur GitHub. |
+| Distribution et confiance | 15 % | 4,0 | Non signé, détecté par Defender sans exclusion (R1). La candidate est commitée sur `dev` (R2 clos). Licences et actions de récupération dans l'installeur. |
+| Produit (expérience, mises à jour) | 5 % | 7,0 | Retour arrière d'Optimiser, alertes en mode jeu, confirmation avant exclusion. Pas de canal de mise à jour du produit (R8). |
+| Dépendances et chaîne d'approvisionnement | 5 % | 7,0 | Archives épinglées, signature GPG Talos, SBOM. Pile de tests et QuestPDF en retard (R11). |
+| **Total pondéré** | | **6,8** | Hors distribution, renormalisé : **7,3** |
+
+Le total est 8,0×25 % + 6,5×15 % + 8,0×15 % + 5,5×10 % + 8,0×10 % + 4,0×15 % + 7,0×5 % + 7,0×5 % = 6,825, arrondi à 6,8. Hors distribution (poids restant 85 %) : 7,3.
+
+**Ce qui fait monter la note**, sans autre changement de code :
+
+| Étape | Effet | Note globale |
+|---|---|---:|
+| R4 : contrôles sur machine virtuelle | Distribution 5 | ≈ 7,0 |
+| + R1 : binaires signés, faux positif levé auprès de Microsoft | Distribution 7,5 | ≈ 7,4 |
+| + R5 : YARA et clamscan isolés (3.2) | Sécurité 9 | ≈ 7,6 |
+
+Les audits internes (8,6 puis 7,9 puis 7,2) notaient surtout le code relu, sans séparer la distribution ni la maintenabilité. Ils ne sont pas comparables terme à terme.
+
+### 3. Décision de release
+
+La recommandation de l'audit du matin était de ne pas publier. Elle est maintenue pour une **diffusion publique**, et précisée pour une **bêta fermée**.
+
+| Étape | Conditions | État |
+|---|---|---|
+| **Bêta fermée** (testeurs informés, exclusion Defender du dossier d'installation documentée) | R2 commits locaux propres (licences comprises) ; R3 suite Release verte sous Windows ; R4 contrôles VM du [plan de release](RELEASE_PLAN_v3.1.md) | R2 et R3 clos ; R4 ouvert |
+| **Release publique 3.1.0** | Bêta fermée, plus R1 signature Authenticode et faux positif levé, premier passage CodeQL C/C++ sur GitHub | ⏳ |
+
+Une bêta reste possible malgré R5 et R7 : ce sont des limites connues, documentées dans [SECURITY.md](SECURITY.md) et sans exploitation démontrée. R1 bloque en revanche toute diffusion large : un utilisateur sans l'exclusion verrait `optiSCAN.exe` mis en quarantaine par Defender.
+
+### 4. Points forts
+
+Six mécanismes tiennent à une relecture hostile ; toute refonte doit les préserver.
+
+- **Suppression et quarantaine sans course** : descente du chemin nom par nom par `NtCreateFile` relatif au parent, refus des jonctions, liens symboliques et liens physiques ; lecture, chiffrement et suppression par la même poignée ; empreinte SHA-256 de la copie analysée exigée avant quarantaine. La lecture de migration au démarrage partage la suppression, pour qu'une purge concurrente aboutisse (L7).
+- **Le service n'agit jamais avec ses propres droits sur un chemin fourni** : ouverture sous le jeton du client (`ImpersonateNamedPipeClient`), analyse d'une copie faite depuis cette poignée.
+- **Tube authentifié dans les deux sens** : ACL explicite, première instance, clients distants refusés, quotas par compte ; côté client, serveur identifié par le PID que donne le gestionnaire de services.
+- **Moindre privilège pour la politique** : un compte standard peut renforcer la protection, jamais l'affaiblir.
+- **clamd confiné** : AppContainer, objet job « kill on close », port local aléatoire, commandes d'arrêt désactivées.
+- **Chaîne d'approvisionnement vérifiée** : archives épinglées par SHA-256, signature GPG exigée en CI, actions GitHub épinglées par commit.
+
+### 5. Registre des risques ouverts
+
+Gravité : impact si le risque se réalise. **Bloquant** : empêche l'étape de release indiquée.
+
+| # | Risque | Gravité | Bloquant pour | Action |
+|---|---|---|---|---|
+| R1 | Binaires et installateur non signés. Defender détecte `optiSCAN.exe` dès que le dossier d'installation n'est plus exclu (nom de détection à relever par `Get-MpThreatDetection`). | Élevée | Release publique | Certificat de signature (OV, EV ou service de signature en ligne) ; soumission des binaires à Microsoft comme faux positif ; retrait de l'exclusion de dossier une fois la signature reconnue. |
+| R2 | Candidate non commitée au soir du 13 octobre (84 fichiers, 15 fichiers C# nouveaux, `installer/licenses/`). | Élevée | Bêta | **Clos.** La candidate est sur `dev` (`c50975c`). La correction L7 du 15 octobre est dans l'arbre de travail, à committer avec cette révision. |
+| R3 | Suite Windows non rejouée depuis le 7 octobre (630/630 alors) ; environ 3 400 lignes ajoutées depuis. Les 76 cas qui ne peuvent pas tourner sous Linux couvrent la quarantaine, le tube et les API de sécurité. | Élevée | Bêta | **Clos le 15 octobre 2026.** Binaires Release : 715 réussis, 0 échec, 0 ignoré. `dotnet test` n'a pas pu lancer l'hôte (accès refusé en surveillant le processus parent ; Test SDK 17.11, R11) ; les mêmes binaires ont été exécutés par le runner xUnit. Deux échecs de quarantaine ont révélé L7, corrigé avant la suite verte. |
+| R4 | Aucun contrôle sur machine virtuelle : service installé, migration 3.0.x, Defender, installeur, relance après plantage. | Élevée | Bêta | Liste du [plan de release](RELEASE_PLAN_v3.1.md). |
+| R5 | `yara64`, `yarac64` et `clamscan` analysent sous SYSTEM des contenus fournis par n'importe quel compte, sans isolation ; YARA 4.5.5 n'a pas les corrections de bornes des versions 4.5.6 à 4.5.8. Une faille d'analyseur serait une exécution de code SYSTEM. | Élevée (défense en profondeur) | Non (3.2) | Exécuter YARA et clamscan dans l'AppContainer de clamd ; compiler YARA 4.5.8 en CI. |
+| R6 | Le dossier d'installation reste exclu de Defender (nécessaire tant que R1 n'est pas levé). Il n'est exclu que s'il est réservé aux administrateurs (`InstallLocationTrust`). | Moyenne | Non | Retirer après R1. |
+| R7 | Détection après écriture et après lancement ; ni AMSI ni minifiltre. La surveillance du noyau voit un processus très court, mais son image n'est plus lisible une fois terminé : il n'est pas analysé (désormais journalisé). | Moyenne (limite produit) | Non | Documenté ; décision séparée pour AMSI ou un pilote. |
+| R8 | Pas de canal de mise à jour du produit signé ; règles YARA-Forge figées sur la publication approuvée. | Moyenne | Non | Décision produit (V7). |
+| R9 | Protection par défaut limitée à la session : le service n'est pas coché à l'installation. | Moyenne | Non | Décision produit (V6). |
+| R10 | Maintenabilité : un exécutable WPF à 20 modes héberge le service SYSTEM ; conteneur singleton ; 503 `catch` sans filtre ; 78 déclarations P/Invoke réparties. | Moyenne | Non | Moteur dans une bibliothèque sans WPF, hébergé par `optiSCAN.Service` ; appels natifs centralisés (3.2). |
+| R11 | xUnit 2 (« legacy »), Microsoft.NET.Test.Sdk 17.11, QuestPDF 2024.12 ; correctifs 10.0.13 disponibles pour les paquets Microsoft.Extensions et System.*. | Faible | Non | Monter et rejouer la suite sous Windows, comparer un PDF produit. |
+| R12 | `clamscan` (repli quand clamd est absent) exclut par motif les gros fichiers de données d'optiSCAN dans `%LOCALAPPDATA%\optiSCAN` (`.cvd`, `.cld`, `.yar`, `.quar`…). Un exécutable nommé ainsi n'est pas vu par clamscan seul ; YARA, clamd et le temps réel lisent l'en-tête et l'analysent. | Faible | Non | Accepté. |
+| R13 | Le désinstalleur ne purge que les données du compte qui désinstalle (Inno ne fournit pas le jeton de l'utilisateur d'origine à la désinstallation). | Faible | Non | Documenté. |
+| R14 | « Rétablir l'origine » rend la télémétrie aux réglages par défaut de Windows, pas à une stratégie d'entreprise préexistante. La confirmation le dit. | Faible | Non | Accepté. |
+| R15 | Historique Git de 303 Mo. | Faible | Passage du dépôt en public | Purge de l'historique avant publication du dépôt. |
+
+### 6. Relecture des corrections : défauts trouvés et corrigés
+
+Toutes les corrections de la journée ont été relues dans le diff. Six défauts sont apparus ; ils sont corrigés et testés (`AuditReviewFixesTests`).
+
+| # | Gravité | Défaut | Correction |
+|---|---|---|---|
+| L1 | Moyenne | Une détection du service relevée par un compte sans droit sur le chemin ne porte que le nom du fichier. Depuis l'historique, « Quarantaine », « Supprimer » ou « Exclure » sur `bad.exe` étaient résolus dans le dossier courant et pouvaient viser un autre fichier. | `AntivirusActions` n'agit que sur un chemin complet (`Path.IsPathFullyQualified`). |
+| L2 | Moyenne | Même cause : une détection du service différée par le mode jeu réapparaissait avec les boutons d'action. | Origine conservée ; elle réapparaît sous sa notification propre, sans action. |
+| L3 | Moyenne | Un exécutable renommé en fichier de données (`payload.dat`) dans les dossiers de `%LOCALAPPDATA%\optiSCAN`, modifiables par la session, restait exclu de toutes les analyses : CreateProcess et rundll32 le lancent quelle que soit son extension. | L'en-tête PE est lu pour ces fichiers ; un exécutable n'est jamais exclu. Motifs de clamscan réduits aux gros fichiers binaires d'optiSCAN (R12). |
+| L4 | Faible | « Rétablir l'origine » aurait supprimé une valeur de registre d'origine qui n'était pas un DWORD. | Valeur d'un autre type laissée intacte. |
+| L5 | Info | La surveillance du noyau était présentée comme voyant les processus courts ; elle les voit, mais ne peut pas lire leur image une fois terminés. | Journalisé ; limite décrite en R7. |
+| L6 | Info | Deux commentaires de documentation mal placés (`ExclusionSettings`, `ServiceContainer`). | Replacés. |
+| L7 | Moyenne | La migration des fichiers de quarantaine au démarrage les ouvrait sans partage de suppression. Une purge ou une suppression pendant cette lecture échouait et laissait l'entrée en place (`PurgeOlderThan`, `PurgeAll`). | `ReadBlobBounded` partage la suppression. L'écriture reste exclusive. Suite Windows rejouée : 715/715. |
+
+#### Corrections de la journée, vérifiées
+
+| Lot | Contenu | Vérification |
+|---|---|---|
+| A3, A4, A5, A6, A9, A10 | Exclusions Defender par processus limitées aux moteurs ; récupération du service ; `scan_path` fermé ; moteurs exigés en CI ; chemins système par l'API ; fin de message JSON en un passage | Relu ; tests réussis sous Linux sauf ceux du tube (Windows) |
+| B1 à B16 | Temps réel du service non coupé au démarrage ; clés et manifeste mis de côté ; pas de double quarantaine ; pas de double surveillance quand le service protège ; OneDrive et corbeilles USB analysés ; compilation YARA sérialisée ; purge des copies orphelines ; rotation du journal ; confirmation de restauration ; et neuf autres | Relu ; `ResilienceFixesTests` 7/7 avec substitut DPAPI |
+| C1 à C8 | « Exclure… » avec confirmation ; dossiers de données analysés ; détections du service notifiées et inscrites ; clamd en parallèle ; tâche rattrapée au réveil ; alertes gardées en mode jeu ; copies de sécurité bornées et utiles ; winget toutes langues avec délais | Relu ; tests réussis, sauf quatre qui supposent Windows (chemins à barre oblique inverse, WPF) |
+| D1 à D7 | Fichier restauré épargné ; santé du temps réel ; instance élevée sans freshclam ni winget ; compte du tube lu sur le jeton ; retour arrière d'Optimiser ; renommage du service de relance | Relu ; tests de `FollowUpFixesTests.cs` 8/8 |
+
+Ces lots sont compris dans les 715 réussites du 15 octobre sous Windows.
+
+### 7. Tests
+
+Exécution du 15 octobre 2026 sous Windows, binaires Release : **715 réussis, 0 échec, 0 ignoré.** Elle couvre les cas qui échouaient sous Linux le 13 octobre (638/714), dont la quarantaine, les tubes et les API de sécurité. Le classement de ces 76 échecs d'environnement reste ci-dessous ; ils ne se reproduisent pas sous Windows.
+
+Exécution du 13 octobre au soir sous Linux, binaires Release : **714 cas, 638 réussis.** Les 76 échecs avaient été classés un par un ; aucun ne mettait en cause la logique testée.
+
+| Cause | Cas |
+|---|---:|
+| Quarantaine : suppression par poignée NT (`NtCreateFile`) | 24 |
+| WPF (`WindowsBase`) non exécutable hors Windows | 18 |
+| Tubes nommés Windows (ACL, usurpation) | 13 |
+| API de sécurité Windows (SID, jetons) | 9 |
+| Chemins à barre oblique inverse, `schtasks`, WMI, épinglage NT | 8 |
+| API natives (`ntdll`, `kernel32`) | 2 |
+| Moteurs ClamAV et YARA absents du poste d'audit (EICAR) | 2 |
+
+Les tests de la quarantaine avaient été rejoués sous Linux avec un substitut DPAPI (chiffrement réversible de test, même interface) : les échecs restants y venaient tous de la suppression NT. La suite Windows du 15 octobre les exécute avec DPAPI et la suppression NT ; elle a aussi révélé L7, corrigé avant le passage vert.
+
+### 8. Mesures
+
+Code de production (`optiSCAN`, `optiSCAN.Platform`, `optiSCAN.Service`), hors `obj` et `bin`.
+
+| Mesure | Valeur |
+|---|---:|
+| Lignes C# de production / fichiers | 39 115 / 215 |
+| Lignes de tests / attributs `[Fact]` et `[Theory]` / cas exécutés sous Windows | 11 324 / 529 / 715 |
+| `catch` sans type ni filtre / `catch (Exception)` sans `when` | 191 / 312 |
+| Méthodes `async void` (gestionnaires d'interface pour l'essentiel) | 22 |
+| Déclarations `DllImport` | 78 |
+| Fichiers de plus de 500 lignes | 22 |
+
+Les comptes de `catch` diffèrent de ceux des audits précédents (173) : ils comptent ici chaque bloc sans filtre, y compris les captures commentées et volontaires d'annulation ou de nettoyage.
+
+### 9. Limites de cet audit
+
+- La suite Release a été exécutée sous Windows le 15 octobre. L'installation du service, l'installeur, Defender et les essais privilégiés sur machine virtuelle n'ont pas été faits (R4).
+- La relecture ligne à ligne couvre l'arbre du 13 octobre ; le code commité avant `d18f333` a été relu par l'audit indépendant du matin. La correction L7 a été relue et couverte par la suite du 15 octobre.
+- La gravité repose sur des faits de code vérifiés ; la probabilité d'exploitation reste une appréciation.
+- Les notes par domaine sont un jugement d'expert ; leur pondération est donnée pour qu'on puisse la discuter.
+

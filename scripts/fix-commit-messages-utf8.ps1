@@ -1,3 +1,4 @@
+﻿# SPDX-License-Identifier: GPL-3.0-or-later
 # Corrige les messages des commits 45a046e et 51bc2ca (UTF-8, sans Co-authored-by).
 param(
     [switch]$Push

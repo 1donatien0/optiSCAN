@@ -11,7 +11,7 @@
 | Document | Rôle |
 |----------|------|
 | [GUIDE_DISTRIBUTION.md](GUIDE_DISTRIBUTION.md) | Signature, modes runtime .NET, Embed CVD/YARA, publish / Inno, checklist |
-| [SIGNATURE_PROCEDURE.md](SIGNATURE_PROCEDURE.md) | Procédure Authenticode réellement utilisée par la CI et en local |
+| [SIGNATURE_PROCEDURE.md](SIGNATURE_PROCEDURE.md) | Procédure de signature SignPath (seule chaîne) |
 | [../ROADMAP.md](../ROADMAP.md) | Feuille de route produit de l’antivirus après la v3.1 |
 | [../RELEASE_PLAN_v3.1.md](../RELEASE_PLAN_v3.1.md) | Étapes et critères de validation de la candidate v3.1 |
 | [DIAGNOSTIC_INTEGRATION_WINDOWS.md](DIAGNOSTIC_INTEGRATION_WINDOWS.md) | Diagnostic historique de distribution Windows ; profil allégé façon version 2 (2 moteurs) |
@@ -25,8 +25,9 @@
 |----------|------|
 | [../README.md](../README.md) | Guide unique (architecture, modules, release, langues, sécurité) |
 | [../SECURITY.md](../SECURITY.md) | Politique de sécurité, signalement, composants v3.1 candidate |
-| [../LICENSE.txt](../LICENSE.txt) | CLUF v3.1 |
-| [../AUDIT_optiSCAN_360.md](../AUDIT_optiSCAN_360.md) | Audit 360, révision du 13 octobre 2026 : note, décision de release, registre des risques ouverts |
+| [../LICENSE.txt](../LICENSE.txt) | Licence GNU GPL v3 |
+| [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md) | Politique de signature du code (SignPath) |
+| [../AUDIT_optiSCAN_360.md](../AUDIT_optiSCAN_360.md) | Audit 360, révision du 15 octobre 2026 au soir (7,6/10 ; 8,0 exigé pour publier) : note, décision de release, registre des risques ouverts |
 | [archive/AUDIT_optiSCAN_360_journal_2026-10.md](archive/AUDIT_optiSCAN_360_journal_2026-10.md) | Journal des audits du 2 au 13 octobre 2026 (séries N à D, traitement détaillé) |
 | [../installer/redist/LISEZMOI.md](../installer/redist/LISEZMOI.md) | Modes runtime .NET et limite actuelle du dossier redist |
 

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Localization;
 using System.IO;
 using System.Windows.Forms;
@@ -74,7 +75,7 @@ namespace optiSCAN.Services
                         return embedded;
                 }
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 // Repli fichier.
             }
@@ -85,7 +86,7 @@ namespace optiSCAN.Services
                 if (File.Exists(iconPath))
                     return new Icon(iconPath);
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 // Repli système.
             }

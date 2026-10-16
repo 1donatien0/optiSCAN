@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Localization;
 using optiSCAN.Models;
 using System.IO;
@@ -40,7 +41,7 @@ namespace optiSCAN.Services
                 return HistoryExportResult.Succeeded(
                     LocalizationService.Format("Status_HtmlSaved", dlg.FileName));
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("HistoryExportService", "Export HTML", ex);
                 return HistoryExportResult.Failed(
@@ -67,7 +68,7 @@ namespace optiSCAN.Services
                 return HistoryExportResult.Succeeded(
                     LocalizationService.Format("Status_PdfSaved", dlg.FileName));
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("HistoryExportService", "Export PDF", ex);
                 return HistoryExportResult.Failed(

@@ -145,32 +145,35 @@ jobs:
           -p:OptiscanShipping=true
           --output publish/win-x64
 
+      - name: Publish SYSTEM host (win-x64, no WPF)
+        run: >
+          dotnet publish optiSCAN.Host/optiSCAN.Host.csproj
+          --configuration Release
+          --runtime win-x64
+          --self-contained true
+          -p:PublishSingleFile=false
+          -p:OptiscanShipping=true
+          --output publish/win-x64
+
       - name: Verify shipped binary has no test hooks
         shell: pwsh
         run: |
-          $dll = 'publish/win-x64/optiSCAN.dll'
-          if (Select-String -LiteralPath $dll -Pattern 'ClamdLoopbackStub' -SimpleMatch -Quiet) {
-            throw 'Le binaire publié contient encore le faux clamd des tests (OPTISCAN_TEST_HOOKS).'
+          foreach ($dll in 'publish/win-x64/optiSCAN.dll', 'publish/win-x64/optiSCAN.Engine.dll', 'publish/win-x64/optiSCAN.Host.dll') {
+            if (Select-String -LiteralPath $dll -Pattern 'ClamdLoopbackStub' -SimpleMatch -Quiet) {
+              throw "Le binaire publié $dll contient encore le faux clamd des tests (OPTISCAN_TEST_HOOKS)."
+            }
           }
           Write-Host 'OK : aucun point d''entrée de test dans le binaire publié.'
 
-      - name: Code signing — prepare (optional)
-        id: codesign
-        shell: pwsh
-        env:
-          CODESIGN_PFX: ${{ secrets.CODESIGN_PFX }}
-        run: pwsh -File scripts/codesign.ps1 -Prepare
+      # Aucune signature dans la CI de développement : les releases sont signées par SignPath
+      # dans release.yml, sur un tag (docs/CODE_SIGNING_POLICY.md).
 
-      - name: Code signing — optiSCAN binaries
-        if: steps.codesign.outputs.enabled == 'true'
+      - name: Build AMSI provider (C++, required)
         shell: pwsh
-        env:
-          CODESIGN_PASSWORD: ${{ secrets.CODESIGN_PASSWORD }}
-          SIGNTOOL_PATH: ${{ steps.codesign.outputs.signtool }}
-        run: >
-          pwsh -File scripts/codesign.ps1 -Sign
-          -PfxPath "${{ steps.codesign.outputs.pfx }}"
-          -Files publish/win-x64/optiSCAN.exe,publish/win-x64/optiSCAN.dll,publish/win-x64/optiSCAN.Service.exe,publish/win-x64/optiSCAN.Service.dll,publish/win-x64/optiSCAN.Platform.dll
+        run: |
+          pwsh -File scripts/build-amsi.ps1 -Require
+          pwsh -File scripts/stage-amsi.ps1 -PublishDir publish/win-x64
+          if (-not (Test-Path publish/win-x64/optiSCAN.AmsiProvider.dll)) { throw 'optiSCAN.AmsiProvider.dll absent du publish.' }
 
       - name: Stage runtime deps into publish folder
         shell: pwsh
@@ -184,25 +187,11 @@ jobs:
         # Version épinglée de l'outil qui produit l'installateur.
         run: choco install innosetup --version 6.7.1 -y --no-progress
 
-      - name: Build installer (Inno Setup)
+      - name: Build installer (Inno Setup, unsigned)
         shell: pwsh
-        env:
-          CODESIGN_PASSWORD: ${{ secrets.CODESIGN_PASSWORD }}
-          SIGNTOOL_PATH: ${{ steps.codesign.outputs.signtool }}
-          SIGN_ENABLED: ${{ steps.codesign.outputs.enabled }}
-          SIGN_PFX: ${{ steps.codesign.outputs.pfx }}
         run: |
-          $setupArgs = @('-SkipPublish', '-PublishDir', 'publish/win-x64')
-          if ($env:SIGN_ENABLED -eq 'true') { $setupArgs += @('-SignPfxPath', $env:SIGN_PFX) }
-          pwsh -File installer/build-release-setup.ps1 @setupArgs
+          pwsh -File installer/build-release-setup.ps1 -SkipPublish -PublishDir publish/win-x64
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
-
-      - name: Code signing — cleanup
-        if: always() && steps.codesign.outputs.enabled == 'true'
-        shell: pwsh
-        env:
-          SIGN_PFX: ${{ steps.codesign.outputs.pfx }}
-        run: Remove-Item -LiteralPath $env:SIGN_PFX -Force -ErrorAction SilentlyContinue
 
       - name: Generate SBOM (CycloneDX)
         shell: pwsh

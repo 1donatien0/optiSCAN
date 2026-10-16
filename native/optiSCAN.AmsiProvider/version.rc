@@ -1,0 +1,33 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+// Métadonnées du fournisseur AMSI. La version suit Directory.Build.props (test
+// AmsiProviderVersionTests) ; le nom de produit est vérifié par SignPath.
+#include <winres.h>
+
+VS_VERSION_INFO VERSIONINFO
+ FILEVERSION 3,1,0,0
+ PRODUCTVERSION 3,1,0,0
+ FILEFLAGSMASK 0x3fL
+ FILEFLAGS 0x0L
+ FILEOS VOS_NT_WINDOWS32
+ FILETYPE VFT_DLL
+ FILESUBTYPE VFT2_UNKNOWN
+BEGIN
+    BLOCK "StringFileInfo"
+    BEGIN
+        BLOCK "040C04B0"
+        BEGIN
+            VALUE "CompanyName", "Dona By"
+            VALUE "FileDescription", "optiSCAN AMSI Provider"
+            VALUE "FileVersion", "3.1.0.0"
+            VALUE "InternalName", "optiSCAN.AmsiProvider"
+            VALUE "LegalCopyright", "Copyright 2026 Dona By. Licence GPL-3.0-or-later."
+            VALUE "OriginalFilename", "optiSCAN.AmsiProvider.dll"
+            VALUE "ProductName", "optiSCAN"
+            VALUE "ProductVersion", "3.1.0"
+        END
+    END
+    BLOCK "VarFileInfo"
+    BEGIN
+        VALUE "Translation", 0x40C, 1200
+    END
+END

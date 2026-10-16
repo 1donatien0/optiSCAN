@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using Microsoft.Win32;
 using optiSCAN.Localization;
 using optiSCAN.Models;
@@ -255,7 +256,7 @@ namespace optiSCAN.Views
                 using var key = Registry.CurrentUser.OpenSubKey(regKey, writable: false);
                 return key?.GetValue(appName) != null;
             }
-            catch { return false; }
+            catch (Exception ignored) when (!ignored.IsFatal()) { return false; }
         }
 
         private void CheckOption_Changed(object sender, RoutedEventArgs e)
@@ -290,7 +291,7 @@ namespace optiSCAN.Views
                         _ = Task.Run(async () =>
                         {
                             try { await ClamdHost.Shared.EnsureRunningAsync(); }
-                            catch (Exception ex) { AppLogger.Warn("Options", "clamd", ex); }
+                            catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("Options", "clamd", ex); }
                         });
                     }
                     else
@@ -536,7 +537,7 @@ namespace optiSCAN.Views
                     if (btnScheduledRunNow != null) btnScheduledRunNow.IsEnabled = true;
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("OptionsControl", "BtnScheduledRunNow_Click failed", ex);
                 if (btnScheduledRunNow != null) btnScheduledRunNow.IsEnabled = true;
@@ -556,7 +557,7 @@ namespace optiSCAN.Views
                 else
                     key.DeleteValue(appName, throwOnMissingValue: false);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("OptionsControl", "SetAutoStart", ex);
             }
@@ -584,7 +585,7 @@ namespace optiSCAN.Views
                 {
                     result = await new UpdateService().CheckForUpdatesAsync().ConfigureAwait(true);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Error("OptionsControl", "CheckForUpdatesAsync", ex);
                     result = new AppUpdateCheckResult
@@ -610,13 +611,13 @@ namespace optiSCAN.Views
                             UseShellExecute = true
                         });
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (!ex.IsFatal())
                     {
                         AppLogger.Warn("OptionsControl", "Navigate SourceForge (update check)", ex);
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("OptionsControl", "BtnCheckAppUpdate_Click failed", ex);
             }
@@ -632,7 +633,7 @@ namespace optiSCAN.Views
                     UseShellExecute = true
                 });
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("OptionsControl", "BtnOpenSourceForge_Click failed", ex);
             }
@@ -666,7 +667,7 @@ namespace optiSCAN.Views
                     UseShellExecute = true
                 });
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("OptionsControl", $"Open document {relativePath}", ex);
                 System.Windows.MessageBox.Show(

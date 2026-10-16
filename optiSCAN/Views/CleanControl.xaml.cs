@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Localization;
 using optiSCAN.Models;
 using optiSCAN.Services;
@@ -142,7 +143,7 @@ namespace optiSCAN.Views
 
                 btnAnalyze.IsEnabled = true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("CleanControl", "btnAnalyze_Click failed", ex);
                 btnAnalyze.IsEnabled = true;
@@ -183,7 +184,7 @@ namespace optiSCAN.Views
                     }
                     if (sel.Recycle)
                     {
-                        SHEmptyRecycleBin(IntPtr.Zero, null, 0x0007);
+                        optiSCAN.Native.UiNativeMethods.SHEmptyRecycleBin(IntPtr.Zero, null, 0x0007);
                         Dispatcher.Invoke(() => AppendLog(LocalizationService.GetString("Clean_LogRecycleEmptied")));
                     }
                     if (sel.Edge)
@@ -296,14 +297,14 @@ namespace optiSCAN.Views
                             });
                             _services!.RequestScanHistoryViewsRefresh();
                         }
-                        catch (Exception ex)
+                        catch (Exception ex) when (!ex.IsFatal())
                         {
                             AppLogger.Warn("CleanControl", "Enregistrement historique nettoyage", ex);
                         }
                     });
                 });
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("CleanControl", "btnCleanNow_Click failed", ex);
                 AppendLog(LocalizationService.Format("Clean_ErrCleaning", ex.Message));
@@ -409,7 +410,7 @@ namespace optiSCAN.Views
                     if (File.Exists(p))
                         total += new FileInfo(p).Length;
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Warn("CleanControl", $"Mesure ignorée : {p}", ex);
                 }
@@ -432,7 +433,7 @@ namespace optiSCAN.Views
                     File.Delete(p);
                     freed += s;
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     locked++;
                     AppLogger.Warn("CleanControl", $"Fichier non supprimé : {p}", ex);
@@ -485,7 +486,7 @@ namespace optiSCAN.Views
                         return localCandidate;
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("CleanControl", "Lecture de profiles.ini Firefox", ex);
             }
@@ -541,7 +542,5 @@ namespace optiSCAN.Views
 
         private static string FormatSize(long bytes) => ByteSizeFormat.Format(bytes);
 
-        [DllImport("Shell32.dll", CharSet = CharSet.Unicode)]
-        private static extern int SHEmptyRecycleBin(IntPtr hwnd, string? pszRootPath, uint dwFlags);
     }
 }

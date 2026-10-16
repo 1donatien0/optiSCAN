@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Runtime.Versioning;
 using System.Security.AccessControl;
 using System.Security.Cryptography;
@@ -52,7 +53,7 @@ public static class ProtectionPipeShutdownToken
             token = File.ReadAllText(TokenFilePath, Encoding.UTF8).Trim();
             return !string.IsNullOrEmpty(token);
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return false;
         }
@@ -83,7 +84,7 @@ public static class ProtectionPipeShutdownToken
 
             new FileInfo(path).SetAccessControl(security);
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             /* ACL best effort — le jeton reste fonctionnel pour SYSTEM */
         }

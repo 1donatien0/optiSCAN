@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.ComponentModel;
 using optiSCAN.Coordinators;
 using optiSCAN.Strings;

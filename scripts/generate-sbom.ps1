@@ -1,3 +1,4 @@
+﻿# SPDX-License-Identifier: GPL-3.0-or-later
 # Génère des SBOM CycloneDX JSON pour les projets publishables.
 param(
     [string]$OutputDir = "sbom",

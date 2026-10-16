@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Runtime.Versioning;
 using Microsoft.Extensions.DependencyInjection;
 using optiSCAN.Localization;
@@ -272,7 +273,9 @@ namespace optiSCAN.Services
             // le temps réel du service à chaque démarrage dès que Defender était actif, contre la
             // politique de l'administrateur. L'hôte suit la politique et rien d'autre.
             ApplySignatureAutoUpdate(_userPreferences.Current.SignatureAutoUpdateEnabled);
-            SignatureUpdatePolicy.NotifyAndScheduleStartupRefresh(this, _userPreferences);
+            SignatureUpdatePolicy.NotifyAndScheduleStartupRefresh(
+                FreshclamUpdater, RulesUpdater, _userPreferences,
+                Notifications.ShowSignatureDownloadStarted, Notifications.ShowSignatureUpdateNeeded);
 
             if (_exclusionSettings.Current.RealTimeEnabled)
             {
@@ -335,7 +338,9 @@ namespace optiSCAN.Services
             DefenderCoexistenceService.EnsureFirstLaunchExclusionSettings(_exclusionSettings, _userPreferences);
 
             ApplySignatureAutoUpdate(_userPreferences.Current.SignatureAutoUpdateEnabled);
-            SignatureUpdatePolicy.NotifyAndScheduleStartupRefresh(this, _userPreferences);
+            SignatureUpdatePolicy.NotifyAndScheduleStartupRefresh(
+                FreshclamUpdater, RulesUpdater, _userPreferences,
+                Notifications.ShowSignatureDownloadStarted, Notifications.ShowSignatureUpdateNeeded);
 
             if (_userPreferences.Current.UsePlatformProtectionService)
             {
@@ -389,7 +394,7 @@ namespace optiSCAN.Services
                         return false;
                 }
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return false;
             }
@@ -411,7 +416,7 @@ namespace optiSCAN.Services
                 _ = Task.Run(async () =>
                 {
                     try { await ClamdHost.Shared.EnsureRunningAsync().ConfigureAwait(false); }
-                    catch (Exception ex) { AppLogger.Warn("ServiceContainer", "Préchauffage clamd", ex); }
+                    catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("ServiceContainer", "Préchauffage clamd", ex); }
                 });
             }
 
@@ -515,7 +520,9 @@ namespace optiSCAN.Services
             Logger.BindActivityLog(ActivityLog);
             Quarantine.BindActivityLog(ActivityLog);
             ActivityLog.EnsureMigrated(Quarantine);
-            Actions = new AntivirusActions(this);
+            Actions = new AntivirusActions(
+                Quarantine, FreshclamUpdater, RulesUpdater, FindKnownThreat,
+                ((IProtectionServiceHostDependencies)this).ExclusionSettingsAccessor);
 
             AppLogger.Info("ServiceContainer", "Services initialisés (DI)");
 
@@ -530,7 +537,7 @@ namespace optiSCAN.Services
                             "Précompilation YARA (.yarc) absente ou échouée au démarrage — sera retentée au premier scan.");
                     }
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Warn("ServiceContainer", "Précompilation YARA au démarrage", ex);
                 }
@@ -555,19 +562,19 @@ namespace optiSCAN.Services
             _uiEventBus.ClearHandlers();
             _serviceDetectionWatcher?.Dispose();
             try { RealTimeProtection.Dispose(); }
-            catch (Exception ex) { AppLogger.Warn("ServiceContainer", "RealTimeProtection.Dispose", ex); }
+            catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("ServiceContainer", "RealTimeProtection.Dispose", ex); }
             try { ProcessStartMonitor.Dispose(); }
-            catch (Exception ex) { AppLogger.Warn("ServiceContainer", "ProcessStartMonitor.Dispose", ex); }
+            catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("ServiceContainer", "ProcessStartMonitor.Dispose", ex); }
             try { RemovableDriveScan.Dispose(); }
-            catch (Exception ex) { AppLogger.Warn("ServiceContainer", "RemovableDriveScan.Dispose", ex); }
+            catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("ServiceContainer", "RemovableDriveScan.Dispose", ex); }
             try { FreshclamUpdater.DisableAutoUpdate(); }
-            catch (Exception ex) { AppLogger.Warn("ServiceContainer", "FreshclamUpdater.DisableAutoUpdate", ex); }
+            catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("ServiceContainer", "FreshclamUpdater.DisableAutoUpdate", ex); }
             try { RulesUpdater.DisableAutoUpdate(); }
-            catch (Exception ex) { AppLogger.Warn("ServiceContainer", "RulesUpdater.DisableAutoUpdate", ex); }
+            catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("ServiceContainer", "RulesUpdater.DisableAutoUpdate", ex); }
             try { ClamdHost.Shared.Stop(); }
-            catch (Exception ex) { AppLogger.Warn("ServiceContainer", "ClamdHost.Stop", ex); }
+            catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("ServiceContainer", "ClamdHost.Stop", ex); }
             try { DistractionFreeMonitor.Stop(); }
-            catch (Exception ex) { AppLogger.Warn("ServiceContainer", "DistractionFreeMonitor.Stop", ex); }
+            catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("ServiceContainer", "DistractionFreeMonitor.Stop", ex); }
             (ClamAv as IDisposable)?.Dispose();
             (Yara as IDisposable)?.Dispose();
             if (_services is IDisposable disposable)

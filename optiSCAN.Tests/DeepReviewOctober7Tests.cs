@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Services;
 
 namespace optiSCAN.Tests;
@@ -217,15 +218,12 @@ public sealed class DeepReviewOctober7Tests : IDisposable
 
         foreach (var file in new[] { "ClamdClient.cs", "ClamdBroker.cs" })
         {
-            var text = File.ReadAllText(Path.Combine(root, "optiSCAN", "Services", file));
+            var text = File.ReadAllText(Path.Combine(root, "optiSCAN.Engine", "Services", file));
             var creations = System.Text.RegularExpressions.Regex.Matches(text, @"new NamedPipeClientStream\(\s*""\.""[^;]*;");
             Assert.All(creations, m => Assert.Contains("PipeServerAccount.ClientImpersonation", m.Value));
         }
     }
 
-    // ── Z4 : scan_buffer fermé ────────────────────────────────────────────────────
-
-    [Fact]
-    public void Scan_buffer_stays_closed_while_amsi_is_not_shipped() =>
-        Assert.False(ProtectionPipeServer.ScanBufferEnabled);
+    // ── Z4 : scan_buffer fermé par défaut, ouvert seulement par l'hôte (AMSI) ─────────
+    // Voir AmsiScanBufferTests.
 }

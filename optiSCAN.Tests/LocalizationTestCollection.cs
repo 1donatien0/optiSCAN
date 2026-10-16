@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 namespace optiSCAN.Tests;
 
 /// <summary>Évite les courses sur UiCulture entre tests parallèles.</summary>

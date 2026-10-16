@@ -1,3 +1,4 @@
+﻿# SPDX-License-Identifier: GPL-3.0-or-later
 <#
 .SYNOPSIS
     Vérifie que tous les binaires et fichiers critiques sont présents dans le dossier
@@ -97,6 +98,9 @@ Check "optiSCAN.Service.exe"              "Service Windows optiSCANProtection"
 Check "optiSCAN.Service.dll"              "Assembly du service (l'exe seul ne demarre pas)"
 Check "optiSCAN.Service.runtimeconfig.json" "Configuration runtime du service"
 Check "optiSCAN.Platform.dll"             "Bibliotheque plateforme partagee"
+Check "optiSCAN.Engine.dll"               "Moteur sans interface (analyse, quarantaine, tube)"
+Check "optiSCAN.Host.exe"                 "Hote SYSTEM lance par le service (sans WPF)"
+Check "optiSCAN.Host.dll"                 "Assembly de l'hote SYSTEM"
 
 Write-Host "`n[ Ressources ]"
 Check "optiSCAN.ico"      "Icone application"

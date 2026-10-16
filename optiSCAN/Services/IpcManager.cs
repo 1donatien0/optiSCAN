@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Windows;
@@ -62,13 +63,13 @@ namespace optiSCAN.Services
                     // élevé (seconde instance lancée normalement, menu contextuel). Ce message-là
                     // seul est autorisé, sans quoi la fenêtre ne se rouvrait pas.
                     try { NativeMethods.ChangeWindowMessageFilterEx(src.Handle, messageId, MsgfltAllow, IntPtr.Zero); }
-                    catch (Exception ex) { AppLogger.Debug("IpcManager", "Filtre de message : " + ex.Message); }
+                    catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Debug("IpcManager", "Filtre de message : " + ex.Message); }
 
                     src.AddHook((IntPtr h, int m, IntPtr w, IntPtr l, ref bool handled) =>
                     {
                         if (m == messageId)
                         {
-                            try { handler(); } catch (Exception ex) { AppLogger.Warn("IpcManager", "HookMessage", ex); }
+                            try { handler(); } catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("IpcManager", "HookMessage", ex); }
                             handled = true;
                         }
                         return IntPtr.Zero;

@@ -1,7 +1,7 @@
 # Avis de composants tiers — optiSCAN v3.1
 
-optiSCAN est distribué sous son propre contrat de licence (`LICENSE.txt`). Il livre les composants
-ci-dessous, chacun sous sa licence d'origine, qui s'applique indépendamment de ce contrat.
+optiSCAN est un logiciel libre distribué sous la GNU GPL v3 ou ultérieure (`LICENSE.txt`). Il livre les
+composants ci-dessous, chacun sous sa licence d'origine.
 Les textes de licence sont installés avec le logiciel :
 
 - `licenses\` : ce fichier et la licence de YARA ;
@@ -29,7 +29,7 @@ Les textes de licence sont installés avec le logiciel :
 | YARA (`yara64`, `yarac64`) | 4.5.5 | BSD-3-Clause | `licenses\YARA-COPYING.txt` |
 
 Le code source de ClamAV 1.4.6 est publié par Cisco-Talos : https://github.com/Cisco-Talos/clamav/tree/clamav-1.4.6
-(archive : https://www.clamav.net/downloads). Sur demande écrite à l'auteur d'optiSCAN (voir `LICENSE.txt`),
+(archive : https://www.clamav.net/downloads). Sur demande écrite à l'auteur d'optiSCAN (voir le dépôt du projet),
 une copie du code source correspondant aux binaires ClamAV livrés est fournie pendant au moins trois ans,
 conformément à la GPLv2 (article 3).
 
@@ -41,7 +41,7 @@ conformément à la GPLv2 (article 3).
 | Microsoft.Extensions.DependencyInjection, Microsoft.Extensions.Hosting.WindowsServices, System.Management, System.ServiceProcess.ServiceController | MIT |
 | MaterialDesignThemes, MaterialDesignColors | MIT |
 | Microsoft.Toolkit.Uwp.Notifications | MIT |
-| QuestPDF 2024.12.2 | Licence QuestPDF, niveau **Community** : gratuit sous conditions, notamment un chiffre d'affaires annuel inférieur à 1 M USD (https://questpdf.com/license/) |
+| PDFsharp, MigraDoc 6.2.4 | MIT (https://github.com/empira/PDFsharp) |
 
 ## Données téléchargées après installation
 

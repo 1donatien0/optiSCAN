@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using optiSCAN.Platform;
@@ -43,15 +44,16 @@ public sealed class ProtectionWindowsService : BackgroundService
     {
         RemoveLegacyEventSources();
 
-        var exe = Path.Combine(AppContext.BaseDirectory, "optiSCAN.exe");
+        // Hôte console sans WPF (3.1) : l'interface optiSCAN.exe ne tourne plus sous SYSTEM.
+        var exe = Path.Combine(AppContext.BaseDirectory, "optiSCAN.Host.exe");
         if (!File.Exists(exe))
         {
-            StopWithError("optiSCAN.exe introuvable dans " + AppContext.BaseDirectory);
+            StopWithError("optiSCAN.Host.exe introuvable dans " + AppContext.BaseDirectory);
             return;
         }
 
         // L'hôte tourne en SYSTEM : un dossier modifiable par un utilisateur lui donnerait
-        // une exécution SYSTEM en remplaçant optiSCAN.exe. Refus tant que le dossier n'est pas
+        // une exécution SYSTEM en remplaçant optiSCAN.Host.exe. Refus tant que le dossier n'est pas
         // réservé aux administrateurs (installation sous Program Files).
         if (!InstallLocationTrust.IsCurrentInstallTrusted(out var reason))
         {
@@ -86,7 +88,7 @@ public sealed class ProtectionWindowsService : BackgroundService
                             _hostProcess.Kill(entireProcessTree: true);
                             _hostProcess.WaitForExit(5000);
                         }
-                        catch (Exception ex) { WriteEvent("Arrêt de l'hôte figé impossible : " + ex.Message, EventLogEntryType.Error); }
+                        catch (Exception ex) when (!ex.IsFatal()) { WriteEvent("Arrêt de l'hôte figé impossible : " + ex.Message, EventLogEntryType.Error); }
                         continue;
                     }
                 }
@@ -144,7 +146,7 @@ public sealed class ProtectionWindowsService : BackgroundService
                     WriteEvent($"Hôte --service-host démarré (PID {_hostProcess.Id})", EventLogEntryType.Information);
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 _restartPolicy.OnHostExit();
                 WriteEvent("Échec démarrage --service-host : " + ex.Message, EventLogEntryType.Error);
@@ -167,7 +169,7 @@ public sealed class ProtectionWindowsService : BackgroundService
         {
             throw;
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return false;
         }
@@ -180,14 +182,14 @@ public sealed class ProtectionWindowsService : BackgroundService
             using var client = new ProtectionPipeClient();
             await client.RequestShutdownAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch { /* ignore */ }
+        catch (Exception ignored) when (!ignored.IsFatal()) { /* ignore */ }
 
         try
         {
             if (_hostProcess is { HasExited: false })
                 _hostProcess.Kill(entireProcessTree: true);
         }
-        catch { /* ignore */ }
+        catch (Exception ignored) when (!ignored.IsFatal()) { /* ignore */ }
 
         WriteEvent("Service Windows arrêté", EventLogEntryType.Information);
         await base.StopAsync(cancellationToken).ConfigureAwait(false);
@@ -206,7 +208,7 @@ public sealed class ProtectionWindowsService : BackgroundService
                 if (EventLog.SourceExists(legacy))
                     EventLog.DeleteEventSource(legacy);
             }
-            catch { /* droits insuffisants : sans conséquence */ }
+            catch (Exception ignored) when (!ignored.IsFatal()) { /* droits insuffisants : sans conséquence */ }
         }
     }
 
@@ -222,10 +224,10 @@ public sealed class ProtectionWindowsService : BackgroundService
 
             EventLog.WriteEntry(EventSourceName, message, type);
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             try { EventLog.WriteEntry("optiSCAN.Service", message, type); }
-            catch { /* ignore */ }
+            catch (Exception inner) when (!inner.IsFatal()) { /* ignore */ }
         }
     }
 }

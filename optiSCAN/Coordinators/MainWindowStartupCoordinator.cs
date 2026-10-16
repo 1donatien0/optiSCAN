@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Localization;
 using optiSCAN.Services;
 using optiSCAN.Strings;
@@ -58,7 +59,7 @@ public static class MainWindowStartupCoordinator
         {
             host.Container.ApplyPreferencesOnStartup();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("MainWindowStartup", "ApplyPreferencesOnStartup", ex);
         }

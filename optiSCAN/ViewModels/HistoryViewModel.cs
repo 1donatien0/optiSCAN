@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Localization;
 using optiSCAN.Models;
 using optiSCAN.Services;
@@ -237,7 +238,7 @@ namespace optiSCAN.ViewModels
                     return false;
                 return File.Exists(filePath);
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return false;
             }

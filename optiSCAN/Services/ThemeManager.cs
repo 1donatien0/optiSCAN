@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using MaterialDesignThemes.Wpf;
 using Microsoft.Win32;
 using optiSCAN.Services;
@@ -100,7 +101,7 @@ namespace optiSCAN
                 if (v is uint u)
                     return u == 0;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ThemeManager", "IsWindowsAppsDarkTheme", ex);
             }
@@ -256,7 +257,7 @@ namespace optiSCAN
                 // 2. Permuter le dictionnaire Donaby personnalisé
                 SwapDonabyTheme(isDark);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ThemeManager", "ApplyTheme", ex);
             }

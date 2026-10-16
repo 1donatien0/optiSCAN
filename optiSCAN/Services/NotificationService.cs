@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using Microsoft.Toolkit.Uwp.Notifications;
 using optiSCAN.Localization;
 using optiSCAN.Models;
@@ -8,7 +9,7 @@ namespace optiSCAN.Services
     /// Notifications toast Windows natives.
     /// Les actions (quarantaine, ignorer, navigation…) sont traitées via <see cref="ToastActivated"/>.
     /// </summary>
-    public class NotificationService
+    public class NotificationService : INotificationSink
     {
         private static NotificationService? _activationTarget;
 
@@ -65,7 +66,7 @@ namespace optiSCAN.Services
                 var args = new ToastActivationEventArgs(action, file, virus);
                 _activationTarget?.DispatchActivation(args);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("NotificationService", "OnActivated", ex);
             }
@@ -90,7 +91,7 @@ namespace optiSCAN.Services
                     .AddText(LocalizationService.Format("Notif_RtDegradedBody", folderCount))
                     .Show();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("NotificationService", "ShowRealTimeDegraded", ex);
             }
@@ -134,7 +135,7 @@ namespace optiSCAN.Services
                     .SetToastDuration(ToastDuration.Long)
                     .Show();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("NotificationService", "ShowThreatDetected", ex);
             }
@@ -223,7 +224,7 @@ namespace optiSCAN.Services
                     .SetToastDuration(ToastDuration.Long)
                     .Show();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("NotificationService", "FlushDeferred", ex);
             }
@@ -247,7 +248,7 @@ namespace optiSCAN.Services
                         .AddArgument("action", "showquarantine"))
                     .Show();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("NotificationService", "ShowQuarantined", ex);
             }
@@ -276,7 +277,7 @@ namespace optiSCAN.Services
                         .AddArgument("action", "history"))
                     .Show();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("NotificationService", "ShowServiceThreat", ex);
             }
@@ -302,7 +303,7 @@ namespace optiSCAN.Services
                         .AddArgument("action", "history"))
                     .Show();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("NotificationService", "ShowServiceThreatsSummary", ex);
             }
@@ -322,7 +323,7 @@ namespace optiSCAN.Services
                     .SetToastDuration(ToastDuration.Short)
                     .Show();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("NotificationService", "ShowRemovableDriveScanStarted", ex);
             }
@@ -363,7 +364,7 @@ namespace optiSCAN.Services
                         .Show();
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("NotificationService", "ShowRemovableDriveScanCompleted", ex);
             }
@@ -405,7 +406,7 @@ namespace optiSCAN.Services
                         .Show();
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("NotificationService", "ShowScanCompleted", ex);
             }
@@ -431,7 +432,7 @@ namespace optiSCAN.Services
                     .SetToastDuration(ToastDuration.Short)
                     .Show();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("NotificationService", "ShowSignatureDownloadStarted", ex);
             }
@@ -453,7 +454,7 @@ namespace optiSCAN.Services
                         .AddArgument("action", "update"))
                     .Show();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("NotificationService", "ShowSignatureUpdateNeeded", ex);
             }
@@ -472,7 +473,7 @@ namespace optiSCAN.Services
                     .SetToastDuration(ToastDuration.Short)
                     .Show();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("NotificationService", "ShowRealTimeProtectionStarted", ex);
             }

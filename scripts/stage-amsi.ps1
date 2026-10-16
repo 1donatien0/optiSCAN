@@ -1,3 +1,4 @@
+﻿# SPDX-License-Identifier: GPL-3.0-or-later
 <#
 .SYNOPSIS
     Copie optiSCAN.AmsiProvider.dll vers un dossier de publication.

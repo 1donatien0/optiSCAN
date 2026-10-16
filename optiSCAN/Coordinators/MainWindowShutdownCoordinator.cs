@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Services;
 using optiSCAN.ViewModels;
 using System.ComponentModel;
@@ -35,7 +36,7 @@ public static class MainWindowShutdownCoordinator
             host.ViewModel?.Dispose();
             host.Container.Shutdown();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("MainWindowShutdown", "PerformCleanShutdown", ex);
         }

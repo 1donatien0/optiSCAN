@@ -1,3 +1,4 @@
+; SPDX-License-Identifier: GPL-3.0-or-later
 ; =============================================================================
 ; optiSCAN — Installateur Windows (Inno Setup)
 ; =============================================================================
@@ -37,7 +38,19 @@
 ; Sans optiSCAN.Service.dll dans le dossier publié, l'installeur livrerait un service qui ne
 ; démarre pas (ou pas de service du tout). /DAllowMissingService pour un build de développement.
 #define AppPublishDir Copy(AppPublishSource, 1, Len(AppPublishSource) - 1)
+; Fournisseur AMSI : exigé pour une release ; /DAllowMissingAmsi pour un build local sans C++.
+#if FileExists(AppPublishDir + "optiSCAN.AmsiProvider.dll") || FileExists(AddBackslash(SourcePath) + AppPublishDir + "optiSCAN.AmsiProvider.dll")
+  #define HaveAmsiProvider
+#else
+  #ifndef AllowMissingAmsi
+    #error optiSCAN.AmsiProvider.dll absent du dossier publié : scripts\build-amsi.ps1 puis scripts\stage-amsi.ps1, ou compiler avec /DAllowMissingAmsi.
+  #endif
+#endif
+
 #ifndef AllowMissingService
+#if !FileExists(AppPublishDir + "optiSCAN.Host.dll") && !FileExists(AddBackslash(SourcePath) + AppPublishDir + "optiSCAN.Host.dll")
+  #error optiSCAN.Host.dll absent du dossier publié : l'hôte SYSTEM (optiSCAN.Host) doit être publié dans le même dossier (publish-release.ps1), ou compiler avec /DAllowMissingService.
+#endif
 #if !FileExists(AppPublishDir + "optiSCAN.Service.dll") && !FileExists(AddBackslash(SourcePath) + AppPublishDir + "optiSCAN.Service.dll")
   #error optiSCAN.Service.dll absent du dossier publié : publier optiSCAN.Service dans le même dossier que optiSCAN (scripts\prepare-release-v3.ps1 ou publish-release.ps1), ou compiler avec /DAllowMissingService.
 #endif
@@ -87,7 +100,7 @@ DisableProgramGroupPage=auto
 ; Pas d'AppMutex ici : il bloquerait l'assistant tant qu'une version
 ; déjà lancée tient Global\optiSCAN_UniqueInstance. StopRunningOptiScan la ferme.
 CloseApplications=force
-CloseApplicationsFilter=optiSCAN.exe,optiSCAN.Service.exe
+CloseApplicationsFilter=optiSCAN.exe,optiSCAN.Service.exe,optiSCAN.Host.exe
 RestartApplications=no
 VersionInfoVersion={#AppVersion}
 VersionInfoCompany={#AppPublisher}
@@ -96,19 +109,11 @@ VersionInfoProductName={#AppName}
 VersionInfoProductVersion={#AppVersion}
 VersionInfoCopyright=Copyright 2026 Dona By
 
-; ── SIGNATURE DE CODE (Authenticode / EV) ───────────────────────────────────
-; Sans signature : SmartScreen affiche « éditeur inconnu » et de nombreux
-; antivirus bloquent l'installeur. Pour signer l'installeur (et le désinstalleur) :
-;   - CI : secrets CODESIGN_PFX (base64) et CODESIGN_PASSWORD ; le job publish
-;     appelle build-release-setup.ps1 -SignPfxPath, qui passe /DSignInstaller et
-;     /Ssigntool=… à ISCC.
-;   - Local : .\installer\build-release-setup.ps1 -SignPfxPath cert.pfx
-;     (mot de passe dans $env:CODESIGN_PASSWORD).
-; Sans certificat, SignInstaller n'est pas défini et la compilation reste possible.
-#ifdef SignInstaller
-SignTool=signtool
-SignedUninstaller=yes
-#endif
+; ── SIGNATURE DE CODE ───────────────────────────────────────────────────────
+; Une seule chaîne : SignPath Foundation, dans .github/workflows/release.yml.
+; Les binaires publiés sont signés avant la compilation de l'installeur, puis
+; l'installeur compilé est signé à son tour. Aucun certificat ni mot de passe
+; n'existe sur un poste ou dans les secrets du dépôt (docs/CODE_SIGNING_POLICY.md).
 
 ; Langue de l'installateur = langue de l'application (UiCulture en Registre).
 ShowLanguageDialog=auto
@@ -119,18 +124,26 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 ; Profil d'install allégé façon v2 : défaut = UI + ClamAV + YARA (+ MAJ signatures).
-; Service plateforme / RTP avancé = opt-in explicite (Flags: unchecked).
+; Service de protection : coché à la première installation (checkedonce) pour que la
+; protection survive à la fermeture de session ; une mise à jour garde le choix précédent.
 Name: "desktopicon";   Description: "Créer une icône sur le Bureau";                              GroupDescription: "Icônes supplémentaires"
 Name: "startupicon";   Description: "Lancer optiSCAN au démarrage de Windows";                   GroupDescription: "Options avancées"; Flags: unchecked
 Name: "autoUpdateSig"; Description: "Activer les mises à jour auto des signatures (recommandé)"; GroupDescription: "Moteurs ClamAV + YARA"; Flags: checkedonce
-Name: "platformservice"; Description: "Installer le service Windows de protection système (temps réel et IPC — avancé)"; GroupDescription: "Protection avancée (optionnel)"; Flags: unchecked
+Name: "platformservice"; Description: "Installer le service Windows de protection (temps réel hors session, recommandé)"; GroupDescription: "Protection"; Flags: checkedonce
 
 [Files]
 ; ── Application principale ───────────────────────────────────────────────────
 ; Avant de compiler : Build > Publish (Release) ou : dotnet publish -c Release
 ; Le chemin exact est résolu par le préprocesseur (AppPublishSource).
 ; clamav\*, rules\* et yara\* sont exclus ici — gérés séparément ci-dessous.
-Source: "{#AppPublishSource}"; DestDir: "{app}"; Excludes: "clamav\*,rules\*,yara\*,bin\*,*.pdb"; Flags: ignoreversion recursesubdirs createallsubdirs
+Source: "{#AppPublishSource}"; DestDir: "{app}"; Excludes: "clamav\*,rules\*,yara\*,bin\*,*.pdb,optiSCAN.AmsiProvider.dll"; Flags: ignoreversion recursesubdirs createallsubdirs
+; ── Fournisseur AMSI (analyse des scripts avant exécution) ─────────────────────
+; Enregistré avec le service (son seul serveur) : DllRegisterServer écrit la classe COM et
+; l'entrée HKLM\SOFTWARE\Microsoft\AMSI\Providers ; la désinstallation les retire.
+; restartreplace : une mise à jour remplace la DLL au redémarrage si un processus la charge.
+#ifdef HaveAmsiProvider
+Source: "{#AppPublishDir}optiSCAN.AmsiProvider.dll"; DestDir: "{app}"; Tasks: platformservice; Flags: ignoreversion regserver 64bit restartreplace uninsrestartdelete
+#endif
 ; ── ClamAV x64 — outils développeur exclus (sigtool/clambc & co : ~47 Mo
 ; inutiles au scan et à la mise à jour ; le code n'y fait jamais appel) ──────
 #if DirExists(AddBackslash(SourcePath) + "..\optiSCAN\clamav\x64")
@@ -159,7 +172,7 @@ Source: "licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion
 #if !FileExists(AddBackslash(SourcePath) + "..\optiSCAN\clamav\x64\licenses\COPYING.txt")
   #error Licence ClamAV absente (optiSCAN\clamav\x64\licenses\COPYING.txt) : relancer scripts\fetch-runtime-deps.ps1.
 #endif
-; ── Service Windows (pour tâche platformservice opt-in) ───────────────────────
+; ── Service Windows (tâche platformservice, cochée par défaut) ───────────────────────
 ; optiSCAN.Service.exe, sa DLL et ses dépendances arrivent par AppPublishSource : le service est
 ; publié dans le même dossier que l'application (CI, prepare-release-v3, publish-release).
 ; Un exe copié seul ne démarre pas ; la présence de la DLL est vérifiée plus haut à la compilation.

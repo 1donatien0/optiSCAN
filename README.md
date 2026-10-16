@@ -64,24 +64,26 @@ optiSCAN v3.1 candidate rapproche un antivirus « classique » via une couche pl
 ```
 optiSCAN.exe (UI WPF)
     ↔ IPC (optiSCAN.Platform — pipe optiSCAN_Protection, protocole v1)
-optiSCAN.Service.exe  →  optiSCAN.exe --service-host
+optiSCAN.Service.exe  →  optiSCAN.Host.exe --service-host   (console, sans WPF)
     ├── RTP (dossiers des comptes interactifs) + ProcessStartMonitor + scan USB
     ├── ProtectionPipeServer (set_policy admin ; recent_detections ; scan_path et scan_buffer fermés)
-    └── clamd en AppContainer, alimenté en flux (zINSTREAM) par l'hôte
+    ├── clamd en AppContainer, alimenté en flux (zINSTREAM) par l'hôte
+    └── yara / yarac / clamscan dans le même AppContainer, sans réseau ni processus enfant
 ```
 
 | Composant | Rôle |
 |---|---|
-| `optiSCAN.Platform` | Contrats JSON IPC (`ping`, `status`, `shutdown`, `set_policy`, `recent_detections` ; `scan_path` et `scan_buffer` existent dans le contrat mais le serveur les refuse : `scan_path` n’est ouvert que par un paramètre explicite des tests, `scan_buffer` tant qu’AMSI n’est pas livré) |
-| `optiSCAN.Service` | Service Windows qui supervise `optiSCAN.exe --service-host` |
-| `--service-host` | Moteur sans UI : RTP, IPC. Refusé hors compte SYSTEM |
+| `optiSCAN.Platform` | Contrats JSON IPC (`ping`, `status`, `shutdown`, `set_policy`, `recent_detections` ; `scan_buffer` pour le fournisseur AMSI, ouvert par l’hôte ; `scan_path` existe dans le contrat mais n’est ouvert que par un paramètre explicite des tests) |
+| `optiSCAN.Engine` | Moteur sans interface : analyse, temps réel, quarantaine, tube. Aucune référence WPF (test d'architecture) |
+| `optiSCAN.Host` | Hôte SYSTEM (`--service-host`) et relais clamd (`--clamd-relay`). Refuse tout autre mode et tout compte autre que SYSTEM |
+| `optiSCAN.Service` | Service Windows qui supervise `optiSCAN.Host.exe --service-host` |
 | `ThreatRepairService` | Quarantaine + recours Defender (`MpCmdRun`) |
 | `WindowsDefenderExclusionService` | Exclusions Defender **opt-in** (Options → réappliquer ; script ; `--defender-exclusions` si UAC) — plus d’auto install/démarrage |
 | `CloudThreatIntelService` | Enrichissement VirusTotal (cache local) |
-| `native/optiSCAN.AmsiProvider` | Prototype **non livré** : non compilé par la CI, non publié et jamais enregistré |
+| `native/optiSCAN.AmsiProvider` | Fournisseur AMSI (C++) : scripts analysés avant exécution par l’hôte ; compilé par la CI, livré et enregistré avec le service, signé par SignPath |
 | `native/optiSCAN.Minifilter` | Squelette **non livré** : ni copié, ni chargé |
 
-**Prérequis** : droits administrateur pour installer le service. AMSI et minifiltre ne font pas partie de la v3.1 candidate : aucun fournisseur AMSI ni pilote n'est enregistré.
+**Prérequis** : droits administrateur pour installer le service. Le fournisseur AMSI est enregistré avec lui ; aucun pilote noyau (minifiltre) n'est livré.
 
 **Option UI** : *Service Windows de protection système* (Options → Protection). Si le service est injoignable, repli automatique sur la RTP locale.
 
@@ -109,11 +111,11 @@ Le service v3 s’appelle `optiSCANProtection` et le pipe `optiSCAN_Protection` 
 │   ├── DIAGNOSTIC_INTEGRATION_WINDOWS.md ← Profil install allégé façon version 2 (2 moteurs)
 │   ├── POLITIQUE_CONFIDENTIALITE.md   ← Politique utilisateur v3.1 candidate
 │   └── CONFORMITE_RGPD.md             ← Note traitements / RGPD
-├── AUDIT_optiSCAN_360.md              ← Audit 360 (révision du 13 octobre 2026) : note, décision de release, registre des risques
+├── AUDIT_optiSCAN_360.md              ← Audit 360 (révision du 15 octobre 2026 au soir, 7,6/10 ; 8,0 visé à la signature) : note, décision de release, registre des risques
 ├── ROADMAP.md                        ← Feuille de route produit de l’antivirus après la v3.1
 ├── RELEASE_PLAN_v3.1.md              ← Critères de validation de la candidate v3.1
 ├── SECURITY.md                        ← Signalement + architecture sécurité
-├── LICENSE.txt                        ← CLUF v3.1
+├── LICENSE.txt                        ← GNU GPL v3
 ├── .editorconfig                      ← Sévérités analyse Roslyn (alignement IDE / MSBuild)
 ├── Directory.Build.props              ← Version candidate 3.1.0, NetAnalyzers, TreatWarningsAsErrors (Release)
 ├── .github/workflows/
@@ -127,18 +129,19 @@ Le service v3 s’appelle `optiSCANProtection` et le pipe `optiSCAN_Protection` 
 │   ├── clean-before-publish.ps1       ← Nettoyage bin/obj avant release
 │   ├── add-defender-exclusions.ps1    ← Exclusions Defender (manuel / Options ; pas auto à l’install)
 │   ├── generate-sbom.ps1              ← SBOM CycloneDX (CI publish)
-│   ├── build-amsi.ps1 / stage-amsi.ps1← Prototype AMSI (hors CI, non livré)
-│   ├── codesign.ps1                   ← Signature Authenticode (.pfx ; CI si secrets CODESIGN_*)
+│   ├── build-amsi.ps1 / stage-amsi.ps1← Fournisseur AMSI : compilation (VS C++) et copie au publish
 │   ├── verify-runtime-deps.ps1        ← Vérifie clamav + clamd + yara (+ rules optionnelles)
 │   ├── publish-release.ps1            ← Publish + Inno (défaut sans CVD/.yar embarqués)
 │   ├── validate-release-readiness.ps1 ← Tests Release (+ verify publish optionnel)
 │   └── runtime-versions.json          ← Versions URL ClamAV / YARA
 ├── optiSCAN.sln                       ← Solution Visual Studio
 ├── optiSCAN.Platform/                 ← IPC protection système (ProtectionIdentifiers = noms service/pipe)
-├── optiSCAN.Service/                  ← Service Windows (supervise --service-host)
+├── optiSCAN.Engine/                   ← Moteur sans WPF (Services, Models, Localization, ressources)
+├── optiSCAN.Host/                     ← Hôte SYSTEM console (--service-host, --clamd-relay)
+├── optiSCAN.Service/                  ← Service Windows (supervise optiSCAN.Host.exe)
 ├── optiSCAN.Tests/                    ← Tests unitaires (xUnit)
 ├── native/
-│   ├── optiSCAN.AmsiProvider/         ← Prototype AMSI (non livré)
+│   ├── optiSCAN.AmsiProvider/         ← Fournisseur AMSI (C++, livré avec le service)
 │   └── optiSCAN.Minifilter/           ← Squelette de pilote (non livré)
 ├── installer/
 │   ├── setup.iss                      ← Inno Setup FR/EN (x64 ; bases/règles téléchargées après install par défaut)
@@ -726,8 +729,8 @@ Offline avec bases + règles : `.\scripts\publish-release.ps1 -EmbedOfflineSigna
 3. Publish local : `.\scripts\prepare-release-v3.ps1` ou `clean` → `dotnet publish` → `build-release-setup.ps1 -SkipPublish`.
 4. VM propre : installer `optiSCAN_Setup_v3.1.0.exe` ; **MAJ signatures** (freshclam + asset YARA-Forge épinglé ; vérifier l'échec fermé si la release latest n'est plus `20261004`) ; scan, RTP optionnelle, FR/EN.
 5. CI : push `main` → job **Publish win-x64** ; artefact `optiSCAN-setup-<sha>.exe`.
-6. Signature : secrets `CODESIGN_PFX` (base64) et `CODESIGN_PASSWORD` → la CI signe binaires, installateur et désinstalleur (`scripts/codesign.ps1`). Local : `build-release-setup.ps1 -SignPfxPath cert.pfx`.
-7. Après validation et accord de publication : `git tag v3.1.0`, puis release GitHub, SourceForge ou site.
+6. Signature : uniquement par SignPath Foundation, sur un tag `vX.Y.Z` poussé sur `main` (`.github/workflows/release.yml`, approbation manuelle). Aucun certificat local ni secret PFX. Voir [la procédure](docs/SIGNATURE_PROCEDURE.md).
+7. Après validation et accord de publication : `git tag v3.1.0` ; le brouillon de release GitHub signé est créé par `release.yml`.
 
 ### Étapes manuelles détaillées
 
@@ -773,7 +776,7 @@ optiSCAN_Setup_v3.1.0.exe
     ├── yara/                ← yara64 / yarac (moteur)
     ├── rules/               ← absent par défaut ; téléchargé si latest correspond à l'asset épinglé `20261004`
     ├── scripts/             ← add-defender-exclusions.ps1 (opt-in manuel / Options)
-    └── (ni AMSI ni .sys : non livrés en v3.1 candidate)
+    └── optiSCAN.AmsiProvider.dll (enregistré avec le service ; aucun pilote .sys)
 ```
 
 Offline complet : `publish-release.ps1 -EmbedOfflineSignatures` (CVD + `.yar` dans le setup).
@@ -822,9 +825,9 @@ Pipelines : [`.github/workflows/ci.yml`](.github/workflows/ci.yml), [`codeql.yml
 - **Version 1 → version 2** : migration historique JSON → `scan_history.dat` (DPAPI) au premier lancement.
 - Maintenabilité et choix volontaires : [§12.1](#121-maintenabilité-et-choix-volontaires-non-bloquants-v30).
 
-### Signature Authenticode (optionnelle)
+### Signature Authenticode (SignPath Foundation)
 
-Sans PFX configuré, les artefacts restent non signés. La signature Authenticode facultative utilise `CODESIGN_PFX` (base64) et `CODESIGN_PASSWORD` dans la CI. Celle-ci signe les binaires de l'application, puis l'installateur et le désinstalleur ; localement, utiliser `scripts/codesign.ps1` puis `installer/build-release-setup.ps1 -SignPfxPath cert.pfx`. La signature ne garantit pas une réputation SmartScreen ni l'absence de blocage par un autre produit de sécurité. Voir [la procédure de signature](docs/SIGNATURE_PROCEDURE.md).
+optiSCAN est sous GPL v3 : la licence dit ce qu'on peut faire du code, la signature prouve qu'un binaire vient du projet. Une seule chaîne existe : SignPath Foundation signe les binaires et l'installeur compilés par `release.yml`, après approbation manuelle. Tant que la candidature n'est pas acceptée et qu'aucun tag n'est poussé, aucun binaire n'est signé. La signature ne garantit pas une réputation SmartScreen ni l'absence de blocage par un autre produit de sécurité. Voir [la procédure de signature](docs/SIGNATURE_PROCEDURE.md) et [la politique](docs/CODE_SIGNING_POLICY.md).
 
 ---
 
@@ -858,13 +861,16 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 
 ## 10. Dépendances et licences
 
+optiSCAN est un logiciel libre : Copyright 2026 Dona By, distribué sous la [GNU General Public License v3](LICENSE.txt) ou toute version ultérieure (`GPL-3.0-or-later`). Il est fourni sans aucune garantie (articles 15 et 16 de la licence). Les composants livrés gardent leur propre licence ([avis de tiers](installer/licenses/THIRD-PARTY-NOTICES.md)).
+
 | Composant | Version | Licence | Notes |
 |---|---|---|---|
+| optiSCAN | 3.1.0 | GPL-3.0-or-later | Code source et scripts de build dans ce dépôt ; politique de signature : [docs/CODE_SIGNING_POLICY.md](docs/CODE_SIGNING_POLICY.md) |
 | ClamAV | 1.4.6 épinglé | GPLv2 | Licence et avis des bibliothèques livrés dans `clamav\x64\licenses` (copiés par `fetch-runtime-deps.ps1`, exigés par l'installeur) ; archive vérifiée (signature Talos + SHA-256) le 4 octobre 2026 |
 | YARA | 4.5.5 épinglé | BSD-3-Clause | Licence livrée (`licenses\YARA-COPYING.txt`). Dernier binaire Windows officiel. Les versions 4.5.6 à 4.5.8 sont publiées en sources seulement ; les adopter suppose de compiler YARA en CI |
 | .NET 10 WPF | 10.x (LTS) | MIT | Runtime publié avec l'application (self-contained) ; support Microsoft annoncé jusqu'au 14 novembre 2028 |
-| MaterialDesignThemes | 5.3.1 | MIT | Bibliothèque UI (PackIcon, styles) |
-| QuestPDF | 2024.12.2 | Licence QuestPDF (Community) | Rapport PDF — gratuit sous conditions (chiffre d'affaires annuel < 1 M USD) ; voir `installer/licenses/THIRD-PARTY-NOTICES.md` |
+| MaterialDesignThemes | 5.3.2 | MIT | Bibliothèque UI (PackIcon, styles) |
+| PDFsharp et MigraDoc | 6.2.4 | MIT | Rapport PDF (remplace QuestPDF, dont la licence n’est pas libre). Les versions 6.3+ passent en AGPL + licence commerciale : non retenues |
 | Mise à jour binaire optiSCAN (`UpdateService`) | — | — | Canal OTA non configuré ; staging `%LocalAppData%\optiSCAN\Updates` ; signatures via Antivirus |
 | Planificateur de tâches (`schtasks.exe`) | — | — | Natif Windows — voir `ScheduledScanService` |
 | Microsoft.Toolkit.Uwp.Notifications | 7.1.3 | MIT | Toasts Windows natifs |
@@ -890,6 +896,26 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 - **Tâche planifiée** — scan manqué rattrapé au réveil (`StartWhenAvailable`)
 - **Optimiser → Mises à jour** — winget lu dans toutes les langues (un nom qui commence par un chiffre n’arrête plus la liste), délais et arrêt de winget à l’annulation
 - **CI** — ClamAV et YARA récupérés avant les tests ; un moteur absent fait échouer le test de détection (`OPTISCAN_REQUIRE_ENGINES=1`)
+
+### v3.1 candidate — 15 octobre 2026
+
+- **Quarantaine** — la lecture de migration au démarrage partage la suppression : une purge pendant cette lecture aboutit (audit L7)
+- **Suite Windows** — 715 tests Release réussis, 0 échec. Note d'audit relevée à **6,8/10** (7,3 hors distribution). Diffusion publique toujours refusée : pas de signature, pas de contrôle sur machine virtuelle
+
+### v3.1 candidate — 15 octobre 2026 (soir)
+
+- **Analyseurs confinés (R5)** — sous SYSTEM, `yara`, `yarac` et `clamscan` tournent dans l'AppContainer de clamd, sans réseau ni processus enfant ; les cibles hors du dossier des copies sont copiées par le service ; un échec du confinement rend l'analyse incomplète
+- **Moteur sans WPF (R10)** — nouvelle bibliothèque `optiSCAN.Engine` ; nouvel hôte SYSTEM `optiSCAN.Host.exe` lancé par le service à la place de `optiSCAN.exe --service-host`
+- **Logiciel libre** — optiSCAN passe sous **GNU GPL v3 ou ultérieure** (remplace le CLUF) ; QuestPDF (licence non libre) remplacé par PDFsharp/MigraDoc 6.2.4 (MIT)
+- **Signature** — politique de signature ([docs/CODE_SIGNING_POLICY.md](docs/CODE_SIGNING_POLICY.md)) et workflow de release signé par SignPath Foundation (`.github/workflows/release.yml`)
+- **Installeur** — service de protection coché à la première installation (R9)
+- **Dépendances** — xUnit v3, Test SDK 18.11, paquets Microsoft 10.0.13, MaterialDesignThemes 5.3.2
+- **Catch filtrés** — les 497 blocs `catch` généraux laissent passer les erreurs fatales (`ExceptionPolicy.IsFatal`)
+- **Suite Windows** — 764 tests Release réussis (moteur séparé, AMSI côté service, en-têtes GPL)
+- **Scripts** — 16 scripts PowerShell en UTF-8 avec BOM (Windows PowerShell 5.1) ; `gpg` de Git pour Windows et dossier de publication corrigés
+- **AMSI** — fournisseur livré avec le service : scripts analysés avant exécution (fail-open), DLL signée par SignPath ; minifiltre non livré (pilote noyau, signature Microsoft)
+- **En-têtes de licence** — tous les fichiers sources portent `SPDX-License-Identifier: GPL-3.0-or-later`
+- **Note d’audit** — **7,6/10** (8,2 hors distribution). Publication à 8,0 : contrôles en machine jetable, signature, CodeQL C/C++
 
 ### v3.0 — 30 septembre 2026
 
@@ -1011,8 +1037,8 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 ### v3.1 — candidate en préparation
 
 - Version de build préparée : **3.1.0** ; la candidate n'est ni publiée ni taguée.
-- L'[audit 360](AUDIT_optiSCAN_360.md), révisé le 13 octobre 2026, donne la note (6,5/10 ; 7,0 hors distribution), la décision de release et le registre des risques ouverts ; les constats et corrections antérieurs sont dans son [journal archivé](docs/archive/AUDIT_optiSCAN_360_journal_2026-10.md). Les validations sont suivies dans le [plan de release v3.1](RELEASE_PLAN_v3.1.md).
-- Validations de release encore requises : tests Windows, parcours service/quarantaine installé et premier succès CodeQL C/C++ sur GitHub.
+- L'[audit 360](AUDIT_optiSCAN_360.md), révisé le 15 octobre 2026 au soir, donne la note (**7,6/10** ; 8,2 hors distribution ; 6,8 le matin, 6,5 le 13 octobre ; 8,0 exigé pour publier), la décision de release et le registre des risques ouverts ; les constats et corrections antérieurs sont dans son [journal archivé](docs/archive/AUDIT_optiSCAN_360_journal_2026-10.md). Les validations sont suivies dans le [plan de release v3.1](RELEASE_PLAN_v3.1.md).
+- Suite Release sous Windows, 15 octobre 2026 au soir : **748 réussis, 0 échec** après la séparation moteur / hôte. Validations encore requises : parcours service et installeur en machine jetable (`artifacts\vm`), première release signée par SignPath, premier succès CodeQL C/C++ sur GitHub.
 - Relectures du 7 octobre 2026 : séries **Y1–Y5** et **Z1–Z9** (publication du service, nettoyeur et jonctions, noms de périphériques, tube clamd, couverture de détection…) et corrections de robustesse — [audit, sections 4.6, 4.7 et 12](docs/archive/AUDIT_optiSCAN_360_journal_2026-10.md#46-relecture-du-7-octobre-2026--y1-à-y5).
 
 **Réévaluation du 2 octobre 2026** — base `main` (`0e8161f`, release 3.0.0) + branche `refactor/protection-identifiers`. Revue statique du dépôt, compilation Release de toute la solution (analyseurs actifs, avertissements = erreurs) et contrôles automatisés ; tests non exécutés ici (runtime WPF requis, voir Tests & CI).
@@ -1035,7 +1061,7 @@ Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de men
 
 1. ✅ ~~**Build Release cassée**~~ — corrigé : `OverviewControl` utilise `LocalizationService.Format` (CA1863) ; projet de tests : CA1711 désactivée pour les classes `[CollectionDefinition]` (convention xUnit), méthode de test `async` sans `await` rendue synchrone (CS1998).
 2. ✅ ~~**`clamd` ne démarrait pas si le profil Windows contient un espace**~~ — corrigé : `ClamdHost.BuildStartInfo` passe le chemin par `ProcessStartInfo.ArgumentList` ; test `ClamdHostTests`.
-3. **🟠 Signature Authenticode** de l’installeur et des `.exe` : chaîne prête (`scripts/codesign.ps1`), reste à fournir le certificat (`CODESIGN_PFX`, `CODESIGN_PASSWORD`).
+3. **🟠 Signature Authenticode** de l’installeur et des `.exe` : chaîne SignPath prête (`release.yml`), en attente de l’acceptation par SignPath Foundation (15 octobre 2026 : l’ancienne chaîne PFX est retirée).
 4. **🟡 37 `catch` vides** à journaliser au minimum (`AppLogger.Debug`), en priorité dans `Services/`.
 5. **🟡 Découper les fichiers de plus de 700 lignes**, en commençant par `OptionsControl.xaml.cs` et `QuarantineManager`.
 6. **🟡 Tests d’intégration** réels clamd / schtasks / service Windows ; remesurer la couverture et viser 50 %.
@@ -1079,7 +1105,7 @@ Liens **Corriger** (accueil) : `optiscan://panel/{id}` (antivirus, options, hist
 
 **Contrôles** : quarantaine AES-GCM + HMAC ; exclusions avec frontière `\` ; périmètres protégés optiSCAN (`OptiscanProtectedPaths`) ; exclusions Defender **opt-in** (`WindowsDefenderExclusionService`) ; UAC pour scan complet ; RTP ; clamd sur `127.0.0.1`.
 
-**Limites** : malware admin peut neutraliser l’AV local ; pas d’AMSI ni de minifiltre dans la candidate v3.1 (FileSystemWatcher agit après l’écriture) ; le temps réel peut manquer une écriture si sa récupération échoue ; les scans de démarrage de processus ont une limite de taille et de droits ; les détections du service SYSTEM ne sont pas visibles dans l’historique interactif ; la quarantaine SYSTEM n’est gérable que par un administrateur élevé. VirusTotal transmet le hash si l’utilisateur configure sa clé. Les journaux ne sont pas chiffrés. Les segments de profils Windows standard (`C:\Users\…`) sont masqués par `PathRedaction`, mais les chemins personnalisés et certaines données de diagnostic peuvent rester lisibles.
+**Limites** : malware admin peut neutraliser l’AV local ; pas de minifiltre (FileSystemWatcher agit après l’écriture ; AMSI couvre les scripts avant exécution, en fail-open) ; le temps réel peut manquer une écriture si sa récupération échoue ; les scans de démarrage de processus ont une limite de taille et de droits ; les détections du service SYSTEM ne sont pas visibles dans l’historique interactif ; la quarantaine SYSTEM n’est gérable que par un administrateur élevé. VirusTotal transmet le hash si l’utilisateur configure sa clé. Les journaux ne sont pas chiffrés. Les segments de profils Windows standard (`C:\Users\…`) sont masqués par `PathRedaction`, mais les chemins personnalisés et certaines données de diagnostic peuvent rester lisibles.
 
 ### Durcissements de sécurité (v3.1 candidate, relectures du 7 octobre 2026)
 
@@ -1087,7 +1113,7 @@ Liens **Corriger** (accueil) : `optiscan://panel/{id}` (antivirus, options, hist
 - **Outils Windows** lancés par leur chemin complet, dans l’application et dans l’installeur (jamais par un nom nu, que Windows chercherait d’abord dans le dossier courant).
 - **Nettoyer** : aucune jonction ni lien suivi ; un dossier remplacé par une jonction pendant le nettoyage est refusé.
 - **Copies d’analyse** : un nom de périphérique DOS (`COM1.txt`, `NUL`…) ou un flux nommé est remplacé par `content` + extension.
-- **Pipe du service** : `scan_buffer` fermé tant qu’AMSI n’est pas livré ; chemins `\\?\` normalisés et chemins de périphérique refusés ; contrôle et écriture de `set_policy` atomiques.
+- **Pipe du service** : `scan_buffer` ouvert par l’hôte pour AMSI seulement (taille, débit et cache bornés) ; chemins `\\?\` normalisés et chemins de périphérique refusés ; contrôle et écriture de `set_policy` atomiques.
 - **clamd** : le client n’accepte qu’un serveur du même compte et n’autorise pas l’usurpation ; clamd et son relais sont rattachés à un objet job et s’arrêtent avec l’hôte.
 - **Détection** : extensions élargies, exécutables PE reconnus quelle que soit l’extension (temps réel, processus, USB), `rundll32` et `regsvr32` suivis.
 

@@ -66,7 +66,7 @@ Optionnel (utilisateur coche) :
 
 - [x] Installeur : pas d’exclusions Defender auto ; service plateforme décoché ; AMSI/`.sys` absents
 - [x] App : plus d’`EnsureOptiscanExclusions` au démarrage / onboarding — opt-in Options uniquement
-- La chaîne Authenticode est désormais facultative dans la CI via les secrets PFX ; voir [`SIGNATURE_PROCEDURE.md`](SIGNATURE_PROCEDURE.md). Cette option ne change pas le profil d'installation allégé décrit ici.
+- La signature passe uniquement par SignPath Foundation, sur un tag de release ; voir [`SIGNATURE_PROCEDURE.md`](SIGNATURE_PROCEDURE.md). Elle ne change pas le profil d'installation décrit ici.
 
 ---
 

@@ -6,7 +6,7 @@
              xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
              xmlns:c="clr-namespace:optiSCAN.Converters"
              xmlns:loc="clr-namespace:optiSCAN.Localization"
-             xmlns:services="clr-namespace:optiSCAN.Services"
+             xmlns:services="clr-namespace:optiSCAN.Services;assembly=optiSCAN.Engine"
              mc:Ignorable="d"
              d:DesignHeight="650" d:DesignWidth="960">
 

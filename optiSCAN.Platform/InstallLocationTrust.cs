@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Runtime.Versioning;
 using System.Security.AccessControl;
 using System.Security.Principal;
@@ -44,7 +45,7 @@ public static class InstallLocationTrust
 
     private const string TrustedInstallerSid = "S-1-5-80-956008885-3418522649-1831038044-1853292631-2271478464";
 
-    private static readonly string[] Executables = { "optiSCAN.exe", "optiSCAN.Service.exe" };
+    private static readonly string[] Executables = { "optiSCAN.exe", "optiSCAN.Service.exe", "optiSCAN.Host.exe" };
 
     /// <summary>Vrai si le dossier de l'exécutable courant est réservé aux administrateurs.</summary>
     public static bool IsCurrentInstallTrusted(out string reason) =>
@@ -106,7 +107,7 @@ public static class InstallLocationTrust
 
             return true;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             reason = "droits illisibles (" + ex.GetType().Name + ")";
             return false;

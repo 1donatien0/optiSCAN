@@ -1,3 +1,4 @@
+﻿# SPDX-License-Identifier: GPL-3.0-or-later
 <#
 .SYNOPSIS
     Télécharge ClamAV (win x64) et YARA (win64) dans optiSCAN/ pour publish et CI.
@@ -85,6 +86,16 @@ function Find-Gpg {
     return $null
 }
 
+# Chemin passé à gpg. Le gpg de Git pour Windows (MSYS) attend « /c/x/y » ; Gpg4win accepte
+# « C:/x/y ». Un « C:\x » est lu par MSYS comme un chemin relatif.
+function ConvertTo-GpgPath([string] $Gpg, [string] $Path) {
+    $full = [System.IO.Path]::GetFullPath($Path)
+    if ($Gpg -match '[\\/]usr[\\/]bin[\\/]gpg(\.exe)?$' -and $full -match '^([A-Za-z]):\\(.*)$') {
+        return '/' + $Matches[1].ToLowerInvariant() + '/' + $Matches[2].Replace('\', '/')
+    }
+    return $full.Replace('\', '/')
+}
+
 # Vérifie la signature détachée Talos de l'archive ClamAV avec la clé versionnée dans le dépôt,
 # dans un trousseau temporaire, et contrôle l'empreinte de la clé primaire qui a signé.
 function Assert-TalosSignature([string] $ZipPath, [string] $ZipUrl) {
@@ -102,16 +113,28 @@ function Assert-TalosSignature([string] $ZipPath, [string] $ZipUrl) {
     Invoke-WebRequest -Uri "$ZipUrl.sig" -OutFile $sigPath -UseBasicParsing
     $gnupgHome = Join-Path $cacheDir ("gnupg-" + [Guid]::NewGuid().ToString('n'))
     New-Item -ItemType Directory -Force -Path $gnupgHome | Out-Null
+    # Sous Windows PowerShell 5.1, une sortie d'erreur d'un programme natif devient une erreur
+    # terminale avec ErrorActionPreference=Stop : gpg y écrit ses messages d'information, d'où
+    # Continue le temps des appels. Sa sortie est gardée pour le diagnostic en cas d'échec.
+    $gpgHomeArg = ConvertTo-GpgPath $gpg $gnupgHome
+    $previousPreference = $ErrorActionPreference
     try {
-        & $gpg --homedir $gnupgHome --batch --quiet --import $keyFile 2>$null | Out-Null
-        $status = & $gpg --homedir $gnupgHome --batch --status-fd 1 --verify $sigPath $ZipPath 2>$null
+        $ErrorActionPreference = 'Continue'
+        $importOut = & $gpg --homedir $gpgHomeArg --batch --import (ConvertTo-GpgPath $gpg $keyFile) 2>&1 | ForEach-Object { "$_" }
+        $verifyOut = & $gpg --homedir $gpgHomeArg --batch --status-fd 1 --verify (ConvertTo-GpgPath $gpg $sigPath) (ConvertTo-GpgPath $gpg $ZipPath) 2>&1 | ForEach-Object { "$_" }
+        $ErrorActionPreference = $previousPreference
+        $status = $verifyOut
         # StartsWith, pas -like : « [GNUPG:] » serait lu comme une classe de caractères.
         $valid = $status | Where-Object { ([string] $_).StartsWith('[GNUPG:] VALIDSIG ') } | Select-Object -First 1
-        if (-not $valid) { throw "Signature ClamAV invalide ($ZipPath)" }
+        if (-not $valid) {
+            Write-Warning ("gpg ($gpg) :`n  import : " + ($importOut -join "`n  ") + "`n  verify : " + ($verifyOut -join "`n  "))
+            throw "Signature ClamAV invalide ($ZipPath)"
+        }
         $primary = ($valid -split ' ')[-1].ToUpperInvariant()
         if ($primary -ne $expected) { throw "Signature ClamAV par une clé inattendue ($primary)" }
         Write-Host "  OK signature Talos ($primary)" -ForegroundColor Green
     } finally {
+        $ErrorActionPreference = $previousPreference
         Remove-Item -LiteralPath $gnupgHome -Recurse -Force -ErrorAction SilentlyContinue
         Remove-Item -LiteralPath $sigPath -Force -ErrorAction SilentlyContinue
     }

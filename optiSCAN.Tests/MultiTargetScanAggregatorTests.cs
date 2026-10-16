@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Models;
 using optiSCAN.Services;
 
@@ -9,7 +10,9 @@ public sealed class MultiTargetScanAggregatorTests
     public async Task Aggregate_progress_keeps_cumulative_files_scanned_across_targets()
     {
         var reported = new List<int>();
-        var progress = new Progress<ScanProgress>(p => reported.Add(p.FilesScanned));
+        // Progress<T> publie de façon asynchrone sur le pool : la liste pouvait être encore vide
+        // à l'assertion sous charge. Rapport synchrone pour un test déterministe.
+        var progress = new SyncProgress<ScanProgress>(p => { lock (reported) reported.Add(p.FilesScanned); });
 
         await MultiTargetScanAggregator.AggregateAsync(
             ScanType.QuickScan,
@@ -55,4 +58,13 @@ public sealed class MultiTargetScanAggregatorTests
         Assert.Single(result.Threats);
         Assert.Equal(path, result.Threats[0].FilePath);
     }
+}
+
+internal sealed class SyncProgress<T> : IProgress<T>
+{
+    private readonly Action<T> _handler;
+
+    public SyncProgress(Action<T> handler) => _handler = handler;
+
+    public void Report(T value) => _handler(value);
 }

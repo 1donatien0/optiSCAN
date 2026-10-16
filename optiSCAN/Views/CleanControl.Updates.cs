@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Localization;
 using optiSCAN.Services;
 using optiSCAN.Strings;
@@ -65,7 +66,7 @@ namespace optiSCAN.Views
                 else
                     AppendUpdateLog(LocalizationService.Format("Upd_LogFound", _updateCheckBoxes.Count));
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("CleanControl", "Recherche winget", ex);
                 AppendUpdateLog(LocalizationService.Format("Upd_LogError", ex.Message));
@@ -124,7 +125,7 @@ namespace optiSCAN.Views
                 int ko = results.Count - ok;
                 AppendUpdateLog(LocalizationService.Format("Upd_LogUpgradeSummary", ok, ko));
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("CleanControl", "Mise à jour winget (sélection)", ex);
                 AppendUpdateLog(LocalizationService.Format("Upd_LogError", ex.Message));
@@ -165,7 +166,7 @@ namespace optiSCAN.Views
                 AppendUpdateLog(LocalizationService.GetString("Upd_LogUpgradeAllDone"));
                 completed = true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("CleanControl", "Mise à jour winget (tout)", ex);
                 AppendUpdateLog(LocalizationService.Format("Upd_LogError", ex.Message));

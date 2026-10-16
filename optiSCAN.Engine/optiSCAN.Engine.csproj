@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- Moteur d'optiSCAN sans WPF : analyse, protection temps réel, quarantaine, tube du service.
+       L'interface (optiSCAN) en dépend ; ce projet ne référence aucune bibliothèque
+       d'interface (audit R10). -->
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.17763.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <AssemblyName>optiSCAN.Engine</AssemblyName>
+    <RootNamespace>optiSCAN</RootNamespace>
+    <Product>optiSCAN</Product>
+  </PropertyGroup>
+
+  <PropertyGroup Condition="'$(_IsPublishing)' != 'true' And '$(OptiscanShipping)' != 'true'">
+    <DefineConstants>$(DefineConstants);OPTISCAN_TEST_HOOKS</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="optiSCAN" />
+    <InternalsVisibleTo Include="optiSCAN.Host" />
+    <InternalsVisibleTo Include="optiSCAN.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="PDFsharp-MigraDoc" Version="6.2.4" />
+    <!-- PDFsharp 6.2.4 dépend de System.Security.Cryptography.Pkcs 8.0.1 (GHSA-846f-f764-76mx) : version corrigée imposée. -->
+    <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
+    <PackageReference Include="System.Management" Version="10.0.13" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.13" />
+    <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.13" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\optiSCAN.Platform\optiSCAN.Platform.csproj" />
+  </ItemGroup>
+
+</Project>

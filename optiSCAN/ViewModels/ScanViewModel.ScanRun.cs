@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Localization;
 using optiSCAN.Models;
 using optiSCAN.Services;
@@ -110,7 +111,7 @@ namespace optiSCAN.ViewModels
             {
                 StatusMessage = OptiscanStrings.UiMessages.AnalyseInterrompueSurDemande;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 StatusMessage = LocalizationService.Format("Vm_ScanError", ex.Message);
             }

@@ -1,3 +1,4 @@
+# SPDX-License-Identifier: GPL-3.0-or-later
 # Vide les sorties Release avant publication / Inno Setup.
 # Supprime TOUS les dossiers publish (win-x64 ET racine publish\) pour qu'Inno
 # ne reprenne jamais un optiSCAN.exe residuel (setup.iss fallback publish\*).
