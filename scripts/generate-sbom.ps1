@@ -31,7 +31,7 @@ foreach ($proj in $Projects) {
 
     $baseName = [System.IO.Path]::GetFileNameWithoutExtension($proj)
     Write-Host "SBOM: $proj -> $OutputDir\$baseName-bom.json"
-    dotnet-CycloneDX $proj -o $OutputDir -json --filename "$baseName-bom"
+    dotnet-CycloneDX $proj --output $OutputDir --output-format Json --filename "$baseName-bom.json"
     if ($LASTEXITCODE -ne 0) {
         throw "CycloneDX failed for $proj (exit $LASTEXITCODE)"
     }
