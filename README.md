@@ -852,7 +852,7 @@ Les deux langues sont **incluses dans le même binaire** (pas de pack de langue 
 Ajouter une clé : même nom dans les deux `.resx` → XAML `{loc:Loc Key=...}` ou C# `LocalizationService.GetString` / `Format`.
 
 ```powershell
-dotnet test optiSCAN.Tests\optiSCAN.Tests.csproj -c Release --filter Localization
+dotnet test --project optiSCAN.Tests\optiSCAN.Tests.csproj -c Release -- --filter-class '*Localization*'
 ```
 
 Non traduit volontairement : sorties brutes clamscan/freshclam/YARA, noms de menaces, chemins, marques ClamAV/YARA. L’UI **Historique** n’affiche pas le libellé moteur (`DetectedBy`) — réservé au pipeline interne.
@@ -882,7 +882,7 @@ optiSCAN est un logiciel libre : Copyright 2026 Dona By, distribué sous la [GNU
 
 ## 11. Historique des versions produit
 
-### v3.1 candidate — corrections du 13 octobre 2026 (audit indépendant)
+### v3.1 candidate — 15 octobre 2026
 
 - **Hôte SYSTEM** — ne coupe plus son propre temps réel au démarrage quand Defender est actif ; l’interface affiche l’état réel du service ; quand le service protège, l’interface ne relance ni scan USB, ni surveillance des processus, ni clamd
 - **Données protégées** — clé de quarantaine, clé HMAC et manifeste illisibles mis de côté au lieu d’être écrasés ; copies d’analyse orphelines purgées au démarrage ; `optiSCAN.log` en rotation à 10 Mo
@@ -896,14 +896,7 @@ optiSCAN est un logiciel libre : Copyright 2026 Dona By, distribué sous la [GNU
 - **Tâche planifiée** — scan manqué rattrapé au réveil (`StartWhenAvailable`)
 - **Optimiser → Mises à jour** — winget lu dans toutes les langues (un nom qui commence par un chiffre n’arrête plus la liste), délais et arrêt de winget à l’annulation
 - **CI** — ClamAV et YARA récupérés avant les tests ; un moteur absent fait échouer le test de détection (`OPTISCAN_REQUIRE_ENGINES=1`)
-
-### v3.1 candidate — 15 octobre 2026
-
 - **Quarantaine** — la lecture de migration au démarrage partage la suppression : une purge pendant cette lecture aboutit (audit L7)
-- **Suite Windows** — 715 tests Release réussis, 0 échec. Note d'audit relevée à **6,8/10** (7,3 hors distribution). Diffusion publique toujours refusée : pas de signature, pas de contrôle sur machine virtuelle
-
-### v3.1 candidate — 15 octobre 2026 (soir)
-
 - **Analyseurs confinés (R5)** — sous SYSTEM, `yara`, `yarac` et `clamscan` tournent dans l'AppContainer de clamd, sans réseau ni processus enfant ; les cibles hors du dossier des copies sont copiées par le service ; un échec du confinement rend l'analyse incomplète
 - **Moteur sans WPF (R10)** — nouvelle bibliothèque `optiSCAN.Engine` ; nouvel hôte SYSTEM `optiSCAN.Host.exe` lancé par le service à la place de `optiSCAN.exe --service-host`
 - **Logiciel libre** — optiSCAN passe sous **GNU GPL v3 ou ultérieure** (remplace le CLUF) ; QuestPDF (licence non libre) remplacé par PDFsharp/MigraDoc 6.2.4 (MIT)
@@ -1068,7 +1061,7 @@ optiSCAN est un logiciel libre : Copyright 2026 Dona By, distribué sous la [GNU
 
 ```powershell
 dotnet build optiSCAN.sln -c Release
-dotnet test optiSCAN.Tests\optiSCAN.Tests.csproj -c Release
+dotnet test --project optiSCAN.Tests\optiSCAN.Tests.csproj -c Release
 ```
 
 ### 12.1 Maintenabilité et choix volontaires (non bloquants, v3.0)

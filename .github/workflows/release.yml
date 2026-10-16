@@ -64,7 +64,7 @@ jobs:
           OPTISCAN_REQUIRE_ENGINES: '1'
         run: |
           dotnet build optiSCAN.sln --configuration Release
-          dotnet test optiSCAN.Tests/optiSCAN.Tests.csproj --configuration Release --no-build
+          dotnet test --project optiSCAN.Tests/optiSCAN.Tests.csproj --configuration Release --no-build
 
       - name: Build AMSI provider (C++, required)
         shell: pwsh
