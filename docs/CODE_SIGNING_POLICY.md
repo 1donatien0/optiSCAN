@@ -8,7 +8,7 @@ Free code signing provided by [SignPath.io](https://about.signpath.io/), certifi
 
 Seuls les fichiers produits par la compilation automatisée de ce dépôt sont signés, à partir de la branche `main` et d'un tag `vX.Y.Z` :
 
-- `optiSCAN.exe`, `optiSCAN.Service.exe`, `optiSCAN.Host.exe`, `optiSCAN.dll`, `optiSCAN.Service.dll`, `optiSCAN.Host.dll`, `optiSCAN.Engine.dll`, `optiSCAN.Platform.dll` ;
+- `optiSCAN.exe`, `optiSCAN.Service.exe`, `optiSCAN.Host.exe`, `optiSCAN.dll`, `optiSCAN.Service.dll`, `optiSCAN.Host.dll`, `optiSCAN.Engine.dll`, `optiSCAN.Platform.dll`, `optiSCAN.AmsiProvider.dll` ;
 - l'installeur `optiSCAN_Setup_vX.Y.Z.exe`.
 
 Les binaires tiers livrés tels que publiés par leurs projets (ClamAV, YARA, runtime .NET) ne sont pas signés par optiSCAN ; leur origine est vérifiée par empreinte SHA-256 et, pour ClamAV, par la signature GPG de Cisco-Talos (voir [SECURITY.md](../SECURITY.md)).

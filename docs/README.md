@@ -29,6 +29,7 @@
 | [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md) | Politique de signature du code (SignPath) |
 | [../AUDIT_optiSCAN_360.md](../AUDIT_optiSCAN_360.md) | Audit 360, révision du 15 octobre 2026 au soir (7,6/10 ; 8,0 exigé pour publier) : note, décision de release, registre des risques ouverts |
 | [archive/AUDIT_optiSCAN_360_journal_2026-10.md](archive/AUDIT_optiSCAN_360_journal_2026-10.md) | Journal des audits du 2 au 13 octobre 2026 (séries N à D, traitement détaillé) |
+| [archive/README_SOURCEFORGE_v3.0.md](archive/README_SOURCEFORGE_v3.0.md) | Guide de la v3.0 publié sur SourceForge, mis à jour pour sa republication sous GPL v3 |
 | [../installer/redist/LISEZMOI.md](../installer/redist/LISEZMOI.md) | Modes runtime .NET et limite actuelle du dossier redist |
 
 ---

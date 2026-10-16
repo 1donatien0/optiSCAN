@@ -874,7 +874,7 @@ optiSCAN est un logiciel libre : Copyright 2026 Dona By, distribué sous la [GNU
 | Mise à jour binaire optiSCAN (`UpdateService`) | — | — | Canal OTA non configuré ; staging `%LocalAppData%\optiSCAN\Updates` ; signatures via Antivirus |
 | Planificateur de tâches (`schtasks.exe`) | — | — | Natif Windows — voir `ScheduledScanService` |
 | Microsoft.Toolkit.Uwp.Notifications | 7.1.3 | MIT | Toasts Windows natifs |
-| Inno Setup | 6.x | Freeware | Gratuit pour projets commerciaux |
+| Inno Setup | 6.x | Inno Setup License | Outil de construction de l'installateur (non livré dans l'application) |
 | Base de signatures ClamAV | — | ClamAV License | Mise à jour depuis database.clamav.net |
 | Règles de détection | — | Diverses open-source | Récupérées depuis l'asset YARA-Forge explicitement épinglé dans optiSCAN |
 
@@ -899,7 +899,7 @@ optiSCAN est un logiciel libre : Copyright 2026 Dona By, distribué sous la [GNU
 - **Quarantaine** — la lecture de migration au démarrage partage la suppression : une purge pendant cette lecture aboutit (audit L7)
 - **Analyseurs confinés (R5)** — sous SYSTEM, `yara`, `yarac` et `clamscan` tournent dans l'AppContainer de clamd, sans réseau ni processus enfant ; les cibles hors du dossier des copies sont copiées par le service ; un échec du confinement rend l'analyse incomplète
 - **Moteur sans WPF (R10)** — nouvelle bibliothèque `optiSCAN.Engine` ; nouvel hôte SYSTEM `optiSCAN.Host.exe` lancé par le service à la place de `optiSCAN.exe --service-host`
-- **Logiciel libre** — optiSCAN passe sous **GNU GPL v3 ou ultérieure** (remplace le CLUF) ; QuestPDF (licence non libre) remplacé par PDFsharp/MigraDoc 6.2.4 (MIT)
+- **Logiciel libre** — optiSCAN passe sous **GNU GPL v3 ou ultérieure** (remplace le CLUF ; les installeurs 1.0.0, 2.0.0 et 3.0.0 sont republiés sous la même licence) ; QuestPDF (licence non libre) remplacé par PDFsharp/MigraDoc 6.2.4 (MIT)
 - **Signature** — politique de signature ([docs/CODE_SIGNING_POLICY.md](docs/CODE_SIGNING_POLICY.md)) et workflow de release signé par SignPath Foundation (`.github/workflows/release.yml`)
 - **Installeur** — service de protection coché à la première installation (R9)
 - **Dépendances** — xUnit v3, Test SDK 18.11, paquets Microsoft 10.0.13, MaterialDesignThemes 5.3.2
@@ -924,6 +924,7 @@ optiSCAN est un logiciel libre : Copyright 2026 Dona By, distribué sous la [GNU
 - **ClamAV 1.4.x** — binaires x64 ; correction `freshclam.conf` (retrait `CVDCertsDirectory`, certificats via `CVD_CERTS_DIR`)
 - **AMSI** — non livré en v3.0 (prototype natif non compilable) ; la désinstallation retire toute clé AMSI laissée par une version antérieure
 - **Service v3** — `optiSCANProtection`, affiché « optiSCAN Protection v3 », n’est créé que si la case « protection avancée » est cochée
+- **Licence** — republiée le 16 octobre 2026 sous **GNU GPL v3 ou ultérieure**, à la place du CLUF d’origine : seuls la licence affichée par l’installateur et le bouton « Licence » de l’application changent
 
 ### v2.0 — 23 juin 2026 — Clamd, posture, historique unifié, scan USB, coordinateurs
 
@@ -942,6 +943,7 @@ optiSCAN est un logiciel libre : Copyright 2026 Dona By, distribué sous la [GNU
 - **clamd** — `CompositeClamAvBackend` ; clamd en AppContainer, flux `zINSTREAM` par tube nommé, repli `clamscan.exe` par fichier non lu
 - **Posture /100**, **VirusTotal**, **mode jeu** — voir [§13](#13-sécurité-posture-et-menaces) et Options
 - **Tests** — **289** tests Release — [§12](#12-audit-et-qualité) ; i18n **621** clés FR/EN ; coordinateurs + exports couverts par tests dédiés
+- **Licence** — republiée le 16 octobre 2026 sous **GNU GPL v3 ou ultérieure**, à la place du CLUF d’origine : seule la licence affichée par l’installateur change
 
 ### v1.0 — 1 juin 2026 — interface Donaby
 
@@ -957,6 +959,7 @@ optiSCAN est un logiciel libre : Copyright 2026 Dona By, distribué sous la [GNU
 - **Options** — schtasks async, hints RTP/UAC honnêtes, limite nettoyage navigateurs documentée
 - **CI** — GitHub Actions ; tests Release ; artefact publish + installateur Inno (main)
 - **Doc** — guide unique `README.md` (sections 8–13)
+- **Licence** — republiée le 16 octobre 2026 sous **GNU GPL v3 ou ultérieure**, à la place du CLUF d’origine : seule la licence affichée par l’installateur change
 
 ### Version 1 — 26 mai 2026
 
