@@ -50,6 +50,7 @@ jobs:
           --report-xunit-trx-filename test-results.trx
           --coverlet
           --coverlet-output-format cobertura
+          --coverlet-include "[optiSCAN*]*"
           --coverlet-exclude "[*.Tests]*"
           --coverlet-exclude "[*]optiSCAN.App*"
           --coverlet-exclude-by-file "**/obj/**"
