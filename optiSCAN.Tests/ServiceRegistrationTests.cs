@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using Microsoft.Extensions.DependencyInjection;
 using optiSCAN.Services;
 using optiSCAN.Services.DependencyInjection;

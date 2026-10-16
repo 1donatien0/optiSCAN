@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Security.Principal;
 using optiSCAN.Localization;
 using optiSCAN.Services;
@@ -100,7 +101,7 @@ internal static class Program
             await host.StopAsync().ConfigureAwait(false);
             return 0;
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Error("Host", "Hôte de service arrêté sur erreur", ex);
             return 1;

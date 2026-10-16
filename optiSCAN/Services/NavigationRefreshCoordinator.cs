@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Strings;
 using System.Windows.Threading;
 
@@ -90,7 +91,7 @@ namespace optiSCAN.Services
             {
                 await refresh().ConfigureAwait(true);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("NavigationRefreshCoordinator", name, ex);
             }

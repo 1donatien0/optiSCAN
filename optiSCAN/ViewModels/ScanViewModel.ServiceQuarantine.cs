@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Localization;
 using optiSCAN.Platform;
 using optiSCAN.Services;
@@ -65,7 +66,7 @@ namespace optiSCAN.ViewModels
                         ServiceQuarantineCount = count;
                     });
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     // Service absent (installation sans service) ou ancien service : rien à afficher.
                     AppLogger.Debug("ScanViewModel", "Résumé quarantaine du service : " + ex.Message);

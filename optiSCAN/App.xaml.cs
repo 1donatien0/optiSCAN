@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Localization;
 using optiSCAN.Models;
 using optiSCAN.Services;
@@ -38,7 +39,6 @@ namespace optiSCAN
         /// </summary>
         protected override async void OnStartup(StartupEventArgs e)
         {
-            LocalizationService.ShutdownRequested = () => Current?.Shutdown();
             var earlyMode = HeadlessScanArguments.ParseMode(e.Args);
             _noInteractiveUi = !Environment.UserInteractive
                 || earlyMode is not (HeadlessScanArguments.Mode.None
@@ -53,7 +53,7 @@ namespace optiSCAN
                     && HeadlessScanArguments.TryParseClamdStub(e.Args, out var stubPort))
                 {
                     try { ClamdLoopbackStub.Run(stubPort); }
-                    catch { /* processus arrêté */ }
+                    catch (Exception ignored) when (!ignored.IsFatal()) { /* processus arrêté */ }
                 }
 #endif
                 // Environment.Exit et non Shutdown() : Shutdown passe par OnExit, qui crée
@@ -68,7 +68,7 @@ namespace optiSCAN
                 if (HeadlessScanArguments.TryParseClamdRelay(e.Args, out var relayPort, out var relayParent, out var relayFile))
                 {
                     try { ClamdRelay.Run(relayPort, relayParent, relayFile); }
-                    catch { /* processus arrêté */ }
+                    catch (Exception ignored) when (!ignored.IsFatal()) { /* processus arrêté */ }
                 }
                 // Relais lancé dans l'AppContainer de clamd : Shutdown() passerait par OnExit et
                 // créerait ServiceContainer.Default dans le conteneur. Sortie immédiate voulue.
@@ -81,6 +81,9 @@ namespace optiSCAN
             // journalisées (%LOCALAPPDATA%\optiSCAN\Logs) et affichées à l'écran.
             InstallGlobalCrashHandlers();
 
+            // Après les modes auxiliaires (relais et faux clamd dans l'AppContainer) : le
+            // constructeur statique de LocalizationService lit le profil, inaccessible au conteneur.
+            LocalizationService.ShutdownRequested = () => Current?.Shutdown();
             LocalizationService.Initialize();
 
             if (ShellScanArguments.TryGetScanPath(e.Args, out var shellPath)
@@ -210,7 +213,7 @@ namespace optiSCAN
                 if (!createdHeadless)
                 {
                     try { new ScanLogManager().WriteToLog("[Headless] Instance déjà active — scan ignoré."); }
-                    catch { /* ignore */ }
+                    catch (Exception ignored) when (!ignored.IsFatal()) { /* ignore */ }
                     _instanceMutex.Close();
                     _instanceMutex = null;
                     Shutdown();
@@ -313,7 +316,7 @@ namespace optiSCAN
         private static void LogFatal(string source, Exception ex)
         {
             try { Services.AppLogger.Fatal("UnhandledException", source, ex); }
-            catch { /* le logging ne doit jamais aggraver un crash */ }
+            catch (Exception ignored) when (!ignored.IsFatal()) { /* le logging ne doit jamais aggraver un crash */ }
         }
 
         private static void ShowCrashDialog(
@@ -366,7 +369,7 @@ namespace optiSCAN
                 else
                     Show();
             }
-            catch { /* pas d'UI disponible (mode headless) → log seul */ }
+            catch (Exception ignored) when (!ignored.IsFatal()) { /* pas d'UI disponible (mode headless) → log seul */ }
         }
 
         // ── Headless ────────────────────────────────────────────────────────────
@@ -424,17 +427,17 @@ namespace optiSCAN
                     {
                         container.Notifications.ShowScanCompleted(result.ThreatsFound, result.FilesScanned);
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (!ex.IsFatal())
                     {
                         logger.WriteToLog($"[Headless] Notification: {ex.Message}");
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 // En mode headless, pas d'UI pour afficher l'erreur — log only.
                 try { new ScanLogManager().WriteToLog($"[Headless] FATAL: {ex}"); }
-                catch { /* dernier recours */ }
+                catch (Exception ignored) when (!ignored.IsFatal()) { /* dernier recours */ }
             }
         }
 
@@ -456,17 +459,17 @@ namespace optiSCAN
                     // Mutex non détenue par le thread courant — incohérence.
                     Services.AppLogger.Warn("App", "ReleaseMutex sur mauvais thread", ex);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     Services.AppLogger.Warn("App", "ReleaseMutex", ex);
                 }
                 try { _instanceMutex.Dispose(); }
-                catch (Exception ex) { Services.AppLogger.Debug("App", $"Dispose instance mutex: {ex.Message}"); }
+                catch (Exception ex) when (!ex.IsFatal()) { Services.AppLogger.Debug("App", $"Dispose instance mutex: {ex.Message}"); }
                 _instanceMutex = null;
             }
             base.OnExit(e);
             try { Services.ServiceContainer.Default.Shutdown(); }
-            catch (Exception ex) { Services.AppLogger.Warn("App", "ServiceContainer.Shutdown", ex); }
+            catch (Exception ex) when (!ex.IsFatal()) { Services.AppLogger.Warn("App", "ServiceContainer.Shutdown", ex); }
         }
     }
 

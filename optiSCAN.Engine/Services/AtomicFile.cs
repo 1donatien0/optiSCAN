@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO;
 using System.Text;
 
@@ -73,12 +74,12 @@ namespace optiSCAN.Services
                     File.Move(tmp, path);
                 }
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 // En cas d'échec du renommage, on tente un cleanup du tmp pour ne
                 // pas laisser de fichier orphelin, puis on relève l'exception au
                 // caller pour qu'il puisse la logger.
-                try { if (File.Exists(tmp)) File.Delete(tmp); } catch { /* approche prudente */ }
+                try { if (File.Exists(tmp)) File.Delete(tmp); } catch (Exception inner) when (!inner.IsFatal()) { /* approche prudente */ }
                 throw;
             }
         }
@@ -100,7 +101,7 @@ namespace optiSCAN.Services
                 AppLogger.Error("AtomicFile", $"Fichier illisible conservé à part : {Path.GetFileName(aside)}");
                 return aside;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("AtomicFile", $"Copie de sauvegarde impossible ({Path.GetFileName(path)})", ex);
                 return null;
@@ -120,7 +121,7 @@ namespace optiSCAN.Services
             if (File.Exists(path))
             {
                 try { return parser(File.ReadAllText(path)); }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Warn("AtomicFile", $"Parse principal échoué ({path}), tentative .bak", ex);
                 }
@@ -131,7 +132,7 @@ namespace optiSCAN.Services
             if (File.Exists(bak))
             {
                 try { return parser(File.ReadAllText(bak)); }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Warn("AtomicFile", $"Parse .bak échoué ({bak})", ex);
                 }

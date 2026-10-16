@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Localization;
 using optiSCAN.Services;
 using optiSCAN.Strings;
@@ -46,7 +47,7 @@ public static class ManualSignatureUpdateCoordinator
             host.SignatureStatus.InvalidateCache();
             await host.RefreshSignaturesDisplayAsync(true).ConfigureAwait(true);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             completedOk = false;
             AppLogger.Error("ManualSignatureUpdate", "RunAsync", ex);
@@ -72,10 +73,10 @@ public static class ManualSignatureUpdateCoordinator
         host.SetStatus(OptiscanStrings.StatusUpdates.SignaturesUpdateStopping, false, false, UiIconKinds.Stop);
 
         try { host.Freshclam.CancelUpdate(); }
-        catch (Exception ex) { AppLogger.Warn("ManualSignatureUpdate", "CancelUpdate ClamAV", ex); }
+        catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("ManualSignatureUpdate", "CancelUpdate ClamAV", ex); }
 
         try { host.Rules.CancelUpdate(); }
-        catch (Exception ex) { AppLogger.Warn("ManualSignatureUpdate", "CancelUpdate règles", ex); }
+        catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("ManualSignatureUpdate", "CancelUpdate règles", ex); }
 
         host.AppendSignatureLog?.Invoke(LocalizationService.GetString("Status_SigInterrupted"));
         host.SetSignatureUpdating?.Invoke(false);

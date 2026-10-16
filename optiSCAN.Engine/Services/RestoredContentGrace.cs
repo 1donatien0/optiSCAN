@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO;
 
 namespace optiSCAN.Services;
@@ -29,7 +30,7 @@ public static class RestoredContentGrace
             return;
         string full;
         try { full = Path.GetFullPath(path); }
-        catch { return; }
+        catch (Exception ignored) when (!ignored.IsFatal()) { return; }
 
         lock (Gate)
         {
@@ -48,7 +49,7 @@ public static class RestoredContentGrace
             return false;
         string full;
         try { full = Path.GetFullPath(path); }
-        catch { return false; }
+        catch (Exception ignored) when (!ignored.IsFatal()) { return false; }
 
         lock (Gate)
         {

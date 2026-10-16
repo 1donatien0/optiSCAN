@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO;
 
 namespace optiSCAN.Services
@@ -85,7 +86,7 @@ namespace optiSCAN.Services
                     DeleteFile(file.FullName);
                     freed += size;
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     onFailure?.Invoke(file.FullName, ex);
                 }

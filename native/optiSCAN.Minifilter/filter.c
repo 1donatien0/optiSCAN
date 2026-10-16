@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 /*
  * optiSCAN Minifilter v2 — squelette WDK
  *

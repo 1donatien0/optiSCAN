@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -25,7 +26,7 @@ namespace optiSCAN.Services
                 _ = fs.Read(bom, 0, 3);
                 return bom[0] == 0xEF && bom[1] == 0xBB && bom[2] == 0xBF;
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return false;
             }
@@ -64,13 +65,13 @@ namespace optiSCAN.Services
                     AppLogger.Info("FreshclamConfSupport",
                         $"Conf legacy renommé en {Path.GetFileName(bak)} — régénération à venir");
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     try { File.Delete(confPath); }
-                    catch { AppLogger.Warn("FreshclamConfSupport", $"Conf legacy non remplaçable: {confPath}", ex); }
+                    catch (Exception ignored) when (!ignored.IsFatal()) { AppLogger.Warn("FreshclamConfSupport", $"Conf legacy non remplaçable: {confPath}", ex); }
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("FreshclamConfSupport", $"InvalidateIfLegacy {confPath}", ex);
             }
@@ -173,7 +174,7 @@ namespace optiSCAN.Services
 
                 if (HasUtf8Bom(targetPath))
                 {
-                    try { File.Delete(targetPath); } catch { /* best effort */ }
+                    try { File.Delete(targetPath); } catch (Exception ignored) when (!ignored.IsFatal()) { /* best effort */ }
                     return null;
                 }
 
@@ -184,7 +185,7 @@ namespace optiSCAN.Services
                 AppLogger.Warn("FreshclamConfSupport", $"TryWriteConfAt {targetPath}: accès refusé", ex);
                 return null;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("FreshclamConfSupport", $"TryWriteConfAt {targetPath}", ex);
                 return null;
@@ -219,12 +220,12 @@ namespace optiSCAN.Services
                     if (File.Exists(bak)) File.Delete(bak);
                     File.Move(installConfPath, bak);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Warn("FreshclamConfSupport", "TryRepairLegacyBom : renommage", ex);
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("FreshclamConfSupport", "TryRepairLegacyBom", ex);
             }

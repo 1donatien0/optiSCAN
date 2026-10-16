@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO;
 using System.Text.RegularExpressions;
 
@@ -28,7 +29,7 @@ namespace optiSCAN.Services
             {
                 return Path.GetFullPath(baseDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return baseDir.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar);
             }

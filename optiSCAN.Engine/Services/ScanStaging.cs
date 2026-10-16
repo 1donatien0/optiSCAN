@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Collections.Concurrent;
 using System.IO;
 using System.Security.Cryptography;
@@ -70,7 +71,7 @@ internal static class ScanStaging
                 && !File.Exists(full)
                 && !Directory.Exists(directory);
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             /* chemin invalide */
         }
@@ -113,7 +114,7 @@ internal static class ScanStaging
                     Directory.Delete(full, recursive: true);
                     removed++;
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Debug("ScanStaging", "Copie ancienne non supprimée : " + ex.Message);
                 }
@@ -122,7 +123,7 @@ internal static class ScanStaging
             if (removed > 0)
                 AppLogger.Info("ScanStaging", $"{removed} copie(s) d'analyse orpheline(s) supprimée(s).");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("ScanStaging", "Nettoyage des copies d'analyse", ex);
         }
@@ -197,7 +198,7 @@ internal static class ScanStaging
 
             return new StagedFile(path, directory, Convert.ToHexString(hash.GetHashAndReset()));
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             TryDeleteDirectory(directory);
             throw;
@@ -268,7 +269,7 @@ internal static class ScanStaging
     private static void TryDeleteDirectory(string directory)
     {
         try { Directory.Delete(directory, recursive: true); }
-        catch (Exception ex) { AppLogger.Debug("ScanStaging", "Nettoyage : " + ex.Message); }
+        catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Debug("ScanStaging", "Nettoyage : " + ex.Message); }
         finally { Unregister(directory); }
     }
 
@@ -279,7 +280,7 @@ internal static class ScanStaging
             using var identity = WindowsIdentity.GetCurrent();
             return identity.IsSystem;
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return false;
         }

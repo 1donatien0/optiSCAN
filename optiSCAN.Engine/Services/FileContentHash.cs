@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO;
 using System.Security.Cryptography;
 
@@ -18,7 +19,7 @@ namespace optiSCAN.Services
                 var hash = await SHA256.HashDataAsync(stream, ct).ConfigureAwait(false);
                 return Convert.ToHexString(hash);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("FileContentHash", filePath, ex);
                 return null;

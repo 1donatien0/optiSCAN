@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Security.Principal;
 
 namespace optiSCAN.Services;
@@ -32,7 +33,7 @@ public static class ElevatedSessionGuard
             // Avec UAC, le groupe Administrateurs n'est actif que dans un jeton élevé.
             return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return false;
         }

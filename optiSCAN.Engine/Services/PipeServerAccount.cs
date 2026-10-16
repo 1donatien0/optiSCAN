@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
 using System.Security.Principal;
@@ -60,7 +61,7 @@ internal static class PipeServerAccount
                 CloseHandle(process);
             }
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return false;
         }

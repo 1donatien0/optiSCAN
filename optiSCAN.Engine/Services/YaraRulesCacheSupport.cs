@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO;
 using System.Security.Cryptography;
 using System.Text;
@@ -25,7 +26,7 @@ namespace optiSCAN.Services
                 var savedStamp = File.ReadAllText(compiledStampPath, Encoding.UTF8).Trim();
                 return string.Equals(currentStamp, savedStamp, StringComparison.Ordinal);
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return false;
             }

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using MaterialDesignThemes.Wpf;
 using optiSCAN.Localization;
 using optiSCAN.Models;
@@ -226,7 +227,7 @@ namespace optiSCAN.Views
                     LaunchFixUri(candidate.Trim());
                     return; // succès — on s'arrête
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     lastEx = ex;
                 }
@@ -309,7 +310,7 @@ namespace optiSCAN.Views
                 if (!removed)
                     AppLogger.Warn("OverviewControl", "Suppression des partages exposés incomplète");
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("OverviewControl", "Suppression des partages exposés", ex);
             }

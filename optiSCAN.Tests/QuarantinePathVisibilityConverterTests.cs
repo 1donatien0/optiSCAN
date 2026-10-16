@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Converters;
 using optiSCAN.Models;
 using optiSCAN.Services;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Diagnostics;
 using System.IO;
 using System.IO.Pipes;
@@ -24,7 +25,7 @@ internal static class ClamdBroker
                 pipe = ClamdPipeAcl.Create(pipeName, first, allowedSid);
                 first = false;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ClamdBroker", "Création du tube clamd refusée", ex);
                 break;
@@ -34,7 +35,7 @@ internal static class ClamdBroker
             {
                 await pipe.WaitForConnectionAsync(ct).ConfigureAwait(false);
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 await pipe.DisposeAsync().ConfigureAwait(false);
                 break;
@@ -46,7 +47,7 @@ internal static class ClamdBroker
         }
 
         try { await Task.WhenAll(inflight).ConfigureAwait(false); }
-        catch { /* arrêt */ }
+        catch (Exception ignored) when (!ignored.IsFatal()) { /* arrêt */ }
     }
 
     /// <summary>
@@ -69,7 +70,7 @@ internal static class ClamdBroker
                 user = ClamdPipeAcl.Create(userPipe, firstUser, allowedSid);
                 firstUser = false;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ClamdBroker", "Création du tube clamd refusée", ex);
                 break;
@@ -79,7 +80,7 @@ internal static class ClamdBroker
             {
                 await user.WaitForConnectionAsync(ct).ConfigureAwait(false);
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 await user.DisposeAsync().ConfigureAwait(false);
                 break;
@@ -91,7 +92,7 @@ internal static class ClamdBroker
         }
 
         try { await Task.WhenAll(inflight).ConfigureAwait(false); }
-        catch { /* arrêt */ }
+        catch (Exception ignored) when (!ignored.IsFatal()) { /* arrêt */ }
     }
 
     private static async Task BridgeAsync(NamedPipeServerStream user, Func<Stream?> openBridge, CancellationToken ct)
@@ -110,7 +111,7 @@ internal static class ClamdBroker
         {
             /* fin de session */
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("ClamdBroker", "Pont : " + ex.Message);
         }
@@ -118,9 +119,9 @@ internal static class ClamdBroker
         {
             if (bridge != null)
             {
-                try { await bridge.DisposeAsync().ConfigureAwait(false); } catch { /* ignore */ }
+                try { await bridge.DisposeAsync().ConfigureAwait(false); } catch (Exception ignored) when (!ignored.IsFatal()) { /* ignore */ }
             }
-            try { await user.DisposeAsync().ConfigureAwait(false); } catch { /* ignore */ }
+            try { await user.DisposeAsync().ConfigureAwait(false); } catch (Exception ignored) when (!ignored.IsFatal()) { /* ignore */ }
         }
     }
 
@@ -180,7 +181,7 @@ internal static class ClamdBroker
             using var process = Process.GetProcessById(parentPid);
             return !process.HasExited;
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return false;
         }
@@ -200,7 +201,7 @@ internal static class ClamdBroker
                     await tcp.ConnectAsync("127.0.0.1", port).ConfigureAwait(false);
                     connected = true;
                 }
-                catch
+                catch (Exception ignored) when (!ignored.IsFatal())
                 {
                     await Task.Delay(250).ConfigureAwait(false);
                 }
@@ -215,16 +216,16 @@ internal static class ClamdBroker
             await Task.WhenAny(outbound, inbound).ConfigureAwait(false);
             stop.Cancel();
             try { await Task.WhenAll(outbound, inbound).ConfigureAwait(false); }
-            catch { /* fin de flux */ }
+            catch (Exception ignored) when (!ignored.IsFatal()) { /* fin de flux */ }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Debug("ClamdBroker", "Relais : " + ex.Message);
         }
         finally
         {
-            try { tcp?.Dispose(); } catch { /* ignore */ }
-            try { await pipe.DisposeAsync(); } catch { /* ignore */ }
+            try { tcp?.Dispose(); } catch (Exception ignored) when (!ignored.IsFatal()) { /* ignore */ }
+            try { await pipe.DisposeAsync(); } catch (Exception ignored) when (!ignored.IsFatal()) { /* ignore */ }
         }
     }
 
@@ -255,7 +256,7 @@ internal static class ClamdRelay
         {
             string text;
             try { text = File.ReadAllText(controlFile); }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 Thread.Sleep(50);
                 continue;
@@ -274,10 +275,10 @@ internal static class ClamdRelay
                         _ = Task.Run(() =>
                         {
                             try { Pump(data, port, file); }
-                            catch (Exception ex) { AppLogger.Error("ClamdBroker", "Pump failed", ex); }
+                            catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Error("ClamdBroker", "Pump failed", ex); }
                         });
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (!ex.IsFatal())
                     {
                         AppLogger.Warn("ClamdBroker", "Failed to create pipe handle", ex);
                     }
@@ -306,7 +307,7 @@ internal static class ClamdRelay
                         throw new TimeoutException("connexion locale expirée");
                     connected = true;
                 }
-                catch
+                catch (Exception ignored) when (!ignored.IsFatal())
                 {
                     Thread.Sleep(250);
                 }
@@ -362,10 +363,10 @@ internal static class ClamdRelay
                 }
             }
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
-            try { tcp?.Dispose(); } catch { /* ignore */ }
-            try { pipe.Dispose(); } catch { /* ignore */ }
+            try { tcp?.Dispose(); } catch (Exception inner) when (!inner.IsFatal()) { /* ignore */ }
+            try { pipe.Dispose(); } catch (Exception inner) when (!inner.IsFatal()) { /* ignore */ }
         }
     }
 
@@ -434,8 +435,9 @@ internal sealed class ClamdRelayChannel : IDisposable
             channel._lock = new FileStream(lockFile, FileMode.Open, FileAccess.Read, FileShare.None);
             return channel;
         }
-        catch
+        catch (Exception ex) when (!ex.IsFatal())
         {
+            AppLogger.Warn("ClamdRelayChannel", "Canal du relais indisponible", ex);
             return null;
         }
     }
@@ -477,7 +479,7 @@ internal sealed class ClamdRelayChannel : IDisposable
 
     public void Dispose()
     {
-        try { _lock?.Dispose(); } catch { /* déjà fermé */ }
+        try { _lock?.Dispose(); } catch (Exception ignored) when (!ignored.IsFatal()) { /* déjà fermé */ }
         _lock = null;
         TryDelete(_controlFile);
         TryDelete(_controlFile + ".lock");
@@ -485,7 +487,7 @@ internal sealed class ClamdRelayChannel : IDisposable
 
     private static void TryDelete(string path)
     {
-        try { File.Delete(path); } catch { /* déjà retiré */ }
+        try { File.Delete(path); } catch (Exception ignored) when (!ignored.IsFatal()) { /* déjà retiré */ }
     }
 
     /// <summary>
@@ -532,8 +534,8 @@ internal sealed class ClamdRelayChannel : IDisposable
         {
             if (disposing)
             {
-                try { _server.Dispose(); } catch { /* déjà fermé */ }
-                try { _client.Dispose(); } catch { /* déjà fermé */ }
+                try { _server.Dispose(); } catch (Exception ignored) when (!ignored.IsFatal()) { /* déjà fermé */ }
+                try { _client.Dispose(); } catch (Exception ignored) when (!ignored.IsFatal()) { /* déjà fermé */ }
             }
             base.Dispose(disposing);
         }

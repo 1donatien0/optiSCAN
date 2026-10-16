@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Diagnostics;
 using System.Globalization;
 using System.Reflection;
@@ -52,7 +53,7 @@ namespace optiSCAN.Localization
         {
             var template = GetString(key);
             try { return string.Format(CurrentCulture, template, args); }
-            catch { return template; }
+            catch (Exception ignored) when (!ignored.IsFatal()) { return template; }
         }
 
         public static void ApplyCulture(string cultureName)
@@ -75,7 +76,7 @@ namespace optiSCAN.Localization
                 prefs.UiCulture = normalized;
                 prefs.Save();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("LocalizationService", "SetUserCulture prefs", ex);
             }
@@ -117,7 +118,7 @@ namespace optiSCAN.Localization
                 using var key = Registry.CurrentUser.CreateSubKey(RegistryPath);
                 key?.SetValue(CultureValueName, normalized);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("LocalizationService", "WriteRegistryCulture", ex);
             }
@@ -131,7 +132,7 @@ namespace optiSCAN.Localization
                 if (!string.IsNullOrWhiteSpace(prefs.UiCulture))
                     return prefs.UiCulture;
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 /* premier lancement avant prefs */
             }
@@ -154,7 +155,7 @@ namespace optiSCAN.Localization
                     prefs.Save();
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("LocalizationService", "PersistCultureIfNeeded", ex);
             }
@@ -167,7 +168,7 @@ namespace optiSCAN.Localization
                 using var key = Registry.CurrentUser.OpenSubKey(RegistryPath, writable: false);
                 return key?.GetValue(CultureValueName) as string;
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return null;
             }

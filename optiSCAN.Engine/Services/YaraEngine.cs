@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Localization;
 using System.Diagnostics;
 using System.IO;
@@ -117,7 +118,7 @@ namespace optiSCAN.Services
                 TryWriteRulesCountCache(stamp, count);
                 return count;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("YaraEngine", "CountRules", ex);
                 return 0;
@@ -138,7 +139,7 @@ namespace optiSCAN.Services
                     return false;
                 return int.TryParse(lines[1].Trim(), out count) && count >= 0;
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return false;
             }
@@ -150,7 +151,7 @@ namespace optiSCAN.Services
             {
                 File.WriteAllText(_rulesCountCachePath, stamp + Environment.NewLine + count, Encoding.UTF8);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("YaraEngine", "Écriture .rules_count.cache", ex);
             }
@@ -288,7 +289,7 @@ namespace optiSCAN.Services
                             File.Move(compiledTemp, _compiledRulesPath, overwrite: true);
                         }
                     }
-                    catch (Exception moveEx)
+                    catch (Exception moveEx) when (!moveEx.IsFatal())
                     {
                         // Ancien .yarc encore lu par un scan : il reste en place, la compilation
                         // sera refaite au prochain scan.
@@ -305,14 +306,14 @@ namespace optiSCAN.Services
                         Array.Sort(ruleFiles, StringComparer.OrdinalIgnoreCase);
                         YaraRulesCacheSupport.WriteCompiledStamp(_compiledStampPath, ruleFiles);
                     }
-                    catch (Exception stampEx)
+                    catch (Exception stampEx) when (!stampEx.IsFatal())
                     {
                         AppLogger.Warn("yarac", "Écriture _compiled.stamp échouée", stampEx);
                     }
                 }
                 return success;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("yarac", "Compilation échouée", ex);
                 return false;
@@ -321,7 +322,7 @@ namespace optiSCAN.Services
             {
                 process?.Dispose();
                 try { if (File.Exists(compiledTemp)) File.Delete(compiledTemp); }
-                catch (Exception ex) { AppLogger.Debug("yarac", "Fichier temporaire : " + ex.Message); }
+                catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Debug("yarac", "Fichier temporaire : " + ex.Message); }
                 CleanupLocalCompileTemps();
             }
         }
@@ -480,7 +481,7 @@ namespace optiSCAN.Services
                 finally
                 {
                     try { File.Delete(listFile); }
-                    catch (Exception ex) { AppLogger.Debug("YaraEngine", "Liste temporaire : " + ex.Message); }
+                    catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Debug("YaraEngine", "Liste temporaire : " + ex.Message); }
                 }
             }
 
@@ -634,7 +635,7 @@ namespace optiSCAN.Services
             {
                 throw;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 // yara introuvable, refus de lancement... : rien n'a été analysé, ce n'est pas « propre ».
                 AppLogger.Error("YARA", "Scan récursif", ex);
@@ -802,7 +803,7 @@ namespace optiSCAN.Services
             {
                 throw;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("YARA", "Scan", ex);
                 throw new YaraScanIncompleteException("YARA n'a pas pu analyser : " + ex.Message, matches);
@@ -825,7 +826,7 @@ namespace optiSCAN.Services
                 if (File.Exists(_compiledRulesPath))
                     File.Delete(_compiledRulesPath);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("YaraEngine", "InvalidateCompiledRules (.yarc)", ex);
             }
@@ -834,7 +835,7 @@ namespace optiSCAN.Services
                 if (File.Exists(_rulesCountCachePath))
                     File.Delete(_rulesCountCachePath);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("YaraEngine", "InvalidateCompiledRules (cache comptage)", ex);
             }
@@ -843,7 +844,7 @@ namespace optiSCAN.Services
                 if (File.Exists(_compiledStampPath))
                     File.Delete(_compiledStampPath);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("YaraEngine", "InvalidateCompiledRules (stamp)", ex);
             }

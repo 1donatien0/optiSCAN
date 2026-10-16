@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO;
 using System.Security.Principal;
 using optiSCAN.Platform;
@@ -144,7 +145,7 @@ namespace optiSCAN.Services
                 Directory.Delete(probeDir, recursive: false);
                 return true;
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return false;
             }
@@ -185,7 +186,7 @@ namespace optiSCAN.Services
 
                 File.WriteAllText(Path.Combine(writableDestDir, SeedMarker), "1");
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ClamAvDatabasePaths", "TrySeedSignatureFiles", ex);
             }

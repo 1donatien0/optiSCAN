@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Localization;
 using optiSCAN.Models;
 using System.Collections.ObjectModel;
@@ -104,7 +105,7 @@ namespace optiSCAN.Services
                 var (stdout, _) = await RunProcessAsync(_clamscanExe, "--version");
                 return stdout.Trim().Split('\n')[0]; // Première ligne seulement
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ClamAvEngine", "GetVersionAsync", ex);
                 return LocalizationService.GetString("Clam_VersionError");
@@ -375,7 +376,7 @@ namespace optiSCAN.Services
                 result.Status = ScanStatus.Cancelled;
                 result.FinishedAt = DateTime.Now;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 result.Status = ScanStatus.Error;
                 result.ErrorMessage = ex.Message;
@@ -386,7 +387,7 @@ namespace optiSCAN.Services
                 proc?.Dispose();
                 if (!string.IsNullOrEmpty(tempFileList))
                 {
-                    try { File.Delete(tempFileList); } catch { /* ignore */ }
+                    try { File.Delete(tempFileList); } catch (Exception ignored) when (!ignored.IsFatal()) { /* ignore */ }
                 }
             }
 

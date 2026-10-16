@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO;
 using System.Text;
 
@@ -62,7 +63,7 @@ namespace optiSCAN.Services
 
             // Console / Debug : toujours, peu importe le niveau (utile en dev).
             try { System.Diagnostics.Debug.WriteLine(line); }
-            catch { /* Debug.WriteLine peut échouer dans certains contextes - ignorer */ }
+            catch (Exception ignored) when (!ignored.IsFatal()) { /* Debug.WriteLine peut échouer dans certains contextes - ignorer */ }
 
             // Fichier : seulement si le niveau est >= seuil.
             if (level < MinimumFileLevel) return;
@@ -77,7 +78,7 @@ namespace optiSCAN.Services
                     MaybeCleanupOldLogs();
                 }
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 // Last resort : un échec de logging ne doit JAMAIS faire crasher l'app.
                 // On laisse Debug.WriteLine qui a déjà capturé la ligne.
@@ -129,10 +130,10 @@ namespace optiSCAN.Services
                         if (File.GetLastWriteTime(f) < threshold)
                             File.Delete(f);
                     }
-                    catch { /* fichier verrouillé → tant pis, on le verra demain */ }
+                    catch (Exception ignored) when (!ignored.IsFatal()) { /* fichier verrouillé → tant pis, on le verra demain */ }
                 }
             }
-            catch { /* best effort */ }
+            catch (Exception ignored) when (!ignored.IsFatal()) { /* best effort */ }
         }
 
         private static DateTime LoadLastCleanupUtc()
@@ -144,7 +145,7 @@ namespace optiSCAN.Services
                 if (DateTime.TryParse(text, null, System.Globalization.DateTimeStyles.RoundtripKind, out var dt))
                     return dt.Kind == DateTimeKind.Utc ? dt : dt.ToUniversalTime();
             }
-            catch { /* premier lancement ou fichier corrompu */ }
+            catch (Exception ignored) when (!ignored.IsFatal()) { /* premier lancement ou fichier corrompu */ }
             return DateTime.MinValue;
         }
 
@@ -155,7 +156,7 @@ namespace optiSCAN.Services
                 if (!Directory.Exists(LogDir)) Directory.CreateDirectory(LogDir);
                 File.WriteAllText(LastCleanupMarkerPath, utc.ToString("o"), Encoding.UTF8);
             }
-            catch { /* best effort */ }
+            catch (Exception ignored) when (!ignored.IsFatal()) { /* best effort */ }
         }
     }
 }

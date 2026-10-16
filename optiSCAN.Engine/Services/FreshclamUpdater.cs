@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
@@ -87,7 +88,7 @@ namespace optiSCAN.Services
                     {
                         try { await UpdateAsync().ConfigureAwait(false); }
                         catch (OperationCanceledException) { /* annulé normalement */ }
-                        catch (Exception ex)
+                        catch (Exception ex) when (!ex.IsFatal())
                         {
                             AppLogger.Warn("FreshclamUpdater", "Auto-update", ex);
                         }
@@ -236,7 +237,7 @@ namespace optiSCAN.Services
                             proc.Kill(entireProcessTree: true);
                         }
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (!ex.IsFatal())
                     {
                         AppLogger.Warn("FreshclamUpdater", "Kill process", ex);
                     }
@@ -252,7 +253,7 @@ namespace optiSCAN.Services
                 // Exited arrive avant la fin de la lecture asynchrone : sans cette attente, la ligne
                 // « up-to-date » pouvait être lue après le calcul du résultat.
                 try { proc.WaitForExit(); }
-                catch (Exception ex) { AppLogger.Debug("FreshclamUpdater", "Fin de lecture : " + ex.Message); }
+                catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Debug("FreshclamUpdater", "Fin de lecture : " + ex.Message); }
 
                 result.ExitCode = proc.ExitCode;
                 result.FinishedAt = DateTime.Now;
@@ -281,7 +282,7 @@ namespace optiSCAN.Services
                     ? LocalizationService.GetString("Freshclam_CancelledUser")
                     : LocalizationService.Format("Freshclam_CancelledTimeout", (int)UpdateTimeout.TotalMinutes);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 result.Success = false;
                 result.Message = LocalizationService.Format("Vm_ScanError", ex.Message);
@@ -334,7 +335,7 @@ namespace optiSCAN.Services
                         if (m.Success && m.Groups[1].Value.All(char.IsDigit))
                             return m.Groups[1].Value;
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (!ex.IsFatal())
                     {
                         AppLogger.Warn("FreshclamUpdater", $"Lecture {filePath}", ex);
                     }
@@ -345,7 +346,7 @@ namespace optiSCAN.Services
 
                 return VersionDisplayHelper.UnknownLabel;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("FreshclamUpdater", "GetLocalDatabaseVersion", ex);
                 return VersionDisplayHelper.UnknownLabel;
@@ -389,7 +390,7 @@ namespace optiSCAN.Services
                 }
                 return max;
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return null;
             }
@@ -405,7 +406,7 @@ namespace optiSCAN.Services
         private static bool IsNetworkAvailable()
         {
             try { return NetworkInterface.GetIsNetworkAvailable(); }
-            catch { return true; /* en cas de doute, on laisse passer */ }
+            catch (Exception ignored) when (!ignored.IsFatal()) { return true; /* en cas de doute, on laisse passer */ }
         }
 
         /// <summary>
@@ -439,7 +440,7 @@ namespace optiSCAN.Services
                                 "Freshclam_LogStaleLockRemoved", Path.GetFileName(lockPath))));
                         }
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (!ex.IsFatal())
                     {
                         AppLogger.Warn("FreshclamUpdater", $"Cleanup {lockPath}", ex);
                     }
@@ -447,7 +448,7 @@ namespace optiSCAN.Services
 
                 CleanupPartialDownloadDirs();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("FreshclamUpdater", "CleanupStaleLocks", ex);
             }
@@ -469,13 +470,13 @@ namespace optiSCAN.Services
                         SurSortieFreshclam(UiLogText.Info(LocalizationService.Format(
                             "Freshclam_LogStaleLockRemoved", Path.GetFileName(dir))));
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (!ex.IsFatal())
                     {
                         AppLogger.Warn("FreshclamUpdater", $"Cleanup tmp {dir}", ex);
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("FreshclamUpdater", "CleanupPartialDownloadDirs", ex);
             }
@@ -503,7 +504,7 @@ namespace optiSCAN.Services
                 // freshclam doit pouvoir créer tmp.* dans un dossier inscriptible.
                 args.Add($"--datadir={_databaseDir}");
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("FreshclamUpdater", "BuildArguments datadir", ex);
             }
@@ -560,7 +561,7 @@ namespace optiSCAN.Services
                     dbDirForConf,
                     logForConf);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("FreshclamUpdater", "BuildConfBytes", ex);
                 return null;
@@ -581,12 +582,12 @@ namespace optiSCAN.Services
                 using var fs = new FileStream(primary, FileMode.OpenOrCreate, FileAccess.Write, FileShare.ReadWrite);
                 return primary;
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 var fallbackDir = Path.Combine(
                     Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
                     "optiSCAN", "logs");
-                try { Directory.CreateDirectory(fallbackDir); } catch { /* approche prudente */ }
+                try { Directory.CreateDirectory(fallbackDir); } catch (Exception inner) when (!inner.IsFatal()) { /* approche prudente */ }
                 return Path.Combine(fallbackDir, "freshclam.log");
             }
         }
@@ -635,7 +636,7 @@ namespace optiSCAN.Services
                 var m = Regex.Match(output, @"(?:ClamAV\s+[\d.]+/|version\s+)(\d{4,6})");
                 return m.Success ? m.Groups[1].Value : VersionDisplayHelper.UnknownLabel;
             }
-            catch { return VersionDisplayHelper.UnknownLabel; }
+            catch (Exception ignored) when (!ignored.IsFatal()) { return VersionDisplayHelper.UnknownLabel; }
         }
 
         private bool HasUsableRootCert()
@@ -645,7 +646,7 @@ namespace optiSCAN.Services
                 var p = Path.Combine(_effectiveCvdCertsDir, "clamav.crt");
                 return Directory.Exists(_effectiveCvdCertsDir) && IsPinnedRootCert(p);
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return false;
             }
@@ -671,7 +672,7 @@ namespace optiSCAN.Services
                     }
                     return IsPinnedRootCert(dest);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Warn("FreshclamUpdater", $"tryDeploy {dir}", ex);
                     return false;
@@ -715,7 +716,7 @@ namespace optiSCAN.Services
                     return false;
                 return IsPinnedRootCert(File.ReadAllBytes(path));
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return false;
             }
@@ -742,7 +743,7 @@ namespace optiSCAN.Services
                 var path = Path.Combine(destDir, "clamav.crt");
                 await File.WriteAllBytesAsync(path, bytes, ct).ConfigureAwait(false);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("FreshclamUpdater", "TryDownloadClamAvRootCertAsync", ex);
             }

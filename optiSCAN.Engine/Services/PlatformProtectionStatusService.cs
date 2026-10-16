@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.Versioning;
@@ -187,7 +188,7 @@ public static class PlatformProtectionStatusService
             return !string.IsNullOrWhiteSpace(path)
                 && string.Equals(Path.GetFullPath(path), Path.GetFullPath(expectedDllPath), StringComparison.OrdinalIgnoreCase);
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return false;
         }
@@ -213,7 +214,7 @@ public static class PlatformProtectionStatusService
             return output.Contains("optiSCANMinifilter", StringComparison.OrdinalIgnoreCase)
                 || output.Contains("optiSCAN.Minifilter", StringComparison.OrdinalIgnoreCase);
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return false;
         }
@@ -226,7 +227,7 @@ public static class PlatformProtectionStatusService
             using var sc = new System.ServiceProcess.ServiceController("WinDefend");
             return sc.Status == System.ServiceProcess.ServiceControllerStatus.Running;
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return false;
         }

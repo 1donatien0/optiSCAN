@@ -1,4 +1,5 @@
-﻿using System.IO;
+﻿// SPDX-License-Identifier: GPL-3.0-or-later
+using System.IO;
 using optiSCAN.Localization;
 using optiSCAN.Strings;
 
@@ -70,7 +71,7 @@ namespace optiSCAN.Services
                         _localUpdatePath),
                 });
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("UpdateService", "Préparation dossier mises à jour", ex);
                 return Task.FromResult(new AppUpdateCheckResult

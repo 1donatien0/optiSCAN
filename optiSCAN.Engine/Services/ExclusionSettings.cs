@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO;
 using System.Runtime.Versioning;
 using System.Text.Json;
@@ -142,7 +143,7 @@ namespace optiSCAN.Services
                     Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
                     SecureStore.Save(SettingsPath, this);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Warn("ExclusionSettings", "Save", ex);
                 }
@@ -262,7 +263,7 @@ namespace optiSCAN.Services
         {
             string full;
             try { full = Path.GetFullPath(folder.Replace('/', '\\')).TrimEnd('\\'); }
-            catch { return true; }
+            catch (Exception ignored) when (!ignored.IsFatal()) { return true; }
 
             var root = Path.GetPathRoot(full)?.TrimEnd('\\');
             if (string.IsNullOrEmpty(root) || string.Equals(full, root, StringComparison.OrdinalIgnoreCase))

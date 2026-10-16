@@ -1,3 +1,4 @@
+﻿# SPDX-License-Identifier: GPL-3.0-or-later
 <#
 .SYNOPSIS
     Vérifie que tous les binaires et fichiers critiques sont présents dans le dossier

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Models;
 
 namespace optiSCAN.Services
@@ -31,7 +32,7 @@ namespace optiSCAN.Services
                 uiEvents?.RequestScanHistoryViewsRefresh();
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("DetectionHistoryRecorder", $"Enregistrement impossible : {filePath}", ex);
                 return false;

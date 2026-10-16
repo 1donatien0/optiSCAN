@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Localization;
 using System.IO;
 using System.Text;
@@ -134,7 +135,7 @@ namespace optiSCAN.Services
                 if (Directory.Exists(rulesDir))
                     return Directory.GetFiles(rulesDir, "*.yar", SearchOption.TopDirectoryOnly).Length;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("RuntimeDependencies", $"Énumération rules : {rulesDir}", ex);
             }

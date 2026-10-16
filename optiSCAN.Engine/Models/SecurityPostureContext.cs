@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 namespace optiSCAN.Models
 {
     /// <summary>Entrées optiSCAN pour le calcul de posture (hors sondes système).</summary>

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -110,7 +111,7 @@ public static class TweakUndoStore
                 return new Snapshot();
             return JsonSerializer.Deserialize<Snapshot>(File.ReadAllText(path), JsonOptions) ?? new Snapshot();
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("TweakUndoStore", "Lecture", ex);
             return new Snapshot();
@@ -132,7 +133,7 @@ public static class TweakUndoStore
             Directory.CreateDirectory(Path.GetDirectoryName(path)!);
             AtomicFile.WriteAllText(path, JsonSerializer.Serialize(snapshot, JsonOptions));
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("TweakUndoStore", "Écriture", ex);
         }

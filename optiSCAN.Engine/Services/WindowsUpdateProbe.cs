@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using Microsoft.Win32;
 using System.Management;
 using System.Runtime.InteropServices;
@@ -64,7 +65,7 @@ namespace optiSCAN.Services
                     if (WindowsUpdateTimeParser.TryParseWmiUtc14(key?.GetValue(valueName) as string, out var parsed))
                         utc = parsed;
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Warn("WindowsUpdateProbe", $"Registre {subKey}\\{valueName}", ex);
                 }
@@ -106,7 +107,7 @@ namespace optiSCAN.Services
 
                 return best;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("WindowsUpdateProbe", "WMI Win32_QuickFixEngineering", ex);
                 return null;
@@ -163,7 +164,7 @@ namespace optiSCAN.Services
 
                 return best;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("WindowsUpdateProbe", "WUA COM", ex);
                 return null;

@@ -1,3 +1,4 @@
+﻿# SPDX-License-Identifier: GPL-3.0-or-later
 # Publie optiSCAN (Release, win-x64) puis compile l'installateur Inno.
 # Usage (depuis la racine du depot) : .\installer\build-release-setup.ps1
 # Uniquement Inno (publish deja fait) : .\installer\build-release-setup.ps1 -SkipPublish
@@ -12,10 +13,9 @@ param(
     # Embarquer les règles YARA. Défaut: non (YARA-Forge post-install).
     [switch] $EmbedYaraRules,
     # Embarquer ClamAV DB + règles YARA (offline).
-    [switch] $EmbedOfflineSignatures,
-    # Signer l'installateur et son désinstalleur (.pfx ; mot de passe dans $env:CODESIGN_PASSWORD).
-    [string] $SignPfxPath
+    [switch] $EmbedOfflineSignatures
 )
+# Signature : faite après compilation par SignPath (.github/workflows/release.yml), jamais ici.
 
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot
@@ -123,30 +123,6 @@ if ($EmbedOfflineSignatures) {
     if ($EmbedClamAvDatabase) { $isccArgs += '/DEmbedClamAvDatabase' }
     if ($EmbedYaraRules) { $isccArgs += '/DEmbedYaraRules' }
 }
-if (-not [string]::IsNullOrWhiteSpace($SignPfxPath)) {
-    if (-not (Test-Path -LiteralPath $SignPfxPath)) { throw "Certificat introuvable : $SignPfxPath" }
-    if ([string]::IsNullOrWhiteSpace($env:CODESIGN_PASSWORD)) { throw 'CODESIGN_PASSWORD absent.' }
-    $signtool = $env:SIGNTOOL_PATH
-    if ([string]::IsNullOrWhiteSpace($signtool)) {
-        $kits = Join-Path ${env:ProgramFiles(x86)} 'Windows Kits\10\bin'
-        $signtool = (Get-ChildItem -Path $kits -Filter signtool.exe -Recurse -ErrorAction SilentlyContinue |
-            Where-Object { $_.FullName -match '\\x64\\signtool\.exe$' } |
-            Sort-Object FullName -Descending | Select-Object -First 1).FullName
-    }
-    if ([string]::IsNullOrWhiteSpace($signtool)) { throw 'signtool.exe introuvable (Windows SDK requis).' }
-    # Le mot de passe ne figure plus dans la commande passée à ISCC puis à signtool : le .pfx
-    # est importé dans le magasin de l'utilisateur et désigné par son empreinte, puis retiré
-    # après la compilation. $q = guillemet, $f = fichier à signer (placeholders Inno Setup).
-    $securePwd = ConvertTo-SecureString -String $env:CODESIGN_PASSWORD -AsPlainText -Force
-    $signCert = Import-PfxCertificate -FilePath $SignPfxPath -CertStoreLocation 'Cert:\CurrentUser\My' -Password $securePwd
-    if (-not $signCert) { throw 'Import du certificat de signature impossible.' }
-    $importedThumbprint = $signCert.Thumbprint
-    $signCommand = '$q' + $signtool + '$q sign /sha1 ' + $importedThumbprint +
-        ' /s My /fd SHA256 /tr http://timestamp.digicert.com /td SHA256 $f'
-    $isccArgs += "/Ssigntool=$signCommand"
-    $isccArgs += '/DSignInstaller'
-    Write-Host '  Signature : installateur et désinstalleur signés' -ForegroundColor DarkGray
-}
 Write-Host "Publish source (force) : $publishGlob" -ForegroundColor DarkGray
 Write-Host "  optiSCAN.exe : $((Get-Item -LiteralPath $publishExe).LastWriteTime.ToString('u'))" -ForegroundColor DarkGray
 if ($EmbedOfflineSignatures -or $EmbedClamAvDatabase) {
@@ -159,14 +135,8 @@ if ($EmbedOfflineSignatures -or $EmbedYaraRules) {
 } else {
     Write-Host '  Regles YARA : telechargement post-install (YARA-Forge / MAJ)' -ForegroundColor DarkGray
 }
-try {
-    & $iscc @isccArgs $iss
-    if ($LASTEXITCODE -ne 0) { throw "ISCC a echoue (code $LASTEXITCODE)." }
-} finally {
-    if ($importedThumbprint) {
-        Remove-Item -LiteralPath ("Cert:\CurrentUser\My\" + $importedThumbprint) -DeleteKey -ErrorAction SilentlyContinue
-    }
-}
+& $iscc @isccArgs $iss
+if ($LASTEXITCODE -ne 0) { throw "ISCC a echoue (code $LASTEXITCODE)." }
 
 if (Test-Path $outDir) {
     Write-Host 'Sortie :' -ForegroundColor Green

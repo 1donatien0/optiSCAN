@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Localization;
 using optiSCAN.Models;
 using optiSCAN.Services;
@@ -445,7 +446,7 @@ namespace optiSCAN.ViewModels
                 AppLogger.Info("ScanViewModel", "Initialisation terminée");
                 _uiEvents.RequestScanHistoryViewsRefresh();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 // Un crash global de InitializeAsync ne devrait plus jamais arriver
                 // grâce aux TryStep ci-dessus, mais on ceinture-bretelles.
@@ -521,7 +522,7 @@ namespace optiSCAN.ViewModels
         private void TryStep(string name, Action step)
         {
             try { step(); }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ScanViewModel", $"Init step '{name}' échouée", ex);
                 if (string.IsNullOrEmpty(InitializationError))
@@ -533,7 +534,7 @@ namespace optiSCAN.ViewModels
         private async Task TryStepAsync(string name, Func<Task> step)
         {
             try { await step(); }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ScanViewModel", $"Init step '{name}' échouée", ex);
                 if (string.IsNullOrEmpty(InitializationError))
@@ -555,9 +556,9 @@ namespace optiSCAN.ViewModels
         {
             if (_disposed) return;
             try { _cts?.Cancel(); }
-            catch (Exception ex) { AppLogger.Debug("ScanViewModel", $"Cancel on dispose: {ex.Message}"); }
+            catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Debug("ScanViewModel", $"Cancel on dispose: {ex.Message}"); }
             try { _cts?.Dispose(); }
-            catch (Exception ex) { AppLogger.Debug("ScanViewModel", $"Dispose CTS: {ex.Message}"); }
+            catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Debug("ScanViewModel", $"Dispose CTS: {ex.Message}"); }
             _cts = null;
 
             try
@@ -565,7 +566,7 @@ namespace optiSCAN.ViewModels
                 _progressCoalesceTimer?.Stop();
                 _progressCoalesceTimer = null;
             }
-            catch { /* ignore */ }
+            catch (Exception ignored) when (!ignored.IsFatal()) { /* ignore */ }
 
             try
             {
@@ -577,7 +578,7 @@ namespace optiSCAN.ViewModels
                 _updater.DisableAutoUpdate();
                 _rulesUpdater.DisableAutoUpdate();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ScanViewModel", "Dispose détachement", ex);
             }

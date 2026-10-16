@@ -66,10 +66,15 @@ jobs:
           dotnet build optiSCAN.sln --configuration Release
           dotnet test optiSCAN.Tests/optiSCAN.Tests.csproj --configuration Release --no-build
 
+      - name: Build AMSI provider (C++, required)
+        shell: pwsh
+        run: pwsh -File scripts/build-amsi.ps1 -Require
+
       - name: Publish win-x64 (self-contained)
         shell: pwsh
         run: |
           pwsh -File scripts/publish-release.ps1 -SelfContained -SkipInstaller
+          if (-not (Test-Path optiSCAN/bin/Release/net10.0-windows10.0.17763.0/publish/win-x64/optiSCAN.AmsiProvider.dll)) { throw 'Fournisseur AMSI absent du publish.' }
           pwsh -File scripts/verify-runtime-deps.ps1 -AllowMissingSignatures
 
       - name: Upload unsigned binaries
@@ -81,7 +86,7 @@ jobs:
           retention-days: 3
 
       - name: Sign binaries (SignPath)
-        uses: signpath/github-action-submit-signing-request@c92b958760219087e01f8d67a1669ed57afe2627 # v2.3
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
@@ -97,7 +102,7 @@ jobs:
         shell: pwsh
         run: |
           $dir = 'optiSCAN/bin/Release/net10.0-windows10.0.17763.0/publish/win-x64'
-          foreach ($f in 'optiSCAN.exe','optiSCAN.dll','optiSCAN.Service.exe','optiSCAN.Service.dll','optiSCAN.Platform.dll','optiSCAN.Engine.dll','optiSCAN.Host.exe','optiSCAN.Host.dll') {
+          foreach ($f in 'optiSCAN.exe','optiSCAN.dll','optiSCAN.Service.exe','optiSCAN.Service.dll','optiSCAN.Platform.dll','optiSCAN.Engine.dll','optiSCAN.Host.exe','optiSCAN.Host.dll','optiSCAN.AmsiProvider.dll') {
             $sig = Get-AuthenticodeSignature (Join-Path $dir $f)
             if ($sig.Status -ne 'Valid') { throw "$f : signature $($sig.Status)" }
             Write-Host "$f : $($sig.SignerCertificate.Subject)"
@@ -105,7 +110,7 @@ jobs:
 
       - name: Install Inno Setup
         shell: pwsh
-        run: choco install innosetup --no-progress -y
+        run: choco install innosetup --version 6.7.1 -y --no-progress
 
       - name: Build installer from signed binaries
         shell: pwsh
@@ -123,7 +128,7 @@ jobs:
           retention-days: 3
 
       - name: Sign installer (SignPath)
-        uses: signpath/github-action-submit-signing-request@c92b958760219087e01f8d67a1669ed57afe2627 # v2.3
+        uses: signpath/github-action-submit-signing-request@f6d04783b4569d051e0c80105fe66e82819d0092 # v3.0
         with:
           api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
           organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}

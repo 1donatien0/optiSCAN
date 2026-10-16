@@ -6,35 +6,19 @@ Ce guide couvre la mise en production d'optiSCAN chez des utilisateurs tiers : *
 
 ## 1. Signature de code
 
-### 1.1 Exécutable & installeur — Authenticode
+### 1.1 Exécutable & installeur — Authenticode (SignPath)
 
-La signature Authenticode est facultative dans la chaîne actuelle. Sans `CODESIGN_PFX` et `CODESIGN_PASSWORD`, les artefacts restent non signés. Avec un certificat PFX configuré, la procédure courante signe les binaires publiés, l'installeur et son désinstalleur. La signature identifie l'éditeur ; elle ne garantit ni une réputation SmartScreen ni l'absence de blocage par un autre produit de sécurité.
-
-- **Certificat** : fournir un PFX autorisé à signer et son mot de passe par la configuration locale ou les secrets CI ; voir la [procédure de signature](SIGNATURE_PROCEDURE.md). Le projet n'impose pas de classe OV/EV ni de fournisseur.
-- **Signer les binaires publiés** avec le certificat PFX :
-
-  ```powershell
-  # Définir CODESIGN_PASSWORD dans l'environnement depuis un gestionnaire de secrets.
-  pwsh -File scripts/codesign.ps1 -Sign -PfxPath cert.pfx `
-    -Files publish/win-x64/optiSCAN.exe,publish/win-x64/optiSCAN.dll,publish/win-x64/optiSCAN.Service.exe,publish/win-x64/optiSCAN.Service.dll,publish/win-x64/optiSCAN.Platform.dll
-  ```
-
-- **Signer l'installeur et son désinstalleur** : après le publish, transmettre le même PFX au script Inno :
-
-  ```powershell
-  pwsh -File installer/build-release-setup.ps1 -SkipPublish `
-    -PublishDir publish/win-x64 -SignPfxPath cert.pfx
-  ```
+Une seule chaîne : **SignPath Foundation**, gratuite pour les projets open source acceptés (optiSCAN est sous GPL v3). Les binaires optiSCAN et l'installeur sont signés par [`release.yml`](../.github/workflows/release.yml) sur un tag `vX.Y.Z`, après approbation manuelle. Aucun certificat ni mot de passe n'existe sur un poste ou dans les secrets du dépôt. Mise en place et publication : [procédure de signature](SIGNATURE_PROCEDURE.md) ; fichiers signés : [politique](CODE_SIGNING_POLICY.md). La signature identifie l'éditeur ; elle ne garantit ni une réputation SmartScreen ni l'absence de blocage par un autre produit de sécurité.
 
 ### 1.2 AMSI et minifiltre
 
-Ces deux composants **ne sont pas livrés ni actifs** dans la version courante. Les prototypes sous `native/` ne sont pas compilés par CI, inclus dans l'installateur, enregistrés ou chargés. La signature AMSI/noyau ne fait donc pas partie de la procédure de publication actuelle. Toute reprise de ces fonctions exige d'abord une implémentation, une revue de sécurité, une chaîne de signature et une validation Windows dédiées.
+**AMSI** : livré avec le service, compilé par la CI (`build-amsi.ps1 -Require`), enregistré par l'installeur (`regserver`) et signé par SignPath avec les autres binaires. **Minifiltre** : non livré ; un pilote noyau exige la signature de Microsoft (Partner Center, certificat EV), indépendante de SignPath.
 
 ---
 
 ## 2. Cohabitation avec d'autres antivirus
 
-optiSCAN analyse à la demande, surveille les changements de fichiers avec `FileSystemWatcher` et peut surveiller les créations de processus WMI lorsque le service avancé est activé. Il n'installe pas de hook noyau, d'AMSI ou de minifiltre dans la version courante.
+optiSCAN analyse à la demande, surveille les changements de fichiers avec `FileSystemWatcher`, peut surveiller les créations de processus WMI et, avec le service, analyse les scripts par AMSI. Il n'installe aucun hook ni pilote noyau.
 
 - **Risque concret** : un **Kaspersky / Bitdefender / Avast** (très répandus en Europe) peut **mettre en quarantaine ou terminer** `optiSCAN.exe` — symptôme « se lance quelques secondes puis disparaît ».
 - **Mesures** :
@@ -82,7 +66,7 @@ L'UI de publication de Visual Studio s'est révélée peu fiable ici. Préférer
 .\installer\build-release-setup.ps1 -SkipPublish
 ```
 
-Le script `publish-release.ps1` publie et compile l'installeur. Avec `-CertSubject`, il signe l'application, le service et les DLL plateforme publiés ; il ne signe pas l'installeur ni son désinstalleur. Pour une publication entièrement signée, utiliser la procédure de [`SIGNATURE_PROCEDURE.md`](SIGNATURE_PROCEDURE.md), qui signe aussi l'installeur et son désinstalleur. Sans certificat, la build reste non signée.
+Le script `publish-release.ps1` publie l'application, le service et l'hôte, puis compile l'installeur. Il ne signe rien : une build locale est toujours non signée ; seule la release produite par `release.yml` est signée (SignPath).
 
 Le publish WPF recopie aussi les assets disque (`optiSCAN.ico`, hero, shield) via la cible MSBuild `CopyEmbeddedAssetsToPublish` — nécessaires au systray, à `verify-runtime-deps` et à Inno.
 
@@ -91,8 +75,8 @@ Le publish WPF recopie aussi les assets disque (`optiSCAN.ico`, hero, shield) vi
 ## 5. Checklist avant release
 
 - [ ] Code committé et build CI vert (tests + CodeQL + gitleaks).
-- [ ] Vérifier que le pilote minifiltre et le fournisseur AMSI restent absents du publish et de l'installateur tant que leur implémentation n'a pas été validée.
-- [ ] Si le certificat est disponible, signer les binaires avec `scripts/codesign.ps1`, puis l'installeur et le désinstalleur avec `-SignPfxPath` ; sinon documenter que la build est non signée.
+- [ ] Vérifier que `optiSCAN.AmsiProvider.dll` est dans l'installeur et signé, et qu'aucun pilote `.sys` n'est livré.
+- [ ] Release produite par `release.yml` sur un tag : binaires et installeur signés par SignPath, signatures vérifiées par le workflow (`Get-AuthenticodeSignature`).
 - [ ] Vérifier que le runtime est inclus dans le publish de release (`verify-runtime-deps.ps1`).
 - [ ] Assets publish présents (`optiSCAN.ico`, hero, shield) — `verify-runtime-deps.ps1`.
 - [ ] Testé sur poste vierge + poste avec Kaspersky/Defender.

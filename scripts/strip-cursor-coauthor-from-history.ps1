@@ -1,3 +1,4 @@
+﻿# SPDX-License-Identifier: GPL-3.0-or-later
 # Parcourt l'historique et retire Co-authored-by: Cursor de tous les messages.
 # Usage : pwsh -File scripts/strip-cursor-coauthor-from-history.ps1 [-Branch win] [-Push]
 param(

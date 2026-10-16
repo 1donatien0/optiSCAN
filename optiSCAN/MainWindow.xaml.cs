@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using MaterialDesignThemes.Wpf;
 using optiSCAN.Coordinators;
 using optiSCAN.Localization;
@@ -147,7 +148,7 @@ namespace optiSCAN
                     SwitchPanel);
                 RegisterScanShortcuts();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("MainWindow", "Initialisation fenêtre principale", ex);
                 SetStatus(LocalizationService.Format("Status_Error", ex.Message), isError: true);
@@ -204,7 +205,7 @@ namespace optiSCAN
                 }).ConfigureAwait(true);
                 App.PendingShellScanPath = null;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("MainWindow", "SurChargementFenetrePrincipale", ex);
                 SetStatus(LocalizationService.Format("Status_Error", ex.Message), isError: true);
@@ -221,7 +222,7 @@ namespace optiSCAN
                     return;
                 await yara.CompileRulesAsync(CancellationToken.None).ConfigureAwait(false);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("MainWindow", "WarmUpYaraRulesAsync", ex);
             }
@@ -405,7 +406,7 @@ namespace optiSCAN
                     UseShellExecute = true
                 });
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("MainWindow", "Ouverture du site web (Process.Start)", ex);
             }
@@ -565,7 +566,7 @@ namespace optiSCAN
                         {
                             OverviewRefreshCoordinator.RefreshProtectionAndRecommendations(t.Result);
                         }
-                        catch (Exception ex)
+                        catch (Exception ex) when (!ex.IsFatal())
                         {
                             AppLogger.Warn("MainWindow", "Application du rafraîchissement vue d'ensemble", ex);
                         }

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 namespace optiSCAN.Services;
 
 /// <summary>Accès testable aux préférences utilisateur (remplace <see cref="UserPreferences.Current"/> direct).</summary>

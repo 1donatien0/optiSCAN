@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 namespace optiSCAN.Services
 {
     /// <summary>Résultat du contrôle signatures au démarrage (sans I/O réseau).</summary>
@@ -126,7 +127,7 @@ namespace optiSCAN.Services
                     if (need.MissingYara || need.ClamStale || need.MissingClam)
                         await rules.UpdateAsync().ConfigureAwait(false);
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Warn("SignatureUpdatePolicy", "ScheduleStartupRefreshIfStale", ex);
                 }

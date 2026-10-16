@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Security.Cryptography;
 using System.Security.Principal;
 
@@ -57,7 +58,7 @@ public static class ClamdContainerName
                 File.WriteAllText(path, name);
                 return _current = name;
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return null;
             }
@@ -88,7 +89,7 @@ public static class ClamdContainerName
             var name = File.ReadAllText(path).Trim();
             return IsValid(name) ? name : null;
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return null;
         }
@@ -103,7 +104,7 @@ public static class ClamdContainerName
             using var identity = WindowsIdentity.GetCurrent();
             return identity.IsSystem;
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return false;
         }

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO;
 using System.Runtime.Versioning;
 using System.Security.Cryptography;
@@ -74,7 +75,7 @@ namespace optiSCAN.Services
                 AppLogger.Warn("SecureStore", $"DPAPI Unprotect échoué pour {Path.GetFileName(path)}", ex);
                 return null;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("SecureStore", $"Lecture {Path.GetFileName(path)}", ex);
                 return null;
@@ -114,7 +115,7 @@ namespace optiSCAN.Services
                 AtomicFile.WriteAllBytes(path, encrypted);
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("SecureStore", $"Save {Path.GetFileName(path)}", ex);
                 return false;
@@ -154,12 +155,12 @@ namespace optiSCAN.Services
                     if (File.Exists(oldLegacy))
                         File.Delete(oldLegacy);
                 }
-                catch (Exception ex) { AppLogger.Warn("SecureStore", $"Migration cleanup {plaintextPath}", ex); }
+                catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("SecureStore", $"Migration cleanup {plaintextPath}", ex); }
 
                 AppLogger.Info("SecureStore", $"Migration {Path.GetFileName(plaintextPath)} → format sécurisé");
                 return obj;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("SecureStore", $"Migration {plaintextPath}", ex);
                 return null;
@@ -177,7 +178,7 @@ namespace optiSCAN.Services
                 var actual = Convert.FromBase64String(envelope.Hmac);
                 return CryptographicOperations.FixedTimeEquals(expected, actual);
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return false;
             }
@@ -195,7 +196,7 @@ namespace optiSCAN.Services
                     DataProtectionScope.CurrentUser);
                 return dec.Length == 32 ? dec : null;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("SecureStore", "Lecture clé HMAC DPAPI", ex);
                 return null;
@@ -224,9 +225,9 @@ namespace optiSCAN.Services
                     Directory.CreateDirectory(dir);
                 AtomicFile.WriteAllBytes(HmacKeyPath, enc);
                 try { File.SetAttributes(HmacKeyPath, FileAttributes.Hidden | FileAttributes.System); }
-                catch { /* best effort */ }
+                catch (Exception ignored) when (!ignored.IsFatal()) { /* best effort */ }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("SecureStore", "Persistance clé HMAC DPAPI", ex);
             }

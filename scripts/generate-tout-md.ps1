@@ -1,3 +1,4 @@
+﻿# SPDX-License-Identifier: GPL-3.0-or-later
 # Génère TOUT.md — export de tous les sources optiSCAN (cs, xaml).
 $ErrorActionPreference = 'Stop'
 $root = Split-Path -Parent $PSScriptRoot

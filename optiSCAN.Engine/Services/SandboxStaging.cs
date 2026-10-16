@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO;
 
 namespace optiSCAN.Services;
@@ -90,7 +91,7 @@ internal static class SandboxStaging
             }
             return batch;
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             batch.Dispose();
             throw;

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Localization;
 using optiSCAN.Models;
 using System.IO;
@@ -323,7 +324,7 @@ namespace optiSCAN.Services
                 result.Status = ScanStatus.Cancelled;
                 result.FinishedAt = DateTime.Now;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 // CORRECTION : catch vide silencieux → impossible de diagnostiquer
                 // un crash YARA (binaire manquant, règles corrompues, etc.).
@@ -401,7 +402,7 @@ namespace optiSCAN.Services
                 result.Status = ScanStatus.Cancelled;
                 result.FinishedAt = DateTime.Now;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ScanOrchestrator", $"RunYaraOnFileListAsync ({targetPath})", ex);
                 result.Status = ScanStatus.Error;
@@ -447,7 +448,7 @@ namespace optiSCAN.Services
                             if (++total >= CountCap) { total = UnknownTotalFiles; break; }
                         }
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (!ex.IsFatal())
                     {
                         AppLogger.Warn("ScanOrchestrator", $"Énumération {folderPath}", ex);
                     }
@@ -517,7 +518,7 @@ namespace optiSCAN.Services
                 result.Status = ScanStatus.Cancelled;
                 result.FinishedAt = DateTime.Now;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ScanOrchestrator", $"RunYaraOnFolderAsync ({folderPath})", ex);
                 result.Status = ScanStatus.Error;
@@ -568,7 +569,7 @@ namespace optiSCAN.Services
                 {
                     fileSize = -1;
                     try { fileSize = new FileInfo(path).Length; }
-                    catch { /* taille indisponible — non bloquant */ }
+                    catch (Exception ignored) when (!ignored.IsFatal()) { /* taille indisponible — non bloquant */ }
                     sizes[path] = fileSize;
                 }
 

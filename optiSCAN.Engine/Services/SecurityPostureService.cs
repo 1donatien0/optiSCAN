@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using Microsoft.Win32;
 using optiSCAN.Localization;
 using optiSCAN.Models;
@@ -84,7 +85,7 @@ namespace optiSCAN.Services
                     @"SOFTWARE\Microsoft\Windows\CurrentVersion\Policies\System");
                 ok = key?.GetValue("EnableLUA") is int i && i != 0;
             }
-            catch (Exception ex) { AppLogger.Warn("SecurityPosture", "UAC", ex); }
+            catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("SecurityPosture", "UAC", ex); }
 
             return new SecurityPostureCheck
             {
@@ -117,7 +118,7 @@ namespace optiSCAN.Services
             {
                 risky = ListExposedShareNames().Count > 0;
             }
-            catch (Exception ex) { AppLogger.Warn("SecurityPosture", "Shares", ex); }
+            catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("SecurityPosture", "Shares", ex); }
 
             return new SecurityPostureCheck
             {

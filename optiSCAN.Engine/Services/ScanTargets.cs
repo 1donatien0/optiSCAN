@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO;
 
 namespace optiSCAN.Services
@@ -111,7 +112,7 @@ namespace optiSCAN.Services
                         || (includeRemovable && d.DriveType == DriveType.Removable))
                         drives.Add(d.RootDirectory.FullName);
                 }
-                catch { /* lecteur en cours de remontée — on l'ignore */ }
+                catch (Exception ignored) when (!ignored.IsFatal()) { /* lecteur en cours de remontée — on l'ignore */ }
             }
             return drives;
         }

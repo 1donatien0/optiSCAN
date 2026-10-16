@@ -1,6 +1,6 @@
 # Plan de release — optiSCAN v3.1
 
-**État au 15 octobre 2026 (soir) :** candidate en préparation, assembly `3.1.0`. L'[audit 360](AUDIT_optiSCAN_360.md) note la candidate **7,4/10** (7,9 hors distribution ; 6,8 le matin) et maintient le refus d'une diffusion publique. **Seuil de publication fixé à 8,0/10.** Les contrôles en machine jetable, la signature SignPath et le premier passage CodeQL C/C++ mènent à 7,9 ; le seuil est atteint si la distribution passe ensuite à 8,0 ([section 2 de l'audit](AUDIT_optiSCAN_360.md#2-notation)). Cette version n'est pas publiée et aucun tag `v3.1.0` n'est créé.
+**État au 15 octobre 2026 (soir) :** candidate en préparation, assembly `3.1.0`. L'[audit 360](AUDIT_optiSCAN_360.md) note la candidate **7,6/10** (8,0 hors distribution ; 6,8 le matin) et maintient le refus d'une diffusion publique. **Seuil de publication fixé à 8,0/10.** Il sera atteint avec les contrôles en machine jetable, la signature SignPath et le premier passage CodeQL C/C++ ([section 2 de l'audit](AUDIT_optiSCAN_360.md#2-notation)). Cette version n'est pas publiée et aucun tag `v3.1.0` n'est créé.
 
 Ce document ne décrit que les critères de la candidate v3.1. Il s'appuie sur l'[audit 360](AUDIT_optiSCAN_360.md) et son journal archivé, en particulier le [traitement des constats E, M et F](docs/archive/AUDIT_optiSCAN_360_journal_2026-10.md#4-constats-e-m-et-f) et les [réserves ouvertes et conditions de clôture](AUDIT_optiSCAN_360.md#5-registre-des-risques-ouverts). La projection produit qui commence après cette release est dans [`ROADMAP.md`](ROADMAP.md).
 
@@ -32,11 +32,11 @@ M19 reste ouvert jusqu'au premier passage CodeQL C/C++ réussi sur GitHub. Les a
 
 ## 3. Décision de publication
 
-**Bêta fermée** (testeurs informés, exclusion Defender du dossier d'installation documentée) : la suite d'avant la séparation du moteur est verte (715/715 le matin) ; celle d'après est encore à rejouer. Elle attend aussi les contrôles en machine jetable ci-dessus. **Release publique** : en plus, signature SignPath, faux positif levé auprès de Microsoft et premier passage CodeQL C/C++. Détail et risques : [audit 360, sections 3 et 5](AUDIT_optiSCAN_360.md#3-décision-de-release). Note en vigueur : **7,4/10** (7,9 hors distribution) ; seuil de publication : **8,0/10**.
+**Bêta fermée** (testeurs informés, exclusion Defender du dossier d'installation documentée) : la suite Windows passe et la candidate est sur `dev`. Elle attend les contrôles sur machine virtuelle ci-dessus. **Release publique** : en plus, signature Authenticode, faux positif levé auprès de Microsoft et premier passage CodeQL C/C++. Détail et risques : [audit 360, sections 3 et 5](AUDIT_optiSCAN_360.md#3-décision-de-release). Note en vigueur : **7,6/10** ; seuil de publication : **8,0/10**.
 
 
 La release `v3.1` ne sera prête qu'après les validations bloquantes, la relecture finale des commits locaux et la vérification des artefacts. Le tag `v3.1.0` et l'envoi vers le dépôt distant viendront ensuite, après décision explicite de publication. Jusqu'à cette étape, `3.1.0` désigne une candidate locale, pas une version distribuée.
 
 ## 4. Hors périmètre de cette candidate
 
-AMSI et le minifiltre restent des prototypes non livrés. Leur intégration demanderait une implémentation, une revue de sécurité, une chaîne de signature et des validations Windows propres ; ils ne font pas partie des critères implicites de la v3.1.
+Le fournisseur AMSI est livré en 3.1 avec le service (compilé et exigé par la CI, enregistré par l'installeur, signé par SignPath, tests `AmsiScanBufferTests` et `AmsiProviderNativeTests`). Le minifiltre reste hors v3.1 : c'est un pilote noyau qui exige la signature de Microsoft (Partner Center, certificat EV) ; prérequis dans `native/optiSCAN.Minifilter/README.md`.

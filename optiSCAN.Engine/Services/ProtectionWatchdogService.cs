@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.Versioning;
@@ -65,7 +66,7 @@ namespace optiSCAN.Services
                     AppLogger.Info("TamperProtection", "Tâche watchdog enregistrée");
                 return ok;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("TamperProtection", "EnsureWatchdogTask", ex);
                 return false;
@@ -90,7 +91,7 @@ namespace optiSCAN.Services
                 proc?.WaitForExit(10_000);
                 return true;
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return false;
             }
@@ -137,7 +138,7 @@ namespace optiSCAN.Services
                 Process.Start(psi);
                 AppLogger.Info("TamperProtection", "Watchdog — relance session garde");
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("TamperProtection", "RunWatchdogCheck", ex);
             }

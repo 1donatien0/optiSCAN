@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Diagnostics;
 using System.Globalization;
 using System.IO;
@@ -144,7 +145,7 @@ namespace optiSCAN.Services
                         var relay = _relay;
                         _brokerTask = Task.Run(() => ClamdBroker.ServeAsync(userPipe, sid, () => channel.OpenData(relay), token));
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (!ex.IsFatal())
                     {
                         AppLogger.Warn("ClamdHost", "Démarrage clamd", ex);
                         StopProcessLocked();
@@ -216,7 +217,7 @@ namespace optiSCAN.Services
                 return image != null
                     && string.Equals(Path.GetFullPath(image), Path.GetFullPath(_clamdExe), StringComparison.OrdinalIgnoreCase);
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 port = 0;
                 pipe = string.Empty;
@@ -245,7 +246,7 @@ namespace optiSCAN.Services
                 using var client = ClamdClient.ForPipe(pipeName, connectTimeoutMs: 300);
                 return await client.PingAsync(ct).ConfigureAwait(false);
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return false;
             }
@@ -275,7 +276,7 @@ namespace optiSCAN.Services
                 proc.Kill(entireProcessTree: true);
                 proc.WaitForExit(3000);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Debug("ClamdHost", "Ancien clamd non arrêté : " + ex.Message);
             }
@@ -285,7 +286,7 @@ namespace optiSCAN.Services
         {
             try
             {
-                try { _brokerStop?.Cancel(); } catch { /* déjà libéré */ }
+                try { _brokerStop?.Cancel(); } catch (Exception ignored) when (!ignored.IsFatal()) { /* déjà libéré */ }
                 if (_relay is { HasExited: false })
                 {
                     _relay.Kill(entireProcessTree: true);
@@ -297,14 +298,14 @@ namespace optiSCAN.Services
                     _process.WaitForExit(3000);
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ClamdHost", "Arrêt clamd", ex);
             }
             finally
             {
-                try { _brokerTask?.Wait(1000); } catch { /* arrêt du courtier */ }
-                try { _brokerStop?.Dispose(); } catch { /* ignore */ }
+                try { _brokerTask?.Wait(1000); } catch (Exception ignored) when (!ignored.IsFatal()) { /* arrêt du courtier */ }
+                try { _brokerStop?.Dispose(); } catch (Exception ignored) when (!ignored.IsFatal()) { /* ignore */ }
                 _brokerStop = null;
                 _brokerTask = null;
                 if (_relay != null)

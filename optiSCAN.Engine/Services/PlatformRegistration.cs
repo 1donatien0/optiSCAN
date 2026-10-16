@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Diagnostics;
 using System.IO;
 using System.Runtime.Versioning;
@@ -13,7 +14,7 @@ public static class PlatformRegistration
 
     public static void TryRegisterAmsiProvider()
     {
-        AppLogger.Info("PlatformRegistration", "AMSI non enregistré : le fournisseur n'est pas signé et n'est pas chargé");
+        AppLogger.Info("PlatformRegistration", "AMSI : enregistré par l'installeur avec le service (optiSCAN.AmsiProvider.dll, DllRegisterServer)");
     }
 
     /// <summary>
@@ -31,7 +32,7 @@ public static class PlatformRegistration
             parent.DeleteSubKey(AmsiProviderGuid, throwOnMissingSubKey: false);
             AppLogger.Info("PlatformRegistration", "Fournisseur AMSI désenregistré");
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("PlatformRegistration", "TryUnregisterAmsiProvider", ex);
         }
@@ -45,7 +46,7 @@ public static class PlatformRegistration
     public static void TryUnloadMinifilter()
     {
         try { RunProcess(SystemExecutables.System32("fltmc.exe"), "unload optiSCANMinifilter"); }
-        catch (Exception ex) { AppLogger.Debug("PlatformRegistration", $"TryUnloadMinifilter: {ex.Message}"); }
+        catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Debug("PlatformRegistration", $"TryUnloadMinifilter: {ex.Message}"); }
     }
 
     private static void RunProcess(string file, string args)

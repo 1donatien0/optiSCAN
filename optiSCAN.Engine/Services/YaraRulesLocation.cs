@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO;
 
 namespace optiSCAN.Services;
@@ -42,7 +43,7 @@ internal static class YaraRulesLocation
                     File.Copy(file, dest, overwrite: false);
             }
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("YaraRules", "Copie initiale des règles", ex);
         }

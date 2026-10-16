@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Runtime.InteropServices;
 using System.Security.AccessControl;
 using System.Security.Principal;
@@ -53,7 +54,7 @@ public static class OptiScanProgramData
             Volatile.Write(ref _claimed, 1);
             return true;
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return false;
         }
@@ -75,7 +76,7 @@ public static class OptiScanProgramData
             var admins = new SecurityIdentifier(WellKnownSidType.BuiltinAdministratorsSid, null);
             return owner.Equals(system) || owner.Equals(admins);
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return false;
         }
@@ -124,7 +125,7 @@ public static class OptiScanProgramData
         {
             entries = Directory.EnumerateFileSystemEntries(directory).ToList();
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return false;
         }
@@ -141,7 +142,7 @@ public static class OptiScanProgramData
                 if (!NormalizeEntry(entry, purge, level, ref visited))
                     complete = false;
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 complete = false;
             }
@@ -223,7 +224,7 @@ public static class OptiScanProgramData
                 return false;
             return IsTrustedEntry(path, isDirectory: false);
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return false;
         }
@@ -271,7 +272,7 @@ public static class OptiScanProgramData
                 return false;
             return IsTrustedSecurity(new FileInfo(path).GetAccessControl(), allowAppContainer: false);
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return false;
         }
@@ -346,7 +347,7 @@ public static class OptiScanProgramData
                 return null;
             return new SecurityIdentifier(sid);
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return null;
         }
@@ -432,7 +433,7 @@ public static class OptiScanProgramData
             info.SetAccessControl(security);
             return true;
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return false;
         }

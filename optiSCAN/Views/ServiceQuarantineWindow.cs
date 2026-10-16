@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Localization;
 using optiSCAN.Platform;
 using optiSCAN.Services;
@@ -169,7 +170,7 @@ namespace optiSCAN.Views
                     ? LocalizationService.Format("SvcQ_StatusTruncated", _items.Count, total)
                     : LocalizationService.Format("SvcQ_Status", total, ServiceQuarantineFormatting.FormatBytes(response.TotalBytes ?? 0));
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ServiceQuarantineWindow", "Liste", ex);
                 _status.Text = LocalizationService.GetString("SvcQ_Unreachable");
@@ -213,7 +214,7 @@ namespace optiSCAN.Views
                     if (!response.Ok)
                         break;
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Warn("ServiceQuarantineWindow", "Restauration", ex);
                     _status.Text = LocalizationService.GetString("SvcQ_Unreachable");
@@ -248,7 +249,7 @@ namespace optiSCAN.Views
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ServiceQuarantineWindow", "Suppression", ex);
                 _status.Text = LocalizationService.GetString("SvcQ_Unreachable");
@@ -271,7 +272,7 @@ namespace optiSCAN.Views
                 if (!response.Ok)
                     _status.Text = LocalizationService.Format("SvcQ_Error", response.Message ?? string.Empty);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ServiceQuarantineWindow", "Purge", ex);
                 _status.Text = LocalizationService.GetString("SvcQ_Unreachable");

@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Diagnostics;
 using System.Reflection;
 using System.Runtime.Versioning;
@@ -39,7 +40,7 @@ namespace optiSCAN.Services
                 var principal = new WindowsPrincipal(identity);
                 return principal.IsInRole(WindowsBuiltInRole.Administrator);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ElevationHelper", "IsRunningElevated", ex);
                 return false;
@@ -76,7 +77,7 @@ namespace optiSCAN.Services
                 }
                 return false;
             }
-            catch { return false; }
+            catch (Exception ignored) when (!ignored.IsFatal()) { return false; }
         }
 
         /// <summary>
@@ -115,7 +116,7 @@ namespace optiSCAN.Services
                 AppLogger.Info("ElevationHelper", "Élévation refusée par l'utilisateur");
                 return false;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Error("ElevationHelper", "RelaunchElevated", ex);
                 return false;

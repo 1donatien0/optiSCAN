@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 namespace optiSCAN.Tests;
 
 public sealed class WindowsUpdateTimeParserTests

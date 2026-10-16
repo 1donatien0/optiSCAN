@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO.Pipes;
 using System.Security.AccessControl;
 using System.Security.Principal;

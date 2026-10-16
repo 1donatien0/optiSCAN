@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Platform;
 using System.IO;
 using System.IO.Pipes;
@@ -18,8 +19,17 @@ public sealed class ProtectionPipeServer : IDisposable
     // un buffer base64 ne peut donc pas dépasser cette taille. La borne est alignée dessus.
     internal const int MaxScanBufferBase64Length = ProtectionPipeJsonFraming.DefaultMaxBytes;
 
-    /// <summary><c>scan_buffer</c> : fermé tant que le fournisseur AMSI n'est pas livré.</summary>
-    internal static readonly bool ScanBufferEnabled = false;
+    /// <summary>
+    /// Contenu brut maximal d'un <c>scan_buffer</c> : le fournisseur AMSI n'envoie que les
+    /// 512 premiers Kio. 640 Kio en base64 restent sous le cadrage JSON de 1 Mo.
+    /// </summary>
+    internal const int MaxScanBufferBytes = 640 * 1024;
+
+    /// <summary>Résultats de <c>scan_buffer</c> gardés en mémoire (empreinte SHA-256 du contenu).</summary>
+    internal const int ScanBufferCacheCapacity = 4096;
+
+    /// <summary>Durée d'un résultat en cache : une mise à jour des signatures s'applique au plus tard après.</summary>
+    internal static readonly TimeSpan ScanBufferCacheLifetime = TimeSpan.FromMinutes(10);
 
     /// <summary>Sérialise le contrôle et l'écriture de <c>set_policy</c>.</summary>
     private static readonly object PolicyGate = new();
@@ -37,6 +47,10 @@ public sealed class ProtectionPipeServer : IDisposable
     private readonly Action? _onShutdown;
     private readonly ServiceQuarantineAdmin? _quarantineAdmin;
     private readonly bool _scanPathEnabled;
+    private readonly bool _scanBufferEnabled;
+    private readonly IpcScanRateLimiter _bufferRateLimiter = new(maxPerMinute: 1200, maxConcurrent: 6);
+    private readonly Dictionary<string, IpcScanRateLimiter> _bufferLimitersByAccount = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (DateTime At, ProtectionPipeResponse Response)> _bufferCache = new(StringComparer.Ordinal);
     private readonly ServiceDetectionLog? _detections;
     private readonly Func<int?>? _realTimeDegradedFolders;
     private string? _shutdownToken;
@@ -52,8 +66,12 @@ public sealed class ProtectionPipeServer : IDisposable
         QuarantineManager? serviceQuarantine = null,
         bool enableScanPath = false,
         ServiceDetectionLog? detections = null,
-        Func<int?>? realTimeDegradedFolders = null)
+        Func<int?>? realTimeDegradedFolders = null,
+        bool enableScanBuffer = false)
     {
+        // scan_buffer : client unique, le fournisseur AMSI (natif, signé avec le reste). Ouverte
+        // par l'hôte du service ; débit propre, contenu borné, résultats en cache.
+        _scanBufferEnabled = enableScanBuffer;
         _detections = detections;
         _realTimeDegradedFolders = realTimeDegradedFolders;
         // scan_path : aucun client livré ne l'appelle (l'interface scanne elle-même, AMSI n'est pas
@@ -75,7 +93,7 @@ public sealed class ProtectionPipeServer : IDisposable
 
         _shutdownToken = _shutdownTokenOverride ?? ProtectionPipeShutdownToken.Generate();
         try { ProtectionPipeShutdownToken.Persist(_shutdownToken); }
-        catch (Exception ex) { AppLogger.Warn("ProtectionPipeServer", "Persist shutdown token", ex); }
+        catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("ProtectionPipeServer", "Persist shutdown token", ex); }
 
         _cts = new CancellationTokenSource();
         _listenTask = Task.Run(() => ListenLoopAsync(_cts.Token));
@@ -116,7 +134,7 @@ public sealed class ProtectionPipeServer : IDisposable
                 pipe = ProtectionPipeAcl.CreateListeningStream(_pipeName, first);
                 first = false;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 // Nom pris par un autre processus, ou ressource momentanément refusée :
                 // réessayer plutôt que d'abandonner l'IPC jusqu'à la prochaine relance.
@@ -139,7 +157,7 @@ public sealed class ProtectionPipeServer : IDisposable
                 await DisposePipeAsync(pipe).ConfigureAwait(false);
                 break;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ProtectionPipeServer", "ListenLoop", ex);
                 await DisposePipeAsync(pipe).ConfigureAwait(false);
@@ -167,7 +185,7 @@ public sealed class ProtectionPipeServer : IDisposable
         }
 
         try { await Task.WhenAll(inflight).ConfigureAwait(false); }
-        catch (Exception ex) { AppLogger.Debug("ProtectionPipeServer", $"Fin d'écoute : {ex.Message}"); }
+        catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Debug("ProtectionPipeServer", $"Fin d'écoute : {ex.Message}"); }
     }
 
     private async Task HandleAndDisposeAsync(NamedPipeServerStream pipe, string account, CancellationToken ct)
@@ -193,7 +211,7 @@ public sealed class ProtectionPipeServer : IDisposable
             deadline.CancelAfter(TimeSpan.FromSeconds(1));
             await pipe.WriteAsync(busy, deadline.Token).ConfigureAwait(false);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Debug("ProtectionPipeServer", "Refus client occupé : " + ex.Message);
         }
@@ -207,7 +225,8 @@ public sealed class ProtectionPipeServer : IDisposable
     internal const int MaxConcurrentClients = 16;
 
     /// <summary>Un compte (hors SYSTEM) ne peut occuper que ces places à la fois.</summary>
-    internal const int MaxConcurrentPerAccount = 2;
+    // 4 : plusieurs processus du même compte (PowerShell, hôtes de scripts) consultent AMSI en parallèle.
+    internal const int MaxConcurrentPerAccount = 4;
 
     private readonly Dictionary<string, int> _slotsByAccount = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IpcScanRateLimiter> _limitersByAccount = new(StringComparer.Ordinal);
@@ -262,7 +281,7 @@ public sealed class ProtectionPipeServer : IDisposable
             if (pipe.IsConnected)
                 pipe.Disconnect();
         }
-        catch (Exception ex) { AppLogger.Debug("ProtectionPipeServer", $"Pipe disconnect: {ex.Message}"); }
+        catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Debug("ProtectionPipeServer", $"Pipe disconnect: {ex.Message}"); }
         await pipe.DisposeAsync().ConfigureAwait(false);
     }
 
@@ -286,7 +305,7 @@ public sealed class ProtectionPipeServer : IDisposable
                 : NamedPipeClientAccess.GetImpersonatedClientSid(pipe) ?? NamedPipeClientAccess.UnknownAccount;
             response = Dispatch(request, pipe, verified);
         }
-        catch (Exception ex)
+        catch (Exception ex) when (!ex.IsFatal())
         {
             AppLogger.Warn("ProtectionPipeServer", "Requête IPC", ex);
             response = ProtectionPipeResponse.Error("Requête refusée");
@@ -364,7 +383,7 @@ public sealed class ProtectionPipeServer : IDisposable
                     return ProtectionPipeResponse.Error("Chemin invalide");
                 string fullPath;
                 try { fullPath = Path.GetFullPath(request.Path); }
-                catch { return ProtectionPipeResponse.Error("Chemin invalide"); }
+                catch (Exception ignored) when (!ignored.IsFatal()) { return ProtectionPipeResponse.Error("Chemin invalide"); }
                 if (QuarantineManager.IsSensitivePath(fullPath))
                     return ProtectionPipeResponse.Error("Chemin refusé");
                 // Aucun accès au chemin avec les droits du service (pas même File.Exists) :
@@ -372,17 +391,13 @@ public sealed class ProtectionPipeServer : IDisposable
                 return ExecuteScanWithRateLimit(account, () => ScanClientFile(pipe, fullPath));
 
             case ProtectionPipeOperations.ScanBuffer:
-                // Seul le fournisseur AMSI l'utilisait, et il n'est pas livré (audit N3) : l'opération
-                // restait ouverte à tout compte authentifié sans aucun client. Fermée tant qu'AMSI
-                // n'est pas réintégré avec sa propre revue.
-                if (!ScanBufferEnabled)
+                if (!_scanBufferEnabled)
                     return ProtectionPipeResponse.Error("Opération non disponible");
                 if (string.IsNullOrWhiteSpace(request.BufferBase64))
                     return ProtectionPipeResponse.Error("Buffer vide");
                 if (request.BufferBase64.Length > MaxScanBufferBase64Length)
                     return ProtectionPipeResponse.Error("Buffer trop volumineux");
-                return ExecuteScanWithRateLimit(account, () =>
-                    ScanBuffer(request.BufferBase64, request.ContentName ?? "amsi_buffer"));
+                return ScanBufferRequest(account, request.BufferBase64, request.ContentName);
 
             case ProtectionPipeOperations.RecentDetections:
             {
@@ -394,7 +409,7 @@ public sealed class ProtectionPipeServer : IDisposable
                     items = items.GetRange(items.Count - 100, 100);
                 int? degraded = null;
                 try { degraded = _realTimeDegradedFolders?.Invoke(); }
-                catch (Exception ex) { AppLogger.Debug("ProtectionPipeServer", "Santé du temps réel : " + ex.Message); }
+                catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Debug("ProtectionPipeServer", "Santé du temps réel : " + ex.Message); }
                 return new ProtectionPipeResponse
                 {
                     Ok = true,
@@ -493,9 +508,146 @@ public sealed class ProtectionPipeServer : IDisposable
         return ProtectionPipeResponse.SuccessClean();
     }
 
-    private ProtectionPipeResponse ScanBuffer(string bufferBase64, string contentName)
+    /// <summary>
+    /// Analyse d'un contenu transmis par le fournisseur AMSI. Un résultat récent pour le même
+    /// contenu est rendu sans nouvelle analyse (PowerShell soumet souvent les mêmes blocs).
+    /// Toute erreur rend <c>ok=false</c> : le fournisseur laisse alors passer le contenu.
+    /// </summary>
+    private ProtectionPipeResponse ScanBufferRequest(string account, string bufferBase64, string? contentName)
     {
-        var bytes = Convert.FromBase64String(bufferBase64);
+        byte[] bytes;
+        try { bytes = Convert.FromBase64String(bufferBase64); }
+        catch (FormatException) { return ProtectionPipeResponse.Error("Buffer invalide"); }
+        if (bytes.Length == 0)
+            return ProtectionPipeResponse.Error("Buffer vide");
+        if (bytes.Length > MaxScanBufferBytes)
+            return ProtectionPipeResponse.Error("Buffer trop volumineux");
+
+        var name = AmsiContentName(contentName);
+        bytes = NormalizeAmsiText(bytes);
+        var key = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes)) + "|" + Path.GetExtension(name);
+        if (TryGetCachedBufferResult(key, out var cached))
+            return cached;
+
+        var exempt = account is NamedPipeClientAccess.SystemAccount or NamedPipeClientAccess.SelfAccount;
+        IDisposable? accountLease = null;
+        if (!exempt && !BufferLimiterFor(account).TryEnter(out accountLease))
+            return ProtectionPipeResponse.Error("Limite de débit atteinte");
+
+        using (accountLease)
+        {
+            if (!_bufferRateLimiter.TryEnter(out var lease))
+                return ProtectionPipeResponse.Error("Limite de débit atteinte");
+
+            using (lease)
+            {
+                var response = ScanBuffer(bytes, name);
+                if (response.Ok && !response.Incomplete)
+                    StoreBufferResult(key, response);
+                if (response.Ok && !response.Clean)
+                    AppLogger.Warn("ProtectionPipeServer", "AMSI : contenu bloqué (" + response.ThreatName + ", " + name + ", compte " + account + ")");
+                return response;
+            }
+        }
+    }
+
+    /// <summary>
+    /// PowerShell et les hôtes de scripts soumettent leur texte en UTF-16LE. Les signatures ClamAV
+    /// et la plupart des règles YARA visent le texte ASCII/UTF-8 : un contenu reconnu comme
+    /// UTF-16LE (BOM, ou un octet nul sur deux) est analysé en UTF-8. Tout autre contenu est
+    /// analysé tel quel.
+    /// </summary>
+    internal static byte[] NormalizeAmsiText(byte[] bytes)
+    {
+        if (bytes.Length < 4 || bytes.Length % 2 != 0)
+            return bytes;
+        var start = 0;
+        if (bytes[0] == 0xFF && bytes[1] == 0xFE)
+            start = 2;
+        else
+        {
+            var sample = Math.Min(bytes.Length, 512);
+            int zeroOdd = 0, zeroEven = 0;
+            for (var i = 0; i < sample; i += 2)
+            {
+                if (bytes[i + 1] == 0) zeroOdd++;
+                if (bytes[i] == 0) zeroEven++;
+            }
+            var pairs = sample / 2;
+            if (zeroOdd < pairs * 0.6 || zeroEven > pairs * 0.1)
+                return bytes;
+        }
+        try
+        {
+            var text = new System.Text.UnicodeEncoding(bigEndian: false, byteOrderMark: false, throwOnInvalidBytes: true)
+                .GetString(bytes, start, bytes.Length - start);
+            return System.Text.Encoding.UTF8.GetBytes(text);
+        }
+        catch (ArgumentException)
+        {
+            return bytes;
+        }
+    }
+
+    /// <summary>Nom de la copie : seules les extensions envoyées par le fournisseur sont gardées.</summary>
+    internal static string AmsiContentName(string? requested) =>
+        Path.GetExtension(requested ?? string.Empty).ToLowerInvariant() switch
+        {
+            ".ps1" => "amsi_content.ps1",
+            ".js" => "amsi_content.js",
+            ".vbs" => "amsi_content.vbs",
+            ".vba" => "amsi_content.vba",
+            ".bin" => "amsi_content.bin",
+            _ => "amsi_content.txt",
+        };
+
+    private bool TryGetCachedBufferResult(string key, out ProtectionPipeResponse response)
+    {
+        lock (_bufferCache)
+        {
+            if (_bufferCache.TryGetValue(key, out var entry) && DateTime.UtcNow - entry.At < ScanBufferCacheLifetime)
+            {
+                response = entry.Response;
+                return true;
+            }
+        }
+        response = null!;
+        return false;
+    }
+
+    private void StoreBufferResult(string key, ProtectionPipeResponse response)
+    {
+        lock (_bufferCache)
+        {
+            if (_bufferCache.Count >= ScanBufferCacheCapacity)
+            {
+                var now = DateTime.UtcNow;
+                foreach (var stale in _bufferCache.Where(e => now - e.Value.At >= ScanBufferCacheLifetime).Select(e => e.Key).ToList())
+                    _bufferCache.Remove(stale);
+                if (_bufferCache.Count >= ScanBufferCacheCapacity)
+                    _bufferCache.Clear();
+            }
+            _bufferCache[key] = (DateTime.UtcNow, response);
+        }
+    }
+
+    /// <summary>Débit AMSI par compte : PowerShell soumet un bloc par commande.</summary>
+    private IpcScanRateLimiter BufferLimiterFor(string account)
+    {
+        lock (_bufferLimitersByAccount)
+        {
+            if (!_bufferLimitersByAccount.TryGetValue(account, out var limiter))
+            {
+                limiter = new IpcScanRateLimiter(maxPerMinute: 600, maxConcurrent: 3);
+                _bufferLimitersByAccount[account] = limiter;
+            }
+
+            return limiter;
+        }
+    }
+
+    private ProtectionPipeResponse ScanBuffer(byte[] bytes, string contentName)
+    {
         try
         {
             using var source = new MemoryStream(bytes, writable: false);

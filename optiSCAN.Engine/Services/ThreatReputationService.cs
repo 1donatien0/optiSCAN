@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Collections.Concurrent;
 using System.Net.Http;
 using System.Net.Http.Headers;
@@ -102,7 +103,7 @@ namespace optiSCAN.Services
                 Cache[hash] = (result, DateTime.UtcNow.Add(CacheTtl));
                 return result;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("ThreatReputation", "Lookup", ex);
                 return new ReputationResult

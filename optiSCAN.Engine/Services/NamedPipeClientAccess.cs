@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO;
 using System.IO.Pipes;
 using System.Runtime.InteropServices;
@@ -75,7 +76,7 @@ internal static class NamedPipeClientAccess
                     return WindowsIdentity.RunImpersonated(impersonationToken, () => TryOpen(fullPath));
             }
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             // Le processus a pu quitter ou son jeton n'est plus accessible.
             return null;
@@ -118,7 +119,7 @@ internal static class NamedPipeClientAccess
             // Refuser les écritures ou remplacements concurrents pendant la copie de staging.
             return new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return null;
         }
@@ -154,7 +155,7 @@ internal static class NamedPipeClientAccess
                 CloseHandle(token);
             }
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return UnknownAccount;
         }
@@ -177,7 +178,7 @@ internal static class NamedPipeClientAccess
             using var identity = WindowsIdentity.GetCurrent(TokenAccessLevels.Query);
             return identity.User?.Value;
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return null;
         }
@@ -272,7 +273,7 @@ internal static class NamedPipeClientAccess
 
             return new WindowsPrincipal(identity).IsInRole(WindowsBuiltInRole.Administrator);
         }
-        catch
+        catch (Exception ignored) when (!ignored.IsFatal())
         {
             return false;
         }

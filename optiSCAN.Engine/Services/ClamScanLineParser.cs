@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Models;
 using System.Globalization;
 using System.IO;
@@ -47,7 +48,7 @@ namespace optiSCAN.Services
 
                 long fileSize = -1;
                 try { fileSize = new FileInfo(filePath).Length; }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Warn("ClamScanLineParser", $"Taille fichier indisponible : {filePath}", ex);
                 }

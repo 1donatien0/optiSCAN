@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using optiSCAN.Localization;
 using optiSCAN.Models;
 using System.IO;
@@ -161,7 +162,7 @@ namespace optiSCAN.Services
                     entries = new DirectoryInfo(directory).EnumerateFileSystemInfos("*", options);
                     enumerator = entries.GetEnumerator();
                 }
-                catch
+                catch (Exception ignored) when (!ignored.IsFatal())
                 {
                     onUnscanned?.Invoke(directory);
                     continue;
@@ -178,7 +179,7 @@ namespace optiSCAN.Services
                                 break;
                             entry = enumerator.Current;
                         }
-                        catch
+                        catch (Exception ignored) when (!ignored.IsFatal())
                         {
                             onUnscanned?.Invoke(directory);
                             break;
@@ -186,7 +187,7 @@ namespace optiSCAN.Services
 
                         FileAttributes attributes;
                         try { attributes = entry.Attributes; }
-                        catch
+                        catch (Exception ignored) when (!ignored.IsFatal())
                         {
                             onUnscanned?.Invoke(entry.FullName);
                             continue;
@@ -240,7 +241,7 @@ namespace optiSCAN.Services
             {
                 return entry.LinkTarget == null;
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return false;
             }
@@ -462,7 +463,7 @@ namespace optiSCAN.Services
                 result.Status = ScanStatus.Cancelled;
                 result.FinishedAt = DateTime.Now;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 result.Status = ScanStatus.Error;
                 result.ErrorMessage = ex.Message;

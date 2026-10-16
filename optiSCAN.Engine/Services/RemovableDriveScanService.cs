@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.IO;
 using System.Management;
 using System.Runtime.Versioning;
@@ -119,7 +120,7 @@ namespace optiSCAN.Services
                 _volumeWatcher.EventArrived += (_, e) => OnVolumeChange(e);
                 _volumeWatcher.Start();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("RemovableDriveScan", "WMI Win32_VolumeChangeEvent indisponible — repli sur polling.", ex);
             }
@@ -149,7 +150,7 @@ namespace optiSCAN.Services
                 if (eventType == WmiDeviceArrival)
                     _ = ScheduleScanNewDrivesAsync();
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("RemovableDriveScan", "OnVolumeChange", ex);
             }
@@ -181,7 +182,7 @@ namespace optiSCAN.Services
                 foreach (var root in claimed)
                     await ScanRootIfEligibleAsync(root).ConfigureAwait(false);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("RemovableDriveScan", "ScheduleScanNewDrivesAsync", ex);
             }
@@ -255,7 +256,7 @@ namespace optiSCAN.Services
                 {
                     AppLogger.Warn("RemovableDriveScan", $"Analyse {root} annulée (délai dépassé).");
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Error("RemovableDriveScan", $"Échec scan {root}", ex);
                 }
@@ -378,7 +379,7 @@ namespace optiSCAN.Services
                 ScanStatusChanged?.Invoke(this, new RemovableDriveScanStatusEventArgs(
                     phase, root, driveLabel, threatsFound, filesScanned));
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("RemovableDriveScan", "ScanStatusChanged", ex);
             }
@@ -474,7 +475,7 @@ namespace optiSCAN.Services
                 drive = new DriveInfo(letter);
                 return drive.IsReady && IsEligibleForAutoScan(drive);
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return false;
             }
@@ -492,7 +493,7 @@ namespace optiSCAN.Services
                     return $"{letter} ({drive.VolumeLabel})";
                 return letter;
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return root.TrimEnd('\\');
             }
@@ -518,7 +519,7 @@ namespace optiSCAN.Services
                     subDirs = Directory.EnumerateDirectories(dir);
                     files = Directory.EnumerateFiles(dir);
                 }
-                catch
+                catch (Exception ignored) when (!ignored.IsFatal())
                 {
                     continue;
                 }
@@ -530,7 +531,7 @@ namespace optiSCAN.Services
                         if ((File.GetAttributes(sub) & FileAttributes.ReparsePoint) != 0)
                             continue;
                     }
-                    catch { continue; }
+                    catch (Exception ignored) when (!ignored.IsFatal()) { continue; }
                     stack.Push(sub);
                 }
 
@@ -581,7 +582,7 @@ namespace optiSCAN.Services
                 // illisible n'interrompt pas le parcours.
                 candidates = Directory.EnumerateFiles(root, "*", SafeDirectoryCleaner.WithoutLinks);
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return new List<string>();
             }
@@ -661,7 +662,7 @@ namespace optiSCAN.Services
                         return true;
                 }
             }
-            catch { /* ignore */ }
+            catch (Exception ignored) when (!ignored.IsFatal()) { /* ignore */ }
             return false;
         }
 
@@ -706,7 +707,7 @@ namespace optiSCAN.Services
                     }
                 }
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("RemovableDriveDiscovery", $"WMI lecteur {deviceId}", ex);
             }
@@ -726,7 +727,7 @@ namespace optiSCAN.Services
                     root += '\\';
                 return true;
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 return false;
             }

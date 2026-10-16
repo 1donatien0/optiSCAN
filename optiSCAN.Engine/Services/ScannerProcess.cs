@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using System.Diagnostics;
 using System.IO;
 using System.Security.Principal;
@@ -169,7 +170,7 @@ internal abstract class ScannerProcess : IDisposable
                 process.BeginOutputReadLine();
                 process.BeginErrorReadLine();
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 process.Dispose();
                 throw;

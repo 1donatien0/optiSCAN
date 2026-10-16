@@ -1,3 +1,4 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
 using Microsoft.Win32;
 using System.Diagnostics;
 using System.Globalization;
@@ -65,7 +66,7 @@ namespace optiSCAN.Services
                 p?.WaitForExit(15000);
                 return p is { ExitCode: 0 };
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("SystemTweaksService", "powercfg /setactive", ex);
                 return false;
@@ -92,7 +93,7 @@ namespace optiSCAN.Services
                 p.WaitForExit(15000);
                 return ParsePowerPlanGuid(output);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("SystemTweaksService", "powercfg /getactivescheme", ex);
                 return null;
@@ -141,7 +142,7 @@ namespace optiSCAN.Services
                         || original.Key.EndsWith(@"\Search", StringComparison.OrdinalIgnoreCase))
                         explorerRestartNeeded = true;
                 }
-                catch (Exception ex)
+                catch (Exception ex) when (!ex.IsFatal())
                 {
                     ok = false;
                     remaining.Registry.Add(original);
@@ -177,7 +178,7 @@ namespace optiSCAN.Services
                 p?.WaitForExit(15000);
                 return p is { ExitCode: 0 };
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("SystemTweaksService", "powercfg /setactive (rétablissement)", ex);
                 return false;
@@ -201,7 +202,7 @@ namespace optiSCAN.Services
                     "VisualFXSetting", 2);
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("SystemTweaksService", "VisualFXSetting", ex);
                 return false;
@@ -221,7 +222,7 @@ namespace optiSCAN.Services
                 });
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("SystemTweaksService", "taskmgr /startup", ex);
                 return false;
@@ -239,7 +240,7 @@ namespace optiSCAN.Services
                     "Enabled", 0);
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("SystemTweaksService", "AdvertisingInfo", ex);
                 return false;
@@ -263,7 +264,7 @@ namespace optiSCAN.Services
                     SetHkcuValue(cdm, n, 0);
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("SystemTweaksService", "ContentDeliveryManager", ex);
                 return false;
@@ -279,7 +280,7 @@ namespace optiSCAN.Services
                     "TailoredExperiencesWithDiagnosticDataEnabled", 0);
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("SystemTweaksService", "TailoredExperiences", ex);
                 return false;
@@ -303,7 +304,7 @@ namespace optiSCAN.Services
                     "SearchboxTaskbarMode", 1);
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("SystemTweaksService", "SearchboxTaskbarMode", ex);
                 return false;
@@ -318,7 +319,7 @@ namespace optiSCAN.Services
                     name, value);
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("SystemTweaksService", $"Explorer\\Advanced {name}", ex);
                 return false;
@@ -337,7 +338,7 @@ namespace optiSCAN.Services
                 foreach (var p in Process.GetProcessesByName("explorer"))
                 {
                     try { p.Kill(); }
-                    catch (Exception ex) { AppLogger.Warn("SystemTweaksService", "Kill explorer", ex); }
+                    catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Warn("SystemTweaksService", "Kill explorer", ex); }
                     finally { p.Dispose(); }
                 }
 
@@ -354,7 +355,7 @@ namespace optiSCAN.Services
                     }
                 });
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("SystemTweaksService", "RestartExplorer", ex);
             }
@@ -362,18 +363,15 @@ namespace optiSCAN.Services
 
         // ── Réseau ───────────────────────────────────────────────────────────
 
-        [DllImport("dnsapi.dll", EntryPoint = "DnsFlushResolverCache", SetLastError = false)]
-        private static extern uint DnsFlushResolverCache();
-
         /// <summary>Vide le cache DNS (sans élévation, via dnsapi.dll).</summary>
         public static bool FlushDnsCache()
         {
             try
             {
-                DnsFlushResolverCache();
+                optiSCAN.Native.NativeMethods.DnsFlushResolverCache();
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("SystemTweaksService", "DnsFlushResolverCache", ex);
                 return false;
@@ -469,7 +467,7 @@ namespace optiSCAN.Services
                 if (File.Exists(script) && (File.GetAttributes(script) & FileAttributes.ReparsePoint) == 0)
                     File.Delete(script);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("SystemTweaks", "Suppression du script Defender refusée", ex);
             }
@@ -479,7 +477,7 @@ namespace optiSCAN.Services
                 // Sans effet si la tâche n'existe pas.
                 RunCaptured("schtasks.exe", "/Delete /F /TN \"" + ClearDefenderHistoryTaskName + "\"");
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Debug("SystemTweaks", "Tâche historique Defender : " + ex.Message);
             }
@@ -489,7 +487,7 @@ namespace optiSCAN.Services
                 using var key = Registry.LocalMachine.OpenSubKey(@"SOFTWARE\optiSCAN", writable: true);
                 key?.DeleteValue("DefenderHistoryAttempts", throwOnMissingValue: false);
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Debug("SystemTweaks", "Compteur historique Defender : " + ex.Message);
             }
@@ -512,7 +510,7 @@ namespace optiSCAN.Services
             var stderr = process.StandardError.ReadToEndAsync();
             if (!process.WaitForExit(4000))
             {
-                try { process.Kill(entireProcessTree: true); } catch { /* déjà terminé */ }
+                try { process.Kill(entireProcessTree: true); } catch (Exception ignored) when (!ignored.IsFatal()) { /* déjà terminé */ }
             }
 
             return stdout.GetAwaiter().GetResult() + stderr.GetAwaiter().GetResult();
@@ -605,7 +603,7 @@ namespace optiSCAN.Services
                             entry.Delete();
                         }
                     }
-                    catch (Exception ex)
+                    catch (Exception ex) when (!ex.IsFatal())
                     {
                         ok = false;
                         AppLogger.Debug("SystemTweaksService", "Cache Windows Update, élément conservé : " + ex.Message);
@@ -614,7 +612,7 @@ namespace optiSCAN.Services
 
                 return ok;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("SystemTweaksService", "Cache Windows Update", ex);
                 return false;
@@ -657,7 +655,7 @@ namespace optiSCAN.Services
                 AppLogger.Info("SystemTweaksService", "Élévation refusée par l'utilisateur");
                 return false;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("SystemTweaksService", "RelaunchTweaks", ex);
                 return false;
@@ -689,7 +687,7 @@ namespace optiSCAN.Services
                     return false;
                 if (!process.WaitForExit(TimeSpan.FromMinutes(30)))
                 {
-                    try { process.Kill(entireProcessTree: true); } catch { /* déjà terminé */ }
+                    try { process.Kill(entireProcessTree: true); } catch (Exception ignored) when (!ignored.IsFatal()) { /* déjà terminé */ }
                     AppLogger.Warn("SystemTweaksService", "Délai dépassé : " + command);
                     return false;
                 }
@@ -699,7 +697,7 @@ namespace optiSCAN.Services
                 AppLogger.Warn("SystemTweaksService", $"Échec ({process.ExitCode}) : {command}");
                 return false;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("SystemTweaksService", "Commande admin : " + command, ex);
                 return false;
@@ -724,7 +722,7 @@ namespace optiSCAN.Services
                 p?.WaitForExit(15000);
                 return p is { ExitCode: 0 };
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("SystemTweaksService", "shutdown /r", ex);
                 return false;
@@ -743,7 +741,7 @@ namespace optiSCAN.Services
                 });
                 return true;
             }
-            catch (Exception ex)
+            catch (Exception ex) when (!ex.IsFatal())
             {
                 AppLogger.Warn("SystemTweaksService", "ms-settings:windowsupdate", ex);
                 return false;

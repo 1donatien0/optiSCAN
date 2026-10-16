@@ -1,3 +1,5 @@
+// SPDX-License-Identifier: GPL-3.0-or-later
+using optiSCAN.Native;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using System.Runtime.Versioning;
@@ -75,7 +77,7 @@ namespace optiSCAN.Services
             {
                 _active = IsForegroundFullscreen() || IsKnownGameProcessRunning();
             }
-            catch
+            catch (Exception ignored) when (!ignored.IsFatal())
             {
                 _active = false;
             }
@@ -83,10 +85,10 @@ namespace optiSCAN.Services
 
         private static bool IsForegroundFullscreen()
         {
-            var hwnd = GetForegroundWindow();
+            var hwnd = NativeMethods.GetForegroundWindow();
             if (hwnd == IntPtr.Zero) return false;
 
-            if (!GetWindowRect(hwnd, out var rect))
+            if (!NativeMethods.GetWindowRect(hwnd, out var rect))
                 return false;
 
             int w = rect.Right - rect.Left;
@@ -94,9 +96,9 @@ namespace optiSCAN.Services
             if (w < 100 || h < 100) return false;
 
             // Écran qui contient la fenêtre (le plus proche si elle déborde).
-            var monitor = MonitorFromWindow(hwnd, MonitorDefaultToNearest);
-            var info = new MONITORINFO { cbSize = Marshal.SizeOf<MONITORINFO>() };
-            if (monitor == IntPtr.Zero || !GetMonitorInfo(monitor, ref info))
+            var monitor = NativeMethods.MonitorFromWindow(hwnd, NativeMethods.MonitorDefaultToNearest);
+            var info = new NativeMethods.MONITORINFO { cbSize = Marshal.SizeOf<NativeMethods.MONITORINFO>() };
+            if (monitor == IntPtr.Zero || !NativeMethods.GetMonitorInfo(monitor, ref info))
                 return false;
             int screenW = info.rcMonitor.Right - info.rcMonitor.Left;
             int screenH = info.rcMonitor.Bottom - info.rcMonitor.Top;
@@ -112,7 +114,7 @@ namespace optiSCAN.Services
                 {
                     procs = Process.GetProcessesByName(name);
                 }
-                catch
+                catch (Exception ignored) when (!ignored.IsFatal())
                 {
                     continue;
                 }
@@ -132,34 +134,5 @@ namespace optiSCAN.Services
             return false;
         }
 
-        [DllImport("user32.dll")]
-        private static extern IntPtr GetForegroundWindow();
-
-        [DllImport("user32.dll")]
-        private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
-
-        private const uint MonitorDefaultToNearest = 2;
-
-        [DllImport("user32.dll")]
-        private static extern IntPtr MonitorFromWindow(IntPtr hwnd, uint flags);
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool GetMonitorInfo(IntPtr monitor, ref MONITORINFO info);
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct RECT
-        {
-            public int Left, Top, Right, Bottom;
-        }
-
-        [StructLayout(LayoutKind.Sequential)]
-        private struct MONITORINFO
-        {
-            public int cbSize;
-            public RECT rcMonitor;
-            public RECT rcWork;
-            public uint dwFlags;
-        }
     }
 }
