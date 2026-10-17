@@ -1,6 +1,7 @@
 # Documentation optiSCAN
 
-**Guide produit** : [README.md](../README.md) à la racine (architecture, release §8, audit §12).
+**Présentation** : [README.md](../README.md) à la racine (captures, téléchargement).
+**Guide produit** : [GUIDE.md](GUIDE.md) (architecture, release §8, audit §12).
 
 **Version visée** : candidate **v3.1**, assembly **3.1.0** ; non publiée. Scripts : `scripts/` · Installeur : `installer/` · CI : `.github/workflows/`.
 
@@ -17,13 +18,14 @@
 | [DIAGNOSTIC_INTEGRATION_WINDOWS.md](DIAGNOSTIC_INTEGRATION_WINDOWS.md) | Diagnostic historique de distribution Windows ; profil allégé façon version 2 (2 moteurs) |
 | [POLITIQUE_CONFIDENTIALITE.md](POLITIQUE_CONFIDENTIALITE.md) | Politique de confidentialité utilisateur (candidate v3.1) |
 | [CONFORMITE_RGPD.md](CONFORMITE_RGPD.md) | Analyse traitements / RGPD (note interne, pas un avis juridique) |
+| [GUIDE.md](GUIDE.md) | Guide unique (architecture, modules, release, langues, sécurité) |
 | [README.md](README.md) | Cet index |
 
 ## Documents à la racine / annexes
 
 | Document | Rôle |
 |----------|------|
-| [../README.md](../README.md) | Guide unique (architecture, modules, release, langues, sécurité) |
+| [../README.md](../README.md) | Présentation du projet (anglais), captures, téléchargement |
 | [../SECURITY.md](../SECURITY.md) | Politique de sécurité, signalement, composants v3.1 candidate |
 | [../LICENSE.txt](../LICENSE.txt) | Licence GNU GPL v3 |
 | [CODE_SIGNING_POLICY.md](CODE_SIGNING_POLICY.md) | Politique de signature du code (SignPath) |
@@ -34,22 +36,22 @@
 
 ---
 
-## Renvois rapides vers le README
+## Renvois rapides vers le guide
 
-| Sujet | Section README |
+| Sujet | Section du guide |
 |-------|----------------|
-| Build, publish, Inno, CI, SBOM, checklist | [§8](../README.md#8-publication-installateur-et-checklist-release-v30) |
-| Coordinateurs UI (`optiSCAN/Coordinators/`) | [§1](../README.md#structure-des-modules) · [§12.1](../README.md#121-maintenabilité-et-choix-volontaires-non-bloquants-v30) |
-| DI préférences (`IUserPreferencesAccessor`, …) | [§1](../README.md#structure-des-modules) |
-| FR / EN | [§9](../README.md#9-langues-de-linterface-fr-fr--en-us) |
-| Historique (`ActivityLogService`) | [§4.9](../README.md#49-journaux-et-historique) |
-| Accueil stats / recommandations | [§4.11](../README.md#411-vue-densemble-dashboard) |
-| Scan USB/SD | [§5](../README.md#5-services-avancés-modules-complémentaires) · `RemovableDriveScanService` |
-| Thème Windows | [§2.2](../README.md#22-thememanager) |
-| Exclusions / anti-autophagie (`OptiscanProtectedPaths`) | [§4.7](../README.md#47-système-dexclusions) |
-| Exclusions Windows Defender | [§4.7](../README.md#47-système-dexclusions) · [§7](../README.md#exclusion-windows-defender) · `scripts/add-defender-exclusions.ps1` |
-| Audit, tests | [§12](../README.md#12-audit-et-qualité) |
-| Posture /100, AMSI | [§13](../README.md#13-sécurité-posture-et-menaces) |
-| Branches `main` / `dev` | [Branches Git](../README.md#branches-git) |
+| Build, publish, Inno, CI, SBOM, checklist | [§8](GUIDE.md#8-publication-installateur-et-checklist-release-v31-candidate) |
+| Coordinateurs UI (`optiSCAN/Coordinators/`) | [§1](GUIDE.md#structure-des-modules) · [§12.1](GUIDE.md#121-maintenabilité-et-choix-volontaires-non-bloquants-v30) |
+| DI préférences (`IUserPreferencesAccessor`, …) | [§1](GUIDE.md#structure-des-modules) |
+| FR / EN | [§9](GUIDE.md#9-langues-de-linterface-fr-fr--en-us) |
+| Historique (`ActivityLogService`) | [§4.9](GUIDE.md#49-journaux-et-historique) |
+| Accueil stats / recommandations | [§4.11](GUIDE.md#411-vue-densemble-dashboard) |
+| Scan USB/SD | [§5](GUIDE.md#5-services-avancés-modules-complémentaires) · `RemovableDriveScanService` |
+| Thème Windows | [§2.2](GUIDE.md#22-thememanager) |
+| Exclusions / anti-autophagie (`OptiscanProtectedPaths`) | [§4.7](GUIDE.md#47-système-dexclusions) |
+| Exclusions Windows Defender | [§4.7](GUIDE.md#47-système-dexclusions) · [§7](GUIDE.md#exclusion-windows-defender) · `scripts/add-defender-exclusions.ps1` |
+| Audit, tests | [§12](GUIDE.md#12-audit-et-qualité) |
+| Posture /100, AMSI | [§13](GUIDE.md#13-sécurité-posture-et-menaces) |
+| Branches `main` / `dev` | [Branches Git](GUIDE.md#branches-git) |
 
-**Distribution** : détails opérationnels dans [GUIDE_DISTRIBUTION.md](GUIDE_DISTRIBUTION.md) (complète le §8 du README).
+**Distribution** : détails opérationnels dans [GUIDE_DISTRIBUTION.md](GUIDE_DISTRIBUTION.md) (complète le §8 du guide).
