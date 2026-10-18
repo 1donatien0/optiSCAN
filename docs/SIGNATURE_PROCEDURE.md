@@ -11,9 +11,9 @@ Tant que SignPath n'a pas accepté le projet et qu'aucun tag de release n'a ét�
 
 ## Ce qui est signé
 
-Voir la [politique de signature](CODE_SIGNING_POLICY.md) : `optiSCAN.exe`, `optiSCAN.Service.exe`, `optiSCAN.Host.exe` et leurs DLL (`optiSCAN.dll`, `optiSCAN.Service.dll`, `optiSCAN.Host.dll`, `optiSCAN.Engine.dll`, `optiSCAN.Platform.dll`), puis l'installeur `optiSCAN_Setup_vX.Y.Z.exe`. Le désinstalleur Inno, enfermé dans l'installeur à la compilation, n'est pas signé : Inno ne le signe que si `signtool` est disponible pendant la compilation, ce que la chaîne SignPath exclut.
+Voir la [politique de signature](CODE_SIGNING_POLICY.md) : `optiSCAN.exe`, `optiSCAN.Service.exe`, `optiSCAN.Host.exe` et leurs DLL (`optiSCAN.dll`, `optiSCAN.Service.dll`, `optiSCAN.Host.dll`, `optiSCAN.Engine.dll`, `optiSCAN.Platform.dll`), le fournisseur AMSI `optiSCAN.AmsiProvider.dll`, puis l'installeur `optiSCAN_Setup_vX.Y.Z.exe`. Le désinstalleur Inno, enfermé dans l'installeur à la compilation, n'est pas signé : Inno ne le signe que si `signtool` est disponible pendant la compilation, ce que la chaîne SignPath exclut.
 
-Les moteurs tiers ne passent pas par cette chaîne : archive ClamAV vérifiée par signature GPG Talos et SHA-256, YARA par SHA-256 épinglé. **AMSI et le minifiltre ne sont pas livrés** (prototypes sous `native/`, hors v3.1).
+Les moteurs tiers ne passent pas par cette chaîne : archive ClamAV vérifiée par signature GPG Talos et SHA-256, YARA par SHA-256 épinglé. Le fournisseur AMSI (C++, `native/optiSCAN.AmsiProvider`) est livré et signé avec les binaires ; `release.yml` refuse une release sans lui. **Le minifiltre n'est pas livré** (prototype sous `native/`, hors v3.1) : l'installeur se contente de décharger une ancienne instance.
 
 ## Mise en place (une seule fois)
 
