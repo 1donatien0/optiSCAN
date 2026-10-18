@@ -1,10 +1,10 @@
 <Project>
   <!-- vM.m = nom de release (README) ; <Version> = semver build / Inno AppVersion -->
   <PropertyGroup>
-    <Version>3.1.0</Version>
+    <Version>3.1.0-beta.1</Version>
     <AssemblyVersion>3.1.0.0</AssemblyVersion>
     <FileVersion>3.1.0.0</FileVersion>
-    <InformationalVersion>3.1.0</InformationalVersion>
+    <InformationalVersion>3.1.0-beta.1</InformationalVersion>
     <!-- Métadonnées exigées sur chaque binaire signé (politique SignPath). Les projets peuvent
          préciser <Product> ; le nom de produit vérifié à la signature est « optiSCAN ». -->
     <Product Condition="'$(Product)' == ''">optiSCAN</Product>

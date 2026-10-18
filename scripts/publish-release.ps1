@@ -114,8 +114,8 @@ if (-not $SkipInstaller) {
         # Version lue depuis Directory.Build.props (source unique de vérité) :
         # évite que l'installeur reparte sur un numéro figé après un bump.
         [xml]$propsXml = Get-Content -LiteralPath (Join-Path $repo 'Directory.Build.props')
-        $appVersion = ($propsXml.Project.PropertyGroup.Version | Select-Object -First 1).'#text'
-        if ([string]::IsNullOrWhiteSpace($appVersion)) { $appVersion = '3.1.0' }
+        $appVersion = [string]($propsXml.Project.PropertyGroup.Version | Select-Object -First 1)
+        if ([string]::IsNullOrWhiteSpace($appVersion)) { throw 'Version absente de Directory.Build.props.' }
         $isccArgs = @((Join-Path $repo 'installer\setup.iss'), "/DAppVersion=$appVersion")
         if (-not $haveAmsi) { $isccArgs += '/DAllowMissingAmsi' }
         if ($EmbedOfflineSignatures) { $isccArgs += '/DEmbedOfflineSignatures' }

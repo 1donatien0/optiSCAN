@@ -48,7 +48,7 @@ jobs:
         shell: pwsh
         run: |
           [xml]$props = Get-Content Directory.Build.props
-          $version = ($props.Project.PropertyGroup.Version | Select-Object -First 1).'#text'
+          $version = [string]($props.Project.PropertyGroup.Version | Select-Object -First 1)
           if ([string]::IsNullOrWhiteSpace($version)) { throw 'Version absente de Directory.Build.props.' }
           if ($env:GITHUB_REF_TYPE -eq 'tag' -and $env:GITHUB_REF_NAME -ne "v$version") {
             throw "Le tag $env:GITHUB_REF_NAME ne correspond pas à la version $version."
