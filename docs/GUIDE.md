@@ -89,7 +89,7 @@ optiSCAN.Service.exe  →  optiSCAN.Host.exe --service-host   (console, sans WPF
 
 **Option UI** : *Service Windows de protection système* (Options → Protection). Si le service est injoignable, repli automatique sur la RTP locale.
 
-**Identifiants techniques** — définis une seule fois dans `optiSCAN.Platform/ProtectionIdentifiers.cs`, avec deux miroirs : `native/optiSCAN.AmsiProvider/protection_identifiers.h` (prototype non livré) et `installer/protection_identifiers.iss` (Inno Setup). Le test `ProtectionIdentifiersTests` échoue si les trois divergent.
+**Identifiants techniques** — définis une seule fois dans `optiSCAN.Platform/ProtectionIdentifiers.cs`, avec deux miroirs : `native/optiSCAN.AmsiProvider/protection_identifiers.h` (fournisseur AMSI, livré avec le service depuis 3.1) et `installer/protection_identifiers.iss` (Inno Setup). Le test `ProtectionIdentifiersTests` échoue si les trois divergent.
 
 | Identifiant | Valeur |
 |---|---|
