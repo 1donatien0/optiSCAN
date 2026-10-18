@@ -6,8 +6,10 @@
 
 #define AppName        "optiSCAN"
 #ifndef AppVersion
-#define AppVersion     "3.1.0"
+#define AppVersion     "3.1.0-beta.1"
 #endif
+; VersionInfo* n'accepte que des chiffres : on retire le suffixe de pré-version (-beta.1).
+#define AppNumericVersion Copy(AppVersion, 1, Pos("-", AppVersion + "-") - 1)
 #ifndef AppRelease
 #define AppRelease     "v3.1"
 #endif
@@ -102,11 +104,13 @@ DisableProgramGroupPage=auto
 CloseApplications=force
 CloseApplicationsFilter=optiSCAN.exe,optiSCAN.Service.exe,optiSCAN.Host.exe
 RestartApplications=no
-VersionInfoVersion={#AppVersion}
+VersionInfoVersion={#AppNumericVersion}
+VersionInfoTextVersion={#AppVersion}
 VersionInfoCompany={#AppPublisher}
 VersionInfoDescription={#AppName} — Installateur
 VersionInfoProductName={#AppName}
-VersionInfoProductVersion={#AppVersion}
+VersionInfoProductVersion={#AppNumericVersion}
+VersionInfoProductTextVersion={#AppVersion}
 VersionInfoCopyright=Copyright 2026 Dona By
 
 ; ── SIGNATURE DE CODE ───────────────────────────────────────────────────────

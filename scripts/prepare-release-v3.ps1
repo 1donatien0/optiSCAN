@@ -109,7 +109,7 @@ if (-not $SkipInstaller) {
 }
 
 [xml]$propsXml = Get-Content -LiteralPath (Join-Path $root 'Directory.Build.props')
-$appVersion = ($propsXml.Project.PropertyGroup.Version | Select-Object -First 1).'#text'
+$appVersion = [string]($propsXml.Project.PropertyGroup.Version | Select-Object -First 1)
 $appRelease = if ($appVersion -match '^(\d+)\.(\d+)') { "v$($Matches[1]).$($Matches[2])" } else { 'v3' }
 Write-Host "`n=== Preparation $appRelease ===" -ForegroundColor Green
 Write-Host "  Publish : $pubDir"
