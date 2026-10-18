@@ -108,4 +108,6 @@ Si optiSCAN vous est utile, une ⭐ sur ce dépôt aide d'autres personnes à le
 
 optiSCAN est un logiciel libre, distribué sous la [GNU General Public License v3 ou ultérieure](LICENSE.txt), sans aucune garantie. Les composants livrés gardent leur propre licence (ClamAV : GPL-2.0, YARA : BSD-3-Clause) ; voir les [avis de tiers](installer/licenses/THIRD-PARTY-NOTICES.md).
 
+**Versions antérieures.** optiSCAN 1, 2 et 3 (tags `v1`, `v2`, `v3`) ont d'abord été distribués sous un contrat de licence utilisateur final (CLUF). Depuis le 16 octobre 2026, leur titulaire des droits les distribue, code source et installeurs, sous la GNU GPL v3 ou ultérieure. Cette déclaration remplace le CLUF présent dans `LICENSE.txt` de ces commits.
+
 Conçu par **Donatien Byakombe (Dona By)** à Vanier (Ottawa), Canada.
