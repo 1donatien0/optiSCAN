@@ -1,0 +1,7 @@
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Empreinte publique de la clé GPG de signature de ClamAV (Cisco-Talos), pas un secret."
+regexTarget = "line"
+regexes = ['''"clamavSigningKeyFingerprint"\s*:\s*"[0-9A-F]{40}"''']
