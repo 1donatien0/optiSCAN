@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://sourceforge.net/projects/optiscan/files/latest/download"><img src="https://img.shields.io/badge/Download-v3.0.0%20for%20Windows-2ea44f?style=for-the-badge&logo=windows" alt="Download optiSCAN for Windows"></a>
+  <a href="https://sourceforge.net/projects/optiscan/files/optiSCAN_Setup_v3.0.0.exe/download"><img src="https://img.shields.io/badge/Download-v3.0.0%20for%20Windows-2ea44f?style=for-the-badge&logo=windows" alt="Download optiSCAN for Windows"></a>
 </p>
 
 <p align="center">
@@ -73,7 +73,7 @@ optiSCAN is designed to **work alongside Windows Defender**, not to replace it.
 
 ## Download and install
 
-1. Download **[optiSCAN_Setup_v3.0.0.exe](https://sourceforge.net/projects/optiscan/files/latest/download)** (about 29 MB) from SourceForge.
+1. Download **[optiSCAN_Setup_v3.0.0.exe](https://sourceforge.net/projects/optiscan/files/optiSCAN_Setup_v3.0.0.exe/download)** (about 29 MB) from SourceForge.
 2. Run the installer and choose English or French.
 3. Open optiSCAN, go to **Antivirus → Signatures** and click **Update** to download the ClamAV signatures and YARA rules.
 
