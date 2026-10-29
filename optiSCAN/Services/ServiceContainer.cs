@@ -21,6 +21,9 @@ namespace optiSCAN.Services
 
         public static ServiceContainer Default => _default.Value;
 
+        /// <summary>Vrai si <see cref="Default"/> a déjà été construit (sans le construire).</summary>
+        public static bool IsCreated => _default.IsValueCreated;
+
         /// <summary>Bus UI (événements inter-panneaux) — même instance que <see cref="Default"/>.</summary>
         public static IUiEventBus UiEvents => Default._uiEventBus;
 

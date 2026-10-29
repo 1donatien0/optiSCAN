@@ -28,7 +28,7 @@ namespace optiSCAN.Models
         /// <summary>Date formatée pour l'affichage dans les listes (ex. « 22/05/2026 14:30 »).</summary>
         [JsonIgnore]
         public string DateDisplay =>
-            StartedAt.ToString("dd/MM/yyyy HH:mm", CultureInfo.CurrentCulture);
+            StartedAt.ToString("g", CultureInfo.CurrentCulture);
 
         /// <summary>Durée formatée en français (ex. « 1 min 12 s »).</summary>
         [JsonIgnore]
@@ -48,10 +48,8 @@ namespace optiSCAN.Models
         {
             get
             {
-                if (BytesFreed >= 1_073_741_824) return $"{BytesFreed / 1_073_741_824.0:F1} Go";
-                if (BytesFreed >= 1_048_576) return $"{BytesFreed / 1_048_576.0:F1} Mo";
-                if (BytesFreed >= 1_024) return $"{BytesFreed / 1_024.0:F0} Ko";
-                return $"{BytesFreed} o";
+                // Unités selon la langue de l'interface (Ko/KB…).
+                return optiSCAN.Localization.ByteSizeFormat.Format(Math.Max(0, BytesFreed));
             }
         }
     }
