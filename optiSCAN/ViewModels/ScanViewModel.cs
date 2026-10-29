@@ -30,7 +30,14 @@ namespace optiSCAN.ViewModels
         private readonly IUserConfirmService _confirm;
         private readonly YaraEngine _yara;
         private readonly IUiEventBus _uiEvents;
-        private readonly INavigationService? _navigation;
+        private readonly ServiceContainer _container;
+
+        /// <summary>
+        /// Lu à chaque usage : MainWindow crée ce ViewModel avant d'assigner
+        /// <see cref="ServiceContainer.Navigation"/>. Capturé dans le constructeur, il restait
+        /// nul et un scan lancé depuis l'accueil (cibles récentes) ne basculait jamais vers Antivirus.
+        /// </summary>
+        private INavigationService? _navigation => _container.Navigation;
         private readonly RealTimeProtection _realTimeProtection;
         private readonly NotificationService _notifications;
         private readonly IUserPreferencesAccessor _prefs;
@@ -343,7 +350,7 @@ namespace optiSCAN.ViewModels
             _logger = container.Logger;
             _confirm = new WpfUserConfirmService();
             _uiEvents = container;
-            _navigation = container.Navigation;
+            _container = container;
             _realTimeProtection = container.RealTimeProtection;
             _notifications = container.Notifications;
             _prefs = container.UserPreferencesAccessor;
@@ -413,7 +420,7 @@ namespace optiSCAN.ViewModels
                 await TryStepAsync("Base de signatures", async () =>
                 {
                     DbVersion = await _updater.GetLocalDatabaseVersionAsync().ConfigureAwait(false);
-                    LastUpdateDisplay = _updater.LastUpdateTime?.ToString("dd/MM/yyyy HH:mm") ?? LocalizationService.GetString("Vm_Never");
+                    LastUpdateDisplay = _updater.LastUpdateTime?.ToString("g", System.Globalization.CultureInfo.CurrentCulture) ?? LocalizationService.GetString("Vm_Never");
                     RulesPackVersion = _rulesUpdater.GetRulesPackVersionDisplay();
                     RulesLastUpdateDisplay = _rulesUpdater.GetRulesLastUpdateDisplay();
                 });
@@ -575,6 +582,7 @@ namespace optiSCAN.ViewModels
                 _rulesUpdater.UpdateOutput -= SurAjoutSortieMiseAJour;
                 _rulesUpdater.UpdateCompleted -= SurTermineeMiseAJourRegles;
                 _realTimeProtection.HealthChanged -= SurDemandeRafraichissementProtection;
+                _container.ProtectionStateRefreshRequested -= SurDemandeRafraichissementProtection;
                 _updater.DisableAutoUpdate();
                 _rulesUpdater.DisableAutoUpdate();
             }

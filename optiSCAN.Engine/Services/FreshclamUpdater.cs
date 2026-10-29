@@ -371,7 +371,7 @@ namespace optiSCAN.Services
         public string GetLastSignatureChangeDisplay()
         {
             var t = GetLastSignatureUpdateTime();
-            return t.HasValue ? t.Value.ToString("dd/MM/yyyy HH:mm") : "—";
+            return t.HasValue ? t.Value.ToString("g", System.Globalization.CultureInfo.CurrentCulture) : "—";
         }
 
         private DateTime? GetLatestLocalDatabaseWriteTime()

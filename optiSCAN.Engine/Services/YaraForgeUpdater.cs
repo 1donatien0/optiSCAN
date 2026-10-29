@@ -91,7 +91,7 @@ namespace optiSCAN.Services
         /// <summary>Date de dernière mise à jour réussie des règles (persistée).</summary>
         public string GetRulesLastUpdateDisplay()
             => LastUpdateTime.HasValue
-                ? LastUpdateTime.Value.ToString("dd/MM/yyyy HH:mm", CultureInfo.CurrentCulture)
+                ? LastUpdateTime.Value.ToString("g", CultureInfo.CurrentCulture)
                 : "—";
 
         private void LoadPersistedMeta()

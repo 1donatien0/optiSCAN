@@ -174,7 +174,10 @@ namespace optiSCAN.Services
 
             try
             {
-                var result = await operation(deadline.Token).ConfigureAwait(false);
+                // Hors du fil appelant : les moteurs font du travail synchrone avant leur premier
+                // await (dénombrement YARA jusqu'à 100 000 fichiers, préparation de clamscan).
+                // Lancé depuis l'interface, ce travail gelait la fenêtre (« Ne répond pas »).
+                var result = await Task.Run(() => operation(deadline.Token)).ConfigureAwait(false);
                 if (!callerToken.IsCancellationRequested && deadline.IsCancellationRequested)
                     return MarkTimedOut(result, timeout);
                 return result;

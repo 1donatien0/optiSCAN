@@ -44,7 +44,10 @@ namespace optiSCAN.Services
                 var virusName = infectedMatch.Groups[2].Value.Trim();
 
                 if ((exclusions ?? new DefaultExclusionSettingsAccessor()).Current.IsFileExcluded(filePath))
+                {
+                    result.SuppressedDetections++;
                     return;
+                }
 
                 long fileSize = -1;
                 try { fileSize = new FileInfo(filePath).Length; }

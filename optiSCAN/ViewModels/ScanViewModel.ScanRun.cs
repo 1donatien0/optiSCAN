@@ -299,8 +299,9 @@ namespace optiSCAN.ViewModels
             _ = d.InvokeAsync(async () =>
             {
                 StatusMessage = result.Message;
-                DbVersion = await _updater.GetLocalDatabaseVersionAsync().ConfigureAwait(false);
-                LastUpdateDisplay = _updater.LastUpdateTime?.ToString("dd/MM/yyyy HH:mm") ?? LocalizationService.GetString("Vm_Never");
+                // Rester sur le fil de l'interface : la suite met à jour des propriétés liées.
+                DbVersion = await _updater.GetLocalDatabaseVersionAsync().ConfigureAwait(true);
+                LastUpdateDisplay = _updater.LastUpdateTime?.ToString("g", System.Globalization.CultureInfo.CurrentCulture) ?? LocalizationService.GetString("Vm_Never");
                 RulesPackVersion = _rulesUpdater.GetRulesPackVersionDisplay();
                 RulesLastUpdateDisplay = _rulesUpdater.GetRulesLastUpdateDisplay();
             });
