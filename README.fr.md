@@ -56,7 +56,7 @@ optiSCAN est conçu pour **fonctionner à côté de Windows Defender**, pas pour
 
 **Interface**
 
-- Français et anglais
+- Français et anglais. L'installateur suit Windows : français ou anglais sans demander ; il propose un choix seulement si Windows n'est ni l'un ni l'autre
 - Thèmes clair, sombre et contraste renforcé ; suit le thème de Windows par défaut
 
 ## Captures d'écran
@@ -71,13 +71,13 @@ optiSCAN est conçu pour **fonctionner à côté de Windows Defender**, pas pour
 
 ## Télécharger et installer
 
-1. Téléchargez **[optiSCAN_Setup_v3.0.0.exe](https://sourceforge.net/projects/optiscan/files/optiSCAN_Setup_v3.0.0.exe/download)** (environ 29 Mo) sur SourceForge.
-2. Lancez l'installateur et choisissez le français ou l'anglais.
+1. Téléchargez **[optiSCAN_Setup_v3.0.0.exe](https://sourceforge.net/projects/optiscan/files/optiSCAN_Setup_v3.0.0.exe/download)** (environ **66 Mo**) sur SourceForge. Le runtime .NET 10 est dans l'installateur ; les bases de signatures ClamAV et YARA ne le sont pas — elles se téléchargent après l'installation.
+2. Lancez l'installateur. Il prend le français ou l'anglais de Windows. Si Windows n'est ni l'un ni l'autre, choisissez.
 3. Ouvrez optiSCAN, allez dans **Antivirus → Signatures** et cliquez sur **Mettre à jour** pour télécharger les signatures ClamAV et les règles YARA.
 
-**Prérequis :** Windows 10 version 1809 ou plus récente, ou Windows 11, en 64 bits. Le runtime .NET est inclus dans l'installateur.
+**Prérequis :** Windows 10 version 1809 ou plus récente, ou Windows 11, en 64 bits.
 
-> **Avertissement Windows SmartScreen.** L'installateur n'est pas encore signé : Windows peut afficher « Windows a protégé votre ordinateur ». Cliquez sur **Informations complémentaires → Exécuter quand même**. La signature par la [SignPath Foundation](https://signpath.org/) est en cours ; voir la [politique de signature](docs/CODE_SIGNING_POLICY.md).
+> **Avertissement Windows SmartScreen.** Cet installateur 3.0.0 n'est pas signé : Windows peut afficher « Windows a protégé votre ordinateur ». Cliquez sur **Informations complémentaires → Exécuter quand même**. Les binaires signés sont prévus pour la 3.1 avec la [SignPath Foundation](https://signpath.org/) ; voir la [politique de signature](docs/CODE_SIGNING_POLICY.md).
 
 ## Documentation
 
