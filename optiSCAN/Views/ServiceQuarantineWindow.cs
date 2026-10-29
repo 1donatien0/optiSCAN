@@ -302,10 +302,7 @@ namespace optiSCAN.Services
         public static string FormatBytes(long bytes) => bytes switch
         {
             < 0 => "?",
-            < 1024 => $"{bytes} o",
-            < 1024 * 1024 => $"{bytes / 1024.0:F1} Ko",
-            < 1024L * 1024 * 1024 => $"{bytes / 1048576.0:F1} Mo",
-            _ => $"{bytes / 1073741824.0:F2} Go",
+            _ => optiSCAN.Localization.ByteSizeFormat.Format(bytes),
         };
     }
 }

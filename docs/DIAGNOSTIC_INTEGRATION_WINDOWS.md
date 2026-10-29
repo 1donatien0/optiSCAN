@@ -2,7 +2,7 @@
 
 > Date : 2026-07-16 · **Mission :** alléger le profil d’installation **façon version 2** (friction basse), tout en **conservant les gains de la version 3** et les **deux moteurs ClamAV + YARA**. Ce n’est pas un alignement produit sur ClamWin.
 
-> **Mise à jour d'état — 5 octobre 2026 :** ce diagnostic décrit la décision de juillet, pas l'état courant. AMSI et le minifiltre sont absents du produit et de l'installeur ; la protection avancée optionnelle comprend RTP, surveillance de processus, scan USB et IPC. Pour l'état courant de sécurité, de distribution et des données SYSTEM, voir [l'audit 360](../AUDIT_optiSCAN_360.md#5-registre-des-risques-ouverts) et le [guide de distribution](GUIDE_DISTRIBUTION.md).
+> **Mise à jour d'état — 29 octobre 2026 :** ce diagnostic décrit la décision de juillet, pas l'état courant. Depuis la 3.1, le service de protection est **coché** à la première installation (R9) et le fournisseur **AMSI est livré** avec le service ; le minifiltre reste absent. Une mise à jour reconfigure le service existant. Les sections 3 à 5 ci-dessous sont historiques. Pour l'état courant de sécurité, de distribution et des données SYSTEM, voir [l'audit 360](../AUDIT_optiSCAN_360.md#5-registre-des-risques-ouverts) et le [guide de distribution](GUIDE_DISTRIBUTION.md).
 
 ---
 

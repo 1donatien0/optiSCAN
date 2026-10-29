@@ -213,7 +213,7 @@ namespace optiSCAN.Models
         };
 
         public string DateDisplay =>
-            StartedAt.ToString("dd/MM/yyyy HH:mm", CultureInfo.CurrentCulture);
+            StartedAt.ToString("g", CultureInfo.CurrentCulture);
 
         private static string QuarantineResultSummary(ActivityEventRecord ev)
         {

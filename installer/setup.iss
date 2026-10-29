@@ -130,10 +130,31 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 ; Profil d'install allégé façon v2 : défaut = UI + ClamAV + YARA (+ MAJ signatures).
 ; Service de protection : coché à la première installation (checkedonce) pour que la
 ; protection survive à la fermeture de session ; une mise à jour garde le choix précédent.
-Name: "desktopicon";   Description: "Créer une icône sur le Bureau";                              GroupDescription: "Icônes supplémentaires"
-Name: "startupicon";   Description: "Lancer optiSCAN au démarrage de Windows";                   GroupDescription: "Options avancées"; Flags: unchecked
-Name: "autoUpdateSig"; Description: "Activer les mises à jour auto des signatures (recommandé)"; GroupDescription: "Moteurs ClamAV + YARA"; Flags: checkedonce
-Name: "platformservice"; Description: "Installer le service Windows de protection (temps réel hors session, recommandé)"; GroupDescription: "Protection"; Flags: checkedonce
+; Libellés par langue ([CustomMessages]) : l'installeur anglais les affichait en français.
+Name: "desktopicon";   Description: "{cm:TaskDesktopIcon}";     GroupDescription: "{cm:GroupIcons}"
+Name: "startupicon";   Description: "{cm:TaskStartup}";         GroupDescription: "{cm:GroupAdvanced}"; Flags: unchecked
+Name: "autoUpdateSig"; Description: "{cm:TaskAutoUpdateSig}";   GroupDescription: "{cm:GroupEngines}"; Flags: checkedonce
+Name: "platformservice"; Description: "{cm:TaskPlatformService}"; GroupDescription: "{cm:GroupProtection}"; Flags: checkedonce
+
+[CustomMessages]
+french.TaskDesktopIcon=Créer une icône sur le Bureau
+english.TaskDesktopIcon=Create a desktop shortcut
+french.GroupIcons=Icônes supplémentaires
+english.GroupIcons=Additional shortcuts
+french.TaskStartup=Lancer optiSCAN au démarrage de Windows
+english.TaskStartup=Start optiSCAN when Windows starts
+french.GroupAdvanced=Options avancées
+english.GroupAdvanced=Advanced options
+french.TaskAutoUpdateSig=Activer les mises à jour auto des signatures (recommandé)
+english.TaskAutoUpdateSig=Enable automatic signature updates (recommended)
+french.GroupEngines=Moteurs ClamAV + YARA
+english.GroupEngines=ClamAV + YARA engines
+french.TaskPlatformService=Installer le service Windows de protection (temps réel hors session, recommandé)
+english.TaskPlatformService=Install the Windows protection service (real-time outside your session, recommended)
+french.GroupProtection=Protection
+english.GroupProtection=Protection
+french.LaunchNow=Lancer %1 maintenant
+english.LaunchNow=Launch %1 now
 
 [Files]
 ; ── Application principale ───────────────────────────────────────────────────
@@ -184,15 +205,15 @@ Source: "licenses\*"; DestDir: "{app}\licenses"; Flags: ignoreversion
 ; Script exclusions Defender : copié pour usage manuel / depuis l'app — PAS exécuté
 ; automatiquement à l'install (évite le marqueur heuristique « tamper » post-v2).
 Source: "..\scripts\add-defender-exclusions.ps1"; DestDir: "{app}\scripts"; Flags: ignoreversion
-; AMSI / minifiltre : non livrés. Les prototypes sous native/ ne sont pas compilés,
-; copiés, enregistrés ou chargés par l'installeur.
+; Minifiltre : non livré (prototype sous native/, ni compilé ni copié). Le fournisseur AMSI,
+; lui, est livré avec le service (voir plus haut).
 [Dirs]
 ; Propriétaire administrateur : un utilisateur ne peut pas préparer une jonction avant le service.
 Name: "{commonappdata}\optiSCAN"; Permissions: admins-full system-full
 
 [Icons]
 Name: "{group}\{#AppName}"; Filename: "{app}\{#AppExeName}"
-Name: "{group}\Désinstaller {#AppName}"; Filename: "{uninstallexe}"
+Name: "{group}\{cm:UninstallProgram,{#AppName}}"; Filename: "{uninstallexe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: desktopicon
 Name: "{userstartup}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: startupicon
 
@@ -202,7 +223,7 @@ Name: "{userstartup}\{#AppName}"; Filename: "{app}\{#AppExeName}"; Tasks: startu
 ; Lancé avec le jeton de l'utilisateur qui a démarré l'installation, pas celui de l'installeur
 ; élevé : une instance élevée refuse freshclam et winget (configuration dans le profil, modifiable
 ; sans élévation) et écrirait ses données dans le profil de l'administrateur.
-Filename: "{app}\{#AppExeName}"; Description: "Lancer {#AppName} maintenant"; Flags: nowait postinstall skipifsilent runasoriginaluser
+Filename: "{app}\{#AppExeName}"; Description: "{cm:LaunchNow,{#AppName}}"; Flags: nowait postinstall skipifsilent runasoriginaluser
 
 ; =============================================================================
 ; CLEAN INSTALL — exécuté AVANT la copie des nouveaux fichiers
@@ -212,6 +233,9 @@ Filename: "{app}\{#AppExeName}"; Description: "Lancer {#AppName} maintenant"; Fl
 ; (héritée des versions antérieures). Le code optiSCAN regénère un freshclam.conf
 ; propre dans %LocalAppData% au premier lancement de la mise à jour.
 [InstallDelete]
+; --- Raccourci de désinstallation des versions antérieures (nom figé en français) ---
+Type: files; Name: "{group}\Désinstaller {#AppName}.lnk"
+
 ; --- freshclam.conf legacy dans le dossier d'install ---
 Type: files; Name: "{app}\clamav\x64\freshclam.conf"
 Type: files; Name: "{app}\clamav\x86\freshclam.conf"
@@ -259,7 +283,7 @@ begin
   try
     WbemLocator := CreateOleObject('WbemScripting.SWbemLocator');
     WbemServices := WbemLocator.ConnectServer('.', 'root\CIMV2');
-    Processes := WbemServices.ExecQuery('SELECT ProcessId FROM Win32_Process WHERE Name="optiSCAN.exe" OR Name="optiSCAN.Service.exe"');
+    Processes := WbemServices.ExecQuery('SELECT ProcessId FROM Win32_Process WHERE Name="optiSCAN.exe" OR Name="optiSCAN.Service.exe" OR Name="optiSCAN.Host.exe"');
     Result := Integer(Processes.Count) > 0;
   except
     Result := False;
@@ -284,6 +308,7 @@ end;
 procedure InstallCurrentProtectionService();
 var
   ResultCode: Integer;
+  BinPathArg: string;
 begin
   if not FileExists(ExpandConstant('{app}\optiSCAN.Service.exe')) then
   begin
@@ -294,8 +319,21 @@ begin
     Exit;
   end;
 
-  if not Exec(ExpandConstant('{sys}\sc.exe'), 'create {#ProtectionServiceName} binPath= "\"' + ExpandConstant('{app}\optiSCAN.Service.exe') + '\"" start= auto DisplayName= "{#ProtectionServiceDisplayName}"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
-     or (ResultCode <> 0) then
+  BinPathArg := 'binPath= "\"' + ExpandConstant('{app}\optiSCAN.Service.exe') + '\""';
+  if not Exec(ExpandConstant('{sys}\sc.exe'), 'create {#ProtectionServiceName} ' + BinPathArg + ' start= auto DisplayName= "{#ProtectionServiceDisplayName}"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    ResultCode := -1;
+
+  // 1073 : le service existe déjà (mise à jour). StopRunningOptiScan l'a arrêté : sans ce cas,
+  // l'installeur affichait une erreur et le laissait arrêté jusqu'au prochain redémarrage.
+  if ResultCode = 1073 then
+  begin
+    if not Exec(ExpandConstant('{sys}\sc.exe'), 'config {#ProtectionServiceName} ' + BinPathArg + ' start= auto DisplayName= "{#ProtectionServiceDisplayName}"', '', SW_HIDE, ewWaitUntilTerminated, ResultCode)
+       or (ResultCode <> 0) then
+      Log(Format('sc config a échoué (code %d)', [ResultCode]));
+    ResultCode := 0;
+  end;
+
+  if ResultCode <> 0 then
   begin
     Log(Format('sc create a échoué (code %d)', [ResultCode]));
     if ActiveLanguage = 'english' then
@@ -365,6 +403,8 @@ begin
   begin
     Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM optiSCAN.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM optiSCAN.Service.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+    // Hôte SYSTEM depuis 3.1 : resté vivant, il verrouille ses DLL et la copie échoue.
+    Exec(ExpandConstant('{sys}\taskkill.exe'), '/F /IM optiSCAN.Host.exe /T', '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
     if not OptiScanProcessStillRunning() then
       Break;
     Sleep(200);
