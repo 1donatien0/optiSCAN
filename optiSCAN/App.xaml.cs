@@ -39,13 +39,12 @@ namespace optiSCAN
         /// </summary>
         protected override async void OnStartup(StartupEventArgs e)
         {
-            // WPF charge StartupUri (MainWindow.xaml) dès le retour de OnStartup, même après
-            // Shutdown() : le constructeur de la fenêtre créait alors ServiceContainer, l'icône de
-            // la zone de notification et le ViewModel dans chaque mode sans interface. Pire, le
-            // scan planifié (--fullscan --quiet) rend la main à son premier await : la fenêtre
-            // s'affichait pendant toute l'analyse. Elle n'est rendue qu'à l'interface normale.
-            var mainWindowUri = StartupUri;
-            StartupUri = null;
+            // Pas de StartupUri dans App.xaml : WPF chargeait MainWindow.xaml dès le retour de
+            // OnStartup, même après Shutdown() et au premier await du scan planifié
+            // (--fullscan --quiet). La fenêtre principale est créée à la fin de cette méthode,
+            // sur le seul chemin de l'interface. Ne jamais écrire StartupUri = null : depuis
+            // .NET 10, le setter lève ArgumentNullException (modes --clamd-stub/--clamd-relay
+            // cassés par la version précédente de ce correctif).
 
             var earlyMode = HeadlessScanArguments.ParseMode(e.Args);
             _noInteractiveUi = !Environment.UserInteractive
@@ -176,8 +175,7 @@ namespace optiSCAN
                     return;
                 }
 
-                // Pas de MainWindow.xaml (StartupUri) : seule cette fenêtre s'ouvre.
-                StartupUri = null;
+                // Seule cette fenêtre s'ouvre (pas de MainWindow).
                 ThemeManager.Initialize();
                 ShutdownMode = ShutdownMode.OnMainWindowClose;
                 var window = new Views.ServiceQuarantineWindow { WindowStartupLocation = WindowStartupLocation.CenterScreen };
@@ -266,9 +264,14 @@ namespace optiSCAN
             GuardSession = headlessMode == HeadlessScanArguments.Mode.Guard
                 || headlessMode == HeadlessScanArguments.Mode.ServiceHost;
 
-            StartupUri = mainWindowUri;
             base.OnStartup(e);
             // Thème : ThemeManager.Initialize() dans MainWindow (avant InitializeComponent).
+            // Fenêtre principale : seulement ici, après le contrôle d'instance unique (une seconde
+            // instance réveille la première sans ouvrir de fenêtre). La session garde la masque
+            // elle-même après chargement (MainWindowStartupCoordinator).
+            var mainWindow = new MainWindow();
+            MainWindow = mainWindow;
+            mainWindow.Show();
         }
 
         // ── Gestion globale des exceptions non gérées ────────────────────────────
