@@ -82,17 +82,21 @@ public sealed class BugfixOctober29Tests
     // ── Démarrage : la fenêtre principale n'est chargée qu'en mode interface ───
 
     [Fact]
-    public void App_restores_startup_uri_only_on_the_interactive_path()
+    public void Main_window_is_created_only_on_the_interactive_path()
     {
+        var xaml = File.ReadAllText(Path.Combine(RepoRoot(), "optiSCAN", "App.xaml"));
         var app = File.ReadAllText(Path.Combine(RepoRoot(), "optiSCAN", "App.xaml.cs"));
-        var cleared = app.IndexOf("StartupUri = null;", StringComparison.Ordinal);
-        var firstHeadless = app.IndexOf("Mode.Watchdog", StringComparison.Ordinal);
-        var restored = app.IndexOf("StartupUri = mainWindowUri;", StringComparison.Ordinal);
-        var singleInstance = app.IndexOf("new Mutex(true, MutexName, out createdNew)", StringComparison.Ordinal);
+        var code = string.Join('\n', app.Split('\n').Where(l => !l.TrimStart().StartsWith("//", StringComparison.Ordinal)));
 
-        Assert.True(cleared >= 0 && cleared < firstHeadless, "StartupUri doit être vidé avant les modes sans interface.");
-        Assert.True(restored > singleInstance, "StartupUri n'est rendu qu'après le contrôle d'instance unique.");
-        Assert.Contains("ServiceContainer.IsCreated", app, StringComparison.Ordinal);
+        // Pas de chargement automatique, et jamais StartupUri = null (ArgumentNullException en .NET 10).
+        Assert.DoesNotContain("StartupUri", xaml, StringComparison.Ordinal);
+        Assert.DoesNotContain("StartupUri", code, StringComparison.Ordinal);
+
+        var singleInstance = code.IndexOf("new Mutex(true, MutexName, out createdNew)", StringComparison.Ordinal);
+        var created = code.IndexOf("new MainWindow()", StringComparison.Ordinal);
+        Assert.True(singleInstance >= 0 && created > singleInstance, "MainWindow n'est créée qu'après le contrôle d'instance unique.");
+        Assert.Equal(created, code.LastIndexOf("new MainWindow()", StringComparison.Ordinal));
+        Assert.Contains("ServiceContainer.IsCreated", code, StringComparison.Ordinal);
     }
 
     // ── Installeur : mise à jour avec un service déjà enregistré ──────────────
@@ -104,6 +108,19 @@ public sealed class BugfixOctober29Tests
         Assert.Contains("if ResultCode = 1073 then", setup, StringComparison.Ordinal);
         Assert.Contains("'config {#ProtectionServiceName} '", setup, StringComparison.Ordinal);
         Assert.Contains("/F /IM optiSCAN.Host.exe /T", setup, StringComparison.Ordinal);
+    }
+
+    // ── YARA-Forge : la release épinglée est interrogée, pas « latest » ───────
+
+    [Fact]
+    public void Rules_update_queries_the_pinned_release_not_latest()
+    {
+        Assert.Equal(
+            "https://api.github.com/repos/YARAHQ/yara-forge/releases/tags/" + YaraForgePackageIntegrity.TrustedTag,
+            YaraForgePackageIntegrity.TrustedReleaseApiUrl);
+        var updater = File.ReadAllText(Path.Combine(RepoRoot(), "optiSCAN.Engine", "Services", "YaraForgeUpdater.cs"));
+        Assert.DoesNotContain("releases/latest", updater, StringComparison.Ordinal);
+        Assert.Contains("YaraForgePackageIntegrity.TrustedReleaseApiUrl", updater, StringComparison.Ordinal);
     }
 
     private sealed class FixedExclusions : IExclusionSettingsAccessor

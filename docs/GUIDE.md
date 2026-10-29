@@ -454,7 +454,7 @@ La **version 2** ajoute aussi : note de **posture sécurité** (Accueil), **rép
 
 **Manuel** — `BtnManualUpdateSignatures_Click` enchaîne `FreshclamUpdater.UpdateAsync()` puis `YaraForgeUpdater.UpdateAsync()` (journal dans l’onglet Signatures).
 
-**Automatique** — À l’instanciation de `ServiceContainer.Default`, les minuteries sont armées : **ClamAV toutes les 4 h**, **vérification/mise à jour YARA-Forge toutes les 24 h**. La case **Mise à jour automatique des signatures** dans **Options** coupe ou réactive **les deux** services (`DisableAutoUpdate` / `EnableAutoUpdate`). Pour YARA-Forge, l'updater n'accepte que l'asset `yara-forge-rules-core.zip` de la release `20261004`, avec la taille et le SHA-256 approuvés localement ; l'URL et le digest de l'API GitHub doivent correspondre aussi. Si la release « latest » change, l'updater refuse le nouvel asset jusqu'à l'ajout de son empreinte dans une mise à jour optiSCAN. L'échec est fermé : les règles précédentes restent installées.
+**Automatique** — À l’instanciation de `ServiceContainer.Default`, les minuteries sont armées : **ClamAV toutes les 4 h**, **vérification/mise à jour YARA-Forge toutes les 24 h**. La case **Mise à jour automatique des signatures** dans **Options** coupe ou réactive **les deux** services (`DisableAutoUpdate` / `EnableAutoUpdate`). Pour YARA-Forge, l'updater n'accepte que l'asset `yara-forge-rules-core.zip` de la release `20261026`, avec la taille et le SHA-256 approuvés localement ; l'URL et le digest de l'API GitHub doivent correspondre aussi. L'updater interroge cette release par son tag (`releases/tags/20261026`), jamais « latest » : une publication plus récente n'est pas installée tant qu'une mise à jour optiSCAN n'approuve pas son empreinte, et ne provoque plus d'erreur « vérification d'intégrité » (c'était le cas avant le 29 octobre 2026, dès que YARA-Forge publiait une nouvelle version).
 
 ### 4.7 Système d'exclusions
 
@@ -657,7 +657,7 @@ FERMETURE
 
 DÉMARRAGE (ligne de commande)
     `--fullscan` / `--quickscan` [+ `--quiet` ] → `App.RunHeadlessAsync` : orchestrateur, journal, quarantaine auto si `ExclusionSettings.Current.AutoQuarantineEnabled`, notification fin si menaces et non quiet.
-    Modes sans fenêtre (headless, watchdog, actions élevées, seconde instance) : `App.OnStartup` vide `StartupUri` et ne le rétablit que sur le chemin de l'interface normale (WPF charge sinon `MainWindow.xaml` après `OnStartup`, même après `Shutdown()`). `OnExit` ne construit pas `ServiceContainer` s'il n'a pas servi (`ServiceContainer.IsCreated`).
+    Modes sans fenêtre (headless, watchdog, actions élevées, seconde instance) : `App.xaml` n'a pas de `StartupUri` (WPF chargerait sinon `MainWindow.xaml` après `OnStartup`, même après `Shutdown()`) ; `App.OnStartup` crée `MainWindow` seulement sur le chemin de l'interface, après le contrôle d'instance unique. Ne jamais assigner `StartupUri = null` : depuis .NET 10 le setter lève `ArgumentNullException`. `OnExit` ne construit pas `ServiceContainer` s'il n'a pas servi (`ServiceContainer.IsCreated`).
 ```
 
 ---
@@ -735,7 +735,7 @@ Offline avec bases + règles : `.\scripts\publish-release.ps1 -EmbedOfflineSigna
 1. Gel fonctionnel : `.\scripts\validate-release-readiness.ps1` (ou suite `dotnet test` Release sur le commit candidat).
 2. Dépendances : `.\scripts\fetch-runtime-deps.ps1` (binaires ClamAV/YARA ; freshclam optionnel — les CVD/`.yar` se téléchargent aussi **après install** via MAJ signatures).
 3. Publish local : `.\scripts\prepare-release-v3.ps1` ou `clean` → `dotnet publish` → `build-release-setup.ps1 -SkipPublish`.
-4. VM propre : installer `optiSCAN_Setup_v3.1.0.exe` ; **MAJ signatures** (freshclam + asset YARA-Forge épinglé ; vérifier l'échec fermé si la release latest n'est plus `20261004`) ; scan, RTP optionnelle, FR/EN.
+4. VM propre : installer `optiSCAN_Setup_v3.1.0.exe` ; **MAJ signatures** (freshclam + asset YARA-Forge épinglé ; règles installées depuis la release épinglée `20261026`, même si une publication plus récente existe) ; scan, RTP optionnelle, FR/EN.
 5. CI : push `main` → job **Publish win-x64** ; artefact `optiSCAN-setup-<sha>.exe`.
 6. Signature : uniquement par SignPath Foundation, sur un tag `vX.Y.Z` poussé sur `main` (`.github/workflows/release.yml`, approbation manuelle). Aucun certificat local ni secret PFX. Voir [la procédure](SIGNATURE_PROCEDURE.md).
 7. Après validation et accord de publication : `git tag v3.1.0` ; le brouillon de release GitHub signé est créé par `release.yml`.
@@ -784,7 +784,7 @@ optiSCAN_Setup_v3.1.0.exe
     ├── optiSCAN.ico / hero / shield
     ├── clamav/x64/          ← Binaires (clamscan, clamd, freshclam) — sans database/
     ├── yara/                ← yara64 / yarac (moteur)
-    ├── rules/               ← absent par défaut ; téléchargé si latest correspond à l'asset épinglé `20261004`
+    ├── rules/               ← absent par défaut ; téléchargé depuis la release épinglée `20261026` (interrogée par son tag, pas `latest`)
     ├── scripts/             ← add-defender-exclusions.ps1 (opt-in manuel / Options)
     └── optiSCAN.AmsiProvider.dll (enregistré avec le service ; aucun pilote .sys)
 ```
