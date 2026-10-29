@@ -160,7 +160,7 @@ Liste complète : [THIRD-PARTY-NOTICES.md](https://github.com/1donatien0/optiSCA
 - Chaîne de signature SignPath Foundation, et moteurs ClamAV et YARA épinglés et vérifiés.
 
 **Qualité**
-- 764 tests automatisés, et un audit indépendant suivi dans le dépôt.
+- 771 tests automatisés, et un audit indépendant suivi dans le dépôt.
 
 Historique complet : [README du dépôt](https://github.com/1donatien0/optiSCAN#11-historique-des-versions-produit).
 
