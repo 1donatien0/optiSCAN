@@ -39,6 +39,14 @@ namespace optiSCAN
         /// </summary>
         protected override async void OnStartup(StartupEventArgs e)
         {
+            // WPF charge StartupUri (MainWindow.xaml) dès le retour de OnStartup, même après
+            // Shutdown() : le constructeur de la fenêtre créait alors ServiceContainer, l'icône de
+            // la zone de notification et le ViewModel dans chaque mode sans interface. Pire, le
+            // scan planifié (--fullscan --quiet) rend la main à son premier await : la fenêtre
+            // s'affichait pendant toute l'analyse. Elle n'est rendue qu'à l'interface normale.
+            var mainWindowUri = StartupUri;
+            StartupUri = null;
+
             var earlyMode = HeadlessScanArguments.ParseMode(e.Args);
             _noInteractiveUi = !Environment.UserInteractive
                 || earlyMode is not (HeadlessScanArguments.Mode.None
@@ -258,6 +266,7 @@ namespace optiSCAN
             GuardSession = headlessMode == HeadlessScanArguments.Mode.Guard
                 || headlessMode == HeadlessScanArguments.Mode.ServiceHost;
 
+            StartupUri = mainWindowUri;
             base.OnStartup(e);
             // Thème : ThemeManager.Initialize() dans MainWindow (avant InitializeComponent).
         }
@@ -468,6 +477,10 @@ namespace optiSCAN
                 _instanceMutex = null;
             }
             base.OnExit(e);
+            // Seconde instance, actions élevées, watchdog… : le conteneur n'a jamais servi.
+            // Le créer ici pour le fermer aussitôt chargeait réglages, quarantaine et moteurs.
+            if (!Services.ServiceContainer.IsCreated)
+                return;
             try { Services.ServiceContainer.Default.Shutdown(); }
             catch (Exception ex) when (!ex.IsFatal()) { Services.AppLogger.Warn("App", "ServiceContainer.Shutdown", ex); }
         }

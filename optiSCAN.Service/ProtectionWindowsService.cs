@@ -17,6 +17,9 @@ public sealed class ProtectionWindowsService : BackgroundService
     /// <summary>Échecs de ping consécutifs (un toutes les 15 s) avant d'arrêter un hôte figé.</summary>
     internal const int MaxFailedPings = 4;
 
+    /// <summary>Délai laissé à l'hôte pour s'arrêter proprement après la demande d'arrêt.</summary>
+    internal static readonly TimeSpan HostShutdownGrace = TimeSpan.FromSeconds(10);
+
     private readonly ServiceHostRestartPolicy _restartPolicy = new();
     private readonly IHostApplicationLifetime _lifetime;
     private Process? _hostProcess;
@@ -186,8 +189,19 @@ public sealed class ProtectionWindowsService : BackgroundService
 
         try
         {
-            if (_hostProcess is { HasExited: false })
-                _hostProcess.Kill(entireProcessTree: true);
+            // La demande d'arrêt est acquittée avant que l'hôte n'ait fini (temps réel, IPC,
+            // clamd, journaux). Le tuer aussitôt rendait cet arrêt propre inopérant : il a
+            // quelques secondes, dans la limite accordée par le gestionnaire de services.
+            if (_hostProcess is { HasExited: false } host)
+            {
+                using var grace = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+                grace.CancelAfter(HostShutdownGrace);
+                try { await host.WaitForExitAsync(grace.Token).ConfigureAwait(false); }
+                catch (OperationCanceledException) { /* délai écoulé : arrêt forcé ci-dessous */ }
+
+                if (!host.HasExited)
+                    host.Kill(entireProcessTree: true);
+            }
         }
         catch (Exception ignored) when (!ignored.IsFatal()) { /* ignore */ }
 

@@ -42,6 +42,14 @@ namespace optiSCAN.Models
         [System.Text.Json.Serialization.JsonIgnore]
         public bool HasCoverageGaps { get; set; }
 
+        /// <summary>
+        /// Détections écartées parce que le fichier est exclu par l'utilisateur. clamscan les
+        /// compte dans son code de sortie (1 = menace trouvée) : sans ce compteur, une analyse
+        /// qui ne trouvait qu'un fichier exclu passait en erreur.
+        /// </summary>
+        [System.Text.Json.Serialization.JsonIgnore]
+        public int SuppressedDetections { get; set; }
+
         /// <summary>Volume total scanné en octets (remontés par clamscan).</summary>
         public long TotalBytesScanned { get; set; }
 

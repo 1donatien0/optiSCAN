@@ -51,10 +51,8 @@ namespace optiSCAN.Models
 
         /// <summary>Affichage de la taille en format lisible.</summary>
         public string FileSizeDisplay => FileSize >= 0
-            ? FileSize < 1024 ? $"{FileSize} o"
-            : FileSize < 1024 * 1024 ? $"{FileSize / 1024.0:F1} Ko"
-            : $"{FileSize / (1024.0 * 1024):F1} Mo"
-            : "Inconnu";
+            ? optiSCAN.Localization.ByteSizeFormat.Format(FileSize)
+            : optiSCAN.Localization.LocalizationService.GetString("Common_Unknown");
 
         /// <summary>Couleur associée au moteur de détection (pour affichage).</summary>
         public string DetectedByColor => DetectedBy switch
