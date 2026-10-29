@@ -359,7 +359,8 @@ namespace optiSCAN.Services
                 result.FinishedAt = DateTime.Now;
                 var timedOut = deadline.IsCancellationRequested && !ct.IsCancellationRequested;
                 var exitCode = proc.HasExited ? proc.ExitCode : -1;
-                result.Status = ClassifyExit(exitCode, result.Threats.Count, ct.IsCancellationRequested, out var exitError);
+                // Les détections écartées par une exclusion comptent : clamscan rend 1 pour elles aussi.
+                result.Status = ClassifyExit(exitCode, result.Threats.Count + result.SuppressedDetections, ct.IsCancellationRequested, out var exitError);
                 if (exitError != null)
                     result.ErrorMessage = exitError;
                 if (timedOut)

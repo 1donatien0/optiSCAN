@@ -52,6 +52,7 @@ namespace optiSCAN.Services
         private readonly object _lock = new();
         private ActivityLogService? _activityLog;
         private readonly IUserPreferencesAccessor _prefs;
+        private bool _resignLegacyManifest;
 
         // ── Construction ─────────────────────────────────────────────────────────
 
@@ -66,6 +67,12 @@ namespace optiSCAN.Services
             EnsureDirectoryExists(_quarantineDir);
             _masterKey = LoadOrCreateMasterKey();
             _doc = LoadManifest();
+            if (_resignLegacyManifest)
+            {
+                lock (_lock)
+                    SaveManifest();
+                AppLogger.Info("QuarantineManager", "Manifeste de quarantaine re-signé au format indépendant de la langue.");
+            }
             UpgradeSignedManifestVersion();
             RebaseRelocatedBlobs();
             _ = Task.Run(() =>
@@ -311,7 +318,9 @@ namespace optiSCAN.Services
                         QuarantinePath = qPath,
                         VirusName = threat.VirusName,
                         QuarantinedAt = DateTime.Now,
-                        OriginalSize = threat.FileSize,
+                        // Taille réellement lue : celle de la menace vaut -1 quand le moteur
+                        // n'a pas pu la relever (affichée « Inconnu » dans la quarantaine).
+                        OriginalSize = len,
                         Sha256 = Convert.ToHexString(sha256),
                         SourceSessionId = sourceSessionId != Guid.Empty ? sourceSessionId : null,
                     };
@@ -935,10 +944,16 @@ namespace optiSCAN.Services
                     if (!string.IsNullOrEmpty(doc.Hmac))
                     {
                         var expected = ComputeHmac(doc.Entries);
-                        if (!CryptographicOperations.FixedTimeEquals(
-                                Convert.FromBase64String(doc.Hmac),
-                                expected))
+                        var stored = Convert.FromBase64String(doc.Hmac);
+                        if (!CryptographicOperations.FixedTimeEquals(stored, expected))
                         {
+                            if (MatchesLegacyHmac(doc.Entries, stored))
+                            {
+                                // Signature d'une version antérieure, authentique : re-signée au
+                                // nouveau format après le chargement.
+                                _resignLegacyManifest = true;
+                                return doc;
+                            }
                             AppLogger.Fatal("QuarantineManager", "HMAC manifest invalide — refus de chargement");
                             KeepRejectedManifest(json);
                             throw new InvalidDataException("Manifest HMAC invalide");
@@ -1010,25 +1025,89 @@ namespace optiSCAN.Services
         /// </summary>
         private byte[] ComputeHmac(List<QuarantineEntry> entries)
         {
-            ThrowIfDisposed();
             // Dérivation : HMAC-key = HKDF(_masterKey, "optiSCAN-manifest-hmac")
-            var hmacKey = HKDF.DeriveKey(
-                hashAlgorithmName: HashAlgorithmName.SHA256,
-                ikm: _masterKey,
-                outputLength: 32,
-                salt: null,
-                info: Encoding.ASCII.GetBytes("optiSCAN-manifest-hmac"));
+            var hmacKey = DeriveHmacKey();
 
             // Sérialisation canonique : on prend les entries sans le champ Hmac
             // pour éviter la circularité, dans un ordre stable.
             var canonical = JsonSerializer.Serialize(
                 entries.OrderBy(e => e.Id, StringComparer.Ordinal).ToList());
 
+            return ComputeHmacOver(hmacKey, canonical);
+        }
+
+        private static byte[] ComputeHmacOver(byte[] hmacKey, string canonical)
+        {
             using var hmac = new HMACSHA256(hmacKey);
             var sig = hmac.ComputeHash(Encoding.UTF8.GetBytes(canonical));
-
             CryptographicOperations.ZeroMemory(hmacKey);
             return sig;
+        }
+
+        private byte[] DeriveHmacKey()
+        {
+            ThrowIfDisposed();
+            return HKDF.DeriveKey(
+                hashAlgorithmName: HashAlgorithmName.SHA256,
+                ikm: _masterKey,
+                outputLength: 32,
+                salt: null,
+                info: Encoding.ASCII.GetBytes("optiSCAN-manifest-hmac"));
+        }
+
+        /// <summary>
+        /// Manifestes signés avant la correction : la sérialisation incluait <c>FileName</c> et
+        /// <c>SizeDisplay</c>, ce dernier formaté dans la culture du moment. La signature est
+        /// recalculée sous cette forme pour les cultures possibles ; si l'une correspond, le
+        /// manifeste est authentique et sera re-signé au nouveau format.
+        /// </summary>
+        internal bool MatchesLegacyHmac(List<QuarantineEntry> entries, byte[] storedHmac)
+        {
+            var cultures = new[]
+            {
+                System.Globalization.CultureInfo.CurrentCulture,
+                System.Globalization.CultureInfo.CurrentUICulture,
+                System.Globalization.CultureInfo.InstalledUICulture,
+                System.Globalization.CultureInfo.GetCultureInfo("fr-FR"),
+                System.Globalization.CultureInfo.GetCultureInfo("en-US"),
+                System.Globalization.CultureInfo.InvariantCulture,
+            };
+            var tried = new HashSet<string>(StringComparer.Ordinal);
+            foreach (var culture in cultures)
+            {
+                var canonical = LegacyCanonicalJson(entries, culture);
+                if (!tried.Add(canonical))
+                    continue;
+                var expected = ComputeHmacOver(DeriveHmacKey(), canonical);
+                if (expected.Length == storedHmac.Length && CryptographicOperations.FixedTimeEquals(expected, storedHmac))
+                    return true;
+            }
+            return false;
+        }
+
+        /// <summary>Reproduit octet pour octet la sérialisation des versions antérieures.</summary>
+        internal static string LegacyCanonicalJson(List<QuarantineEntry> entries, System.Globalization.CultureInfo culture)
+        {
+            var sb = new StringBuilder("[");
+            var first = true;
+            foreach (var e in entries.OrderBy(e => e.Id, StringComparer.Ordinal))
+            {
+                var size = e.OriginalSize;
+                var display = size >= 0
+                    ? size < 1024 ? string.Format(culture, "{0} o", size)
+                    : size < 1048576 ? string.Format(culture, "{0:F1} Ko", size / 1024.0)
+                    : string.Format(culture, "{0:F1} Mo", size / 1048576.0)
+                    : "Inconnu";
+                var json = JsonSerializer.Serialize(e);
+                if (!first)
+                    sb.Append(',');
+                first = false;
+                sb.Append(json, 0, json.Length - 1)
+                  .Append(",\"FileName\":").Append(JsonSerializer.Serialize(Path.GetFileName(e.OriginalPath)))
+                  .Append(",\"SizeDisplay\":").Append(JsonSerializer.Serialize(display))
+                  .Append('}');
+            }
+            return sb.Append(']').ToString();
         }
 
         private static void EnsureDirectoryExists(string dir)
@@ -1072,11 +1151,17 @@ namespace optiSCAN.Services
         [System.Text.Json.Serialization.JsonIgnore(Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingNull)]
         public Guid? SourceSessionId { get; set; }
 
+        /// <remarks>
+        /// Propriétés d'affichage : jamais sérialisées. Elles entraient dans le HMAC du manifeste,
+        /// et <see cref="SizeDisplay"/> dépend de la culture (« 1,5 Ko » / « 1.5 KB ») : changer la
+        /// langue de l'interface rendait le manifeste invalide et vidait la quarantaine.
+        /// </remarks>
+        [System.Text.Json.Serialization.JsonIgnore]
         public string FileName => Path.GetFileName(OriginalPath);
+
+        [System.Text.Json.Serialization.JsonIgnore]
         public string SizeDisplay => OriginalSize >= 0
-            ? OriginalSize < 1024 ? $"{OriginalSize} o"
-            : OriginalSize < 1048576 ? $"{OriginalSize / 1024.0:F1} Ko"
-            : $"{OriginalSize / 1048576.0:F1} Mo"
-            : "Inconnu";
+            ? optiSCAN.Localization.ByteSizeFormat.Format(OriginalSize)
+            : optiSCAN.Localization.LocalizationService.GetString("Common_Unknown");
     }
 }

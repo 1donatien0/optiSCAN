@@ -333,7 +333,7 @@ namespace optiSCAN.Views
 
             if (txtSessionDate != null)
 
-                txtSessionDate.Text = entry.StartedAt.ToString("dd/MM/yyyy HH:mm", cult);
+                txtSessionDate.Text = entry.StartedAt.ToString("g", cult);
 
 
 
