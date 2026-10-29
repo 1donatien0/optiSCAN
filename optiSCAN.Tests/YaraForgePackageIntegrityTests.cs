@@ -33,12 +33,12 @@ public sealed class YaraForgePackageIntegrityTests
         Assert.False(YaraForgePackageIntegrity.TryGetExpectedDigest(JsonNode.Parse(json), out _, out _));
 
     [Theory]
-    [InlineData("https://github.com/YARAHQ/yara-forge/releases/download/20261004/yara-forge-rules-core.zip", "20261004", "yara-forge-rules-core.zip", true)]
-    [InlineData("http://github.com/YARAHQ/yara-forge/releases/download/20261004/yara-forge-rules-core.zip", "20261004", "yara-forge-rules-core.zip", false)]
-    [InlineData("https://github.com.evil.example/YARAHQ/yara-forge/releases/download/20261004/yara-forge-rules-core.zip", "20261004", "yara-forge-rules-core.zip", false)]
+    [InlineData("https://github.com/YARAHQ/yara-forge/releases/download/20261026/yara-forge-rules-core.zip", "20261026", "yara-forge-rules-core.zip", true)]
+    [InlineData("http://github.com/YARAHQ/yara-forge/releases/download/20261026/yara-forge-rules-core.zip", "20261026", "yara-forge-rules-core.zip", false)]
+    [InlineData("https://github.com.evil.example/YARAHQ/yara-forge/releases/download/20261026/yara-forge-rules-core.zip", "20261026", "yara-forge-rules-core.zip", false)]
     [InlineData("https://github.com/YARAHQ/yara-forge/releases/download/20261005/yara-forge-rules-core.zip", "20261005", "yara-forge-rules-core.zip", false)]
-    [InlineData("https://github.com/YARAHQ/yara-forge/releases/download/20261004/other.zip", "20261004", "other.zip", false)]
-    [InlineData(null, "20261004", "yara-forge-rules-core.zip", false)]
+    [InlineData("https://github.com/YARAHQ/yara-forge/releases/download/20261026/other.zip", "20261026", "other.zip", false)]
+    [InlineData(null, "20261026", "yara-forge-rules-core.zip", false)]
     public void IsAllowedDownloadUrl_only_accepts_the_pinned_yara_forge_asset(
         string? url, string tagName, string assetName, bool expected) =>
         Assert.Equal(expected, YaraForgePackageIntegrity.IsAllowedDownloadUrl(url, tagName, assetName));

@@ -27,10 +27,17 @@ internal static class YaraForgePackageIntegrity
 
     private const string AllowedHost = "github.com";
     private const string AllowedPathPrefix = "/YARAHQ/yara-forge/releases/download/";
-    private const string TrustedTag = "20261004";
+    internal const string TrustedTag = "20261026";
     private const string TrustedAssetName = "yara-forge-rules-core.zip";
-    private const long TrustedAssetSize = 1_747_609;
-    private const string TrustedSha256Hex = "0b548dff76139b7a041d20923ccfddfa614db6b6ee8710c181ff037a753ffe69";
+    private const long TrustedAssetSize = 1_744_047;
+    private const string TrustedSha256Hex = "95ff046c4250e8965928f467dda61621a2c776dd02f40a375a829d60a4e92e13";
+
+    /// <summary>
+    /// Release interrogée : celle qui est épinglée, jamais « latest ». Avec « latest », chaque
+    /// nouvelle publication hebdomadaire de YARA-Forge faisait échouer toute mise à jour des
+    /// règles (« vérification d'intégrité »), alors que la release approuvée restait disponible.
+    /// </summary>
+    internal const string TrustedReleaseApiUrl = "https://api.github.com/repos/YARAHQ/yara-forge/releases/tags/" + TrustedTag;
 
     /// <summary>
     /// Vérifie la release et l'asset contre l'allowlist embarquée, puis vérifie que les

@@ -26,7 +26,7 @@ namespace optiSCAN.Services
     {
         // ── Constantes ────────────────────────────────────────────────────────────
 
-        private const string ApiUrl = OptiscanStrings.Urls.YaraForgeApiLatest;
+        private const string ApiUrl = YaraForgePackageIntegrity.TrustedReleaseApiUrl;
         private const string PackageName = "yara-forge-rules-core.zip";
 
         private readonly string _rulesDirectory;

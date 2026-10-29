@@ -33,7 +33,7 @@ Aucune de ces données ne quitte le poste.
 
 ### Mises à jour de signatures (ClamAV/YARA)
 
-- `freshclam` et l'API/téléchargement GitHub des règles contactent les serveurs de signatures (téléchargement de bases publiques). YARA-Forge n'installe que l'asset et l'empreinte autorisés localement par optiSCAN (release `20261004` dans l'état courant). Pas d'envoi de fichiers ou d'autres données locales ; échange réseau standard de mise à jour.
+- `freshclam` et l'API/téléchargement GitHub des règles contactent les serveurs de signatures (téléchargement de bases publiques). YARA-Forge n'installe que l'asset et l'empreinte autorisés localement par optiSCAN (release `20261026` dans l'état courant, interrogée par son tag). Pas d'envoi de fichiers ou d'autres données locales ; échange réseau standard de mise à jour.
 
 ## 3. Points à formaliser pour le RGPD
 
