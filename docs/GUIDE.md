@@ -433,7 +433,7 @@ En bas du tableau, le bouton **Tout mettre en quarantaine** (`BtnQuarantineAll_C
 
 ### 4.5 Pipeline de détection en parallèle
 
-Les scans interactifs passent par `ScanViewModel.StartScanAsync` → `ScanOrchestrator` : pour chaque cible, **ClamAV** (daemon **clamd** ou repli **clamscan.exe**) et **YARA** tournent en parallèle (`Task.WhenAll`), puis fusion. Les scans **multi-dossiers** passent par `MultiTargetScanAggregator`. Les **périmètres protégés** optiSCAN sont exclus (`OptiscanProtectedPaths` + `ExclusionSettings`) : le dossier d'installation entier s'il est réservé aux administrateurs (sinon ses seuls `clamav`, `rules` et `yara`), et dans `%LOCALAPPDATA%\optiSCAN`, sous `clamav`, `clamd`, `rules`, `Quarantine` et `SafetyBackups`, les seuls fichiers de données connus (signatures `.cvd`/`.cld`…, règles `.yar`/`.yarc`, configuration, journaux, quarantaine `.quar`, copies `.optibak`). Ces dossiers sont inscriptibles par la session : un exécutable ou un script qui y est déposé est analysé, comme le reste du dossier. **`RiskScoringService`** alimente la colonne **Risque**, les toasts et le PDF.
+Les scans interactifs passent par `ScanViewModel.StartScanAsync` → `ScanOrchestrator` : pour chaque cible, **ClamAV** (daemon **clamd** ou repli **clamscan.exe**) et **YARA** tournent en parallèle (`Task.WhenAll`), puis fusion. Le pipeline s'exécute hors du fil de l'interface (`Task.Run` dans `ScanOrchestrator.RunWithDeadlineAsync`) : le dénombrement YARA d'un dossier (jusqu'à 100 000 fichiers) ne fige plus la fenêtre. Les scans **multi-dossiers** passent par `MultiTargetScanAggregator`. Les **périmètres protégés** optiSCAN sont exclus (`OptiscanProtectedPaths` + `ExclusionSettings`) : le dossier d'installation entier s'il est réservé aux administrateurs (sinon ses seuls `clamav`, `rules` et `yara`), et dans `%LOCALAPPDATA%\optiSCAN`, sous `clamav`, `clamd`, `rules`, `Quarantine` et `SafetyBackups`, les seuls fichiers de données connus (signatures `.cvd`/`.cld`…, règles `.yar`/`.yarc`, configuration, journaux, quarantaine `.quar`, copies `.optibak`). Ces dossiers sont inscriptibles par la session : un exécutable ou un script qui y est déposé est analysé, comme le reste du dossier. **`RiskScoringService`** alimente la colonne **Risque**, les toasts et le PDF.
 
 > **clamd** — si `clamd.exe` est présent et l’option **Moteur clamd** est activée (Options), clamd est lancé dans un **AppContainer** sans accès direct aux fichiers des utilisateurs. L’hôte ouvre chaque fichier avec ses propres droits et l’envoie en flux (`zINSTREAM`) : aucune ACL n’est modifiée. Le client optiSCAN utilise un tube nommé réservé au compte; le port TCP aléatoire écoute sur `127.0.0.1`. Le protocole TCP de clamd n’authentifie pas ses clients : selon les filtres AppContainer/loopback de Windows, un processus local peut potentiellement l’atteindre. Ce port ne constitue pas une frontière d’identité. Les commandes d’arrêt et de rechargement sont désactivées. clamd reçoit jusqu’à **4 fichiers en parallèle** (la moitié des cœurs, au moins 2) ; un dossier est parcouru au fil de l’eau, sans liste complète en mémoire. Un fichier non lu par clamd repasse par **`clamscan.exe`** ; si clamd est indisponible ou tombe pendant l’analyse, tout le dossier passe par clamscan. Note posture Accueil : [§13 Sécurité](#13-sécurité-posture-et-menaces).
 
@@ -475,6 +475,7 @@ La **version 2** ajoute aussi : note de **posture sécurité** (Accueil), **rép
 - **Dossiers utilisateur** : ajout manuel dans **Options → EXCLUSIONS**
 - **Règles exclues** : matches YARA filtrés (ex. `SuspiciousDownloads` — exclu par défaut)
 - **ClamAV / clamd** : plusieurs `--exclude` / lignes `ExcludePath` (une par racine protégée)
+- **Fichier exclu détecté par clamscan** : la détection est écartée et comptée (`ScanResult.SuppressedDetections`, non persisté) ; clamscan rend alors 1, et l'analyse reste « terminée » au lieu de passer en erreur (« menace qui n'a pas été lue »)
 - **RTP** et **scan USB/SD** : mêmes exclusions ; lecteur entier exclu si son chemin racine est listé
 
 **Exclusions Windows Defender** (`WindowsDefenderExclusionService`) — **opt-in** (évite le marqueur heuristique « tamper » d’un ajout silencieux) :
@@ -495,7 +496,9 @@ Configurable depuis **Options → EXCLUSIONS** (exclusions internes optiSCAN uni
 Les fichiers en quarantaine sont stockés en **AES-256-GCM** (format binaire `OPTQ`, nonce et tag d’authentification).
 
 - Clé maîtresse 256 bits, **DPAPI CurrentUser** (fichier `.key`).
-- Manifeste `manifest.json` signé **HMAC-SHA256** (intégrité).
+- Manifeste `manifest.json` signé **HMAC-SHA256** (intégrité), calculé sur les seuls champs enregistrés : les propriétés d'affichage `FileName` et `SizeDisplay` ne sont pas sérialisées (`[JsonIgnore]`).
+- Jusqu'au 29 octobre 2026, `SizeDisplay` (« 1,5 Ko » / « 1.5 Ko » selon la langue) entrait dans la signature : changer la langue de l'interface rendait le manifeste invalide et la quarantaine semblait vide. Un manifeste signé à l'ancien format est reconnu (`MatchesLegacyHmac` : culture courante, fr-FR, en-US, invariante), puis re-signé au nouveau format au chargement. Un manifeste non signé reste refusé.
+- La taille enregistrée est celle réellement lue au moment de la quarantaine (et non celle du moteur, parfois inconnue).
 
 Stockage : `%LOCALAPPDATA%\optiSCAN\Quarantine\` — `{guid}.quar` + `manifest.json`. Restauration par défaut ou vers un dossier choisi : `IThreatStore.RestoreTo(quarantineId, destinationFolder)`, après confirmation qui nomme la menace. Le temps réel de la session épargne 15 minutes le fichier restauré (même chemin, même contenu : `RestoredContentGrace`) au lieu de le remettre aussitôt en quarantaine.
 
@@ -573,7 +576,7 @@ Un seul scan USB à la fois (**SemaphoreSlim(1)**). `ServiceContainer.ApplyRemov
 
 ### ScheduledScanService — tâche planifiée Windows
 
-Instance unique : **`ServiceContainer.Default.ScheduledScan`** (partagée avec **Options**, pas d’instance locale isolée). Enveloppe **`schtasks.exe`** pour **`optiSCAN_DailyScan`** (`optiSCAN.exe --fullscan --quiet`, moindre privilège, session interactive, heure configurable). La tâche est créée depuis une définition XML avec **`StartWhenAvailable`** : un scan manqué (PC en veille ou éteint à l’heure prévue) est lancé au réveil. Une tâche créée par une version antérieure est recréée à la même heure au démarrage de l’interface ; si `/XML` échoue, l’ancienne création `/SC DAILY` sert de repli. **Options** : case planification, sélecteur d’heure, libellé **prochaine exécution** (`GetNextRunTime`), bouton **Lancer maintenant** (`RunNow`). **`App.xaml.cs`** : `--fullscan` / `--quickscan` / `--quiet` en headless (quarantaine auto si activée) — les résultats ne remontent pas dans la grille menaces de la session UI ouverte.
+Instance unique : **`ServiceContainer.Default.ScheduledScan`** (partagée avec **Options**, pas d’instance locale isolée). Enveloppe **`schtasks.exe`** pour **`optiSCAN_DailyScan`** (`optiSCAN.exe --fullscan --quiet`, moindre privilège, session interactive, heure configurable). La tâche est créée depuis une définition XML avec **`StartWhenAvailable`** : un scan manqué (PC en veille ou éteint à l’heure prévue) est lancé au réveil. Une tâche créée par une version antérieure est recréée à la même heure au démarrage de l’interface ; si `/XML` échoue, l’ancienne création `/SC DAILY` sert de repli. **Options** : case planification, sélecteur d’heure, libellé **prochaine exécution** (`GetNextRunTime`), bouton **Lancer maintenant** (`RunNow`). **`App.xaml.cs`** : `--fullscan` / `--quickscan` / `--quiet` en headless (quarantaine auto si activée), sans ouvrir la fenêtre principale — les résultats ne remontent pas dans la grille menaces de la session UI ouverte.
 
 ### NotificationService — toasts Windows natifs
 
@@ -654,6 +657,7 @@ FERMETURE
 
 DÉMARRAGE (ligne de commande)
     `--fullscan` / `--quickscan` [+ `--quiet` ] → `App.RunHeadlessAsync` : orchestrateur, journal, quarantaine auto si `ExclusionSettings.Current.AutoQuarantineEnabled`, notification fin si menaces et non quiet.
+    Modes sans fenêtre (headless, watchdog, actions élevées, seconde instance) : `App.OnStartup` vide `StartupUri` et ne le rétablit que sur le chemin de l'interface normale (WPF charge sinon `MainWindow.xaml` après `OnStartup`, même après `Shutdown()`). `OnExit` ne construit pas `ServiceContainer` s'il n'a pas servi (`ServiceContainer.IsCreated`).
 ```
 
 ---
@@ -767,7 +771,8 @@ $pub = ".\optiSCAN\bin\Release\net10.0-windows10.0.17763.0\publish\win-x64"
 ```
 
 **Installateur** : assistant **bilingue** (français / English) ; langue choisie → `UiCulture` en registre pour le premier lancement de l’app.  
-**Profil release recommandé** : x64 only ; `prepare-release-v3.ps1` utilise `FolderProfile` (self-contained, runtime inclus) et `publish-release.ps1` inclut toujours le runtime .NET ; service plateforme **décoché** ; ni AMSI ni pilote ; **pas** d’exclusions Defender auto ; bases ClamAV via **MAJ signatures** après install, règles YARA dans `%LOCALAPPDATA%\optiSCAN\rules`.
+**Profil release recommandé** : x64 only ; `prepare-release-v3.ps1` utilise `FolderProfile` (self-contained, runtime inclus) et `publish-release.ps1` inclut toujours le runtime .NET ; service plateforme **coché** à la première installation (R9, `checkedonce`) ; fournisseur AMSI livré avec le service, aucun pilote ; **pas** d’exclusions Defender auto ; bases ClamAV via **MAJ signatures** après install, règles YARA dans `%LOCALAPPDATA%\optiSCAN\rules`.
+**Mise à jour par-dessus une installation existante** : `optiSCAN.Host.exe` est arrêté avec l'interface et le service avant la copie ; un service déjà enregistré (`sc create` → code 1073) est reconfiguré par `sc config` puis redémarré, au lieu d'une erreur qui le laissait arrêté jusqu'au redémarrage. Libellés des tâches, du raccourci de désinstallation et de la case « Lancer » traduits via `[CustomMessages]`.
 
 **Contenu de l'installateur (taille dépend du mode de publication, hors CVD/.yar) :**
 
@@ -775,6 +780,7 @@ $pub = ".\optiSCAN\bin\Release\net10.0-windows10.0.17763.0\publish\win-x64"
 optiSCAN_Setup_v3.1.0.exe
     ├── optiSCAN.exe + dépendances .NET (runtime inclus)
     ├── optiSCAN.Service.exe + optiSCAN.Service.dll + dépendances (service de protection, enregistré seulement si la case est cochée)
+    ├── optiSCAN.Host.exe + optiSCAN.Host.dll (hôte SYSTEM sans WPF, lancé par le service)
     ├── optiSCAN.ico / hero / shield
     ├── clamav/x64/          ← Binaires (clamscan, clamd, freshclam) — sans database/
     ├── yara/                ← yara64 / yarac (moteur)
@@ -791,7 +797,8 @@ Offline complet : `publish-release.ps1 -EmbedOfflineSignatures` (CVD + `.yar` da
 - [ ] `.\scripts\verify-runtime-deps.ps1` — vert sur dossier publish (exige aussi `optiSCAN.Service.exe`, `optiSCAN.Service.dll`, son `runtimeconfig.json` et `optiSCAN.Platform.dll`)
 - [ ] `clamscan.exe`, `freshclam.exe`, **`clamd.exe`**, `yara64.exe` (rules `.yar` : OK si absentes — MAJ post-install)
 - [ ] `clamav\database\` — optionnel dans le setup défaut ; après install : freshclam / MAJ signatures
-- [ ] Installateur FR/EN, service plateforme décoché par défaut ; vérifier que le runtime est inclus dans la publication de release
+- [ ] Installateur FR/EN (libellés des tâches dans la langue choisie), service plateforme coché à la première installation ; vérifier que le runtime est inclus dans la publication de release
+- [ ] Mise à jour par-dessus une installation avec service : aucune erreur `sc create`, service relancé (`sc query optiSCANProtection` → RUNNING)
 - [ ] Test post-install : **MAJ signatures** → scan fichier, quarantaine, historique ; exclusions Defender via Options si souhaité
 - [ ] Après upgrade depuis la version 1 : `scan_history.dat` présent (éventuellement `scan_history.json.legacy`)
 
@@ -846,6 +853,8 @@ optiSCAN est sous GPL v3 : la licence dit ce qu'on peut faire du code, la signat
 
 Les deux langues sont **incluses dans le même binaire** (pas de pack de langue séparé). Les rapports PDF/HTML exportés et les journaux techniques ClamAV/YARA peuvent rester partiellement en français ou en anglais technique.
 
+Dates (format court de la culture, `g`) et tailles (`ByteSizeFormat` : o/Ko/Mo en français, B/KB/MB en anglais) suivent la langue de l'interface : historique, quarantaine (interface et service), signatures, nettoyage. Certains messages d'erreur du moteur (délais, analyse incomplète) restent en français.
+
 ### Développeurs et traducteurs
 
 | Fichier | Culture |
@@ -885,6 +894,18 @@ optiSCAN est un logiciel libre : Copyright 2026 Dona By, distribué sous la [GNU
 ---
 
 ## 11. Historique des versions produit
+
+### v3.1 candidate — corrections du 29 octobre 2026
+
+Revue du code (interface, moteur, service, installeur), branche `fix/bugs-2026-10-29`. Compilation Release sans avertissement ; tests ajoutés : `BugfixOctober29Tests` (6). **Suite Windows à rejouer** (770 cas).
+
+- **Quarantaine** — la signature du manifeste ne dépend plus de la langue : changer fr ↔ en ne vide plus la quarantaine ; anciens manifestes reconnus puis re-signés
+- **Scan planifié** — `--fullscan --quiet` n'ouvre plus la fenêtre principale ; les modes sans fenêtre ne construisent plus la fenêtre ni les services
+- **ClamAV** — un fichier exclu détecté par clamscan ne fait plus passer l'analyse en erreur
+- **Interface** — analyses lancées hors du fil de l'interface (plus de gel au démarrage d'une analyse de dossier) ; une analyse lancée depuis l'accueil bascule bien vers Antivirus (navigation lue à l'usage dans `ScanViewModel`)
+- **Installeur** — mise à jour avec service existant : reconfiguration (`sc config`) et redémarrage au lieu d'une erreur ; arrêt de `optiSCAN.Host.exe` avant copie ; libellés traduits
+- **Service** — l'hôte dispose de 10 s pour s'arrêter proprement après la demande d'arrêt avant l'arrêt forcé
+- **Langue** — dates et tailles selon la culture de l'interface
 
 ### v3.1 candidate — 15 octobre 2026
 
