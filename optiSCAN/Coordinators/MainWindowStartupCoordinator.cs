@@ -92,5 +92,10 @@ public static class MainWindowStartupCoordinator
             host.PendingShellScanPath = null;
             await host.ShellScan.RunShellScanAsync(shellPath).ConfigureAwait(true);
         }
+
+        // Autres éléments d'une sélection multiple, déposés pendant le démarrage : leur message
+        // a pu être diffusé avant que la fenêtre écoute.
+        if (host.ShellScan != null)
+            await host.ShellScan.DrainQueueAsync().ConfigureAwait(true);
     }
 }

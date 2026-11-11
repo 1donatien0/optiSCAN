@@ -39,6 +39,11 @@ namespace optiSCAN.ViewModels
 
             if (type == ScanType.FullScan && !ElevationHelper.IsRunningElevated())
                 StatusMessage = LocalizationService.GetString("Scan_FullPartialWithoutAdmin");
+            else if (type is ScanType.File or ScanType.Folder
+                && path != null
+                && ElevationHelper.NeedsElevation(path)
+                && !ElevationHelper.IsRunningElevated())
+                StatusMessage = LocalizationService.GetString("Scan_TargetPartialWithoutAdmin");
             else
                 StatusMessage = ScanUserDisplay.ScanStarting(type, path);
 
@@ -89,7 +94,12 @@ namespace optiSCAN.ViewModels
                 int autoQuarantined = 0;
                 if (_exclusions.Current.AutoQuarantineEnabled && result.Threats.Count > 0)
                 {
-                    autoQuarantined = _quarantine.QuarantineAll(result.Threats, result.SessionId);
+                    // Hors du thread de l'interface : chiffrer et écrire chaque fichier figeait la
+                    // fenêtre quand l'analyse trouvait beaucoup de menaces. IsScanning reste vrai
+                    // pendant ce temps, aucune autre analyse ne peut démarrer.
+                    var toQuarantine = result.Threats.ToArray();
+                    var sessionId = result.SessionId;
+                    autoQuarantined = await Task.Run(() => _quarantine.QuarantineAll(toQuarantine, sessionId));
                     WpfApp.Current?.Dispatcher.Invoke(LoadQuarantine);
                     _uiEvents.RequestScanHistoryViewsRefresh();
                 }

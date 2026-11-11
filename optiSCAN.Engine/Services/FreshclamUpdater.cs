@@ -432,7 +432,7 @@ namespace optiSCAN.Services
                     if (!File.Exists(lockPath)) continue;
                     try
                     {
-                        var age = DateTime.Now - File.GetLastWriteTime(lockPath);
+                        var age = DateTime.UtcNow - File.GetLastWriteTimeUtc(lockPath); // UTC : pas de saut au changement d'heure
                         if (age > StaleLockAge)
                         {
                             File.Delete(lockPath);

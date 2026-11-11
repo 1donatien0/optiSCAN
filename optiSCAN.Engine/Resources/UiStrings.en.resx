@@ -770,6 +770,7 @@ Remove them? Files are not deleted, only the share is removed. Other devices wil
   <data name="Opt_HighContrast" xml:space="preserve"><value>High contrast</value></data>
   <data name="Opt_HighContrastSub" xml:space="preserve"><value>Stronger borders and text for improved readability.</value></data>
   <data name="Scan_FullPartialWithoutAdmin" xml:space="preserve"><value>Full scan — partial coverage without administrator rights (see Home banner).</value></data>
+  <data name="Scan_TargetPartialWithoutAdmin" xml:space="preserve"><value>Scan — partial coverage without administrator rights: some files in this location may be unreadable.</value></data>
   <data name="SigUpd_VerifyingRules" xml:space="preserve"><value>Verifying detection rules…</value></data>
   <data name="Av_Action_FileNotFound" xml:space="preserve"><value>File not found: {0}</value></data>
   <data name="Av_Action_DriveUnavailable" xml:space="preserve"><value>Drive unavailable ({0}) — reconnect it to quarantine, or remove the threat from history.</value></data>

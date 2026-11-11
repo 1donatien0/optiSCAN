@@ -49,6 +49,10 @@ namespace optiSCAN
 
         public async void Execute(object? parameter)
         {
+            // Raccourci clavier ou double déclenchement avant la réévaluation du bouton :
+            // CanExecute n'est pas toujours rappelé, la commande se lançait deux fois.
+            if (_isRunning)
+                return;
             _isRunning = true;
             CommandManager.InvalidateRequerySuggested();
             try

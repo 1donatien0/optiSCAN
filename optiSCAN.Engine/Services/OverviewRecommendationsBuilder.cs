@@ -34,7 +34,7 @@ namespace optiSCAN.Services
             var prefs = (preferences ?? new DefaultUserPreferencesAccessor()).Current;
 
             bool suggestClean = !ctx.LastCleanAt.HasValue
-                || (DateTime.Now - ctx.LastCleanAt.Value).TotalDays > prefs.CleanSuggestThresholdDays;
+                || (DateTime.UtcNow - ctx.LastCleanAt.Value.ToUniversalTime()).TotalDays > prefs.CleanSuggestThresholdDays;
 
             string hypLine = suggestClean
                 ? LocalizationService.GetString("Rec_CleanSuggest")
@@ -55,7 +55,7 @@ namespace optiSCAN.Services
                 hypSev = 1;
                 showLink = true;
             }
-            else if ((DateTime.Now - ctx.LastFreshclamUpdate.Value).TotalDays > prefs.SignatureStaleThresholdDays)
+            else if ((DateTime.UtcNow - ctx.LastFreshclamUpdate.Value.ToUniversalTime()).TotalDays > prefs.SignatureStaleThresholdDays)
             {
                 hypLine = LocalizationService.Format("Rec_SigStale", prefs.SignatureStaleThresholdDays);
                 hypSev = 1;

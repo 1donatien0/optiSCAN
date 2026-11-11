@@ -33,7 +33,9 @@ namespace optiSCAN.Services
             {
                 _scheduledTime = time ?? TimeSpan.FromHours(2);
 
-                DeleteTask();
+                // Pas de DeleteTask() préalable : /F remplace la tâche existante. Supprimer
+                // d'abord laissait l'utilisateur sans scan planifié si les deux créations
+                // (XML puis /SC DAILY) échouaient.
 
                 // Définition XML plutôt que /SC DAILY : seule elle permet StartWhenAvailable.
                 // Sans ce réglage, un PC en veille ou éteint à l'heure prévue sautait le scan
@@ -107,8 +109,18 @@ namespace optiSCAN.Services
             try
             {
                 var doc = XDocument.Parse(xml);
-                var startWhenAvailable = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "StartWhenAvailable");
-                if (startWhenAvailable != null && string.Equals(startWhenAvailable.Value.Trim(), "true", StringComparison.OrdinalIgnoreCase))
+                bool IsTrue(string name)
+                {
+                    var el = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == name);
+                    return el != null && string.Equals(el.Value.Trim(), "true", StringComparison.OrdinalIgnoreCase);
+                }
+
+                // Mise à niveau aussi des tâches XML qui refusent de démarrer sur batterie : un
+                // portable rallumé sur batterie ne rattrapait jamais le scan manqué. Une tâche XML
+                // sans cet élément le refuse par défaut (valeur par défaut du planificateur : true).
+                var disallowOnBattery = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "DisallowStartIfOnBatteries");
+                var blocksOnBattery = disallowOnBattery == null || IsTrue("DisallowStartIfOnBatteries");
+                if (IsTrue("StartWhenAvailable") && !blocksOnBattery)
                     return false;
                 var boundary = doc.Descendants().FirstOrDefault(e => e.Name.LocalName == "StartBoundary");
                 if (boundary != null && DateTime.TryParse(boundary.Value.Trim(), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var anchor))
@@ -161,7 +173,9 @@ namespace optiSCAN.Services
                     new XElement(ns + "Principals", principal),
                     new XElement(ns + "Settings",
                         new XElement(ns + "MultipleInstancesPolicy", "IgnoreNew"),
-                        new XElement(ns + "DisallowStartIfOnBatteries", "true"),
+                        // Démarrage autorisé sur batterie : sinon le rattrapage (StartWhenAvailable)
+                        // ne se faisait jamais sur un portable rallumé hors secteur.
+                        new XElement(ns + "DisallowStartIfOnBatteries", "false"),
                         new XElement(ns + "StopIfGoingOnBatteries", "false"),
                         new XElement(ns + "AllowHardTerminate", "true"),
                         new XElement(ns + "StartWhenAvailable", "true"),

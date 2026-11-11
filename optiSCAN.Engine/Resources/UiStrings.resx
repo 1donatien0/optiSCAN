@@ -770,6 +770,7 @@ Les supprimer ? Les fichiers ne sont pas effacés, seul le partage est retiré. 
   <data name="Opt_HighContrast" xml:space="preserve"><value>Contraste renforcé</value></data>
   <data name="Opt_HighContrastSub" xml:space="preserve"><value>Bordures et textes plus marqués pour une meilleure lisibilité.</value></data>
   <data name="Scan_FullPartialWithoutAdmin" xml:space="preserve"><value>Analyse complète — couverture partielle sans droits administrateur (voir bandeau Accueil).</value></data>
+  <data name="Scan_TargetPartialWithoutAdmin" xml:space="preserve"><value>Analyse — couverture partielle sans droits administrateur : certains fichiers de cet emplacement peuvent être illisibles.</value></data>
   <data name="SigUpd_VerifyingRules" xml:space="preserve"><value>Vérification des règles de détection…</value></data>
   <data name="Av_Action_FileNotFound" xml:space="preserve"><value>Fichier introuvable : {0}</value></data>
   <data name="Av_Action_DriveUnavailable" xml:space="preserve"><value>Lecteur inaccessible ({0}) — rebranchez-le pour mettre en quarantaine, ou retirez la menace de l'historique.</value></data>

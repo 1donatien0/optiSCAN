@@ -152,7 +152,7 @@ namespace optiSCAN.Services
 
         private static SecurityPostureCheck CheckRecentScan(DateTime? lastScanAt)
         {
-            bool ok = lastScanAt.HasValue && (DateTime.Now - lastScanAt.Value).TotalDays <= 7;
+            bool ok = lastScanAt.HasValue && (DateTime.UtcNow - lastScanAt.Value.ToUniversalTime()).TotalDays <= 7;
             return new SecurityPostureCheck
             {
                 Id = "scan",

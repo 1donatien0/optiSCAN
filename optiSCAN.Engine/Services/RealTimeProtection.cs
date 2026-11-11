@@ -358,7 +358,7 @@ namespace optiSCAN.Services
                 await Task.Delay(StabilizationDelay);
 
                 // Un événement plus récent a repoussé le scan : seul le dernier traite le fichier.
-                if (!_recentlyScanned.TryGetValue(e.FullPath, out var latest) || latest != utcNow)
+                if (IsSupersededEvent(e.FullPath, utcNow))
                     return;
                 if (!listed && !IsUnlistedExecutable(sender, e.FullPath, utcNow))
                     return;
@@ -372,7 +372,7 @@ namespace optiSCAN.Services
                 await _scanSemaphore.WaitAsync();
                 try
                 {
-                    if (!_recentlyScanned.TryGetValue(e.FullPath, out latest) || latest != utcNow)
+                    if (IsSupersededEvent(e.FullPath, utcNow))
                         return;
                     await ScanFileAsync(WatchRootOf(sender), e.FullPath, e.ChangeType);
                 }
@@ -418,7 +418,7 @@ namespace optiSCAN.Services
                     HandleRecentCacheSaturation(sender, e.FullPath);
 
                 await Task.Delay(StabilizationDelay);
-                if (!_recentlyScanned.TryGetValue(e.FullPath, out var latest) || latest != utcNow)
+                if (IsSupersededEvent(e.FullPath, utcNow))
                     return;
                 if (!listed && !IsUnlistedExecutable(sender, e.FullPath, utcNow))
                     return;
@@ -431,7 +431,7 @@ namespace optiSCAN.Services
                 await _scanSemaphore.WaitAsync();
                 try
                 {
-                    if (!_recentlyScanned.TryGetValue(e.FullPath, out latest) || latest != utcNow)
+                    if (IsSupersededEvent(e.FullPath, utcNow))
                         return;
                     await ScanFileAsync(WatchRootOf(sender), e.FullPath, WatcherChangeTypes.Renamed);
                 }
@@ -697,7 +697,7 @@ namespace optiSCAN.Services
             {
                 if (!_isEnabled || IsSuspended)
                     return false;
-                if (!_recentlyScanned.TryGetValue(filePath, out var latest) || latest != eventTime)
+                if (IsSupersededEvent(filePath, eventTime))
                     return false;
                 if (!File.Exists(filePath))
                     return false;
@@ -958,9 +958,31 @@ namespace optiSCAN.Services
 
             foreach (var threat in result.Threats)
             {
-                if (threat.FilePath.StartsWith(stagedPath, StringComparison.OrdinalIgnoreCase))
+                if (IsStagedPathOrMember(threat.FilePath, stagedPath))
                     threat.FilePath = originalPath + threat.FilePath[stagedPath.Length..];
             }
+        }
+
+        /// <summary>
+        /// Vrai si un événement plus récent a repris ce chemin : seul le dernier l'analyse.
+        /// Une entrée absente (purge des entrées de plus de 5 min pendant une longue attente du
+        /// sémaphore, ou retrait des plus anciennes à saturation) ne veut pas dire « remplacé » :
+        /// le fichier était alors abandonné sans analyse ni trace.
+        /// </summary>
+        private bool IsSupersededEvent(string filePath, DateTime eventTime)
+            => _recentlyScanned.TryGetValue(filePath, out var latest) && latest != eventTime;
+
+        /// <summary>
+        /// Chemin de la copie elle-même ou d'un de ses membres (<c>copie!membre</c>, sous-chemin,
+        /// flux <c>:ads</c>). Un simple préfixe (« f.zip » devant « f.zip.bak ») ne suffit pas.
+        /// </summary>
+        internal static bool IsStagedPathOrMember(string threatPath, string stagedPath)
+        {
+            if (!threatPath.StartsWith(stagedPath, StringComparison.OrdinalIgnoreCase))
+                return false;
+            if (threatPath.Length == stagedPath.Length)
+                return true;
+            return threatPath[stagedPath.Length] is '!' or '\\' or '/' or ':';
         }
 
         private void CleanupRecentCache()

@@ -41,6 +41,25 @@ public sealed class ShellScanArgumentsTests
 
 public sealed class ShellScanRequestTests
 {
+    // Sélection multiple dans l'Explorateur : un processus, donc une demande, par élément.
+    // Avec un fichier unique, chaque demande écrasait la précédente.
+    [Fact]
+    public void Several_published_paths_are_all_consumed_in_order()
+    {
+        var a = Path.Combine(Path.GetTempPath(), "optiscan_multi_a_" + Guid.NewGuid().ToString("N"));
+        var b = Path.Combine(Path.GetTempPath(), "optiscan_multi_b_" + Guid.NewGuid().ToString("N"));
+        var c = Path.Combine(Path.GetTempPath(), "optiscan_multi_c_" + Guid.NewGuid().ToString("N"));
+        Assert.Empty(ShellScanRequest.TryConsumeAll());
+
+        ShellScanRequest.Publish(a);
+        ShellScanRequest.Publish(b);
+        ShellScanRequest.Publish(c);
+        ShellScanRequest.Publish(b);
+
+        Assert.Equal(new[] { a, b, c }, ShellScanRequest.TryConsumeAll());
+        Assert.Empty(ShellScanRequest.TryConsumeAll());
+    }
+
     [Fact]
     public void Publish_then_TryConsume_roundtrip()
     {

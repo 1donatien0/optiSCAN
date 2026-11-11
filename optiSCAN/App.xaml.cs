@@ -93,9 +93,14 @@ namespace optiSCAN
             LocalizationService.ShutdownRequested = () => Current?.Shutdown();
             LocalizationService.Initialize();
 
+            // Une interface déjà ouverte reçoit la demande telle quelle : l'élévation ici ne
+            // servait à rien (l'instance élevée trouvait le mutex pris et transmettait le chemin à
+            // l'interface non élevée, après une invite UAC inutile, voire dans le profil d'un
+            // autre compte administrateur où la demande se perdait).
             if (ShellScanArguments.TryGetScanPath(e.Args, out var shellPath)
                 && ElevationHelper.NeedsElevation(shellPath)
-                && !ElevationHelper.IsRunningElevated())
+                && !ElevationHelper.IsRunningElevated()
+                && !IsInterfaceInstanceRunning())
             {
                 if (ElevationHelper.RelaunchElevated(ShellScanArguments.Scan, shellPath))
                 {
@@ -272,6 +277,23 @@ namespace optiSCAN
             var mainWindow = new MainWindow();
             MainWindow = mainWindow;
             mainWindow.Show();
+        }
+
+        /// <summary>Vrai si une interface optiSCAN tient déjà le mutex d'instance de la session.</summary>
+        private static bool IsInterfaceInstanceRunning()
+        {
+            try
+            {
+                if (!Mutex.TryOpenExisting(MutexName, out var existing))
+                    return false;
+                existing.Dispose();
+                return true;
+            }
+            catch (UnauthorizedAccessException)
+            {
+                // Mutex créé par une instance élevée : il existe bien.
+                return true;
+            }
         }
 
         // ── Gestion globale des exceptions non gérées ────────────────────────────

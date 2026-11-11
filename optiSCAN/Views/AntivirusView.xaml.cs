@@ -222,7 +222,8 @@ namespace optiSCAN.Views
             if (!lastScan.HasValue)
                 return Localization.LocalizationService.GetString("Av_LastScanNone");
 
-            var diff = DateTime.Now - lastScan.Value;
+            // En UTC : un écart calculé en heure locale sautait d'une heure au changement d'heure.
+            var diff = DateTime.UtcNow - lastScan.Value.ToUniversalTime();
             if (diff.TotalMinutes < 1)
                 return Localization.LocalizationService.GetString("Av_LastScanInstant");
             if (diff.TotalMinutes < 60)
