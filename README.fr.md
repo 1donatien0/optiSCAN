@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://sourceforge.net/projects/optiscan/files/optiSCAN_Setup_v3.0.0.exe/download"><img src="https://img.shields.io/badge/T%C3%A9l%C3%A9charger-v3.0.0%20pour%20Windows-2ea44f?style=for-the-badge&logo=windows" alt="Télécharger optiSCAN pour Windows"></a>
+  <a href="https://sourceforge.net/projects/optiscan/files/optiSCAN_Setup_v3.1.0.exe/download"><img src="https://img.shields.io/badge/T%C3%A9l%C3%A9charger-v3.1.0%20pour%20Windows-2ea44f?style=for-the-badge&logo=windows" alt="Télécharger optiSCAN pour Windows"></a>
 </p>
 
 <p align="center">
@@ -71,13 +71,13 @@ optiSCAN est conçu pour **fonctionner à côté de Windows Defender**, pas pour
 
 ## Télécharger et installer
 
-1. Téléchargez **[optiSCAN_Setup_v3.0.0.exe](https://sourceforge.net/projects/optiscan/files/optiSCAN_Setup_v3.0.0.exe/download)** (environ **66 Mo**) sur SourceForge. Le runtime .NET 10 est dans l'installateur ; les bases de signatures ClamAV et YARA ne le sont pas — elles se téléchargent après l'installation.
+1. Téléchargez **[optiSCAN_Setup_v3.1.0.exe](https://sourceforge.net/projects/optiscan/files/optiSCAN_Setup_v3.1.0.exe/download)** sur SourceForge. Le runtime .NET 10 est dans l'installateur ; les bases de signatures ClamAV et YARA ne le sont pas — elles se téléchargent après l'installation.
 2. Lancez l'installateur. Il prend le français ou l'anglais de Windows. Si Windows n'est ni l'un ni l'autre, choisissez.
 3. Ouvrez optiSCAN, allez dans **Antivirus → Signatures** et cliquez sur **Mettre à jour** pour télécharger les signatures ClamAV et les règles YARA.
 
 **Prérequis :** Windows 10 version 1809 ou plus récente, ou Windows 11, en 64 bits.
 
-> **Avertissement Windows SmartScreen.** Cet installateur 3.0.0 n'est pas signé : Windows peut afficher « Windows a protégé votre ordinateur ». Cliquez sur **Informations complémentaires → Exécuter quand même**. Les binaires signés sont prévus pour la 3.1 avec la [SignPath Foundation](https://signpath.org/) ; voir la [politique de signature](docs/CODE_SIGNING_POLICY.md).
+> **Avertissement Windows SmartScreen.** Cet installateur 3.1.0 n'est pas signé : Windows peut afficher « Windows a protégé votre ordinateur ». Cliquez sur **Informations complémentaires → Exécuter quand même**. La signature du code est prévue pour une version ultérieure, quand le projet sera plus visible.
 
 ## Documentation
 

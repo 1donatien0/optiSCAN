@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://sourceforge.net/projects/optiscan/files/optiSCAN_Setup_v3.0.0.exe/download"><img src="https://img.shields.io/badge/Download-v3.0.0%20for%20Windows-2ea44f?style=for-the-badge&logo=windows" alt="Download optiSCAN for Windows"></a>
+  <a href="https://sourceforge.net/projects/optiscan/files/optiSCAN_Setup_v3.1.0.exe/download"><img src="https://img.shields.io/badge/Download-v3.1.0%20for%20Windows-2ea44f?style=for-the-badge&logo=windows" alt="Download optiSCAN for Windows"></a>
 </p>
 
 <p align="center">
@@ -73,13 +73,13 @@ optiSCAN is designed to **work alongside Windows Defender**, not to replace it.
 
 ## Download and install
 
-1. Download **[optiSCAN_Setup_v3.0.0.exe](https://sourceforge.net/projects/optiscan/files/optiSCAN_Setup_v3.0.0.exe/download)** (about **66 MB**) from SourceForge. The .NET 10 runtime is inside the installer; ClamAV and YARA signature databases are not — they download after install.
+1. Download **[optiSCAN_Setup_v3.1.0.exe](https://sourceforge.net/projects/optiscan/files/optiSCAN_Setup_v3.1.0.exe/download)** from SourceForge. The .NET 10 runtime is inside the installer; ClamAV and YARA signature databases are not — they download after install.
 2. Run the installer. It uses French or English from Windows. If Windows is neither, pick one.
 3. Open optiSCAN, go to **Antivirus → Signatures** and click **Update** to download the ClamAV signatures and YARA rules.
 
 **Requirements:** Windows 10 version 1809 or later, or Windows 11, 64-bit.
 
-> **Windows SmartScreen warning.** This 3.0.0 installer is not code-signed, so Windows may show "Windows protected your PC". Click **More info → Run anyway**. Signed binaries are planned for 3.1 with [SignPath Foundation](https://signpath.org/); see the [code signing policy](docs/CODE_SIGNING_POLICY.md).
+> **Windows SmartScreen warning.** This 3.1.0 installer is not code-signed, so Windows may show "Windows protected your PC". Click **More info → Run anyway**. Code signing is planned for a later release, once the project has wider public visibility.
 
 ## How it works
 
@@ -92,7 +92,7 @@ optiSCAN.Service.exe (optional Windows service, SYSTEM)
     └── optiSCAN.Host.exe — real-time protection, USB scans
 ```
 
-The engines run in a sandbox (AppContainer) without network access. AMSI script scanning is not in 3.0.0; it is planned for 3.1 with the signed service. The full technical guide, in French, covers the architecture, security model, build and release process: **[docs/GUIDE.md](docs/GUIDE.md)**.
+The engines run in a sandbox (AppContainer) without network access. Version 3.1.0 adds AMSI script scanning with the protection service. The full technical guide, in French, covers the architecture, security model, build and release process: **[docs/GUIDE.md](docs/GUIDE.md)**.
 
 ## Build from source
 
@@ -108,7 +108,7 @@ You need Windows 10 or 11 x64 and the .NET 10 SDK. Building the installer also n
 
 ## Roadmap
 
-Version **3.0.0** is the current public installer. Version **3.1** waits on code signing (SignPath): AMSI with the protection service, and signed binaries. See the [release plan](RELEASE_PLAN_v3.1.md) and the [roadmap](ROADMAP.md).
+Version **3.1.0** is the current public installer, published unsigned on SourceForge. Version **3.2** is the next candidate; code signing waits until the project has wider public visibility. See the [3.2 release plan](RELEASE_PLAN_v3.2.md) and the [roadmap](ROADMAP.md).
 
 ## Contributing and support
 

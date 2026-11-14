@@ -1,6 +1,8 @@
 # Plan de release — optiSCAN v3.1
 
-**État au 15 octobre 2026 (soir) :** candidate en préparation, assembly `3.1.0`. L'[audit 360](AUDIT_optiSCAN_360.md) note la candidate **7,6/10** (8,0 hors distribution ; 6,8 le matin) et maintient le refus d'une diffusion publique. **Seuil de publication fixé à 8,0/10.** Il sera atteint avec les contrôles en machine jetable, la signature SignPath et le premier passage CodeQL C/C++ ([section 2 de l'audit](AUDIT_optiSCAN_360.md#2-notation)). Cette version n'est pas publiée et aucun tag `v3.1.0` n'est créé.
+**Décision du 13 novembre 2026.** La 3.1.0 est la version publique, publiée **non signée** sur SourceForge (`optiSCAN_Setup_v3.1.0.exe`). La candidature SignPath Foundation du 15 octobre a été refusée le 13 novembre : le motif est le manque de visibilité publique (étoiles, forks, articles, discussions), pas un défaut du produit. La signature Authenticode n'est donc plus une porte de cette release. Elle devient l'objet de la [candidate 3.2](RELEASE_PLAN_v3.2.md), après que la 3.1 aura circulé. Les contrôles encore ouverts (machine jetable, CodeQL C/C++) restent des limites connues de cette publication, pas des bloquants.
+
+**État au 15 octobre 2026 (soir), avant cette décision :** candidate en préparation, assembly `3.1.0`. L'[audit 360](AUDIT_optiSCAN_360.md) notait la candidate **7,6/10** et refusait alors une diffusion publique tant que la signature et CodeQL n'étaient pas faits. Cette barre est levée pour la 3.1 seulement.
 
 Ce document ne décrit que les critères de la candidate v3.1. Il s'appuie sur l'[audit 360](AUDIT_optiSCAN_360.md) et son journal archivé, en particulier le [traitement des constats E, M et F](docs/archive/AUDIT_optiSCAN_360_journal_2026-10.md#4-constats-e-m-et-f) et les [réserves ouvertes et conditions de clôture](AUDIT_optiSCAN_360.md#5-registre-des-risques-ouverts). La projection produit qui commence après cette release est dans [`ROADMAP.md`](ROADMAP.md).
 

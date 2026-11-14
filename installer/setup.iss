@@ -6,7 +6,7 @@
 
 #define AppName        "optiSCAN"
 #ifndef AppVersion
-#define AppVersion     "3.1.0-beta.1"
+#define AppVersion     "3.1.0"
 #endif
 ; VersionInfo* n'accepte que des chiffres : on retire le suffixe de pré-version (-beta.1).
 #define AppNumericVersion Copy(AppVersion, 1, Pos("-", AppVersion + "-") - 1)

@@ -1,175 +1,177 @@
-# optiSCAN 3.1 — antivirus libre pour Windows
+# optiSCAN 3.1 — free antivirus for Windows
 
-**optiSCAN** est un antivirus libre pour Windows 10 et 11 (x64). Il associe le moteur **ClamAV** et les règles **YARA**, avec :
+**optiSCAN** is a free antivirus for Windows 10 and 11 (x64). It combines the **ClamAV** engine and **YARA** rules with:
 
-- une protection en temps réel ;
-- un service Windows de protection ;
-- l'analyse des scripts avant exécution (AMSI) ;
-- une quarantaine chiffrée.
+- real-time protection;
+- a Windows protection service;
+- script scanning before execution (AMSI);
+- an encrypted quarantine.
 
-Il complète Microsoft Defender sans le remplacer.
+It works alongside Microsoft Defender. It does not replace it.
 
-**optiSCAN est un logiciel libre** distribué sous la **GNU General Public License, version 3 ou toute version ultérieure** (`GPL-3.0-or-later`). Vous pouvez l'utiliser, l'étudier, le modifier et le redistribuer selon les termes de cette licence.
+**optiSCAN is free software**, released under the **GNU General Public License, version 3 or any later version** (`GPL-3.0-or-later`). You may use, study, modify, and redistribute it under the terms of that license.
 
-> *In English — optiSCAN is a free (GPL-3.0-or-later) antivirus for Windows 10/11 x64. It combines ClamAV and YARA with real-time protection, a SYSTEM protection service, AMSI script scanning and an encrypted quarantine, and works alongside Microsoft Defender. The interface is available in French and English. See [Licence](#licence) and [Code source](#code-source) below.*
+> *En français — optiSCAN est un antivirus libre (GPL-3.0-or-later) pour Windows 10/11 x64. Il associe ClamAV et YARA, une protection en temps réel, un service de protection, l'analyse AMSI des scripts et une quarantaine chiffrée. Il complète Microsoft Defender. L'interface est en français et en anglais. Voir [Licence](#license) et [Code source](#source-code) ci-dessous.*
 
 ---
 
-## Fonctionnalités
+## Features
 
-**Analyse**
-- Analyse rapide, complète, d'un dossier ou d'un fichier, et clic droit « Scanner avec optiSCAN » dans l'Explorateur.
-- ClamAV et YARA tournent en parallèle, et leurs résultats sont fusionnés avec un score de risque par menace.
-- Analyse quotidienne planifiée. Une analyse manquée pendant la veille est lancée au réveil.
+**Scanning**
+- Quick, full, folder, and file scans, plus "Scan with optiSCAN" in the File Explorer right-click menu.
+- ClamAV and YARA run in parallel. Their results are merged, with a risk score for each threat.
+- A daily scan is scheduled. A scan missed while the computer was asleep starts when it wakes.
 
 **Protection**
-- **Temps réel** : les fichiers à risque sont analysés dès leur écriture, y compris un exécutable déguisé sous une autre extension.
-- **Démarrage des processus** : un programme est examiné juste après son lancement, avec les fichiers que lui passent les hôtes de scripts, `rundll32` et `regsvr32`.
-- **Clés USB et cartes SD** : analyse automatique à l'insertion.
-- **AMSI** : les scripts PowerShell, JavaScript, VBScript et les macros Office sont analysés avant exécution.
-- **Service Windows `optiSCANProtection`** : il protège la machine même sans session ouverte. Les moteurs y tournent dans un bac à sable Windows (AppContainer), sans accès au réseau.
+- **Real time:** risky files are scanned as soon as they are written, including an executable disguised with another extension.
+- **Process start:** a program is examined just after it launches, along with the files passed to it by script hosts, `rundll32`, and `regsvr32`.
+- **USB drives and SD cards:** scanned automatically when inserted.
+- **AMSI:** PowerShell, JavaScript, VBScript, and Office macros are scanned before they run.
+- **Windows service `optiSCANProtection`:** the computer stays protected even when nobody is signed in. The engines run in a Windows sandbox (AppContainer), with no network access.
 
-**Gestion des menaces**
-- Quarantaine chiffrée (AES-256-GCM), avec restauration et suppression.
-- Historique unifié des analyses, détections et nettoyages, exportable en **HTML** et **PDF**.
-- Mise à jour automatique des signatures ClamAV (toutes les 4 h) et des règles YARA-Forge (toutes les 24 h).
+**Threat handling**
+- Encrypted quarantine (AES-256-GCM), with restore and delete.
+- One history of scans, detections, and cleanups, exportable as **HTML** and **PDF**.
+- Automatic updates of ClamAV signatures (every 4 hours) and YARA-Forge rules (every 24 hours).
 
-**Outils**
-- **Note de sécurité du PC sur 100**, avec liens « Corriger » : pare-feu, UAC, Windows Update, partages, protection.
-- **Optimiser** :
-  - nettoyage des fichiers temporaires, des caches de navigateurs et de la corbeille ;
-  - mise à jour des applications via `winget` ;
-  - réglages de Windows (performances, confidentialité, interface), réversibles.
+**Tools**
+- **PC security score out of 100**, with "Fix" links: firewall, UAC, Windows Update, shares, protection.
+- **Optimize:**
+  - cleanup of temporary files, browser caches, and the Recycle Bin;
+  - application updates through `winget`;
+  - reversible Windows settings (performance, privacy, interface).
 
 **Interface**
-- Français et anglais.
-- Thèmes clair, sombre et contraste renforcé.
-- Notifications Windows.
+- French and English.
+- Light, dark, and high-contrast themes.
+- Windows notifications.
 
-## Limites à connaître
+## Limits to know
 
-- optiSCAN **n'installe pas de pilote noyau**. La surveillance des fichiers agit juste après l'écriture, pas avant. Un pilote minifiltre est étudié pour une version ultérieure.
-- AMSI est **non bloquant en cas de panne** : si le service ne répond pas, le script s'exécute.
-- Le **contenu des archives RAR n'est pas analysé** : le module UnRAR de ClamAV n'est pas livré, car sa licence n'est pas libre. Les archives ZIP, 7z, CAB et les autres formats restent analysés.
-- Un logiciel malveillant qui a déjà les droits administrateur peut neutraliser un antivirus local, quel qu'il soit.
-- Gardez **Microsoft Defender actif** : optiSCAN est conçu pour fonctionner à ses côtés.
+- optiSCAN **does not install a kernel driver**. File monitoring happens just after a write, not before it. A minifilter driver is being studied for a later version.
+- AMSI **fails open**: if the service does not answer, the script runs.
+- **RAR archive contents are not scanned.** ClamAV's UnRAR module is not shipped, because its license is not free. ZIP, 7z, CAB, and other archive formats are still scanned.
+- Malware that already has administrator rights can disable a local antivirus, whichever product it is.
+- Keep **Microsoft Defender turned on.** optiSCAN is built to run next to it.
 
-## Configuration requise
+## Requirements
 
-- Windows 10 version 1809 ou ultérieure, ou Windows 11, en **64 bits (x64)**.
-- Droits administrateur pour l'installation et le service de protection.
-- Une connexion Internet pour télécharger les signatures après l'installation (environ 300 Mo pour ClamAV).
-- Rien d'autre à installer : le runtime .NET 10 est inclus.
+- Windows 10 version 1809 or later, or Windows 11, **64-bit (x64)**.
+- Administrator rights for installation and for the protection service.
+- An Internet connection to download signatures after installation (about 300 MB for ClamAV).
+- Nothing else to install: the .NET 10 runtime is included.
 
 ## Installation
 
-1. Téléchargez `optiSCAN_Setup_v3.1.0.exe` depuis l'onglet **Files**.
-2. Lancez-le et choisissez la langue et les options : service de protection (recommandé), mises à jour automatiques des signatures, lancement au démarrage, icône sur le Bureau.
-3. Au premier lancement, laissez optiSCAN télécharger les signatures ClamAV et les règles YARA.
+1. Download `optiSCAN_Setup_v3.1.0.exe` from the **Files** tab.
+2. Run it and choose the language and options: protection service (recommended), automatic signature updates, launch at startup, Desktop icon.
+3. On first launch, let optiSCAN download the ClamAV signatures and the YARA rules.
 
-La désinstallation se fait dans **Paramètres Windows > Applications**. Elle retire le service, le fournisseur AMSI et, s'ils ont été activés, la tâche planifiée et les exclusions Defender ajoutées par optiSCAN.
+Uninstall from **Windows Settings > Apps**. Uninstall removes the service, the AMSI provider, and, if they were enabled, the scheduled task and the Defender exclusions added by optiSCAN.
 
-### Signature du code
+### Code signing
 
-Les versions signées d'optiSCAN le sont par la **SignPath Foundation**. Les binaires sont compilés par GitHub Actions à partir du code source public, puis signés après approbation manuelle. Les règles sont décrites dans la [politique de signature](https://github.com/1donatien0/optiSCAN/blob/main/docs/CODE_SIGNING_POLICY.md).
+The **3.1.0 installer is not code-signed**. Windows may show "Windows protected your PC": click **More info → Run anyway**. Compare the SHA-256 of the file you downloaded with this value:
 
-> Free code signing provided by [SignPath.io](https://about.signpath.io/), certificate by [SignPath Foundation](https://signpath.org/).
+`D192B386B1FF6A668A973EBCB98F4E704DB7D3A104D45F087E09E62F00D16270`
 
-Un fichier non signé (pré-version, compilation personnelle) déclenche l'avertissement SmartScreen de Windows. Vérifiez alors son empreinte SHA-256 avec celle publiée dans la release.
+The source code for this version is tag `v3.1.0` of the public repository: <https://github.com/1donatien0/optiSCAN>.
 
-## Confidentialité
+## Privacy
 
-optiSCAN **n'envoie aucune télémétrie**. Il ne se connecte qu'aux services suivants :
+optiSCAN **sends no telemetry**. It connects only to the following services:
 
-- les serveurs officiels de ClamAV, pour les signatures (aucune donnée locale envoyée) ;
-- GitHub, pour les règles YARA-Forge d'une publication épinglée (aucune donnée locale envoyée) ;
-- **VirusTotal, seulement si vous saisissez votre propre clé API** (désactivé par défaut). Dans ce cas, seule l'empreinte SHA-256 du fichier est envoyée, jamais le fichier.
+- the official ClamAV servers, for signatures (no local data is sent);
+- GitHub, for the YARA-Forge rules of a pinned release (no local data is sent);
+- **VirusTotal, only if you enter your own API key** (off by default). In that case only the file's SHA-256 is sent, never the file itself.
 
-Détail : [politique de confidentialité](https://github.com/1donatien0/optiSCAN/blob/main/docs/POLITIQUE_CONFIDENTIALITE.md).
+Details: [privacy policy](https://github.com/1donatien0/optiSCAN/blob/main/docs/POLITIQUE_CONFIDENTIALITE.md).
 
-## Code source
+## Source code
 
-Le code source complet d'optiSCAN se trouve sur **GitHub : <https://github.com/1donatien0/optiSCAN>**. Il comprend l'application, le service, le fournisseur AMSI en C++, l'installeur Inno Setup et les scripts de compilation et de publication. Chaque version publiée correspond à un tag `vX.Y.Z`, et une archive des sources est jointe à chaque release.
+The complete source code of optiSCAN is on **GitHub: <https://github.com/1donatien0/optiSCAN>**. It includes the application, the service, the C++ AMSI provider, the Inno Setup installer, and the build and release scripts. Each published version matches a `vX.Y.Z` tag, and a source archive is attached to each release.
 
-Pour compiler :
+To build:
 
 ```powershell
-# Prérequis : SDK .NET 10, Visual Studio avec « Développement Desktop en C++ », Inno Setup 6
+# Requirements: .NET 10 SDK, Visual Studio with "Desktop development with C++", Inno Setup 6
 git clone https://github.com/1donatien0/optiSCAN.git
 cd optiSCAN
-.\scripts\fetch-runtime-deps.ps1      # ClamAV et YARA, vérifiés par SHA-256 et signature GPG
+.\scripts\fetch-runtime-deps.ps1      # ClamAV and YARA, checked by SHA-256 and GPG signature
 dotnet test optiSCAN.sln -c Release
-.\scripts\publish-release.ps1         # publication + installeur
+.\scripts\publish-release.ps1         # publish + installer
 ```
 
-## Licence
+## License
 
 ```
-optiSCAN — antivirus libre pour Windows
+optiSCAN — free antivirus for Windows
 Copyright (C) 2026 Dona By (Donatien Byakombe)
 
-Ce programme est un logiciel libre : vous pouvez le redistribuer et/ou le modifier
-selon les termes de la GNU General Public License telle que publiée par la
-Free Software Foundation, soit la version 3 de la licence, soit (à votre choix)
-toute version ultérieure.
+This program is free software: you can redistribute it and/or modify
+it under the terms of the GNU General Public License as published by
+the Free Software Foundation, either version 3 of the License, or
+(at your option) any later version.
 
-Ce programme est distribué dans l'espoir qu'il sera utile, mais SANS AUCUNE
-GARANTIE, sans même la garantie implicite de QUALITÉ MARCHANDE ou d'ADÉQUATION
-À UN USAGE PARTICULIER. Voir la GNU General Public License pour plus de détails.
+This program is distributed in the hope that it will be useful,
+but WITHOUT ANY WARRANTY; without even the implied warranty of
+MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the
+GNU General Public License for more details.
 
-Vous devez avoir reçu une copie de la GNU General Public License avec ce
-programme (fichier LICENSE.txt). Sinon, voir <https://www.gnu.org/licenses/>.
+You should have received a copy of the GNU General Public License
+along with this program (file LICENSE.txt). If not, see
+<https://www.gnu.org/licenses/>.
 ```
 
-Le texte intégral de la licence est livré avec le logiciel (`LICENSE.txt`) et s'affiche pendant l'installation.
+The full license text is shipped with the software (`LICENSE.txt`) and is shown during installation.
 
-### Composants tiers
+### Third-party components
 
-optiSCAN livre des composants libres qui gardent chacun leur propre licence. Leurs textes sont installés dans les dossiers `licenses\` et `clamav\x64\licenses\`.
+optiSCAN ships free components that each keep their own license. Their texts are installed in the `licenses\` and `clamav\x64\licenses\` folders.
 
-| Composant | Licence |
+| Component | License |
 |---|---|
 | ClamAV 1.4.6 (`clamscan`, `clamd`, `freshclam`) | GNU GPL v2 |
-| OpenSSL, libcurl, zlib, bzip2, PCRE2, libxml2 et autres bibliothèques de ClamAV | Licences libres respectives |
+| OpenSSL, libcurl, zlib, bzip2, PCRE2, libxml2, and the other ClamAV libraries | Their respective free licenses |
 | YARA 4.5.5 | BSD-3-Clause |
-| Runtime .NET 10, WPF | MIT |
+| .NET 10 runtime, WPF | MIT |
 | MaterialDesignThemes, PDFsharp/MigraDoc 6.2.4, Microsoft.Toolkit.Uwp.Notifications | MIT |
 
-Les signatures ClamAV et les règles YARA-Forge sont téléchargées après l'installation et relèvent des conditions de leurs auteurs. Le code source de ClamAV est publié par Cisco-Talos : <https://github.com/Cisco-Talos/clamav>.
+ClamAV signatures and YARA-Forge rules are downloaded after installation and remain under their authors' terms. ClamAV source code is published by Cisco-Talos: <https://github.com/Cisco-Talos/clamav>.
 
-Liste complète : [THIRD-PARTY-NOTICES.md](https://github.com/1donatien0/optiSCAN/blob/main/installer/licenses/THIRD-PARTY-NOTICES.md).
+Full list: [THIRD-PARTY-NOTICES.md](https://github.com/1donatien0/optiSCAN/blob/main/installer/licenses/THIRD-PARTY-NOTICES.md).
 
-## Nouveautés de la version 3.1
+## What is new in 3.1
 
-**Licence**
-- optiSCAN devient un **logiciel libre sous GPL-3.0-or-later** et remplace l'ancien CLUF.
-- Les versions 1.0.0, 2.0.0 et 3.0.0 de l'onglet **Files** sont republiées sous la même licence : seule la licence affichée à l'installation change.
-- Tous les fichiers sources portent un en-tête `SPDX-License-Identifier`.
-- Le générateur PDF QuestPDF, dont la licence n'est pas libre, est remplacé par PDFsharp/MigraDoc (MIT).
+**License**
+- optiSCAN is now **free software under GPL-3.0-or-later**, replacing the old end-user license.
+- Versions 1.0.0, 2.0.0, and 3.0.0 on the **Files** tab are republished under the same license: only the license shown at installation changes.
+- Every source file carries an `SPDX-License-Identifier` header.
+- The QuestPDF generator, whose license is not free, is replaced by PDFsharp/MigraDoc (MIT).
 
 **Protection**
-- **Fournisseur AMSI** livré avec le service : les scripts sont analysés avant exécution.
-- **Moteur séparé de l'interface** : le service lance un hôte dédié (`optiSCAN.Host.exe`), sans WPF.
-- **Moteurs confinés** : sous SYSTEM, `clamd`, `clamscan`, `yara` et `yarac` tournent dans un AppContainer, sans réseau ni processus enfant.
-- Le service de protection est coché à la première installation. Ses détections apparaissent dans l'historique et les notifications.
+- An **AMSI provider** ships with the service: scripts are scanned before they run.
+- **The engine is separate from the interface:** the service starts a dedicated host (`optiSCAN.Host.exe`), without WPF.
+- **Confined engines:** under SYSTEM, `clamd`, `clamscan`, `yara`, and `yarac` run in an AppContainer, with no network and no child processes.
+- The protection service is selected on a first installation. Its detections appear in the history and in notifications.
 
-**Détection**
-- Couverture élargie : exécutables reconnus quelle que soit leur extension, `%APPDATA%` et dossier Public dans l'analyse rapide, corbeilles des clés USB, sept nouveaux hôtes de scripts surveillés.
+**Detection**
+- Wider coverage: executables are recognized whatever their extension; `%APPDATA%` and the Public folder are part of the quick scan; USB Recycle Bins are scanned; seven additional script hosts are watched.
 
 **Distribution**
-- Chaîne de signature SignPath Foundation, et moteurs ClamAV et YARA épinglés et vérifiés.
+- ClamAV and YARA are pinned and verified. This 3.1.0 installer is not code-signed. A signing setup is kept in the public repository for a later release.
 
-**Qualité**
-- 771 tests automatisés, et un audit indépendant suivi dans le dépôt.
+**Quality**
+- 771 automated tests, and an independent audit tracked in the repository.
 
-Historique complet : [README du dépôt](https://github.com/1donatien0/optiSCAN#11-historique-des-versions-produit).
+Full history: [repository README](https://github.com/1donatien0/optiSCAN).
 
-## Signaler un problème
+## Report a problem
 
-- **Bogues et suggestions** : onglet *Tickets* ou *Discussion* de cette page, ou *Issues* sur GitHub.
-- **Vulnérabilités** : ne les publiez pas. Écrivez en privé à l'auteur via sa [page SourceForge](https://sourceforge.net/u/donaby) (voir [SECURITY.md](https://github.com/1donatien0/optiSCAN/blob/main/SECURITY.md)).
-- **Faux positif** : utilisez la quarantaine plutôt que la suppression. Vous pourrez restaurer le fichier et l'exclure dans *Options*.
+- **Bugs and suggestions:** the *Tickets* or *Discussion* tab on this page, or *Issues* on GitHub.
+- **Vulnerabilities:** do not post them publicly. Write privately to the author through his [SourceForge page](https://sourceforge.net/u/donaby) (see [SECURITY.md](https://github.com/1donatien0/optiSCAN/blob/main/SECURITY.md)).
+- **False positive:** quarantine the file instead of deleting it. You can restore it and exclude it under *Options*.
 
 ---
 
-Développé par **Dona By (Donatien Byakombe)**, 2026, avec le système de design Donaby Design.
+Developed by **Dona By (Donatien Byakombe)**, 2026, with the Donaby Design system.
