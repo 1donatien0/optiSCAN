@@ -26,7 +26,7 @@
     <PackageReference Include="PDFsharp-MigraDoc" Version="6.2.4" />
     <!-- PDFsharp 6.2.4 dépend de System.Security.Cryptography.Pkcs 8.0.1 (GHSA-846f-f764-76mx) : version corrigée imposée. -->
     <PackageReference Include="System.Security.Cryptography.Pkcs" Version="10.0.13" />
-    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.13" />
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="11.0.0" />
     <PackageReference Include="System.Management" Version="10.0.13" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.13" />
     <PackageReference Include="System.ServiceProcess.ServiceController" Version="10.0.13" />
