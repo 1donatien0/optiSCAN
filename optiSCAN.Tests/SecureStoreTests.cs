@@ -72,4 +72,77 @@ public sealed class SecureStoreTests
             try { File.Delete(path); } catch { /* best effort */ }
         }
     }
+
+    [Fact]
+    public void TrySave_returns_false_when_new_key_cannot_be_persisted()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "optiscan_ut_keyfail_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var keyPath = Path.Combine(dir, "hmac.key");
+        var dataPath = Path.Combine(dir, "prefs.dat");
+        SecureStore.HmacKeyPathOverrideForTests = keyPath;
+        SecureStore.PersistNewKeyForTests = (_, _) => throw new IOException("écriture de clé simulée");
+        try
+        {
+            Assert.False(SecureStore.TrySave(dataPath, new TestDto { Value = "ne-pas-ecrire", N = 1 }));
+            Assert.False(File.Exists(dataPath));
+            Assert.False(File.Exists(keyPath));
+        }
+        finally
+        {
+            SecureStore.PersistNewKeyForTests = null;
+            SecureStore.HmacKeyPathOverrideForTests = null;
+            try { Directory.Delete(dir, recursive: true); } catch { /* best effort */ }
+        }
+    }
+
+    [Fact]
+    public void Save_reports_failure_when_new_key_cannot_be_persisted()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "optiscan_ut_savefail_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        SecureStore.HmacKeyPathOverrideForTests = Path.Combine(dir, "hmac.key");
+        SecureStore.PersistNewKeyForTests = (_, _) => throw new IOException("écriture de clé simulée");
+        try
+        {
+            Assert.False(SecureStore.Save(Path.Combine(dir, "prefs.dat"), new TestDto { Value = "x", N = 1 }));
+
+            SecureStore.PersistNewKeyForTests = null;
+            Assert.True(SecureStore.Save(Path.Combine(dir, "prefs.dat"), new TestDto { Value = "x", N = 1 }));
+        }
+        finally
+        {
+            SecureStore.PersistNewKeyForTests = null;
+            SecureStore.HmacKeyPathOverrideForTests = null;
+            try { Directory.Delete(dir, recursive: true); } catch { /* best effort */ }
+        }
+    }
+
+    [Fact]
+    public void Save_Load_still_works_after_a_failed_key_persist()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "optiscan_ut_keyok_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var keyPath = Path.Combine(dir, "hmac.key");
+        var dataPath = Path.Combine(dir, "prefs.dat");
+        SecureStore.HmacKeyPathOverrideForTests = keyPath;
+        try
+        {
+            SecureStore.PersistNewKeyForTests = (_, _) => throw new IOException("écriture de clé simulée");
+            Assert.False(SecureStore.TrySave(dataPath, new TestDto { Value = "rate", N = 0 }));
+
+            SecureStore.PersistNewKeyForTests = null;
+            Assert.True(SecureStore.TrySave(dataPath, new TestDto { Value = "ok", N = 7 }));
+            var loaded = SecureStore.Load<TestDto>(dataPath);
+            Assert.NotNull(loaded);
+            Assert.Equal("ok", loaded.Value);
+            Assert.Equal(7, loaded.N);
+        }
+        finally
+        {
+            SecureStore.PersistNewKeyForTests = null;
+            SecureStore.HmacKeyPathOverrideForTests = null;
+            try { Directory.Delete(dir, recursive: true); } catch { /* best effort */ }
+        }
+    }
 }

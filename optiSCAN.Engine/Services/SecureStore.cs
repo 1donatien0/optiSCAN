@@ -23,9 +23,32 @@ namespace optiSCAN.Services
     public static class SecureStore
     {
 
-        private static string HmacKeyPath => Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "optiSCAN", ".securestore_hmac.key");
+        private static readonly System.Threading.AsyncLocal<string?> HmacKeyPathForTests = new();
+        private static readonly System.Threading.AsyncLocal<Action<string, byte[]>?> PersistKeyForTests = new();
+
+        /// <summary>
+        /// Chemin de clé pour un test. À remettre à null dans un finally : la valeur ne doit
+        /// pas rester pour un autre test du même fil.
+        /// </summary>
+        internal static string? HmacKeyPathOverrideForTests
+        {
+            get => HmacKeyPathForTests.Value;
+            set => HmacKeyPathForTests.Value = value;
+        }
+
+        /// <summary>
+        /// Remplace l'écriture de la clé HMAC. Lever simule un échec DPAPI ou disque.
+        /// </summary>
+        internal static Action<string, byte[]>? PersistNewKeyForTests
+        {
+            get => PersistKeyForTests.Value;
+            set => PersistKeyForTests.Value = value;
+        }
+
+        private static string HmacKeyPath =>
+            HmacKeyPathForTests.Value ?? Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+                "optiSCAN", ".securestore_hmac.key");
 
         /// <summary>
         /// Charge un objet T depuis un fichier sécurisé. Retourne default(T)
@@ -83,9 +106,10 @@ namespace optiSCAN.Services
         }
 
         /// <summary>
-        /// Sauvegarde un objet T dans un fichier sécurisé (DPAPI + HMAC).
+        /// Sauvegarde un objet T dans un fichier sécurisé (DPAPI + HMAC). Ne lève pas :
+        /// rend faux si l'écriture a échoué (cause déjà journalisée).
         /// </summary>
-        public static void Save<T>(string path, T value) where T : class => TrySave(path, value);
+        public static bool Save<T>(string path, T value) where T : class => TrySave(path, value);
 
         /// <summary>Comme <see cref="Save{T}"/>, mais rend faux si l'écriture a échoué.</summary>
         public static bool TrySave<T>(string path, T value) where T : class
@@ -223,15 +247,21 @@ namespace optiSCAN.Services
                 var dir = Path.GetDirectoryName(HmacKeyPath);
                 if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
                     Directory.CreateDirectory(dir);
-                AtomicFile.WriteAllBytes(HmacKeyPath, enc);
+                var persist = PersistKeyForTests.Value;
+                if (persist != null)
+                    persist(HmacKeyPath, enc);
+                else
+                    AtomicFile.WriteAllBytes(HmacKeyPath, enc);
                 try { File.SetAttributes(HmacKeyPath, FileAttributes.Hidden | FileAttributes.System); }
                 catch (Exception ignored) when (!ignored.IsFatal()) { /* best effort */ }
+                return key;
             }
             catch (Exception ex) when (!ex.IsFatal())
             {
+                CryptographicOperations.ZeroMemory(key);
                 AppLogger.Error("SecureStore", "Persistance clé HMAC DPAPI", ex);
+                throw;
             }
-            return key;
         }
 
         private class Envelope

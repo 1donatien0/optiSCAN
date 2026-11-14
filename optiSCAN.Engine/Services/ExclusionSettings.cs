@@ -134,18 +134,20 @@ namespace optiSCAN.Services
         public static bool IsMandatoryExcludedFolder(string? folderPath)
             => OptiscanProtectedPaths.IsMandatoryExcludedFolder(folderPath);
 
-        public void Save()
+        /// <summary>Rend faux si les réglages n'ont pas pu être écrits.</summary>
+        public bool Save()
         {
             lock (_saveLock)
             {
                 try
                 {
                     Directory.CreateDirectory(Path.GetDirectoryName(SettingsPath)!);
-                    SecureStore.Save(SettingsPath, this);
+                    return SecureStore.Save(SettingsPath, this);
                 }
                 catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Warn("ExclusionSettings", "Save", ex);
+                    return false;
                 }
             }
         }

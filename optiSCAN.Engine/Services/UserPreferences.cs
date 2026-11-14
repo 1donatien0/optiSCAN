@@ -181,8 +181,11 @@ namespace optiSCAN.Services
             Save();
         }
 
-        /// <summary>Sauvegarde les préférences (DPAPI + HMAC, atomique, thread-safe).</summary>
-        public void Save()
+        /// <summary>
+        /// Sauvegarde les préférences (DPAPI + HMAC, atomique, thread-safe).
+        /// Rend faux si elles n'ont pas pu être écrites.
+        /// </summary>
+        public bool Save()
         {
             lock (_saveLock)
             {
@@ -192,11 +195,12 @@ namespace optiSCAN.Services
                     if (!Directory.Exists(dir))
                         Directory.CreateDirectory(dir);
 
-                    SecureStore.Save(FilePath, this);
+                    return SecureStore.Save(FilePath, this);
                 }
                 catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Warn("UserPreferences", "Save", ex);
+                    return false;
                 }
             }
         }
@@ -249,7 +253,7 @@ namespace optiSCAN.Services
         }
 
         /// <summary>Sauvegarde vers un chemin explicite (tests).</summary>
-        internal static void SaveToStorage(string securePath, UserPreferences prefs)
+        internal static bool SaveToStorage(string securePath, UserPreferences prefs)
         {
             lock (_saveLock)
             {
@@ -258,11 +262,12 @@ namespace optiSCAN.Services
                     var dir = Path.GetDirectoryName(securePath)!;
                     if (!Directory.Exists(dir))
                         Directory.CreateDirectory(dir);
-                    SecureStore.Save(securePath, prefs);
+                    return SecureStore.Save(securePath, prefs);
                 }
                 catch (Exception ex) when (!ex.IsFatal())
                 {
                     AppLogger.Warn("UserPreferences", "SaveToStorage", ex);
+                    return false;
                 }
             }
         }
