@@ -4,8 +4,8 @@
 #include <winres.h>
 
 VS_VERSION_INFO VERSIONINFO
- FILEVERSION 3,1,0,0
- PRODUCTVERSION 3,1,0,0
+ FILEVERSION 3,2,0,0
+ PRODUCTVERSION 3,2,0,0
  FILEFLAGSMASK 0x3fL
  FILEFLAGS 0x0L
  FILEOS VOS_NT_WINDOWS32
@@ -18,12 +18,12 @@ BEGIN
         BEGIN
             VALUE "CompanyName", "Dona By"
             VALUE "FileDescription", "optiSCAN AMSI Provider"
-            VALUE "FileVersion", "3.1.0.0"
+            VALUE "FileVersion", "3.2.0.0"
             VALUE "InternalName", "optiSCAN.AmsiProvider"
             VALUE "LegalCopyright", "Copyright 2026 Dona By. Licence GPL-3.0-or-later."
             VALUE "OriginalFilename", "optiSCAN.AmsiProvider.dll"
             VALUE "ProductName", "optiSCAN"
-            VALUE "ProductVersion", "3.1.0"
+            VALUE "ProductVersion", "3.2.0"
         END
     END
     BLOCK "VarFileInfo"
