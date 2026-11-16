@@ -48,6 +48,7 @@ namespace optiSCAN.Services
 
         // ── État ─────────────────────────────────────────────────────────────────
         private readonly byte[] _masterKey;     // 32 octets (déchiffrés en RAM)
+        private readonly Action<string, byte[]>? _persistNewKey;
         private QuarantineDocument _doc;
         private readonly object _lock = new();
         private ActivityLogService? _activityLog;
@@ -57,15 +58,43 @@ namespace optiSCAN.Services
         // ── Construction ─────────────────────────────────────────────────────────
 
         public QuarantineManager(string? quarantineDir = null, IUserPreferencesAccessor? preferences = null)
+            : this(quarantineDir, preferences, persistNewKey: null)
         {
+        }
+
+        /// <summary>
+        /// <paramref name="persistNewKey"/> remplace l'écriture de la clé maîtresse dans les tests.
+        /// Lever simule un échec DPAPI ou disque : la quarantaine démarre indisponible
+        /// (<see cref="IsAvailable"/> faux) sans empêcher le reste du service de démarrer.
+        /// </summary>
+        internal QuarantineManager(
+            string? quarantineDir,
+            IUserPreferencesAccessor? preferences,
+            Action<string, byte[]>? persistNewKey)
+        {
+            _persistNewKey = persistNewKey;
             _prefs = preferences ?? new DefaultUserPreferencesAccessor();
             _quarantineDir = quarantineDir ?? DefaultDirectory();
 
             _manifestPath = Path.Combine(_quarantineDir, "manifest.json");
             _keyPath = Path.Combine(_quarantineDir, ".key");
 
-            EnsureDirectoryExists(_quarantineDir);
-            _masterKey = LoadOrCreateMasterKey();
+            try
+            {
+                EnsureDirectoryExists(_quarantineDir);
+                _masterKey = LoadOrCreateMasterKey();
+            }
+            catch (Exception ex) when (!ex.IsFatal())
+            {
+                // Une clé non enregistrée ne doit chiffrer aucun fichier : il serait perdu au
+                // prochain démarrage. Rien n'est mis en quarantaine tant que la clé n'est pas sûre.
+                AppLogger.Error("QuarantineManager", "Quarantaine indisponible : clé maîtresse non enregistrée", ex);
+                _masterKey = Array.Empty<byte>();
+                _doc = new QuarantineDocument();
+                IsAvailable = false;
+                return;
+            }
+
             _doc = LoadManifest();
             if (_resignLegacyManifest)
             {
@@ -127,6 +156,12 @@ namespace optiSCAN.Services
                 }
             }
         }
+
+        /// <summary>
+        /// Faux si la clé maîtresse n'a pas pu être chargée ni enregistrée : aucune mise en
+        /// quarantaine n'est alors possible pour cette session, et la liste est vide.
+        /// </summary>
+        public bool IsAvailable { get; } = true;
 
         public void BindActivityLog(ActivityLogService activityLog) => _activityLog = activityLog;
 
@@ -196,7 +231,10 @@ namespace optiSCAN.Services
             try
             {
                 var encrypted = ProtectedData.Protect(key, optionalEntropy: null, DataProtectionScope.CurrentUser);
-                AtomicFile.WriteAllBytes(_keyPath, encrypted);
+                if (_persistNewKey != null)
+                    _persistNewKey(_keyPath, encrypted);
+                else
+                    AtomicFile.WriteAllBytes(_keyPath, encrypted);
 
                 // Sur Windows, on tente de marquer le fichier comme caché + system
                 // pour éviter la curiosité utilisateur (best effort).
@@ -205,8 +243,11 @@ namespace optiSCAN.Services
             }
             catch (Exception ex) when (!ex.IsFatal())
             {
+                CryptographicOperations.ZeroMemory(key);
                 AppLogger.Error("QuarantineManager", "Persistance clé maîtresse échouée", ex);
+                throw;
             }
+
             return key;
         }
 
@@ -218,6 +259,12 @@ namespace optiSCAN.Services
 
         public bool Quarantine(ThreatInfo threat, Guid sourceSessionId = default, string? expectedSha256 = null)
         {
+            if (!IsAvailable)
+            {
+                AppLogger.Warn("QuarantineManager", $"Quarantaine indisponible, fichier laissé en place : {threat.FilePath}");
+                return false;
+            }
+
             SafePathDelete.QuarantineHandle? source = null;
             var committed = false;
             try

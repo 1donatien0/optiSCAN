@@ -46,6 +46,76 @@ public sealed class QuarantineManagerTests
     }
 
     [Fact]
+    public void Quarantine_is_unavailable_when_new_master_key_cannot_be_persisted()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "optiscan_ut_qkey_" + Guid.NewGuid().ToString("N"));
+        var qDir = Path.Combine(root, "quarantine");
+        var sample = Path.Combine(root, "sample.bin");
+        Directory.CreateDirectory(root);
+        try
+        {
+            File.WriteAllBytes(sample, new byte[] { 1, 2, 3 });
+            using var qm = new QuarantineManager(
+                qDir, preferences: null, persistNewKey: (_, _) => throw new IOException("écriture de clé simulée"));
+
+            Assert.False(qm.IsAvailable);
+            Assert.False(File.Exists(Path.Combine(qDir, ".key")));
+            Assert.False(qm.Quarantine(new ThreatInfo
+            {
+                FilePath = sample,
+                VirusName = "UnitTest",
+                FileSize = 3,
+                DetectedAt = DateTime.UtcNow,
+            }));
+            Assert.True(File.Exists(sample));
+            Assert.Empty(Directory.GetFiles(qDir, "*.quar"));
+            Assert.Empty(qm.GetEntries());
+            Assert.Equal(0, qm.PurgeAll());
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { /* best effort */ }
+        }
+    }
+
+    [Fact]
+    public void Existing_quarantine_stays_readable_when_a_later_key_write_would_fail()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "optiscan_ut_qkeep_" + Guid.NewGuid().ToString("N"));
+        var qDir = Path.Combine(root, "quarantine");
+        var sample = Path.Combine(root, "sample.bin");
+        Directory.CreateDirectory(root);
+        try
+        {
+            var payload = new byte[] { 9, 8, 7 };
+            File.WriteAllBytes(sample, payload);
+            var qm = new QuarantineManager(qDir);
+            Assert.True(qm.Quarantine(new ThreatInfo
+            {
+                FilePath = sample,
+                VirusName = "UnitTest",
+                FileSize = payload.Length,
+                DetectedAt = DateTime.UtcNow,
+            }));
+            qm.Dispose();
+
+            var reloaded = new QuarantineManager(
+                qDir,
+                preferences: null,
+                persistNewKey: (_, _) => throw new IOException("écriture de clé simulée"));
+            var entries = reloaded.GetEntries();
+            Assert.Single(entries);
+            Assert.True(reloaded.Restore(entries[0].Id));
+            Assert.Equal(payload, File.ReadAllBytes(sample));
+            reloaded.Dispose();
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { /* best effort */ }
+        }
+    }
+
+    [Fact]
     public void GetEntriesPaged_empty_returns_empty()
     {
         var root = Path.Combine(Path.GetTempPath(), "optiscan_ut_qp_" + Guid.NewGuid().ToString("N"));
