@@ -62,6 +62,10 @@ namespace optiSCAN.Services
         {
             if (!IsActionablePath(threat.FilePath))
                 return Complete(false, LocalizationService.GetString("Av_Action_InvalidPath"), isError: true);
+            if (!_quarantine.IsAvailable)
+                return Complete(false,
+                    LocalizationService.Format("Av_Action_QuarantineUnavailable", Path.GetFileName(threat.FilePath)),
+                    isError: true);
 
             var existing = _quarantine.GetEntries().FirstOrDefault(e =>
                 string.Equals(e.OriginalPath, threat.FilePath, StringComparison.OrdinalIgnoreCase));

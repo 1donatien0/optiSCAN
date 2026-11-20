@@ -298,6 +298,8 @@ namespace optiSCAN.ViewModels
         {
             get
             {
+                if (!_quarantine.IsAvailable)
+                    return LocalizationService.GetString("Vm_QuarantineUnavailable");
                 if (QuarantineTotalCount == 0)
                     return LocalizationService.GetString("Vm_QuarantineEmpty");
                 if (!QuarantineHasMore)

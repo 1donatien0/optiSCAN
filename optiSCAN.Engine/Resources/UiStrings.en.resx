@@ -721,6 +721,8 @@ Remove them? Files are not deleted, only the share is removed. Other devices wil
   <data name="YaraForge_VersionAvailable" xml:space="preserve"><value>Available version: {0}</value></data>
   <data name="YaraForge_IntegrityError" xml:space="preserve"><value>Downloaded package failed integrity verification (size or digest). Update cancelled.</value></data>
   <data name="Vm_QuarantineEmpty" xml:space="preserve"><value>No files in quarantine.</value></data>
+  <data name="Vm_QuarantineUnavailable" xml:space="preserve"><value>Quarantine unavailable (encryption key not saved) — restart optiSCAN.</value></data>
+  <data name="Vm_AutoQuarantineUnavailable" xml:space="preserve"><value>{0} — automatic quarantine not possible: quarantine unavailable.</value></data>
   <data name="Vm_QuarantineAllShown" xml:space="preserve"><value>All entries shown ({0:N0}).</value></data>
   <data name="Vm_QuarantinePartial" xml:space="preserve"><value>{0:N0} of {1:N0} shown — click Load more for the rest.</value></data>
   <data name="Vm_AutoQuarantineMsg" xml:space="preserve"><value>{0} — {1} file(s) automatically quarantined.</value></data>
@@ -778,6 +780,7 @@ Remove them? Files are not deleted, only the share is removed. Other devices wil
   <data name="Av_Action_DetectedDefault" xml:space="preserve"><value>Detected</value></data>
   <data name="Av_Action_QuarantineOk" xml:space="preserve"><value>File quarantined: {0}</value></data>
   <data name="Av_Action_QuarantineFail" xml:space="preserve"><value>Quarantine failed: {0}</value></data>
+  <data name="Av_Action_QuarantineUnavailable" xml:space="preserve"><value>Quarantine unavailable: {0} was not isolated.</value></data>
   <data name="Av_Action_AlreadyExcluded" xml:space="preserve"><value>Already excluded from scans: {0}</value></data>
   <data name="Av_Action_ExcludeFail" xml:space="preserve"><value>Could not exclude: {0}</value></data>
   <data name="Av_Action_ExcludedOk" xml:space="preserve"><value>File excluded from scans: {0}</value></data>

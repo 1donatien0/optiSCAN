@@ -721,6 +721,8 @@ Les supprimer ? Les fichiers ne sont pas effacés, seul le partage est retiré. 
   <data name="YaraForge_VersionAvailable" xml:space="preserve"><value>Version disponible : {0}</value></data>
   <data name="YaraForge_IntegrityError" xml:space="preserve"><value>Le paquet téléchargé n'a pas passé la vérification d'intégrité (taille ou empreinte). Mise à jour annulée.</value></data>
   <data name="Vm_QuarantineEmpty" xml:space="preserve"><value>Aucun fichier en quarantaine.</value></data>
+  <data name="Vm_QuarantineUnavailable" xml:space="preserve"><value>Quarantaine indisponible (clé de chiffrement non enregistrée) — redémarrez optiSCAN.</value></data>
+  <data name="Vm_AutoQuarantineUnavailable" xml:space="preserve"><value>{0} — quarantaine automatique impossible : quarantaine indisponible.</value></data>
   <data name="Vm_QuarantineAllShown" xml:space="preserve"><value>Toutes les entrées sont affichées ({0:N0}).</value></data>
   <data name="Vm_QuarantinePartial" xml:space="preserve"><value>{0:N0} sur {1:N0} affiché(s) — « Charger plus » pour la suite.</value></data>
   <data name="Vm_AutoQuarantineMsg" xml:space="preserve"><value>{0} — {1} fichier(s) mis en quarantaine automatiquement.</value></data>
@@ -778,6 +780,7 @@ Les supprimer ? Les fichiers ne sont pas effacés, seul le partage est retiré. 
   <data name="Av_Action_DetectedDefault" xml:space="preserve"><value>Détecté</value></data>
   <data name="Av_Action_QuarantineOk" xml:space="preserve"><value>Fichier mis en quarantaine : {0}</value></data>
   <data name="Av_Action_QuarantineFail" xml:space="preserve"><value>Échec quarantaine : {0}</value></data>
+  <data name="Av_Action_QuarantineUnavailable" xml:space="preserve"><value>Quarantaine indisponible : {0} n'a pas été isolé.</value></data>
   <data name="Av_Action_AlreadyExcluded" xml:space="preserve"><value>Déjà exclu des analyses : {0}</value></data>
   <data name="Av_Action_ExcludeFail" xml:space="preserve"><value>Impossible d'exclure : {0}</value></data>
   <data name="Av_Action_ExcludedOk" xml:space="preserve"><value>Fichier exclu des analyses : {0}</value></data>

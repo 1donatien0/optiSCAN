@@ -62,6 +62,32 @@ public sealed class AntivirusActionsTests
     }
 
     [Fact]
+    public void QuarantineThreat_reports_unavailable_quarantine_and_keeps_file()
+    {
+        var root = Path.Combine(Path.GetTempPath(), "optiscan_qunav_" + Guid.NewGuid().ToString("N"));
+        var sample = Path.Combine(root, "malware.bin");
+        Directory.CreateDirectory(root);
+        File.WriteAllBytes(sample, [0x4D, 0x5A]);
+        try
+        {
+            using var qm = new QuarantineManager(
+                Path.Combine(root, "quarantine"),
+                preferences: null,
+                persistNewKey: (_, _) => throw new IOException("écriture de clé simulée"));
+            var result = new AntivirusActions(qm).QuarantineThreat(sample);
+
+            Assert.False(result.Success);
+            Assert.True(result.IsError);
+            Assert.Contains("malware.bin", result.Message);
+            Assert.True(File.Exists(sample));
+        }
+        finally
+        {
+            try { Directory.Delete(root, recursive: true); } catch { /* best effort */ }
+        }
+    }
+
+    [Fact]
     public void QuarantineThreat_moves_file_to_quarantine_and_removes_original()
     {
         var root = Path.Combine(Path.GetTempPath(), "optiscan_qact_" + Guid.NewGuid().ToString("N"));

@@ -14,6 +14,11 @@ namespace optiSCAN.ViewModels
         private void QuarantineAllThreats()
         {
             if (Threats.Count == 0) return;
+            if (!_quarantine.IsAvailable)
+            {
+                StatusMessage = LocalizationService.GetString("Vm_QuarantineUnavailable");
+                return;
+            }
             if (!_confirm.ConfirmYesNo(
                     OptiscanStrings.Confirmations.QuarantineAll(Threats.Count),
                     OptiscanStrings.Confirmations.Title))

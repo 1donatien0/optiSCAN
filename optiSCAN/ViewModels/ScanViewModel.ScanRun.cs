@@ -104,9 +104,12 @@ namespace optiSCAN.ViewModels
                     _uiEvents.RequestScanHistoryViewsRefresh();
                 }
 
-                StatusMessage = autoQuarantined > 0
-                    ? LocalizationService.Format("Vm_AutoQuarantineMsg", result.SummaryDisplay, autoQuarantined)
-                    : result.SummaryDisplay;
+                if (autoQuarantined > 0)
+                    StatusMessage = LocalizationService.Format("Vm_AutoQuarantineMsg", result.SummaryDisplay, autoQuarantined);
+                else if (_exclusions.Current.AutoQuarantineEnabled && result.Threats.Count > 0 && !_quarantine.IsAvailable)
+                    StatusMessage = LocalizationService.Format("Vm_AutoQuarantineUnavailable", result.SummaryDisplay);
+                else
+                    StatusMessage = result.SummaryDisplay;
                 FilesScanned = result.FilesScanned;
                 ThreatsFound = result.Threats.Count;
 
