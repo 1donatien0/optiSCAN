@@ -1,6 +1,6 @@
 # Plan de release — optiSCAN v3.2
 
-**Ouverte le 13 novembre 2026.** La 3.2 est la candidate à la signature, pas une version à publier aujourd'hui. La 3.1.0 part sur SourceForge sans signature. Le numéro de version du dépôt reste `3.1.0` jusqu'au tag `v3.1.0` : la 3.2 ne commence dans `Directory.Build.props` qu'après ce tag.
+**Ouverte le 13 novembre 2026. Travail de code commencé le 14 novembre.** La 3.2 est la candidate à la signature. Le tag `v3.1.0` reste la version publique. `Directory.Build.props` porte `3.2.0` dans l'arbre de travail. On ne soumet à SignPath qu'une fois la piste ci-dessous vérifiée par les tests et les signes publics de la 3.1.0 réunis.
 
 ## Pourquoi la signature attend
 
@@ -8,11 +8,28 @@ La SignPath Foundation a refusé la candidature le 13 novembre 2026. Le motif, d
 
 Recandidater le jour du refus, avec un simple changement de numéro, n'ajoute aucun de ces signaux. La prochaine demande partira quand la 3.1.0 aura été téléchargée et que le dépôt montrera une activité visible (issues, discussions, étoiles). La chaîne technique reste en place : `.signpath/`, `.github/workflows/release.yml`, [politique de signature](docs/CODE_SIGNING_POLICY.md), [procédure](docs/SIGNATURE_PROCEDURE.md). Elle n'est pas retirée du dépôt.
 
+## Piste retenue — persistance des clés
+
+Audit statique du 14 novembre 2026, priorité **P2**. La correction est dans l'arbre de travail, pas encore publiée. Les notes d'origine restent sur le bureau : `Audit/Synthese-audit-optiSCAN.md` et `Audit/Pistes-corrections-optiSCAN.md`.
+
+`GetOrCreateDpapiHmacKeyMaterial` dans `optiSCAN.Engine/Services/SecureStore.cs` et `LoadOrCreateMasterKey` dans `optiSCAN.Engine/Services/QuarantineManager.cs` génèrent une clé, puis la retournent même si `ProtectedData.Protect` ou l'écriture du fichier échoue. L'échec est seulement journalisé. Une enveloppe de préférences ou un fichier de quarantaine peut alors être écrit avec une clé qui n'existe plus au redémarrage : `Load` refuse l'enveloppe, et la quarantaine de cette session ne se déchiffre plus.
+
+La correction, adaptée au filtre `when (!ex.IsFatal())` du projet :
+
+- ne pas retourner une clé neuve tant que son fichier DPAPI n'est pas écrit ;
+- `TrySave` du magasin sécurisé retourne `false` et n'écrit pas l'enveloppe ;
+- le gestionnaire de quarantaine ne démarre pas avec une clé seulement en mémoire ; la quarantaine est indisponible pour les nouvelles opérations ;
+- conserver le repli actuel qui met de côté une clé ou un manifeste illisibles ;
+- effacer la clé en mémoire si la persistance échoue.
+
+Vérifications avant de soumettre la 3.2 : échec d'écriture simulé sur chemins temporaires, sans provoquer une vraie panne disque. Après échec puis redémarrage, les données déjà lisibles le restent. Les sauvegardes normales et la migration du magasin en clair passent encore.
+
 ## Ce que la 3.2 devra montrer
 
 - Le tag `v3.1.0` et l'installeur `optiSCAN_Setup_v3.1.0.exe` publiés, avec leur empreinte SHA-256.
 - La page SourceForge de la 3.1 qui dit clairement que ce fichier n'est pas signé.
 - Des signes extérieurs accumulés depuis cette publication, cités dans la nouvelle demande.
+- La piste « persistance des clés » corrigée et couverte par les tests décrits ci-dessus.
 - Une 3.2 compilée par GitHub Actions, puis soumise à la signature seulement après une nouvelle acceptation.
 
 ## Visibilité
