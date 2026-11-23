@@ -27,7 +27,7 @@ namespace optiSCAN.Services
         {
             _prefs = preferences ?? new DefaultUserPreferencesAccessor();
             _exclusions = exclusions ?? new DefaultExclusionSettingsAccessor();
-            _exePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "optiSCAN.exe");
+            _exePath = Path.Combine(AppInstallPaths.ProcessBaseDirectory, "optiSCAN.exe");
         }
 
         public bool EnsureWatchdogTask()
@@ -127,7 +127,7 @@ namespace optiSCAN.Services
 
             try
             {
-                var exe = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "optiSCAN.exe");
+                var exe = Path.Combine(AppInstallPaths.ProcessBaseDirectory, "optiSCAN.exe");
                 var psi = new ProcessStartInfo
                 {
                     FileName = exe,

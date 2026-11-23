@@ -98,7 +98,7 @@ namespace optiSCAN.Localization
                 {
                     FileName = path,
                     UseShellExecute = true,
-                    WorkingDirectory = AppDomain.CurrentDomain.BaseDirectory,
+                    WorkingDirectory = AppInstallPaths.ProcessBaseDirectory,
                 });
             }
 

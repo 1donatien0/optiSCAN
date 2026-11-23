@@ -20,7 +20,7 @@ namespace optiSCAN.Services
 
         public ScheduledScanService()
         {
-            _exePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "optiSCAN.exe");
+            _exePath = Path.Combine(AppInstallPaths.ProcessBaseDirectory, "optiSCAN.exe");
         }
 
         /// <summary>

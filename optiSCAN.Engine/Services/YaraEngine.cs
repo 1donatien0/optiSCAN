@@ -53,7 +53,7 @@ namespace optiSCAN.Services
             IExclusionSettingsAccessor? exclusions = null)
         {
             _exclusions = exclusions ?? new DefaultExclusionSettingsAccessor();
-            var baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            var baseDir = AppInstallPaths.ProcessBaseDirectory;
             var arch = Environment.Is64BitProcess ? "64" : "32";
 
             var resolvedYaraDir = yaraDir ?? Path.Combine(baseDir, "yara");

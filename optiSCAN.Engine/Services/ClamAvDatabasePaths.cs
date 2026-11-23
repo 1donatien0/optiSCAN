@@ -32,14 +32,14 @@ namespace optiSCAN.Services
         /// </param>
         /// <param name="baseDir">
         /// Répertoire racine de recherche. <c>null</c> (valeur par défaut) utilise
-        /// <see cref="AppDomain.CurrentDomain.BaseDirectory"/> — comportement de production.
+        /// <see cref="AppInstallPaths.ProcessBaseDirectory"/> — comportement de production.
         /// Passer une valeur explicite en test pour isoler la logique de découverte.
         /// </param>
         public static string ResolveClamAvBinDir(
             string executableName = "clamscan.exe",
             string? baseDir = null)
         {
-            baseDir ??= AppDomain.CurrentDomain.BaseDirectory;
+            baseDir ??= AppInstallPaths.ProcessBaseDirectory;
             var arch = Environment.Is64BitProcess ? "x64" : "x86";
 
             var candidates = new[]

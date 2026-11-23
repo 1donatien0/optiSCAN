@@ -16,14 +16,27 @@ namespace optiSCAN.Services
         /// <summary>Racine normalisée sans slash final (Path.GetFullPath).</summary>
         public static string GetInstallRoot() => CachedRoot.Value;
 
+        /// <summary>
+        /// Répertoire de résolution des assemblies (publish, install, debug), séparateur final compris.
+        /// <see cref="AppContext.BaseDirectory"/>, puis le répertoire de l'AppDomain si le premier est vide.
+        /// </summary>
+        internal static string ProcessBaseDirectory
+        {
+            get
+            {
+                var baseDir = AppContext.BaseDirectory;
+                if (string.IsNullOrWhiteSpace(baseDir))
+                    baseDir = AppDomain.CurrentDomain.BaseDirectory;
+                return baseDir ?? string.Empty;
+            }
+        }
+
         /// <summary>Résolution directe sans cache (découverte des autres racines protégées).</summary>
         internal static string GetInstallRootUncached() => ResolveRoot();
 
         private static string ResolveRoot()
         {
-            var baseDir = AppContext.BaseDirectory;
-            if (string.IsNullOrWhiteSpace(baseDir))
-                baseDir = AppDomain.CurrentDomain.BaseDirectory;
+            var baseDir = ProcessBaseDirectory;
 
             try
             {

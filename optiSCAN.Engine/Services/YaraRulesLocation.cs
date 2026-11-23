@@ -12,7 +12,7 @@ internal static class YaraRulesLocation
         "rules");
 
     internal static string InstallDirectory =>
-        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "rules");
+        Path.Combine(AppInstallPaths.ProcessBaseDirectory, "rules");
 
     internal static string ResolveWritable(string? explicitDirectory = null)
     {

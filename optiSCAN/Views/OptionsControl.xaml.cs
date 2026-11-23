@@ -648,7 +648,7 @@ namespace optiSCAN.Views
 
         private static void OpenBundledDocument(string relativePath)
         {
-            var path = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, relativePath);
+            var path = Path.Combine(AppInstallPaths.ProcessBaseDirectory, relativePath);
             if (!File.Exists(path))
             {
                 System.Windows.MessageBox.Show(
