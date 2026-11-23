@@ -43,9 +43,8 @@ namespace optiSCAN.Services
 
         static YaraForgeUpdater()
         {
-            _http = new HttpClient();
+            _http = OptiscanHttp.CreateLongLived(TimeSpan.FromMinutes(10));
             _http.DefaultRequestHeaders.UserAgent.ParseAdd(ProductVersionInfo.HttpUserAgent);
-            _http.Timeout = TimeSpan.FromMinutes(10);
         }
 
         // ── Événements et état ────────────────────────────────────────────────────

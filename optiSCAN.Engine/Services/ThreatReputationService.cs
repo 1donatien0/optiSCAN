@@ -10,10 +10,7 @@ namespace optiSCAN.Services
     /// <summary>Consultation VirusTotal v3 (hash SHA-256) — clé API utilisateur.</summary>
     public sealed class ThreatReputationService : IThreatReputationService
     {
-        private static readonly HttpClient DefaultHttp = new()
-        {
-            Timeout = TimeSpan.FromSeconds(25),
-        };
+        private static readonly HttpClient DefaultHttp = OptiscanHttp.CreateLongLived(TimeSpan.FromSeconds(25));
 
         private static readonly ConcurrentDictionary<string, (ReputationResult Result, DateTime ExpiresUtc)> Cache = new();
         private static readonly TimeSpan CacheTtl = TimeSpan.FromHours(6);
