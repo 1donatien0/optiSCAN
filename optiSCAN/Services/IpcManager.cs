@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 using System.Diagnostics;
-using System.Runtime.InteropServices;
 using System.Windows;
 using System.Windows.Interop;
+using optiSCAN.Native;
 
 namespace optiSCAN.Services
 {
@@ -17,11 +17,11 @@ namespace optiSCAN.Services
         private const uint MsgfltAllow = 1;
 
         private static readonly Lazy<int> WmShowMeLazy = new(() =>
-            NativeMethods.RegisterWindowMessage(
+            UiNativeMethods.RegisterWindowMessage(
                 $"WM_SHOWME_OPTISCAN_{Process.GetCurrentProcess().SessionId}"));
 
         private static readonly Lazy<int> WmShellScanLazy = new(() =>
-            NativeMethods.RegisterWindowMessage(
+            UiNativeMethods.RegisterWindowMessage(
                 $"WM_SHELLSCAN_OPTISCAN_{Process.GetCurrentProcess().SessionId}"));
 
         public static int WM_SHOWME => WmShowMeLazy.Value;
@@ -33,13 +33,13 @@ namespace optiSCAN.Services
         /// </summary>
         public static void NotifyShowExistingInstance()
         {
-            NativeMethods.PostMessage((IntPtr)HWND_BROADCAST, WM_SHOWME, IntPtr.Zero, IntPtr.Zero);
+            UiNativeMethods.PostMessage((IntPtr)HWND_BROADCAST, WM_SHOWME, IntPtr.Zero, IntPtr.Zero);
         }
 
         /// <summary>Demande à l'instance principale de lancer un scan menu contextuel.</summary>
         public static void NotifyShellScanRequest()
         {
-            NativeMethods.PostMessage((IntPtr)HWND_BROADCAST, WM_SHELL_SCAN, IntPtr.Zero, IntPtr.Zero);
+            UiNativeMethods.PostMessage((IntPtr)HWND_BROADCAST, WM_SHELL_SCAN, IntPtr.Zero, IntPtr.Zero);
         }
 
         /// <summary>
@@ -62,7 +62,7 @@ namespace optiSCAN.Services
                     // Fenêtre élevée : Windows bloque par défaut les messages d'un processus moins
                     // élevé (seconde instance lancée normalement, menu contextuel). Ce message-là
                     // seul est autorisé, sans quoi la fenêtre ne se rouvrait pas.
-                    try { NativeMethods.ChangeWindowMessageFilterEx(src.Handle, messageId, MsgfltAllow, IntPtr.Zero); }
+                    try { UiNativeMethods.ChangeWindowMessageFilterEx(src.Handle, messageId, MsgfltAllow, IntPtr.Zero); }
                     catch (Exception ex) when (!ex.IsFatal()) { AppLogger.Debug("IpcManager", "Filtre de message : " + ex.Message); }
 
                     src.AddHook((IntPtr h, int m, IntPtr w, IntPtr l, ref bool handled) =>
@@ -78,17 +78,5 @@ namespace optiSCAN.Services
             };
         }
 
-        private static class NativeMethods
-        {
-            [DllImport("user32.dll")]
-            public static extern bool PostMessage(IntPtr hWnd, int msg, IntPtr wParam, IntPtr lParam);
-
-            [DllImport("user32.dll", CharSet = CharSet.Auto)]
-            public static extern int RegisterWindowMessage(string message);
-
-            [DllImport("user32.dll", SetLastError = true)]
-            [return: MarshalAs(UnmanagedType.Bool)]
-            public static extern bool ChangeWindowMessageFilterEx(IntPtr hwnd, int message, uint action, IntPtr changeFilterStruct);
-        }
     }
 }
