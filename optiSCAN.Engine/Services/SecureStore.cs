@@ -116,7 +116,7 @@ namespace optiSCAN.Services
         {
             try
             {
-                var json = JsonSerializer.Serialize(value, new JsonSerializerOptions { WriteIndented = false });
+                var json = JsonSerializer.Serialize(value);
 
                 var key = GetOrCreateDpapiHmacKeyMaterial();
                 string hmacB64;

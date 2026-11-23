@@ -54,6 +54,7 @@ namespace optiSCAN.Services
         private ActivityLogService? _activityLog;
         private readonly IUserPreferencesAccessor _prefs;
         private bool _resignLegacyManifest;
+        private static readonly JsonSerializerOptions ManifestJson = new() { WriteIndented = true };
 
         // ── Construction ─────────────────────────────────────────────────────────
 
@@ -1045,10 +1046,7 @@ namespace optiSCAN.Services
                 _doc.Version = 2;
                 _doc.Hmac = Convert.ToBase64String(ComputeHmac(_doc.Entries));
 
-                var json = JsonSerializer.Serialize(_doc, new JsonSerializerOptions
-                {
-                    WriteIndented = true,
-                });
+                var json = JsonSerializer.Serialize(_doc, ManifestJson);
                 AtomicFile.WriteAllText(_manifestPath, json);
                 return true;
             }
